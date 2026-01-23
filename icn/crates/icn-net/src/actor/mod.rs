@@ -6,6 +6,9 @@
 //! - Automatic connection establishment to discovered peers
 //! - Connection lifecycle management
 
+mod connection;
+mod messages;
+
 use anyhow::{Context, Result};
 #[cfg(test)]
 use icn_identity::KeyPair;
@@ -13,13 +16,10 @@ use icn_identity::{Did, IdentityBundle, PersonhoodStoreTrait};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{debug, info, instrument, warn};
+use tracing::{info, instrument, warn};
 
 use crate::{
-    handlers::ConnectionContext,
-    protocol::{
-        read_message, write_message, write_message_negotiated, MessagePayload, NetworkMessage,
-    },
+    protocol::NetworkMessage,
     rate_limit::{AnchorRateLimitConfig, RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
     topology::{NeighborSets, TopologyConfig, TopologyInfo},
@@ -1253,770 +1253,9 @@ impl NetworkActor {
         info!("Network actor stopped");
         Ok(())
     }
-
-    /// Handle a single message
-    async fn handle_message(&mut self, msg: NetworkMsg) {
-        match msg {
-            NetworkMsg::GetPeers(tx) => {
-                let peers = self.discovery.peers().await;
-                let _ = tx.send(peers);
-            }
-
-            NetworkMsg::Dial {
-                addr,
-                did,
-                response,
-            } => {
-                // Timeout for dial operation (30 seconds to allow for slow networks)
-                const DIAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-
-                let dial_future = async {
-                    self.session_manager
-                        .read()
-                        .await
-                        .dial(addr, did.as_str().to_string())
-                        .await
-                };
-
-                // Allow bind_instead_of_map: when post-quantum feature is enabled,
-                // the closure uses `?` which requires and_then, not map
-                #[allow(clippy::bind_instead_of_map)]
-                let result = tokio::time::timeout(DIAL_TIMEOUT, dial_future)
-                    .await
-                    .context("Timeout dialing peer")
-                    .and_then(|r| r)
-                    .and_then(|connection| {
-                        // Increment connection counter
-                        let stats = self.stats.clone();
-                        tokio::spawn(async move {
-                            stats.write().await.connections_total += 1;
-                        });
-
-                        // Track metrics
-                        icn_obs::metrics::network::connections_total_inc();
-
-                        // Spawn connection handler for outbound connection if handler is available
-                        if let Some(handler) = self.incoming_handler.clone() {
-                            let rate_limiter = self.rate_limiter.clone();
-                            let replay_guard = self.replay_guard.clone();
-                            let neighbor_sets = self.neighbor_sets.clone();
-                            let topology_config = self.topology_config.clone();
-                            let trust_graph = self.trust_graph.clone();
-                            let session_manager = self.session_manager.clone();
-                            let peer_connections = self.peer_connections.clone();
-                            let blob_registry = self.blob_registry.clone();
-                            let misbehavior_detector = self.misbehavior_detector.clone();
-                            let identity_bundle = self.identity_bundle.clone();
-                            let own_did = self.own_did.clone();
-
-                            tokio::spawn(async move {
-                                if let Err(e) = Self::handle_connection(
-                                    connection.clone(),
-                                    handler,
-                                    rate_limiter,
-                                    replay_guard,
-                                    neighbor_sets,
-                                    topology_config,
-                                    trust_graph,
-                                    session_manager,
-                                    peer_connections,
-                                    blob_registry,
-                                    misbehavior_detector,
-                                    identity_bundle,
-                                    own_did,
-                                )
-                                .await
-                                {
-                                    warn!("Outbound connection handler error: {}", e);
-                                }
-                            });
-                        }
-
-                        // Send Hello message with DID-TLS binding and X25519 public key
-                        let binding_info = self.identity_bundle.binding_info();
-                        let x25519_public = *self.identity_bundle.x25519_public_bytes();
-                        let version_info =
-                            crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
-                        let topology_info =
-                            self.topology_config.as_ref().map(|topo_cfg| TopologyInfo {
-                                region: topo_cfg.region.clone(),
-                                cluster_id: topo_cfg.cluster_id.clone(),
-                                role: topo_cfg.role,
-                            });
-
-                        // Build Hello message with PQ binding proof if available
-                        #[cfg(feature = "post-quantum")]
-                        let hello_msg = {
-                            let keypair = self
-                                .identity_bundle
-                                .keypair()
-                                .context("Failed to load keypair for PQ binding")?;
-                            let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
-                            let ml_kem = self
-                                .identity_bundle
-                                .kem_pq_public_bytes()
-                                .map(|b| b.to_vec());
-
-                            // Use hello_with_binding to include DID-PQ binding proof
-                            NetworkMessage::hello_with_binding(
-                                self.own_did.clone(),
-                                did.clone(),
-                                binding_info,
-                                version_info,
-                                topology_info,
-                                x25519_public,
-                                ml_dsa,
-                                ml_kem,
-                                &keypair,
-                            )
-                        };
-
-                        #[cfg(not(feature = "post-quantum"))]
-                        let hello_msg = NetworkMessage::hello(
-                            self.own_did.clone(),
-                            did.clone(),
-                            binding_info,
-                            version_info,
-                            topology_info,
-                            x25519_public,
-                            None,
-                            None,
-                        );
-
-                        let session_mgr = self.session_manager.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) =
-                                Self::send_handshake_internal(session_mgr, &did, hello_msg).await
-                            {
-                                warn!("Failed to send Hello to {}: {}", did, e);
-                            }
-                        });
-                        Ok(())
-                    });
-
-                let _ = response.send(result);
-            }
-
-            NetworkMsg::SendMessage {
-                did,
-                message,
-                response,
-            } => {
-                let result = self.send_message_to_peer(&did, message).await;
-                let _ = response.send(result);
-            }
-
-            NetworkMsg::Broadcast { message, response } => {
-                let result = self.broadcast_message(message).await;
-                let _ = response.send(result);
-            }
-
-            NetworkMsg::GetStats(tx) => {
-                // Calculate stats on-demand
-                let peers = self.discovery.peers().await;
-                let connections = self.session_manager.read().await.connections().await;
-                let total = self.stats.read().await.connections_total;
-
-                let stats = NetworkStats {
-                    peers_discovered: peers.len(),
-                    connections_active: connections.len(),
-                    connections_total: total,
-                };
-
-                // Update gauge metrics
-                icn_obs::metrics::network::peers_discovered_set(stats.peers_discovered as u64);
-                icn_obs::metrics::network::connections_active_set(stats.connections_active as u64);
-
-                let _ = tx.send(stats);
-            }
-        }
-    }
-
-    /// Send a message to a specific peer
-    #[instrument(skip(self, message), fields(peer_did = %did, message_type = message.payload.variant_name()))]
-    async fn send_message_to_peer(&self, did: &Did, message: NetworkMessage) -> Result<()> {
-        // Timeout for the entire send operation (10 seconds)
-        const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-
-        // Look up peer's negotiated capabilities for encoding selection
-        let (use_postcard, use_compression) = {
-            let connections = self.peer_connections.read().await;
-            connections
-                .get(did)
-                .map(|peer_info| peer_info.encoding_flags())
-                .unwrap_or((false, false)) // No peer info yet (pre-Hello) - use legacy encoding
-        };
-
-        let send_future = async {
-            // Get connection for this peer
-            let connections = self.session_manager.read().await.connections().await;
-            let connection = connections
-                .iter()
-                .find(|(peer_did, _)| peer_did == did.as_str())
-                .map(|(_, conn)| conn.clone())
-                .context("No connection to peer")?;
-
-            // Open a new stream (with timeout to prevent hanging on stream open)
-            let (mut send, _recv) =
-                tokio::time::timeout(std::time::Duration::from_secs(5), connection.open_bi())
-                    .await
-                    .context("Timeout opening stream to peer")?
-                    .context("Failed to open stream")?;
-
-            // Write message with negotiated encoding (with timeout to prevent hanging on slow writes)
-            tokio::time::timeout(
-                std::time::Duration::from_secs(5),
-                write_message_negotiated(&mut send, &message, use_postcard, use_compression),
-            )
-            .await
-            .context("Timeout writing message to peer")?
-            .context("Failed to write message")?;
-
-            send.finish().context("Failed to finish stream")?;
-
-            Ok::<(), anyhow::Error>(())
-        };
-
-        // Apply overall timeout to the entire operation
-        tokio::time::timeout(SEND_TIMEOUT, send_future)
-            .await
-            .context("Timeout sending message to peer")?
-            .context("Failed to send message")?;
-
-        // Track metrics
-        icn_obs::metrics::network::messages_sent_inc();
-
-        Ok(())
-    }
-
-    /// Broadcast a message to all connected peers
-    #[instrument(skip(self, message), fields(message_type = message.payload.variant_name()))]
-    async fn broadcast_message(&self, message: NetworkMessage) -> Result<()> {
-        // Timeout for each peer send operation (5 seconds)
-        const PEER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-
-        let connections = self.session_manager.read().await.connections().await;
-
-        // Get snapshot of peer capabilities for encoding selection
-        let peer_caps = self.peer_connections.read().await;
-
-        // Send to all connected peers
-        let mut sent_count = 0;
-        for (did_str, connection) in connections {
-            // Look up peer's negotiated capabilities for encoding selection
-            let (use_postcard, use_compression) = did_str
-                .parse::<Did>()
-                .ok()
-                .and_then(|did| peer_caps.get(&did))
-                .map(|peer_info| peer_info.encoding_flags())
-                .unwrap_or((false, false)); // No peer info or invalid DID - use legacy encoding
-
-            // Use timeout for each peer to prevent one slow peer from blocking broadcast
-            let send_result = tokio::time::timeout(PEER_TIMEOUT, async {
-                // Open a new stream and send the message with negotiated encoding
-                let (mut send, _recv) = connection.open_bi().await?;
-                write_message_negotiated(&mut send, &message, use_postcard, use_compression)
-                    .await?;
-                send.finish()?;
-                Ok::<(), anyhow::Error>(())
-            })
-            .await;
-
-            if send_result.is_ok() {
-                sent_count += 1;
-            } else {
-                // Log timeout or error but continue with other peers
-                warn!("Failed to broadcast to peer (timeout or error)");
-            }
-        }
-
-        // Track metrics (one increment per successful send)
-        for _ in 0..sent_count {
-            icn_obs::metrics::network::messages_sent_inc();
-        }
-
-        Ok(())
-    }
-
-    /// Handle incoming QUIC connections
-    #[allow(clippy::too_many_arguments)]
-    async fn handle_incoming_connections(
-        session_manager: Arc<RwLock<SessionManager>>,
-        handler: IncomingMessageHandler,
-        rate_limiter: Arc<RateLimiter>,
-        replay_guard: Arc<RwLock<ReplayGuard>>,
-        neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
-        topology_config: Option<TopologyConfig>,
-        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
-        blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
-        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
-        identity_bundle: IdentityBundle,
-        own_did: Did,
-        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
-    ) -> Result<()> {
-        info!("Starting incoming connection handler");
-
-        loop {
-            // Check for shutdown signal first (non-blocking)
-            match shutdown_rx.try_recv() {
-                Ok(_) | Err(tokio::sync::broadcast::error::TryRecvError::Closed) => {
-                    info!("Incoming connection handler received shutdown signal");
-                    break;
-                }
-                Err(tokio::sync::broadcast::error::TryRecvError::Empty)
-                | Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {
-                    // Continue to accept connections
-                }
-            }
-
-            // Accept with timeout to periodically check shutdown
-            let conn_result = {
-                let guard = session_manager.read().await;
-                tokio::time::timeout(tokio::time::Duration::from_millis(100), guard.accept())
-                    .await
-                    .ok() // Convert timeout error to None
-            };
-
-            if let Some(conn_result) = conn_result {
-                match conn_result {
-                    Ok(Some(connection)) => {
-                        // Spawn handler for this connection
-                        let handler_clone = handler.clone();
-                        let rate_limiter_clone = rate_limiter.clone();
-                        let replay_guard_clone = replay_guard.clone();
-                        let neighbor_sets_clone = neighbor_sets.clone();
-                        let topology_config_clone = topology_config.clone();
-                        let trust_graph_clone = trust_graph.clone();
-                        let session_mgr_clone = session_manager.clone();
-                        let peer_connections_clone = peer_connections.clone();
-                        let blob_registry_clone = blob_registry.clone();
-                        let misbehavior_detector_clone = misbehavior_detector.clone();
-                        let identity_bundle_clone = identity_bundle.clone();
-                        let own_did_clone = own_did.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = Self::handle_connection(
-                                connection,
-                                handler_clone,
-                                rate_limiter_clone,
-                                replay_guard_clone,
-                                neighbor_sets_clone,
-                                topology_config_clone,
-                                trust_graph_clone,
-                                session_mgr_clone,
-                                peer_connections_clone,
-                                blob_registry_clone,
-                                misbehavior_detector_clone,
-                                identity_bundle_clone,
-                                own_did_clone,
-                            )
-                            .await
-                            {
-                                warn!("Connection handler error: {}", e);
-                            }
-                        });
-                    }
-                    Ok(None) => {
-                        info!("Session manager shut down");
-                        break;
-                    }
-                    Err(e) => {
-                        warn!("Failed to accept connection: {}", e);
-                    }
-                }
-            }
-        }
-
-        info!("Incoming connection handler stopped");
-        Ok(())
-    }
-
-    /// Send handshake message to a peer
-    async fn send_handshake_internal(
-        session_manager: Arc<RwLock<SessionManager>>,
-        peer_did: &Did,
-        handshake_msg: NetworkMessage,
-    ) -> Result<()> {
-        let connections = session_manager.read().await.connections().await;
-        let connection = connections
-            .iter()
-            .find(|(did, _)| did == peer_did.as_str())
-            .map(|(_, conn)| conn.clone())
-            .context("No connection to peer")?;
-
-        let (mut send, _recv) = connection
-            .open_bi()
-            .await
-            .context("Failed to open stream")?;
-        write_message(&mut send, &handshake_msg).await?;
-        send.finish().context("Failed to finish stream")?;
-
-        info!("Sent handshake to {}", peer_did);
-        Ok(())
-    }
-
-    /// Handle a single QUIC connection (process all incoming streams)
-    #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all, fields(remote_addr = %connection.remote_address()))]
-    async fn handle_connection(
-        connection: quinn::Connection,
-        handler: IncomingMessageHandler,
-        rate_limiter: Arc<RateLimiter>,
-        replay_guard: Arc<RwLock<ReplayGuard>>,
-        neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
-        topology_config: Option<TopologyConfig>,
-        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        session_manager: Arc<RwLock<SessionManager>>,
-        peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
-        blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
-        misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
-        identity_bundle: IdentityBundle,
-        own_did: Did,
-    ) -> Result<()> {
-        info!("Handling connection from {}", connection.remote_address());
-
-        // Create connection context for handlers (clone shared state)
-        let ctx = ConnectionContext::new(
-            handler.clone(),
-            rate_limiter.clone(),
-            replay_guard.clone(),
-            neighbor_sets.clone(),
-            topology_config.clone(),
-            trust_graph.clone(),
-            session_manager.clone(),
-            peer_connections.clone(),
-            blob_registry.clone(),
-            misbehavior_detector.clone(),
-            identity_bundle.clone(),
-            own_did.clone(),
-        );
-
-        loop {
-            // Accept incoming bidirectional stream
-            match connection.accept_bi().await {
-                Ok((mut send, mut recv)) => {
-                    // Read network message
-                    match read_message(&mut recv).await {
-                        Ok((message, bytes_read)) => {
-                            // Track bandwidth contribution (aggregate, no per-DID tracking)
-                            icn_obs::metrics::contribution::total_bandwidth_bytes_add(
-                                bytes_read as u64,
-                            );
-
-                            // Check rate limit BEFORE processing message
-                            // Uses dual-path rate limiting: per-DID and per-anchor (if Sybil resistance enabled)
-                            let (did_allowed, anchor_allowed) = rate_limiter
-                                .check_rate_limit_with_personhood(&message.from)
-                                .await;
-
-                            if !did_allowed {
-                                warn!(
-                                    "Rate limited message from {} (per-DID limit exceeded)",
-                                    message.from
-                                );
-
-                                // Track rate limiting metric
-                                icn_obs::metrics::network::messages_rate_limited_inc();
-
-                                // Close stream before continuing to avoid resource leak
-                                if let Err(e) = send.finish() {
-                                    tracing::debug!("Stream finish error during rate limit: {}", e);
-                                }
-
-                                // Drop the message (don't call handler)
-                                continue;
-                            }
-
-                            if !anchor_allowed {
-                                warn!(
-                                    "Rate limited message from {} (per-person limit exceeded - Sybil mitigation)",
-                                    message.from
-                                );
-
-                                // Track Sybil-specific rate limiting metric
-                                icn_obs::metrics::network::messages_rate_limited_by_anchor_inc();
-
-                                // Close stream before continuing to avoid resource leak
-                                if let Err(e) = send.finish() {
-                                    tracing::debug!("Stream finish error during rate limit: {}", e);
-                                }
-
-                                // Drop the message (don't call handler)
-                                continue;
-                            }
-
-                            info!(
-                                peer_did = %message.from,
-                                protocol = ?message.payload.variant_name(),
-                                "Received network message"
-                            );
-
-                            // Track metrics
-                            icn_obs::metrics::network::messages_received_inc();
-
-                            // Dispatch to handlers
-                            match &message.payload {
-                                MessagePayload::Hello {
-                                    binding_info,
-                                    version_info,
-                                    topology_info,
-                                    x25519_public,
-                                    ml_dsa_public,
-                                    ml_kem_public,
-                                    pq_binding_proof,
-                                } => {
-                                    ctx.handle_hello(
-                                        &connection,
-                                        &message.from,
-                                        binding_info,
-                                        version_info,
-                                        topology_info,
-                                        x25519_public,
-                                        ml_dsa_public.clone(),
-                                        ml_kem_public.clone(),
-                                        pq_binding_proof.clone(),
-                                    )
-                                    .await?;
-                                }
-                                MessagePayload::Handshake {
-                                    region,
-                                    cluster_id,
-                                    role,
-                                } => {
-                                    ctx.handle_handshake(
-                                        &connection,
-                                        &message.from,
-                                        region,
-                                        cluster_id,
-                                        role,
-                                    )
-                                    .await;
-                                }
-                                MessagePayload::HandshakeAck => {
-                                    ctx.handle_handshake_ack(&message.from);
-                                }
-                                MessagePayload::Ping { sent_at } => {
-                                    ctx.handle_ping(
-                                        &connection,
-                                        message.clone(),
-                                        &message.from,
-                                        *sent_at,
-                                    )
-                                    .await;
-                                }
-                                MessagePayload::Pong {
-                                    ping_sent_at,
-                                    pong_sent_at,
-                                } => {
-                                    ctx.handle_pong(&message.from, *ping_sent_at, *pong_sent_at)
-                                        .await;
-                                }
-                                MessagePayload::Gossip(ref gossip_msg) => {
-                                    // Extract BlobAnnounce from gossip messages for data locality tracking
-                                    if let icn_gossip::types::GossipMessage::BlobAnnounce {
-                                        blob_hash,
-                                        peer_did,
-                                        size_bytes,
-                                    } = gossip_msg
-                                    {
-                                        debug!(
-                                            peer_did = %peer_did,
-                                            blob_hash_len = blob_hash.len(),
-                                            size_bytes = size_bytes,
-                                            "Received blob announcement via gossip"
-                                        );
-
-                                        // Update blob location registry
-                                        if let Some(ref registry) = blob_registry {
-                                            if let Err(e) = registry.write().await.announce_blob(
-                                                *blob_hash,
-                                                peer_did.clone(),
-                                                *size_bytes,
-                                            ) {
-                                                debug!(
-                                                    error = %e,
-                                                    peer_did = %peer_did,
-                                                    blob_size = size_bytes,
-                                                    "Rejected blob announcement from peer"
-                                                );
-                                            }
-                                        }
-                                    }
-
-                                    // Forward gossip message to external handler
-                                    handler(message);
-                                }
-                                MessagePayload::Signed(ref envelope) => {
-                                    ctx.handle_signed(message.clone(), envelope).await;
-                                }
-                                MessagePayload::PeerExchange(ref peer_msg) => {
-                                    ctx.handle_peer_exchange(
-                                        &connection,
-                                        message.clone(),
-                                        &message.from,
-                                        peer_msg,
-                                    )
-                                    .await;
-                                }
-                                MessagePayload::Onion(ref onion_msg) => {
-                                    ctx.handle_onion(onion_msg).await;
-                                }
-                                _ => {
-                                    // Forward other messages to the external handler
-                                    handler(message);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            let err_msg = e.to_string();
-
-                            // Track protocol version mismatches
-                            if err_msg.contains("too old") {
-                                warn!("Protocol version too old: {}", err_msg);
-                                icn_obs::metrics::network::protocol_version_too_old_inc();
-                                icn_obs::metrics::network::protocol_version_mismatch_inc();
-                            } else if err_msg.contains("too new") {
-                                warn!("Protocol version too new: {}", err_msg);
-                                icn_obs::metrics::network::protocol_version_too_new_inc();
-                                icn_obs::metrics::network::protocol_version_mismatch_inc();
-                            } else {
-                                warn!("Failed to read message: {}", e);
-                            }
-                        }
-                    }
-
-                    // Close the stream
-                    if let Err(e) = send.finish() {
-                        tracing::debug!("Stream finish error (normal during disconnect): {}", e);
-                    }
-                }
-                Err(quinn::ConnectionError::ApplicationClosed(_)) => {
-                    info!("Connection closed by peer");
-                    break;
-                }
-                Err(e) => {
-                    warn!("Error accepting stream: {}", e);
-                    break;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Export network actor state for persistence
-    ///
-    /// This exports:
-    /// - Peer X25519 public keys (for end-to-end encryption)
-    /// - Known peer addresses (last known SocketAddr for reconnection)
-    ///
-    /// Note: Active connections are NOT persisted - they will be re-established
-    /// via discovery and dialing after restart.
-    pub async fn export_state(&self) -> icn_snapshot::NetworkState {
-        // Export peer connection info (version, capabilities, X25519 keys, PQ keys)
-        let peer_connections: std::collections::HashMap<String, icn_snapshot::PeerConnectionInfo> =
-            self.peer_connections
-                .read()
-                .await
-                .iter()
-                .map(|(did, info)| {
-                    let snapshot_info = icn_snapshot::PeerConnectionInfo {
-                        did: did.to_string(),
-                        negotiated_version: info.negotiated_version,
-                        peer_capabilities: info.peer_capabilities.bits(),
-                        peer_software: info.peer_software.clone(),
-                        x25519_key: info.x25519_key,
-                        ml_dsa_public: info.ml_dsa_public.clone(),
-                        ml_kem_public: info.ml_kem_public.clone(),
-                    };
-                    (did.to_string(), snapshot_info)
-                })
-                .collect();
-
-        // Legacy formats (empty for new deployments)
-        let peer_x25519_keys: std::collections::HashMap<String, [u8; 32]> =
-            std::collections::HashMap::new();
-        let peer_addresses: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
-
-        icn_snapshot::NetworkState {
-            peer_connections,
-            peer_x25519_keys,
-            peer_addresses,
-        }
-    }
-
-    /// Restore network actor state from persistence
-    ///
-    /// This restores:
-    /// - Peer connection info (version, capabilities, X25519 keys)
-    /// - Known peer addresses (as a hint for reconnection)
-    ///
-    /// Supports both modern (peer_connections) and legacy (peer_x25519_keys) formats.
-    /// Note: Connections are NOT automatically re-established - that happens
-    /// through normal discovery and connection management processes.
-    pub async fn restore_state(&self, state: icn_snapshot::NetworkState) -> Result<()> {
-        info!(
-            "Restoring network state: {} peer connections, {} legacy keys, {} peer addresses",
-            state.peer_connections.len(),
-            state.peer_x25519_keys.len(),
-            state.peer_addresses.len()
-        );
-
-        // Restore peer connections
-        let mut connections = self.peer_connections.write().await;
-
-        // Restore modern format (peer_connections)
-        for (did_str, snapshot_info) in state.peer_connections {
-            let did =
-                Did::from_str(&did_str).context("Failed to parse DID from peer connections")?;
-
-            let connection_info = PeerConnectionInfo {
-                did: did.clone(),
-                negotiated_version: snapshot_info.negotiated_version,
-                peer_capabilities: crate::CapabilityFlags::from_bits_truncate(
-                    snapshot_info.peer_capabilities,
-                ),
-                peer_software: snapshot_info.peer_software,
-                x25519_key: snapshot_info.x25519_key,
-                ml_dsa_public: snapshot_info.ml_dsa_public,
-                ml_kem_public: snapshot_info.ml_kem_public,
-            };
-
-            connections.insert(did, connection_info);
-        }
-
-        // Legacy migration: restore old peer_x25519_keys format
-        // (for backward compatibility with old snapshots)
-        for (did_str, key) in state.peer_x25519_keys {
-            let did = Did::from_str(&did_str)
-                .context("Failed to parse DID from legacy peer X25519 keys")?;
-
-            // Only restore if not already present from modern format
-            connections
-                .entry(did.clone())
-                .or_insert_with(|| PeerConnectionInfo {
-                    did,
-                    negotiated_version: 1, // Assume v1 for legacy
-                    peer_capabilities: crate::CapabilityFlags::empty(),
-                    peer_software: "legacy-unknown".to_string(),
-                    x25519_key: key,
-                    ml_dsa_public: None,
-                    ml_kem_public: None,
-                });
-        }
-        drop(connections);
-
-        // Note: We don't restore peer addresses directly because Discovery manages
-        // its own peer list. Peer addresses will be rediscovered via mDNS.
-        // We could optionally pre-populate the discovery with these addresses,
-        // but that adds complexity and they'll be rediscovered quickly anyway.
-
-        info!("✅ Network state restored successfully");
-        Ok(())
-    }
 }
 
+// Tests for NetworkActor and NetworkHandle functionality
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2028,7 +1267,7 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let identity_bundle = IdentityBundle::from_keypair(keypair).unwrap();
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+        let (shutdown_tx, _) = tokio::sync::broadcast::channel::<()>(1);
 
         let handle = NetworkActor::spawn(
             identity_bundle,
@@ -2098,37 +1337,40 @@ mod tests {
         );
 
         let (tx, _rx) = mpsc::channel(1);
-        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
-        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let (_shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+
+        let own_keypair = KeyPair::generate().unwrap();
+        let own_did = own_keypair.did();
+
+        let session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+
         let handle = NetworkHandle {
             tx,
             neighbor_sets: None,
             peer_connections: Some(peer_connections),
-            session_manager: test_session_mgr,
-            own_did: test_did,
+            session_manager: session_mgr,
+            own_did: own_did.clone(),
             blob_registry: None,
         };
 
-        // Test peer_has_capability
+        // Alice supports E2E encryption
         assert!(
             handle
                 .peer_has_capability(alice_did, CapabilityFlags::E2E_ENCRYPTION)
                 .await
         );
-        assert!(
-            handle
-                .peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES)
-                .await
-        );
-        assert!(
-            !handle
-                .peer_has_capability(alice_did, CapabilityFlags::GRACEFUL_RESTART)
-                .await
-        );
 
+        // Bob does not support E2E encryption
         assert!(
             !handle
                 .peer_has_capability(bob_did, CapabilityFlags::E2E_ENCRYPTION)
+                .await
+        );
+
+        // Both support signed messages
+        assert!(
+            handle
+                .peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES)
                 .await
         );
         assert!(
@@ -2137,12 +1379,12 @@ mod tests {
                 .await
         );
 
-        // Unknown peer
-        let charlie_keypair = KeyPair::generate().unwrap();
-        let charlie_did = charlie_keypair.did();
+        // Unknown peer has no capabilities
+        let unknown_keypair = KeyPair::generate().unwrap();
+        let unknown_did = unknown_keypair.did();
         assert!(
             !handle
-                .peer_has_capability(charlie_did, CapabilityFlags::E2E_ENCRYPTION)
+                .peer_has_capability(unknown_did, CapabilityFlags::E2E_ENCRYPTION)
                 .await
         );
     }
