@@ -144,3 +144,126 @@ impl VerificationConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_config_defaults() {
+        let config = ComputeConfig::default();
+        assert_eq!(config.max_concurrent_tasks, 10);
+        assert!(!config.actor_model_enabled);
+        assert_eq!(config.max_actors, 100);
+
+        assert_eq!(config.verification.low_value_threshold, 100);
+        assert_eq!(config.verification.medium_value_threshold, 1000);
+        assert_eq!(config.verification.high_value_threshold, 10000);
+        assert_eq!(config.verification.high_value_quorum, 3);
+        assert!((config.verification.consensus_threshold - 0.67).abs() < f64::EPSILON);
+        assert_eq!(config.verification.collection_window_ms, 30_000);
+    }
+
+    #[test]
+    fn test_verification_config_defaults() {
+        let config = VerificationConfig::default();
+        assert_eq!(config.low_value_threshold, 100);
+        assert_eq!(config.medium_value_threshold, 1000);
+        assert_eq!(config.high_value_threshold, 10000);
+        assert_eq!(config.high_value_quorum, 3);
+        assert!((config.consensus_threshold - 0.67).abs() < f64::EPSILON);
+        assert_eq!(config.collection_window_ms, 30_000);
+    }
+
+    #[test]
+    fn test_compute_config_toml_serialization() {
+        let config = ComputeConfig {
+            max_concurrent_tasks: 20,
+            verification: VerificationConfig {
+                low_value_threshold: 200,
+                medium_value_threshold: 2000,
+                high_value_threshold: 20000,
+                high_value_quorum: 5,
+                consensus_threshold: 0.75,
+                collection_window_ms: 60_000,
+            },
+            actor_model_enabled: true,
+            max_actors: 200,
+        };
+
+        let toml_str = toml::to_string(&config).unwrap();
+        let deserialized: ComputeConfig = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(deserialized.max_concurrent_tasks, 20);
+        assert!(deserialized.actor_model_enabled);
+        assert_eq!(deserialized.max_actors, 200);
+
+        assert_eq!(deserialized.verification.low_value_threshold, 200);
+        assert_eq!(deserialized.verification.medium_value_threshold, 2000);
+        assert_eq!(deserialized.verification.high_value_threshold, 20000);
+        assert_eq!(deserialized.verification.high_value_quorum, 5);
+        assert!((deserialized.verification.consensus_threshold - 0.75).abs() < f64::EPSILON);
+        assert_eq!(deserialized.verification.collection_window_ms, 60_000);
+    }
+
+    #[test]
+    fn test_compute_config_toml_deserialization_with_defaults() {
+        let toml_str = r#"
+max_concurrent_tasks = 15
+
+[verification]
+low_value_threshold = 150
+"#;
+
+        let config: ComputeConfig = toml::from_str(toml_str).unwrap();
+
+        // Explicitly set values
+        assert_eq!(config.max_concurrent_tasks, 15);
+        assert_eq!(config.verification.low_value_threshold, 150);
+
+        // Default values
+        assert!(!config.actor_model_enabled);
+        assert_eq!(config.max_actors, 100);
+        assert_eq!(config.verification.medium_value_threshold, 1000);
+        assert_eq!(config.verification.high_value_quorum, 3);
+    }
+
+    #[test]
+    fn test_verification_config_to_compute_config() {
+        let config = VerificationConfig {
+            low_value_threshold: 250,
+            medium_value_threshold: 2500,
+            high_value_threshold: 25000,
+            high_value_quorum: 7,
+            consensus_threshold: 0.8,
+            collection_window_ms: 45_000,
+        };
+
+        let compute_config = config.to_compute_config();
+
+        assert_eq!(compute_config.low_value_threshold, 250);
+        assert_eq!(compute_config.medium_value_threshold, 2500);
+        assert_eq!(compute_config.high_value_threshold, 25000);
+        assert_eq!(compute_config.high_value_quorum, 7);
+        assert!((compute_config.consensus_threshold - 0.8).abs() < f64::EPSILON);
+        assert_eq!(compute_config.collection_window_ms, 45_000);
+    }
+
+    #[test]
+    fn test_verification_config_value_thresholds() {
+        let config = VerificationConfig::default();
+
+        // Verify thresholds are in ascending order
+        assert!(config.low_value_threshold < config.medium_value_threshold);
+        assert!(config.medium_value_threshold < config.high_value_threshold);
+    }
+
+    #[test]
+    fn test_verification_config_consensus_threshold_valid_range() {
+        let config = VerificationConfig::default();
+
+        // Consensus threshold should be between 0 and 1
+        assert!(config.consensus_threshold > 0.0);
+        assert!(config.consensus_threshold <= 1.0);
+    }
+}
