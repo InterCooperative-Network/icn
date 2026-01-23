@@ -313,7 +313,11 @@ impl TestNode {
     /// Establish trust with another node
     async fn trust_peer(&self, peer_did: &icn_identity::Did, score: f64) -> anyhow::Result<()> {
         let mut graph = self.trust_graph.write().await;
-        let edge = icn_trust::TrustEdge::new(self.did.clone(), peer_did.clone(), TrustScore::unchecked(score));
+        let edge = icn_trust::TrustEdge::new(
+            self.did.clone(),
+            peer_did.clone(),
+            TrustScore::unchecked(score),
+        );
         graph.add_edge(edge)?;
         Ok(())
     }

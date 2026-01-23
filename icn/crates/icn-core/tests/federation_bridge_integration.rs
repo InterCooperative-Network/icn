@@ -145,7 +145,11 @@ impl FederationTestNode {
     /// Establish local trust edge
     async fn add_trust_edge(&self, other: &FederationTestNode, weight: f64) -> Result<()> {
         let mut trust = self.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(self.did.clone(), other.did.clone(), TrustScore::unchecked(weight)))?;
+        trust.add_edge(TrustEdge::new(
+            self.did.clone(),
+            other.did.clone(),
+            TrustScore::unchecked(weight),
+        ))?;
 
         info!(
             "Node '{}' added trust edge to '{}' (weight: {:.2})",

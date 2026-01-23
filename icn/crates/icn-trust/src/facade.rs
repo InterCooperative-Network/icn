@@ -358,15 +358,27 @@ mod tests {
         // Use typed access to add edges
         facade
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         facade
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
         facade
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
 
         // Verify scores through typed access
@@ -393,15 +405,27 @@ mod tests {
         // Add edges to all graphs
         facade
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         facade
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
         facade
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.4)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.4),
+            ))
             .unwrap();
 
         // Combined score calculation:
@@ -424,15 +448,27 @@ mod tests {
         // Add high trust in all graphs
         facade
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(1.0)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(1.0),
+            ))
             .unwrap();
         facade
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(1.0)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(1.0),
+            ))
             .unwrap();
         facade
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(1.0)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(1.0),
+            ))
             .unwrap();
 
         // Combined: 0.6*0.5 + 0.8*0.3 + 0.9*0.2 = 0.3 + 0.24 + 0.18 = 0.72
@@ -452,11 +488,19 @@ mod tests {
         // Add edges in multiple graphs
         facade
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         facade
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         // Perform recovery

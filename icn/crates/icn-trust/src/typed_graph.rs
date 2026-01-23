@@ -267,8 +267,24 @@ mod tests {
         economic.add_edge(economic_edge).unwrap();
 
         // Both graphs now have edges, but with different scores
-        assert_eq!(social.get_edge(&alice, &bob).unwrap().unwrap().score.value(), 0.8);
-        assert_eq!(economic.get_edge(&alice, &bob).unwrap().unwrap().score.value(), 0.5);
+        assert_eq!(
+            social
+                .get_edge(&alice, &bob)
+                .unwrap()
+                .unwrap()
+                .score
+                .value(),
+            0.8
+        );
+        assert_eq!(
+            economic
+                .get_edge(&alice, &bob)
+                .unwrap()
+                .unwrap()
+                .score
+                .value(),
+            0.5
+        );
     }
 
     #[test]

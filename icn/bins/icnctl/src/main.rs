@@ -6571,7 +6571,11 @@ token_expiry_hours = 24
     for member_did in &member_dids {
         if member_did != &my_did {
             // Add bidirectional trust at "partner" level (0.5)
-            let edge = TrustEdge::new(my_did.clone(), member_did.clone(), TrustScore::unchecked(0.5));
+            let edge = TrustEdge::new(
+                my_did.clone(),
+                member_did.clone(),
+                TrustScore::unchecked(0.5),
+            );
             trust_graph.add_edge(edge)?;
         }
     }

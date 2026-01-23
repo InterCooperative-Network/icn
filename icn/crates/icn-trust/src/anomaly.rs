@@ -545,13 +545,25 @@ mod tests {
         let did_c = test_did(3);
 
         graph
-            .add_edge(TrustEdge::new(did_a.clone(), did_b.clone(), TrustScore::unchecked(0.9)))
+            .add_edge(TrustEdge::new(
+                did_a.clone(),
+                did_b.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_b.clone(), did_c.clone(), TrustScore::unchecked(0.9)))
+            .add_edge(TrustEdge::new(
+                did_b.clone(),
+                did_c.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_c.clone(), did_a.clone(), TrustScore::unchecked(0.9)))
+            .add_edge(TrustEdge::new(
+                did_c.clone(),
+                did_a.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
 
         let anomalies = analyzer.detect_circular_vouching(&graph);
@@ -583,13 +595,25 @@ mod tests {
         let did_c = test_did(3);
 
         graph
-            .add_edge(TrustEdge::new(did_a.clone(), did_b.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                did_a.clone(),
+                did_b.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_b.clone(), did_c.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                did_b.clone(),
+                did_c.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_c.clone(), did_a.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                did_c.clone(),
+                did_a.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
 
         let anomalies = analyzer.detect_circular_vouching(&graph);
@@ -611,30 +635,62 @@ mod tests {
 
         // High internal trust
         graph
-            .add_edge(TrustEdge::new(did_a.clone(), did_b.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_a.clone(),
+                did_b.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_b.clone(), did_c.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_b.clone(),
+                did_c.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_c.clone(), did_a.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_c.clone(),
+                did_a.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_a.clone(), did_c.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_a.clone(),
+                did_c.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_b.clone(), did_a.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_b.clone(),
+                did_a.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_c.clone(), did_b.clone(), TrustScore::unchecked(0.95)))
+            .add_edge(TrustEdge::new(
+                did_c.clone(),
+                did_b.clone(),
+                TrustScore::unchecked(0.95),
+            ))
             .unwrap();
 
         // Low external trust
         graph
-            .add_edge(TrustEdge::new(did_a.clone(), did_outside.clone(), TrustScore::unchecked(0.2)))
+            .add_edge(TrustEdge::new(
+                did_a.clone(),
+                did_outside.clone(),
+                TrustScore::unchecked(0.2),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(did_outside.clone(), did_a.clone(), TrustScore::unchecked(0.2)))
+            .add_edge(TrustEdge::new(
+                did_outside.clone(),
+                did_a.clone(),
+                TrustScore::unchecked(0.2),
+            ))
             .unwrap();
 
         let anomalies = analyzer.detect_sybil_clusters(&graph);

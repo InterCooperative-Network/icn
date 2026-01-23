@@ -95,7 +95,11 @@ async fn test_trust_rate_limiter_known_peer() {
     // Create a known peer with trust score 0.2 (Known class: 0.1-0.4)
     let (_peer_kp, peer_did) = create_test_did("known_peer");
     trust_graph
-        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), TrustScore::unchecked(0.2)))
+        .add_edge(TrustEdge::new(
+            self_did.clone(),
+            peer_did.clone(),
+            TrustScore::unchecked(0.2),
+        ))
         .expect("Failed to add trust edge");
 
     let trust_graph = Arc::new(RwLock::new(trust_graph));
@@ -141,7 +145,11 @@ async fn test_trust_rate_limiter_partner_peer() {
     // So edge score 0.7 → actual score 0.7 * 0.7 = 0.49 (Partner class)
     let (_peer_kp, peer_did) = create_test_did("partner_peer");
     trust_graph
-        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), TrustScore::unchecked(0.7)))
+        .add_edge(TrustEdge::new(
+            self_did.clone(),
+            peer_did.clone(),
+            TrustScore::unchecked(0.7),
+        ))
         .expect("Failed to add trust edge");
 
     let trust_graph = Arc::new(RwLock::new(trust_graph));
@@ -187,7 +195,11 @@ async fn test_trust_rate_limiter_federated_peer() {
     // So edge score 1.0 → actual score 1.0 * 0.7 = 0.7 (Federated class)
     let (_peer_kp, peer_did) = create_test_did("federated_peer");
     trust_graph
-        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), TrustScore::unchecked(1.0)))
+        .add_edge(TrustEdge::new(
+            self_did.clone(),
+            peer_did.clone(),
+            TrustScore::unchecked(1.0),
+        ))
         .expect("Failed to add trust edge");
 
     let trust_graph = Arc::new(RwLock::new(trust_graph));
@@ -261,7 +273,11 @@ async fn test_trust_rate_limiter_trust_upgrade() {
     {
         let mut graph = trust_graph.write().await;
         graph
-            .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), TrustScore::unchecked(0.7)))
+            .add_edge(TrustEdge::new(
+                self_did.clone(),
+                peer_did.clone(),
+                TrustScore::unchecked(0.7),
+            ))
             .expect("Failed to add trust edge");
     }
 

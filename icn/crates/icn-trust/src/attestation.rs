@@ -588,9 +588,13 @@ mod tests {
             executed_at: 12345,
         };
 
-        let mut edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), TrustScore::unchecked(0.8))
-            .with_label("partner")
-            .with_evidence(evidence);
+        let mut edge = TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.8),
+        )
+        .with_label("partner")
+        .with_evidence(evidence);
 
         let expiry = edge.created_at + 86400; // 1 day
         edge = edge.with_expiry(expiry);

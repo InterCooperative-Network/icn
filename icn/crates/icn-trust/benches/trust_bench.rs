@@ -8,7 +8,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use ed25519_dalek::SigningKey;
 use icn_identity::Did;
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use rand::Rng;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -47,7 +47,7 @@ fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
     let direct_count = std::cmp::max(1, size / 10);
     for _i in 0..direct_count {
         let target_idx = rng.gen_range(1..size);
-        let score = 0.3 + rng.gen::<f64>() * 0.7; // 0.3 to 1.0
+        let score = TrustScore::unchecked(0.3 + rng.gen::<f64>() * 0.7); // 0.3 to 1.0
         let edge = TrustEdge::new(dids[0].clone(), dids[target_idx].clone(), score);
         graph.add_edge(edge).unwrap();
     }
@@ -58,7 +58,7 @@ fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
         let source_idx = rng.gen_range(1..size);
         let target_idx = rng.gen_range(1..size);
         if source_idx != target_idx {
-            let score = 0.3 + rng.gen::<f64>() * 0.7;
+            let score = TrustScore::unchecked(0.3 + rng.gen::<f64>() * 0.7);
             let edge = TrustEdge::new(dids[source_idx].clone(), dids[target_idx].clone(), score);
             let _ = graph.add_edge(edge); // Ignore errors for duplicates
         }
@@ -199,7 +199,7 @@ fn bench_edge_operations(c: &mut Criterion) {
             |(mut graph, _temp_dir)| {
                 let from = did_from_seed(1);
                 let to = did_from_seed(2);
-                let edge = TrustEdge::new(from, to, 0.7);
+                let edge = TrustEdge::new(from, to, TrustScore::unchecked(0.7));
                 graph.add_edge(black_box(edge)).unwrap();
                 graph
             },
@@ -217,7 +217,7 @@ fn bench_edge_operations(c: &mut Criterion) {
                 let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
                 let own_did = did_from_seed(0);
                 let mut graph = TrustGraph::new(store, own_did);
-                let edge = TrustEdge::new(from.clone(), to.clone(), 0.7);
+                let edge = TrustEdge::new(from.clone(), to.clone(), TrustScore::unchecked(0.7));
                 graph.add_edge(edge).unwrap();
                 (graph, temp_dir)
             },

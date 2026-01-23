@@ -30,9 +30,9 @@
 
 use dashmap::DashMap;
 use icn_identity::Did;
-use icn_trust::{TrustEdge, TrustGraph};
 #[cfg(test)]
 use icn_trust::TrustScore;
+use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -504,7 +504,10 @@ impl TrustManager {
     #[allow(deprecated)] // Uses sync edge methods intentionally
     fn compute_trust_score_local(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust
-        let direct_score = self.get_edge(from, to).map(|e| e.score.value()).unwrap_or(0.0);
+        let direct_score = self
+            .get_edge(from, to)
+            .map(|e| e.score.value())
+            .unwrap_or(0.0);
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges(from);
@@ -822,12 +825,20 @@ mod tests {
 
         // Alice trusts Bob
         manager
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Bob trusts Carol
         manager
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         let score = manager.compute_trust_score(&alice, &carol);
@@ -843,10 +854,18 @@ mod tests {
         let carol = KeyPair::generate().unwrap().did().clone();
 
         manager
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         manager
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         let network = manager.get_trust_network(&alice, 2);
@@ -874,10 +893,18 @@ mod tests {
 
         // Both Alice and Carol trust Bob
         manager
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         manager
-            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                carol.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         // Get incoming edges to Bob ("who trusts Bob?")
@@ -916,11 +943,19 @@ mod tests {
 
         // Alice trusts Bob, Bob trusts Carol
         manager
-            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge_async(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .await
             .unwrap();
         manager
-            .add_edge_async(TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.6)))
+            .add_edge_async(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .await
             .unwrap();
 
@@ -944,11 +979,19 @@ mod tests {
 
         // Alice trusts Bob, Carol trusts Bob
         manager
-            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge_async(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .await
             .unwrap();
         manager
-            .add_edge_async(TrustEdge::new(carol.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge_async(TrustEdge::new(
+                carol.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .await
             .unwrap();
 
@@ -972,7 +1015,11 @@ mod tests {
 
         // Seed with an edge
         manager
-            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
+            .add_edge_async(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .await
             .unwrap();
 

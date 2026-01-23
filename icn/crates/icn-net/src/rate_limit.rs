@@ -847,7 +847,11 @@ mod tests {
         // Start with low trust (Known = burst 10)
         // Direct score 0.3 -> final 0.21 = Known class
         graph
-            .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                own_keypair.did().clone(),
+                peer.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
 
         // Create trust-gated rate limiter
@@ -868,7 +872,11 @@ mod tests {
         {
             let mut graph = graph_handle.write().await;
             graph
-                .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), TrustScore::unchecked(1.0)))
+                .add_edge(TrustEdge::new(
+                    own_keypair.did().clone(),
+                    peer.clone(),
+                    TrustScore::unchecked(1.0),
+                ))
                 .unwrap();
         }
 

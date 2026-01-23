@@ -930,12 +930,20 @@ mod tests {
 
         // Alice trusts Bob
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Bob trusts Carol
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         // Compute Alice's trust in Carol (transitive through Bob)
@@ -975,12 +983,20 @@ mod tests {
 
         // Alice trusts Bob
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Bob trusts Carol
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         let all_dids = graph.get_all_known_dids().unwrap();
@@ -1004,17 +1020,29 @@ mod tests {
 
         // Alice trusts Bob highly (0.8 direct = 0.56 score)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Alice trusts Carol moderately (0.5 direct = 0.35 score)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
 
         // Alice has low trust in Dave (0.2 direct = 0.14 score)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.2)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                dave.clone(),
+                TrustScore::unchecked(0.2),
+            ))
             .unwrap();
 
         // Threshold 0.3: should include Bob (0.56) and Carol (0.35), exclude Dave (0.14)
@@ -1042,22 +1070,38 @@ mod tests {
 
         // Alice trusts Bob
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Carol trusts Bob
         graph
-            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), TrustScore::unchecked(0.7)))
+            .add_edge(TrustEdge::new(
+                carol.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.7),
+            ))
             .unwrap();
 
         // Dave trusts Bob
         graph
-            .add_edge(TrustEdge::new(dave.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                dave.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         // Alice also trusts Carol
         graph
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
 
         // Get incoming edges to Bob (who trusts Bob?)
@@ -1096,12 +1140,19 @@ mod tests {
 
         // Alice trusts Bob (not expired)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Carol trusts Bob (expired - set expiry to 100 seconds ago)
         graph
-            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), TrustScore::unchecked(0.7)).with_expiry(now - 100))
+            .add_edge(
+                TrustEdge::new(carol.clone(), bob.clone(), TrustScore::unchecked(0.7))
+                    .with_expiry(now - 100),
+            )
             .unwrap();
 
         // Get incoming edges to Bob - should only include non-expired edge from Alice

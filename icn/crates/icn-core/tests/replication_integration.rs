@@ -72,7 +72,11 @@ impl TestNode {
 
     /// Add a trust edge to another node
     async fn trust_peer(&self, peer_did: &Did, score: f64) -> Result<()> {
-        let edge = TrustEdge::new(self.did.clone(), peer_did.clone(), TrustScore::unchecked(score));
+        let edge = TrustEdge::new(
+            self.did.clone(),
+            peer_did.clone(),
+            TrustScore::unchecked(score),
+        );
         let mut graph = self.trust_graph_handle.write().await;
         graph.add_edge(edge)?;
         Ok(())

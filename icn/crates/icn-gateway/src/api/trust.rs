@@ -114,9 +114,8 @@ pub async fn create_trust_attestation(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
     // Validate score range and create TrustScore
-    let trust_score = TrustScore::new(req.score).map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid trust score: {e}"))
-    })?;
+    let trust_score = TrustScore::new(req.score)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {e}")))?;
 
     let from = from_did.into_inner();
     let mut edge = TrustEdge::new(from.clone(), to_did.clone(), trust_score);

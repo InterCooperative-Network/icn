@@ -380,15 +380,27 @@ mod tests {
         // Add different scores to different graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.3)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
 
         // Verify isolation
@@ -415,15 +427,27 @@ mod tests {
         // Technical: 0.4 direct → 0.4 * 0.9 = 0.36 score
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.4)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.4),
+            ))
             .unwrap();
 
         // Combined: 0.48 * 0.5 + 0.48 * 0.3 + 0.36 * 0.2
@@ -467,15 +491,27 @@ mod tests {
         // Add different DIDs to different graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.5)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                dave.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
 
         // Get all DIDs
@@ -501,11 +537,19 @@ mod tests {
         // Add edges from alice in all graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         // Perform recovery

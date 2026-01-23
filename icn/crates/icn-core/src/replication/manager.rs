@@ -465,7 +465,11 @@ mod tests {
         // Add a peer with Partner trust (0.4-0.7 range)
         let peer_keypair = KeyPair::generate()?;
         let peer_did = peer_keypair.did().clone();
-        let edge = icn_trust::TrustEdge::new(did.clone(), peer_did.clone(), icn_trust::TrustScore::unchecked(0.5));
+        let edge = icn_trust::TrustEdge::new(
+            did.clone(),
+            peer_did.clone(),
+            icn_trust::TrustScore::unchecked(0.5),
+        );
         trust_graph.add_edge(edge)?;
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));

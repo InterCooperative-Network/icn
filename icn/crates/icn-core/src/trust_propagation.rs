@@ -470,7 +470,11 @@ mod tests {
         let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
 
         // Alice trusts Bob
-        let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), TrustScore::unchecked(0.75));
+        let edge = TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.75),
+        );
         add_edge_and_broadcast(&alice_graph, edge.clone(), &alice, &alice_gossip)
             .await
             .unwrap();

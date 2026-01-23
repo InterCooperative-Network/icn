@@ -248,7 +248,8 @@ impl IdentityActor {
                         return;
                     }
                 };
-                let mut edge = icn_trust::TrustEdge::new(self.keypair.did().clone(), target, trust_score);
+                let mut edge =
+                    icn_trust::TrustEdge::new(self.keypair.did().clone(), target, trust_score);
 
                 for label in labels {
                     edge = edge.with_label(label);
