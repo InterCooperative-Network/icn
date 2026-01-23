@@ -33,23 +33,18 @@ impl ComputeService {
         // Build TaskCode based on code type
         let (task_code, required_capabilities) = match params.code_type {
             CodeTypeParam::Ccl => {
-                let code = params
-                    .code
-                    .ok_or_else(|| ApiError::InvalidParameter("Missing 'code' for CCL task".into()))?;
-                (
-                    TaskCode::Ccl(code),
-                    vec![ExecutorCapability::Ccl],
-                )
+                let code = params.code.ok_or_else(|| {
+                    ApiError::InvalidParameter("Missing 'code' for CCL task".into())
+                })?;
+                (TaskCode::Ccl(code), vec![ExecutorCapability::Ccl])
             }
             CodeTypeParam::Wasm => {
                 let wasm_b64 = params.wasm_bytes.ok_or_else(|| {
                     ApiError::InvalidParameter("Missing 'wasm_bytes' for WASM task".into())
                 })?;
-                let wasm_bytes = base64::Engine::decode(
-                    &base64::engine::general_purpose::STANDARD,
-                    &wasm_b64,
-                )
-                .map_err(|e| ApiError::InvalidParameter(format!("Invalid base64: {e}")))?;
+                let wasm_bytes =
+                    base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &wasm_b64)
+                        .map_err(|e| ApiError::InvalidParameter(format!("Invalid base64: {e}")))?;
                 (
                     TaskCode::WasmInline(wasm_bytes),
                     vec![ExecutorCapability::Wasm],
@@ -72,7 +67,9 @@ impl ComputeService {
             storage_mb: rp.storage_mb,
             network_mbps: rp.network_mbps,
             gpu_spec: None,
-            duration_estimate: rp.duration_estimate_secs.map(std::time::Duration::from_secs),
+            duration_estimate: rp
+                .duration_estimate_secs
+                .map(std::time::Duration::from_secs),
         });
 
         // Convert inputs to bytes
@@ -172,15 +169,21 @@ impl SubmitTaskParams {
             return Err(ApiError::ValidationError("Task ID cannot be empty".into()));
         }
         if self.task_id.len() > 256 {
-            return Err(ApiError::ValidationError("Task ID too long (max 256 chars)".into()));
+            return Err(ApiError::ValidationError(
+                "Task ID too long (max 256 chars)".into(),
+            ));
         }
 
         // Validate fuel limit (100 to 10M)
         if self.fuel_limit < 100 {
-            return Err(ApiError::ValidationError("Fuel limit too low (min 100)".into()));
+            return Err(ApiError::ValidationError(
+                "Fuel limit too low (min 100)".into(),
+            ));
         }
         if self.fuel_limit > 10_000_000 {
-            return Err(ApiError::ValidationError("Fuel limit too high (max 10M)".into()));
+            return Err(ApiError::ValidationError(
+                "Fuel limit too high (max 10M)".into(),
+            ));
         }
 
         // Validate payment rate if provided (max 1M)
@@ -327,9 +330,7 @@ fn convert_task_status(task_id: &TaskId, status: TaskStatus) -> TaskStatusRespon
                 icn_compute::ExecutionOutcome::Failed(e) => {
                     ("failed".to_string(), None, Some(e.clone()))
                 }
-                icn_compute::ExecutionOutcome::OutOfFuel => {
-                    ("out_of_fuel".to_string(), None, None)
-                }
+                icn_compute::ExecutionOutcome::OutOfFuel => ("out_of_fuel".to_string(), None, None),
                 icn_compute::ExecutionOutcome::Timeout => ("timeout".to_string(), None, None),
             };
 
@@ -380,14 +381,8 @@ mod tests {
     #[test]
     fn test_task_priority_from_str() {
         assert_eq!(TaskPriorityParam::from_str("low"), TaskPriorityParam::Low);
-        assert_eq!(
-            TaskPriorityParam::from_str("LOW"),
-            TaskPriorityParam::Low
-        );
-        assert_eq!(
-            TaskPriorityParam::from_str("high"),
-            TaskPriorityParam::High
-        );
+        assert_eq!(TaskPriorityParam::from_str("LOW"), TaskPriorityParam::Low);
+        assert_eq!(TaskPriorityParam::from_str("high"), TaskPriorityParam::High);
         assert_eq!(
             TaskPriorityParam::from_str("critical"),
             TaskPriorityParam::Critical

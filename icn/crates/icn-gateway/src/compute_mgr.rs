@@ -99,7 +99,8 @@ impl ComputeManager {
         let (code_str, wasm_bytes, code_type) = match code {
             TaskCode::Ccl(c) => (Some(c), None, icn_api::compute::CodeTypeParam::Ccl),
             TaskCode::WasmInline(b) => {
-                let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &b);
+                let encoded =
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &b);
                 (None, Some(encoded), icn_api::compute::CodeTypeParam::Wasm)
             }
             TaskCode::CclRef { .. } => {
