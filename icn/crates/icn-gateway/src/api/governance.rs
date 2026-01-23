@@ -1024,7 +1024,7 @@ pub async fn create_join_federation_proposal(
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.federation_id)?;
-    validation::validate_trust_score(req.terms.min_trust_threshold)?;
+    // TrustScore is already validated during deserialization
     let data_sharing_level_str =
         validation::validate_data_sharing_level(&req.terms.data_sharing_level)?;
     let dispute_resolution_str =
