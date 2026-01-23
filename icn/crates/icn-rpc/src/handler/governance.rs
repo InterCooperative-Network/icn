@@ -13,6 +13,7 @@ use std::sync::Arc;
 use icn_governance::{MembershipSource, ProposalPayload, ProposalState, VoteChoice};
 
 use crate::context::RpcContext;
+use crate::error_codes::{NOT_FOUND, RESOURCE_NOT_AVAILABLE};
 use crate::server::RpcServer;
 use crate::types::{
     CastVoteRequest, CloseProposalRequest, CreateDomainRequest, CreateProposalRequest,
@@ -37,7 +38,7 @@ pub async fn handle_governance_domain_list(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -92,7 +93,7 @@ pub async fn handle_governance_domain_get(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -133,7 +134,7 @@ pub async fn handle_governance_domain_get(
                 Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Domain not found".to_string()),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Domain not found".to_string()),
         Err(e) => RpcResponse::internal_error(id, e),
     }
 }
@@ -155,7 +156,7 @@ pub async fn handle_governance_proposal_list(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -242,7 +243,7 @@ pub async fn handle_governance_proposal_get(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -316,7 +317,7 @@ pub async fn handle_governance_proposal_get(
                 Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Proposal not found".to_string()),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Proposal not found".to_string()),
         Err(e) => RpcResponse::internal_error(id, e),
     }
 }
@@ -339,7 +340,7 @@ pub async fn handle_governance_domain_create(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -419,7 +420,7 @@ pub async fn handle_governance_proposal_create(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -517,7 +518,7 @@ pub async fn handle_governance_proposal_open(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -585,7 +586,7 @@ pub async fn handle_governance_vote_cast(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 
@@ -645,7 +646,7 @@ pub async fn handle_governance_proposal_close(
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Governance not available".to_string());
         }
     };
 

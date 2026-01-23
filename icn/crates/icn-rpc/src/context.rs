@@ -45,7 +45,7 @@ impl RpcContext {
     /// ```ignore
     /// let ctx: &RpcContext = ...;
     /// if let Err(e) = ctx.require_coop("coop-123") {
-    ///     return e.to_response(id);
+    ///     return e.to_default_response(id);
     /// }
     /// ```
     pub fn require_coop(&self, coop_id: &str) -> Result<(), RpcErrorCode> {
