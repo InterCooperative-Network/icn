@@ -1388,4 +1388,361 @@ mod tests {
                 .await
         );
     }
+
+    #[tokio::test]
+    async fn test_get_peers_with_capability() {
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        let alice_keypair = KeyPair::generate().unwrap();
+        let alice_did = alice_keypair.did();
+        let bob_keypair = KeyPair::generate().unwrap();
+        let bob_did = bob_keypair.did();
+        let charlie_keypair = KeyPair::generate().unwrap();
+        let charlie_did = charlie_keypair.did();
+
+        // Alice: E2E + Signed
+        peer_connections.write().await.insert(
+            alice_did.clone(),
+            PeerConnectionInfo {
+                did: alice_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION
+                    | CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.1.0".to_string(),
+                x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Bob: Only Signed
+        peer_connections.write().await.insert(
+            bob_did.clone(),
+            PeerConnectionInfo {
+                did: bob_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.0.5".to_string(),
+                x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Charlie: E2E + Signed + Graceful Restart
+        peer_connections.write().await.insert(
+            charlie_did.clone(),
+            PeerConnectionInfo {
+                did: charlie_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION
+                    | CapabilityFlags::SIGNED_MESSAGES
+                    | CapabilityFlags::GRACEFUL_RESTART,
+                peer_software: "icnd-0.2.0".to_string(),
+                x25519_key: [3u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
+            blob_registry: None,
+        };
+
+        // Get peers with E2E encryption (should be Alice and Charlie)
+        let encrypted_peers = handle
+            .get_peers_with_capability(CapabilityFlags::E2E_ENCRYPTION)
+            .await;
+        assert_eq!(encrypted_peers.len(), 2);
+        assert!(encrypted_peers.contains(alice_did));
+        assert!(encrypted_peers.contains(charlie_did));
+
+        // Get peers with Signed Messages (should be all three)
+        let signed_peers = handle
+            .get_peers_with_capability(CapabilityFlags::SIGNED_MESSAGES)
+            .await;
+        assert_eq!(signed_peers.len(), 3);
+
+        // Get peers with Graceful Restart (should be only Charlie)
+        let restart_peers = handle
+            .get_peers_with_capability(CapabilityFlags::GRACEFUL_RESTART)
+            .await;
+        assert_eq!(restart_peers.len(), 1);
+        assert!(restart_peers.contains(charlie_did));
+
+        // Get peers with capability no one has
+        let quantum_peers = handle
+            .get_peers_with_capability(CapabilityFlags::MULTI_DEVICE)
+            .await;
+        assert_eq!(quantum_peers.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_peer_protocol_version() {
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        let alice_keypair = KeyPair::generate().unwrap();
+        let alice_did = alice_keypair.did();
+        let bob_keypair = KeyPair::generate().unwrap();
+        let bob_did = bob_keypair.did();
+
+        // Alice on v1
+        peer_connections.write().await.insert(
+            alice_did.clone(),
+            PeerConnectionInfo {
+                did: alice_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.1.0".to_string(),
+                x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Bob on v2
+        peer_connections.write().await.insert(
+            bob_did.clone(),
+            PeerConnectionInfo {
+                did: bob_did.clone(),
+                negotiated_version: 2,
+                peer_capabilities: CapabilityFlags::E2E_ENCRYPTION,
+                peer_software: "icnd-0.2.0".to_string(),
+                x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
+            blob_registry: None,
+        };
+
+        // Get versions
+        assert_eq!(handle.get_peer_protocol_version(alice_did).await, Some(1));
+        assert_eq!(handle.get_peer_protocol_version(bob_did).await, Some(2));
+
+        // Unknown peer
+        let charlie_keypair = KeyPair::generate().unwrap();
+        let charlie_did = charlie_keypair.did();
+        assert_eq!(handle.get_peer_protocol_version(charlie_did).await, None);
+    }
+
+    #[tokio::test]
+    async fn test_get_peer_connection_info() {
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        let alice_keypair = KeyPair::generate().unwrap();
+        let alice_did = alice_keypair.did();
+
+        let alice_info = PeerConnectionInfo {
+            did: alice_did.clone(),
+            negotiated_version: 2,
+            peer_capabilities: CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::GRACEFUL_RESTART,
+            peer_software: "icnd-0.2.5".to_string(),
+            x25519_key: [42u8; 32],
+            ml_dsa_public: None,
+            ml_kem_public: None,
+        };
+
+        peer_connections
+            .write()
+            .await
+            .insert(alice_did.clone(), alice_info.clone());
+
+        let (tx, _rx) = mpsc::channel(1);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let test_did = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: Some(peer_connections),
+            session_manager: test_session_mgr,
+            own_did: test_did,
+            blob_registry: None,
+        };
+
+        // Get full connection info
+        let info = handle.get_peer_connection_info(alice_did).await.unwrap();
+        assert_eq!(info.did, alice_did.clone());
+        assert_eq!(info.negotiated_version, 2);
+        assert_eq!(info.peer_software, "icnd-0.2.5");
+        assert_eq!(info.x25519_key, [42u8; 32]);
+        assert!(info
+            .peer_capabilities
+            .contains(CapabilityFlags::E2E_ENCRYPTION));
+        assert!(info
+            .peer_capabilities
+            .contains(CapabilityFlags::GRACEFUL_RESTART));
+
+        // Unknown peer
+        let bob_keypair = KeyPair::generate().unwrap();
+        let bob_did = bob_keypair.did();
+        assert!(handle.get_peer_connection_info(bob_did).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_announce_blob_availability() {
+        // Setup blob registry
+        let blob_registry = Arc::new(RwLock::new(crate::BlobLocationRegistry::new()));
+
+        // Setup NetworkHandle with mock channel
+        let (tx, mut rx) = mpsc::channel(10);
+        let test_session_mgr = Arc::new(RwLock::new(SessionManager::new()));
+        let own_did = KeyPair::generate().unwrap().did().clone();
+
+        let handle = NetworkHandle {
+            tx,
+            neighbor_sets: None,
+            peer_connections: None,
+            session_manager: test_session_mgr,
+            own_did: own_did.clone(),
+            blob_registry: Some(blob_registry.clone()),
+        };
+
+        // Spawn task to handle response channel (prevents hanging)
+        tokio::spawn(async move {
+            if let Some(NetworkMsg::Broadcast { response, .. }) = rx.recv().await {
+                let _ = response.send(Ok(()));
+            }
+        });
+
+        // Announce blob availability
+        let blob_hash = [42u8; 32];
+        let size_bytes = 1024;
+        handle
+            .announce_blob_availability(blob_hash, own_did.clone(), size_bytes)
+            .await;
+
+        // Verify blob was recorded in local registry
+        let peers = blob_registry.read().await.get_peers_with_blob(&blob_hash);
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].peer_did, own_did);
+        assert_eq!(peers[0].size_bytes, size_bytes);
+
+        // Test query API
+        let query_peers = handle.get_peers_with_blob(&blob_hash).await;
+        assert_eq!(query_peers.len(), 1);
+        assert_eq!(query_peers[0].peer_did, own_did);
+
+        // Test find_peers_with_all API
+        let peer_matches = handle.find_peers_with_all(&[blob_hash]).await;
+        assert_eq!(peer_matches.len(), 1);
+        assert_eq!(peer_matches[0].0, own_did);
+        assert_eq!(peer_matches[0].1, 1); // 1 matching blob
+    }
+
+    #[tokio::test]
+    async fn test_encoding_selection_based_on_capabilities() {
+        // Test that encoding is correctly selected based on peer capabilities
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        let modern_keypair = KeyPair::generate().unwrap();
+        let modern_did = modern_keypair.did().clone();
+        let legacy_keypair = KeyPair::generate().unwrap();
+        let legacy_did = legacy_keypair.did().clone();
+
+        // Modern peer: supports both POSTCARD_ENCODING and MESSAGE_COMPRESSION
+        peer_connections.write().await.insert(
+            modern_did.clone(),
+            PeerConnectionInfo {
+                did: modern_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::POSTCARD_ENCODING
+                    | CapabilityFlags::MESSAGE_COMPRESSION
+                    | CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.3.0".to_string(),
+                x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Legacy peer: no postcard support, only compression
+        peer_connections.write().await.insert(
+            legacy_did.clone(),
+            PeerConnectionInfo {
+                did: legacy_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::MESSAGE_COMPRESSION
+                    | CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.1.0".to_string(),
+                x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Test encoding selection for modern peer
+        {
+            let connections = peer_connections.read().await;
+            if let Some(peer_info) = connections.get(&modern_did) {
+                let use_postcard = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::POSTCARD_ENCODING);
+                let use_compression = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+
+                assert!(use_postcard, "Modern peer should use postcard encoding");
+                assert!(use_compression, "Modern peer should use compression");
+            } else {
+                panic!("Modern peer not found");
+            }
+        }
+
+        // Test encoding selection for legacy peer
+        {
+            let connections = peer_connections.read().await;
+            if let Some(peer_info) = connections.get(&legacy_did) {
+                let use_postcard = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::POSTCARD_ENCODING);
+                let use_compression = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+
+                assert!(
+                    !use_postcard,
+                    "Legacy peer should NOT use postcard encoding"
+                );
+                assert!(use_compression, "Legacy peer should use compression");
+            } else {
+                panic!("Legacy peer not found");
+            }
+        }
+
+        // Test unknown peer (pre-Hello)
+        {
+            let connections = peer_connections.read().await;
+            let unknown_did = KeyPair::generate().unwrap().did().clone();
+
+            let (use_postcard, use_compression) = connections
+                .get(&unknown_did)
+                .map(|peer_info| peer_info.encoding_flags())
+                .unwrap_or((false, false)); // No peer info yet - use legacy encoding
+
+            assert!(
+                !use_postcard,
+                "Unknown peer should NOT use postcard encoding"
+            );
+            assert!(!use_compression, "Unknown peer should NOT use compression");
+        }
+    }
 }
