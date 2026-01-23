@@ -91,8 +91,9 @@ pub use pagination::{
     DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE,
 };
 pub use rate_limit::{
-    category_rate_limit_middleware, CategoryRateLimiter, EndpointCategory, RateLimitConfig,
-    RateLimiter, VelocityLimitConfig, VelocityLimiter,
+    category_rate_limit_middleware, trust_rate_limit_middleware, CategoryRateLimiter,
+    EndpointCategory, RateLimitConfig, RateLimiter, TrustRateLimitConfig, TrustRateLimiter,
+    VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};

@@ -209,6 +209,15 @@ pub fn velocity_limit_exceeded_inc() {
     counter!("icn_gateway_velocity_limit_exceeded_total").increment(1);
 }
 
+/// Increment trust-gated rate limit exceeded counter
+pub fn trust_rate_limit_exceeded_inc(trust_class: &str) {
+    counter!(
+        "icn_gateway_trust_rate_limit_exceeded_total",
+        "trust_class" => trust_class.to_string()
+    )
+    .increment(1);
+}
+
 // Auth metrics
 
 /// Increment auth challenges counter
