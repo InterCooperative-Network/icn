@@ -640,7 +640,12 @@ pub struct UpdateFederationPolicyProposalRequest {
     pub title: String,
     /// Rationale/explanation for the proposal
     pub description: String,
-    /// Auto-accept vouch threshold (-1.0 to disable, or 0.0-1.0)
+    /// Auto-accept vouch threshold.
+    ///
+    /// Uses `f64` instead of `TrustScore` because this field supports a sentinel
+    /// value of `-1.0` to disable auto-accept functionality. Valid values are:
+    /// - `-1.0`: Disable auto-accept (vouches require manual review)
+    /// - `0.0` to `1.0`: Trust threshold for automatic vouch acceptance
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_accept_vouch_threshold: Option<f64>,
     /// Trust decay factor (0.0-1.0)

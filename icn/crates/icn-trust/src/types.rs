@@ -287,17 +287,38 @@ impl TrustScore {
 
     /// Create a trust score without validation (for constants and trusted sources)
     ///
-    /// # Correctness requirements
+    /// # Correctness Requirements
     ///
     /// The caller must ensure the value is in range [0.0, 1.0] and not NaN.
-    /// This is intended for use with constants where the value is known to be valid.
+    ///
+    /// # When to Use `unchecked()` vs `new()`
+    ///
+    /// **Use `unchecked()` for:**
+    /// - Compile-time constants: `const DEFAULT: TrustScore = TrustScore::unchecked(0.5);`
+    /// - Hardcoded literals in test code where values are visually verified
+    /// - Internal calculations where the value is mathematically guaranteed valid
+    ///   (e.g., after `clamp(0.0, 1.0)`)
+    ///
+    /// **Use `new()` for:**
+    /// - User input from APIs, CLI, or configuration files
+    /// - Deserialized values from external sources
+    /// - Any value whose validity cannot be verified at compile time
     ///
     /// # Examples
     ///
     /// ```
     /// use icn_trust::TrustScore;
     ///
+    /// // Good: Compile-time constant with known-valid value
     /// const PARTNER_TRUST: TrustScore = TrustScore::unchecked(0.4);
+    ///
+    /// // Good: Test code with obvious literal
+    /// let test_score = TrustScore::unchecked(0.8);
+    ///
+    /// // Good: After explicit clamping
+    /// let raw_value: f64 = some_calculation();
+    /// let clamped = raw_value.clamp(0.0, 1.0);
+    /// let score = TrustScore::unchecked(clamped);
     /// ```
     pub const fn unchecked(value: f64) -> Self {
         Self(value)
@@ -371,6 +392,29 @@ impl TryFrom<f64> for TrustScore {
         Self::new(value)
     }
 }
+
+// =============================================================================
+// Arithmetic Operations
+// =============================================================================
+//
+// Design Decision: Arithmetic operations return `f64` rather than `TrustScore`.
+//
+// Rationale:
+// - Arithmetic on trust scores is used for intermediate calculations (e.g.,
+//   computing transitive trust, decay factors, weighted averages).
+// - These intermediate results may temporarily fall outside [0.0, 1.0] during
+//   computation, and forcing immediate validation would be overly restrictive.
+// - The result should be validated when stored as a new TrustScore via `new()`.
+//
+// Example usage:
+// ```ignore
+// let weight = 0.8;
+// let adjusted = trust_score * weight;  // Returns f64
+// let final_score = TrustScore::new(adjusted.clamp(0.0, 1.0))?;  // Re-validate
+// ```
+//
+// If you need to maintain type safety through calculations, use `.value()`
+// explicitly to make the conversion to f64 visible in the code.
 
 impl std::ops::Sub<f64> for TrustScore {
     type Output = f64;
@@ -754,5 +798,69 @@ mod tests {
     fn test_trust_score_unchecked() {
         const PARTNER_TRUST: TrustScore = TrustScore::unchecked(0.4);
         assert_eq!(PARTNER_TRUST.value(), 0.4);
+    }
+
+    #[test]
+    fn test_trust_score_threshold_boundaries() {
+        // Test exactly at threshold boundaries
+        let exactly_known = TrustScore::new(0.1).unwrap();
+        let exactly_partner = TrustScore::new(0.4).unwrap();
+        let exactly_federated = TrustScore::new(0.7).unwrap();
+
+        // At Known threshold (0.1)
+        assert!(exactly_known.is_known_or_better());
+        assert!(!exactly_known.is_partner_or_better());
+        assert_eq!(exactly_known.to_class(), TrustClass::Known);
+
+        // At Partner threshold (0.4)
+        assert!(exactly_partner.is_known_or_better());
+        assert!(exactly_partner.is_partner_or_better());
+        assert!(!exactly_partner.is_federated());
+        assert_eq!(exactly_partner.to_class(), TrustClass::Partner);
+
+        // At Federated threshold (0.7)
+        assert!(exactly_federated.is_known_or_better());
+        assert!(exactly_federated.is_partner_or_better());
+        assert!(exactly_federated.is_federated());
+        assert_eq!(exactly_federated.to_class(), TrustClass::Federated);
+    }
+
+    #[test]
+    fn test_trust_score_just_below_thresholds() {
+        // Test just below threshold boundaries
+        let just_below_known = TrustScore::new(0.099).unwrap();
+        let just_below_partner = TrustScore::new(0.399).unwrap();
+        let just_below_federated = TrustScore::new(0.699).unwrap();
+
+        // Just below Known threshold (0.099)
+        assert!(!just_below_known.is_known_or_better());
+        assert_eq!(just_below_known.to_class(), TrustClass::Isolated);
+
+        // Just below Partner threshold (0.399)
+        assert!(just_below_partner.is_known_or_better());
+        assert!(!just_below_partner.is_partner_or_better());
+        assert_eq!(just_below_partner.to_class(), TrustClass::Known);
+
+        // Just below Federated threshold (0.699)
+        assert!(just_below_federated.is_partner_or_better());
+        assert!(!just_below_federated.is_federated());
+        assert_eq!(just_below_federated.to_class(), TrustClass::Partner);
+    }
+
+    #[test]
+    fn test_trust_score_btree_map_key() {
+        // Verify TrustScore can be used as BTreeMap key (requires Eq + Ord)
+        use std::collections::BTreeMap;
+
+        let mut map: BTreeMap<TrustScore, &str> = BTreeMap::new();
+        map.insert(TrustScore::unchecked(0.3), "low");
+        map.insert(TrustScore::unchecked(0.7), "high");
+        map.insert(TrustScore::unchecked(0.5), "medium");
+
+        // Verify ordering is maintained
+        let keys: Vec<_> = map.keys().collect();
+        assert_eq!(keys[0].value(), 0.3);
+        assert_eq!(keys[1].value(), 0.5);
+        assert_eq!(keys[2].value(), 0.7);
     }
 }
