@@ -52,6 +52,11 @@ pub mod sync;
 pub mod types;
 pub mod vector_clock;
 
+// Gossip protocol phase modules (extend gossip::GossipActor)
+mod anti_entropy;
+mod protocol;
+mod subscriptions;
+
 pub use bloom::{BloomFilter, BloomResizeConfig};
 pub use error::{GossipError, Result};
 pub use gossip::{
