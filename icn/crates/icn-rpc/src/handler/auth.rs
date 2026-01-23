@@ -150,8 +150,20 @@ pub async fn handle_auth_verify(
     // For async compatibility, we first verify without coop_id, then validate
     // membership, then the token already has the correct coop_id embedded.
     let validated_coop_id = if let Some(ref requested_coop_id) = coop_id_for_validation {
-        // We have a coop_id request and coop_handle is available (checked above)
-        let coop_handle = coop_handle.unwrap();
+        // We have a coop_id request and coop_handle is available (checked above at line 123)
+        // Use match to satisfy clippy even though pre-check guarantees Some
+        let coop_handle = match coop_handle {
+            Some(h) => h,
+            None => {
+                // This branch should never be reached due to pre-check, but handle gracefully
+                tracing::error!("CoopHandle unexpectedly None after pre-check");
+                return RpcResponse::error(
+                    id,
+                    crate::error_codes::INTERNAL_ERROR,
+                    "Internal server error".to_string(),
+                );
+            }
+        };
 
         // First verify the signature to prove identity
         match auth_manager.verify_challenge_with_coop(
