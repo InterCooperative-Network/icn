@@ -80,7 +80,7 @@ pub use messages::{
 };
 pub use registry::{
     compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
-    Visibility,
+    SemanticVersion, Visibility,
 };
 pub use registry_actor::{
     ContractRegistryActor, ContractRegistryHandle, ContractRegistryMessage, ContractStatus,

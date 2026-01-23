@@ -75,7 +75,7 @@ pub(crate) enum ContractRegistryCommand {
     },
 
     /// Handle incoming gossip message
-    GossipMessage(ContractRegistryMessage),
+    GossipMessage(Box<ContractRegistryMessage>),
 
     /// Check governance approval status for a contract
     CheckApproval {

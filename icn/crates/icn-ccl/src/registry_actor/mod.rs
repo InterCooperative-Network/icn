@@ -175,7 +175,7 @@ impl ContractRegistryActor {
                 let _ = resp.send(versions);
             }
             ContractRegistryCommand::GossipMessage(msg) => {
-                if let Err(e) = self.handle_gossip_message(msg).await {
+                if let Err(e) = self.handle_gossip_message(*msg).await {
                     warn!("Error handling gossip message: {}", e);
                 }
             }
