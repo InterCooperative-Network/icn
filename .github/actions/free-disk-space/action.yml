@@ -6,6 +6,10 @@ inputs:
     description: 'Show disk space before and after cleanup'
     required: false
     default: 'false'
+  aggressive:
+    description: 'Enable more aggressive cleanup (removes additional caches)'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -19,6 +23,7 @@ runs:
         fi
 
         echo "Removing preinstalled software to free space..."
+        # Large language runtimes and SDKs
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /usr/local/lib/android
         sudo rm -rf /opt/ghc
@@ -36,8 +41,42 @@ runs:
         sudo rm -rf /usr/local/share/vcpkg
         sudo rm -rf /usr/share/miniconda
         sudo rm -rf /imagegeneration
+
+        # Docker cleanup
         docker system prune -af || true
+
+        # APT cleanup
         sudo apt-get clean || true
+
+        # Additional large directories
+        sudo rm -rf /usr/share/az_* || true
+        sudo rm -rf /usr/share/gradle-* || true
+        sudo rm -rf /usr/share/kotlinc || true
+        sudo rm -rf /usr/share/sbt || true
+        sudo rm -rf /usr/local/julia* || true
+        sudo rm -rf /opt/pipx || true
+
+        if [ "${{ inputs.aggressive }}" = "true" ]; then
+          echo "Running aggressive cleanup..."
+          # Clear runner tool cache except what we need
+          sudo rm -rf /opt/hostedtoolcache/PyPy || true
+          sudo rm -rf /opt/hostedtoolcache/Java* || true
+
+          # Clear large documentation
+          sudo rm -rf /usr/share/doc/* || true
+          sudo rm -rf /usr/share/man/* || true
+
+          # Clear unused locales
+          sudo rm -rf /usr/share/locale/* || true
+
+          # Clear temporary files
+          sudo rm -rf /tmp/* || true
+          sudo rm -rf /var/tmp/* || true
+
+          # Clear package manager caches
+          sudo rm -rf /var/cache/apt/archives/* || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+        fi
 
         if [ "${{ inputs.verbose }}" = "true" ]; then
           echo "Disk space after cleanup:"
