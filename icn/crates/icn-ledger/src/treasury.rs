@@ -14,6 +14,16 @@
 //! - **Spending Rule**: Thresholds that trigger governance approval requirements
 //! - **Audit Trail**: Complete history of all treasury operations
 //!
+//! ## Module Organization
+//!
+//! This module is organized into focused submodules by operation type:
+//!
+//! - `budgets`: Budget lifecycle management (create, spend, status updates)
+//! - `approvals`: Governance rules, velocity limits, and approval logic
+//! - `audit`: Audit trail recording and paginated retrieval
+//!
+//! All types are re-exported from this module for backward compatibility.
+//!
 //! ## Example
 //!
 //! ```rust,no_run
