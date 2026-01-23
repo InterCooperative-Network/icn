@@ -417,3 +417,162 @@ async fn test_trust_rate_limiter_per_did_isolation() {
         "Peer2 should have full burst capacity"
     );
 }
+
+// ============================================================================
+// HTTP Integration Tests
+// ============================================================================
+// These tests verify the middleware is properly wired up and responds via HTTP.
+
+/// Test that the trust_rate_limit_middleware correctly rate limits HTTP requests
+/// when the TrustRateLimiter is configured.
+///
+/// This test verifies:
+/// 1. The middleware is correctly wired up via wrap()
+/// 2. Anonymous requests get Isolated class limits
+/// 3. Rate limiting triggers 429 Too Many Requests
+#[actix_web::test]
+async fn test_http_trust_rate_limit_middleware_integration() {
+    use actix_web::{middleware, web, App, HttpResponse};
+
+    // Create trust graph with self-DID
+    let (_self_kp, self_did) = create_test_did("self");
+    let trust_graph = Arc::new(RwLock::new(create_test_trust_graph(self_did.clone()).await));
+    let trust_manager = create_trust_manager(trust_graph);
+
+    // Create rate limiter with very low limits for testing (burst=2)
+    let config = TrustRateLimitConfig {
+        isolated_requests_per_sec: 2.0,
+        isolated_burst: 2.0, // Only 2 requests allowed in burst
+        known_requests_per_sec: 5.0,
+        known_burst: 5.0,
+        partner_requests_per_sec: 10.0,
+        partner_burst: 10.0,
+        federated_requests_per_sec: 20.0,
+        federated_burst: 20.0,
+    };
+    let rate_limiter = Arc::new(TrustRateLimiter::new(trust_manager, config));
+
+    // Create test app with trust rate limit middleware
+    let app = actix_web::test::init_service(
+        App::new()
+            .app_data(web::Data::new(rate_limiter.clone()))
+            .route(
+                "/test",
+                web::get()
+                    .to(|| async { HttpResponse::Ok().body("OK") })
+                    .wrap(middleware::from_fn(
+                        icn_gateway::rate_limit::trust_rate_limit_middleware,
+                    )),
+            ),
+    )
+    .await;
+
+    // First request should succeed (burst capacity = 2)
+    // Note: All anonymous requests share the same bucket (did:icn:anonymous:{ip})
+    let req = actix_web::test::TestRequest::get()
+        .uri("/test")
+        .to_request();
+    let resp = actix_web::test::try_call_service(&app, req).await;
+    assert!(
+        resp.is_ok(),
+        "First request should succeed: {:?}",
+        resp.err()
+    );
+    let resp = resp.unwrap();
+    assert!(
+        resp.status().is_success(),
+        "First request status should be 2xx: {}",
+        resp.status()
+    );
+
+    // Second request should succeed (still within burst)
+    let req = actix_web::test::TestRequest::get()
+        .uri("/test")
+        .to_request();
+    let resp = actix_web::test::try_call_service(&app, req).await;
+    assert!(
+        resp.is_ok(),
+        "Second request should succeed: {:?}",
+        resp.err()
+    );
+    let resp = resp.unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Second request status should be 2xx: {}",
+        resp.status()
+    );
+
+    // Third request should fail (burst exhausted)
+    // The middleware returns an error which try_call_service will capture
+    let req = actix_web::test::TestRequest::get()
+        .uri("/test")
+        .to_request();
+    let resp = actix_web::test::try_call_service(&app, req).await;
+
+    // Rate limiting should cause an error (429 response)
+    // Note: actix-web middleware errors are returned as Err, not as a response
+    assert!(
+        resp.is_err(),
+        "Third request should be rate limited (got: {:?})",
+        resp.ok().map(|r| r.status())
+    );
+}
+
+/// Test that the middleware falls back gracefully when TrustRateLimiter is not configured.
+///
+/// When TrustRateLimiter is not in app_data, the middleware falls back to
+/// regular rate_limit_middleware behavior. Since regular rate limiting
+/// allows unauthenticated requests through, we verify requests succeed.
+#[actix_web::test]
+async fn test_http_trust_middleware_fallback_allows_requests() {
+    use actix_web::{middleware, web, App, HttpResponse};
+    use icn_gateway::rate_limit::{RateLimitConfig, RateLimiter};
+
+    // Create regular rate limiter (used by fallback)
+    // Note: Regular rate limiting skips unauthenticated requests
+    let config = RateLimitConfig {
+        capacity: 2.0,
+        refill_rate: 1.0,
+        cost_per_request: 1.0,
+    };
+    let rate_limiter = Arc::new(RateLimiter::new(config));
+
+    // Create test app WITHOUT TrustRateLimiter but WITH regular RateLimiter
+    // The trust_rate_limit_middleware should fall back to regular rate limiting
+    // which allows unauthenticated requests through
+    let app = actix_web::test::init_service(
+        App::new()
+            .app_data(web::Data::new(rate_limiter.clone()))
+            .route(
+                "/test",
+                web::get()
+                    .to(|| async { HttpResponse::Ok().body("OK") })
+                    .wrap(middleware::from_fn(
+                        icn_gateway::rate_limit::trust_rate_limit_middleware,
+                    )),
+            ),
+    )
+    .await;
+
+    // All requests should succeed since regular rate limiting
+    // allows unauthenticated requests through (no TokenClaims)
+    for i in 1..=5 {
+        let req = actix_web::test::TestRequest::get()
+            .uri("/test")
+            .to_request();
+        let resp = actix_web::test::try_call_service(&app, req).await;
+        assert!(
+            resp.is_ok(),
+            "Request {} should succeed via fallback: {:?}",
+            i,
+            resp.err()
+        );
+        let resp = resp.unwrap();
+        assert!(
+            resp.status().is_success(),
+            "Request {} status should be 2xx (fallback allows unauthenticated): {}",
+            i,
+            resp.status()
+        );
+    }
+}

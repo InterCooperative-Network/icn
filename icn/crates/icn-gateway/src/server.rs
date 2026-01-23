@@ -43,6 +43,10 @@ use icn_compute::ComputeHandle;
 use icn_store::SledStore;
 use tokio::sync::RwLock;
 
+/// Cleanup interval for rate limiter buckets (1 hour)
+/// Applied to both trust-gated and regular rate limiters
+const RATE_LIMITER_CLEANUP_INTERVAL_SECS: u64 = 3600;
+
 /// Configuration for audit record pruning
 #[derive(Debug, Clone)]
 pub struct AuditPruneConfig {
@@ -705,14 +709,14 @@ impl GatewayServer {
                             }
 
                             // Clean up inactive rate limiter buckets (1 hour inactivity)
-                            let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(3600));
+                            let removed = rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(RATE_LIMITER_CLEANUP_INTERVAL_SECS));
                             if removed > 0 {
                                 info!("Cleaned up {} inactive rate limiter buckets", removed);
                             }
 
                             // Clean up trust rate limit buckets if enabled
                             if let Some(ref trust_limiter) = trust_rate_limiter_clone {
-                                let removed: usize = trust_limiter.cleanup_inactive_buckets(Duration::from_secs(3600));
+                                let removed: usize = trust_limiter.cleanup_inactive_buckets(Duration::from_secs(RATE_LIMITER_CLEANUP_INTERVAL_SECS));
                                 if removed > 0 {
                                     info!("Cleaned up {} inactive trust rate limiter buckets", removed);
                                 }
@@ -960,7 +964,7 @@ impl GatewayServer {
                                 .service(api::coops::update_member_role)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -974,7 +978,7 @@ impl GatewayServer {
                                 .service(api::ledger::get_cross_payment_quote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -984,7 +988,7 @@ impl GatewayServer {
                             web::scope("/treasury")
                                 .configure(api::treasury::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -994,7 +998,7 @@ impl GatewayServer {
                             web::scope("/oracle")
                                 .configure(api::oracle::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1003,7 +1007,7 @@ impl GatewayServer {
                             web::scope("")
                                 .configure(api::recurring_payments::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1012,7 +1016,7 @@ impl GatewayServer {
                             web::scope("")
                                 .configure(api::escrow::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1021,7 +1025,7 @@ impl GatewayServer {
                             web::scope("")
                                 .configure(api::budgets::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1067,7 +1071,7 @@ impl GatewayServer {
                                 .service(api::governance::remove_reaction)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1078,7 +1082,7 @@ impl GatewayServer {
                                 .service(api::invites::list_invites)
                                 .service(api::invites::join_via_invite)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1088,7 +1092,7 @@ impl GatewayServer {
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1098,7 +1102,7 @@ impl GatewayServer {
                             web::scope("/contracts")
                                 .configure(api::contracts::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1108,7 +1112,7 @@ impl GatewayServer {
                             web::scope("/entities")
                                 .configure(api::entity::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1118,7 +1122,7 @@ impl GatewayServer {
                             web::scope("/listings")
                                 .configure(api::listings::configure_routes)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1143,7 +1147,7 @@ impl GatewayServer {
                                 .service(api::federation::perform_multilateral_netting)
                                 .service(api::federation::apply_multilateral_netting)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1156,7 +1160,7 @@ impl GatewayServer {
                                 .service(api::trust::revoke_trust_attestation)
                                 .service(api::trust::get_trust_network)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1170,7 +1174,7 @@ impl GatewayServer {
                                 .service(api::devices::get_device)
                                 .service(api::devices::revoke_device)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1186,7 +1190,7 @@ impl GatewayServer {
                             web::scope("/commons")
                                 .configure(api::commons::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1195,7 +1199,7 @@ impl GatewayServer {
                             web::scope("/charter")
                                 .configure(api::charter::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1204,7 +1208,7 @@ impl GatewayServer {
                             web::scope("/steward")
                                 .configure(api::steward::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1213,7 +1217,7 @@ impl GatewayServer {
                             web::scope("/membership")
                                 .configure(api::membership::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1222,7 +1226,7 @@ impl GatewayServer {
                             web::scope("/constitutional")
                                 .configure(api::constitutional::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1231,7 +1235,7 @@ impl GatewayServer {
                             web::scope("")
                                 .configure(api::governance_dashboard::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         )
@@ -1240,7 +1244,7 @@ impl GatewayServer {
                             web::scope("")
                                 .configure(api::communities::configure)
                                 .wrap(middleware::from_fn(
-                                    crate::rate_limit::rate_limit_middleware,
+                                    crate::rate_limit::trust_rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
                         ),

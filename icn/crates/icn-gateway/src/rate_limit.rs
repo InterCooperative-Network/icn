@@ -21,7 +21,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use actix_web::{dev::ServiceRequest, Error, HttpMessage};
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::auth::TokenClaims;
 use crate::error::GatewayError;
@@ -200,10 +200,10 @@ impl RateLimiter {
 
     /// Check if request should be allowed for a DID
     pub fn check_rate_limit(&self, did: &str) -> Result<(), GatewayError> {
-        let mut buckets = self
-            .buckets
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut buckets = self.buckets.write().map_err(|e| {
+            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
+            GatewayError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
 
         let bucket = buckets
             .entry(did.to_string())
@@ -282,10 +282,10 @@ impl CategoryRateLimiter {
         let config = category.config();
         let key = Self::bucket_key(did, category);
 
-        let mut buckets = self
-            .buckets
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut buckets = self.buckets.write().map_err(|e| {
+            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
+            GatewayError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
 
         let bucket = buckets
             .entry(key.clone())
@@ -384,10 +384,10 @@ impl IpRateLimiter {
 
     /// Check if request should be allowed for an IP address
     pub fn check_rate_limit(&self, ip: &str) -> Result<(), GatewayError> {
-        let mut buckets = self
-            .buckets
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut buckets = self.buckets.write().map_err(|e| {
+            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
+            GatewayError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
 
         let bucket = buckets
             .entry(ip.to_string())
@@ -543,10 +543,10 @@ impl TrustRateLimiter {
         let trust_class = TrustRateLimitConfig::trust_class_name(trust_score);
 
         // Get or create bucket for this DID
-        let mut buckets = self
-            .buckets
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut buckets = self.buckets.write().map_err(|e| {
+            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
+            GatewayError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
 
         let (bucket, last_trust) = buckets
             .entry(did.to_string())
@@ -611,17 +611,20 @@ impl TrustRateLimiter {
 ///
 /// Applies rate limits based on authenticated user's trust class.
 /// Anonymous/unauthenticated requests are treated as Isolated (lowest limits).
+///
+/// When trust rate limiting is not configured, falls back to regular rate limiting
+/// using the standard RateLimiter for consistent protection.
 pub async fn trust_rate_limit_middleware(
     req: ServiceRequest,
     next: actix_web::middleware::Next<actix_web::body::BoxBody>,
 ) -> Result<actix_web::dev::ServiceResponse, Error> {
     // Get trust rate limiter from app data
-    let rate_limiter = match req.app_data::<actix_web::web::Data<Arc<TrustRateLimiter>>>() {
+    let trust_limiter = req.app_data::<actix_web::web::Data<Arc<TrustRateLimiter>>>();
+
+    // If trust rate limiter not configured, fall back to regular rate limiting
+    let rate_limiter = match trust_limiter {
         Some(limiter) => limiter.get_ref().clone(),
-        None => {
-            // Trust rate limiter not configured - allow request
-            return next.call(req).await;
-        }
+        None => return rate_limit_middleware(req, next).await,
     };
 
     // Get DID from token claims (inserted by jwt_auth middleware)
