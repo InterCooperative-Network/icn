@@ -1,5 +1,6 @@
 //! Network layer configuration
 
+use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Network layer configuration
@@ -33,7 +34,7 @@ pub struct NetworkConfig {
     ///
     /// For controlled/trusted environments, set to 0.0 to disable trust gating
     #[serde(default = "default_min_trust_threshold")]
-    pub min_trust_threshold: f64,
+    pub min_trust_threshold: TrustScore,
 
     /// TURN relay server for NAT traversal fallback (format: "IP:PORT")
     /// Used when direct connection fails (e.g., symmetric NAT)
@@ -256,8 +257,8 @@ pub(crate) fn default_stun_servers() -> Vec<String> {
     ]
 }
 
-pub(crate) fn default_min_trust_threshold() -> f64 {
-    0.1 // Require at least "Known" trust class by default
+pub(crate) fn default_min_trust_threshold() -> TrustScore {
+    TrustScore::unchecked(0.1) // Require at least "Known" trust class by default
 }
 
 pub(crate) fn default_true() -> bool {
