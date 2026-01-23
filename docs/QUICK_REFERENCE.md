@@ -1,8 +1,7 @@
 # ICN Invite System - Quick Reference
 
-**Your Code Location:** `/home/matt/projects/icn/`  
 **GitHub:** https://github.com/InterCooperative-Network/icn  
-**Deployed At:** http://10.8.10.40:30030
+**Deployed At:** (deployment-specific URL)
 
 ---
 
@@ -39,23 +38,23 @@ sdk/react-native/examples/CoopWallet/src/
 
 | Service | URL | Status |
 |---------|-----|--------|
-| Pilot UI | http://10.8.10.40:30030 | ✅ Running |
-| Gateway API | http://10.8.10.40:30080 | ✅ Running |
-| Metrics | http://10.8.10.40:30091/metrics | ✅ Running |
+| Pilot UI | (deployment-specific URL) | ✅ Running |
+| Gateway API | (deployment-specific URL) | ✅ Running |
+| Metrics | (deployment-specific URL)/metrics | ✅ Running |
 
 ---
 
 ## 🛠️ Common Commands
 
 ```bash
-# Navigate to project
-cd /home/matt/projects/icn
+# Navigate to project (from repo root)
+cd icn
 
 # View backend code
-cat icn/crates/icn-gateway/src/invite.rs
-cat icn/crates/icn-gateway/src/api/invites.rs
+cat crates/icn-gateway/src/invite.rs
+cat crates/icn-gateway/src/api/invites.rs
 
-# View frontend code
+# View frontend code (from repo root)
 cat web/pilot-ui/app.js | grep -A 100 "Invite System"
 
 # Check deployment
@@ -118,8 +117,7 @@ curl http://10.8.10.40:30091/metrics | grep invite
 When you make code changes:
 
 ```bash
-# 1. Make changes
-cd /home/matt/projects/icn
+# 1. Make changes (from repo root)
 # ... edit files ...
 
 # 2. Test locally
@@ -131,8 +129,8 @@ git add .
 git commit -m "your changes"
 git push origin main
 
-# 4. Redeploy
-cd /home/matt/projects/icn/deploy/k8s
+# 4. Redeploy (from repo root)
+cd deploy/k8s
 make full-deploy-with-ui
 
 # 5. Verify

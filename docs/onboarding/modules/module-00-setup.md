@@ -117,7 +117,8 @@ icn/                          # Root directory
 │   ├── Cargo.toml            # Workspace manifest
 │   ├── bins/                 # Binary crates
 │   │   ├── icnd/             # Daemon binary
-│   │   └── icnctl/           # CLI tool
+│   │   ├── icnctl/           # CLI tool
+│   │   └── icn-console/      # Interactive TUI console
 │   └── crates/               # Library crates
 │       ├── icn-core/         # Runtime, supervisor, orchestration
 │       ├── icn-identity/     # DID, keystore, key management

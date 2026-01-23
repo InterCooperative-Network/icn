@@ -15,8 +15,8 @@
 ## Quick Commands
 
 ```bash
-# Deploy new version
-cd /home/matt/projects/icn/deploy/k8s && make full-deploy-dev
+# Deploy new version (from repo root)
+cd deploy/k8s && make full-deploy-dev
 
 # Check status
 make status
@@ -35,6 +35,7 @@ ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/
 Full deployment automation available via `deploy/k8s/`:
 
 ```bash
+# From repo root
 cd deploy/k8s
 make full-deploy-dev  # Build, sync, and deploy in one command
 ```

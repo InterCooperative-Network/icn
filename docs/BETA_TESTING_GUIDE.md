@@ -24,7 +24,8 @@
 First, generate your ICN identity (DID) using icnctl:
 
 ```bash
-cd /home/matt/projects/icn/icn
+# From repo root, navigate to Rust workspace
+cd icn
 cargo build --release
 
 # Initialize identity
@@ -40,7 +41,7 @@ cargo build --release
 **Option A: Use the helper script (Recommended)**
 
 ```bash
-cd /home/matt/projects/icn
+# From repo root
 ICN_PASSPHRASE="your-passphrase" ./scripts/generate-test-token.sh
 ```
 
@@ -49,19 +50,20 @@ This will output your DID and token ready to paste into the Web UI.
 **Option B: Use icnctl directly**
 
 ```bash
-cd /home/matt/projects/icn/icn
+# From icn/ workspace directory
+cd icn
 
 # Get token (handles challenge-response automatically)
 ICN_PASSPHRASE="your-passphrase" ./target/release/icnctl auth token \
-  --gateway http://10.8.10.40:30080 \
+  --gateway http://YOUR_GATEWAY_URL:30080 \
   --coop-id test-coop
 ```
 
 ### 3. Access the Web UI
 
-1. Open http://10.8.10.40:30030 in your browser
+1. Open the Pilot UI in your browser (deployment-specific URL)
 2. Enter:
-   - **Gateway URL**: `http://10.8.10.40:30080`
+   - **Gateway URL**: Your gateway URL
    - **Cooperative ID**: `test-coop`
    - **Your DID**: (from step 1)
    - **Token**: (from step 2)

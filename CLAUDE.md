@@ -30,7 +30,7 @@ make logs                                # View logs
 
 ## Workspace Structure
 
-The Cargo workspace is located in `icn/` subdirectory. All build/test commands must be run from `/home/matt/projects/icn/icn/`.
+The Cargo workspace is located in the `icn/` subdirectory. All build/test commands must be run from the `icn/` directory within the repository root.
 
 **Crates** (in `icn/crates/`):
 - `icn-core` - Tokio runtime, supervisor, actor lifecycle management
@@ -46,24 +46,39 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `icn-gateway` - REST + WebSocket API for cooperative applications
 - `icn-governance` - Governance primitives for community decision-making
 - `icn-compute` - Distributed compute layer with trust-gated task execution
+- `icn-federation` - Inter-cooperative coordination and federation protocol
+- `icn-privacy` - Privacy primitives and metadata protection
+- `icn-security` - Byzantine fault detection and reputation
+- `icn-time` - Clock synchronization (Rough Time Protocol)
+- `icn-snapshot` - State snapshots for graceful restarts
+- `icn-crypto-pq` - Post-quantum hybrid cryptography
+- `icn-steward` - SDIS steward network & VUI computation
+- `icn-zkp` - Zero-knowledge proofs for SDIS
+- `icn-coop` - Cooperative management & lifecycle
+- `icn-community` - Community structures & civic engine
+- `icn-entity` - Unified entity model (individuals/coops/federations)
+- `icn-api` - API types and definitions
+- `icn-encoding` - Serialization utilities
 - `icn-testkit` - Test utilities for multi-node scenarios
 
 **Binaries** (in `icn/bins/`):
 - `icnd` - The ICN daemon
 - `icnctl` - CLI management tool
+- `icn-console` - Interactive TUI for cooperative management
 
 ## Documentation Structure
 
 **IMPORTANT: Never save documentation files to the project root.** All documentation (session notes, status reports, guides, etc.) must go in the appropriate `docs/` subdirectory.
 
-**Project root `/home/matt/projects/icn/`** (only these files):
+**Project root** (only these files):
 - `README.md` - Project overview and quick start
 - `CHANGELOG.md` - User-facing changelog
 - `CLAUDE.md` - This file (Claude Code guidance)
 - `CODE_OF_CONDUCT.md` - Community guidelines
 - `CONTRIBUTING.md` - Contribution guidelines
+- `AGENTS.md` - Agent coding instructions
 
-**Documentation directory `/home/matt/projects/icn/docs/`:**
+**Documentation directory (`docs/`):**
 - `ARCHITECTURE.md` - System architecture and component design
 - `PHASE_HISTORY.md` - Completed development phases
 - `HOMELAB_DEPLOYMENT.md` - K3s deployment details

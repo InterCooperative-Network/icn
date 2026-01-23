@@ -89,7 +89,7 @@ Detailed development notes and historical records:
 ### For New Developers
 1. Read [README.md](../README.md)
 2. Review [CONTRIBUTING.md](../CONTRIBUTING.md)
-3. Check [docs/architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md)
+3. Check [docs/ARCHITECTURE.md](ARCHITECTURE.md)
 4. Browse [docs/dev-journal/](dev-journal/) for context
 
 ### For Security Engineers

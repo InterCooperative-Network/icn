@@ -85,7 +85,7 @@ If you're joining an existing cooperative, you need:
 
 ```bash
 # Connect to a bootstrap node
-icnctl network add-peer 192.168.1.100:5600 did:icn:abc123...
+icnctl network add-peer 192.168.1.100:7777 did:icn:abc123...
 
 # Request trust from a member
 # (They run: icnctl trust add did:icn:YOUR_DID 0.5)
@@ -287,7 +287,7 @@ Wrong passphrase. Try again or restore from backup.
 Your node hasn't discovered peers yet. Either:
 1. Wait for mDNS discovery (~30 seconds on LAN)
 2. Manually add a peer: `icnctl network add-peer <addr> <did>`
-3. Check firewall settings (port 5600/UDP and TCP)
+3. Check firewall settings (port 7777/UDP for QUIC)
 
 ### "Transaction rejected: insufficient credit"
 You've hit your credit limit. Either:
