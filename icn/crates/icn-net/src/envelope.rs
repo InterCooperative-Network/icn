@@ -87,7 +87,7 @@ pub struct SignedEnvelope {
 
     /// ML-DSA (post-quantum) signature (only present for Hybrid type)
     /// When present, both this and `signature` must verify
-    /// Note: Using `#[serde(default)]` without `skip_serializing_if` for bincode compatibility
+    /// Note: Using `#[serde(default)]` without `skip_serializing_if` for positional encoding compatibility
     #[serde(default)]
     pub pq_signature: Option<Vec<u8>>,
 }
@@ -408,7 +408,7 @@ impl SignedEnvelope {
 
     /// Deserialize payload as the specified type
     pub fn decode_payload<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
-        icn_encoding::decode_bincode_legacy(&self.payload).context("Failed to deserialize payload")
+        icn_encoding::decode(&self.payload).context("Failed to deserialize payload")
     }
 
     /// Serialize and create envelope for a typed payload
@@ -419,8 +419,7 @@ impl SignedEnvelope {
         payload_type: PayloadType,
         payload: &T,
     ) -> Result<Self> {
-        let payload_bytes =
-            icn_encoding::encode_bincode_legacy(payload).context("Failed to serialize payload")?;
+        let payload_bytes = icn_encoding::encode(payload).context("Failed to serialize payload")?;
         Self::new(from, keypair, sequence, payload_type, payload_bytes)
     }
 }

@@ -102,78 +102,70 @@ fn get_message_topic_and_data(
     use icn_compute::ComputeMessage;
 
     match compute_msg {
-        ComputeMessage::TaskSubmitted(_) => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::TaskClaimed { .. } => (
-            icn_compute::TOPIC_CLAIM,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::TaskResult(_) => (
-            icn_compute::TOPIC_RESULT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::TaskCancelled { .. } => (
-            icn_compute::TOPIC_CANCEL,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::ExecutorAnnounce { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::PlacementRequest { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::PlacementOffer { .. } => (
-            icn_compute::TOPIC_CLAIM,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
-        ComputeMessage::NodeCapacityAnnounce { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
-        ),
+        ComputeMessage::TaskSubmitted(_) => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskClaimed { .. } => {
+            (icn_compute::TOPIC_CLAIM, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskResult(_) => {
+            (icn_compute::TOPIC_RESULT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskCancelled { .. } => {
+            (icn_compute::TOPIC_CANCEL, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::ExecutorAnnounce { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::PlacementRequest { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::PlacementOffer { .. } => {
+            (icn_compute::TOPIC_CLAIM, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::NodeCapacityAnnounce { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
         ComputeMessage::CheckpointQuery { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::CheckpointResponse { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::MigrationRequest { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::MigrationAccept { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::CheckpointAnnounce { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::MigrationReject { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::MigrationComplete { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         // Phase 21: Cross-cooperative federation messages
         ComputeMessage::FederatedExecutorAnnounce { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::FederatedTaskRequest { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
         ComputeMessage::FederatedTaskResult { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            icn_encoding::encode_bincode_legacy(compute_msg),
+            icn_encoding::encode(compute_msg),
         ),
     }
 }

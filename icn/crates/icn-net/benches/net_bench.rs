@@ -51,18 +51,17 @@ fn bench_message_serialization(c: &mut Criterion) {
         b.iter(|| icn_encoding::decode::<NetworkMessage>(black_box(&postcard_bytes)).unwrap());
     });
 
-    // Benchmark bincode legacy encoding (backward compatibility)
-    group.bench_function("serialize_ping_bincode_legacy", |b| {
+    // Benchmark versioned storage encoding (with version prefix)
+    group.bench_function("serialize_ping_versioned", |b| {
         let msg = create_ping_message(1);
-        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap());
+        b.iter(|| icn_encoding::encode_versioned(black_box(&msg)).unwrap());
     });
 
-    let bincode_bytes = icn_encoding::encode_bincode_legacy(&msg).unwrap();
+    let versioned_bytes = icn_encoding::encode_versioned(&msg).unwrap();
 
-    group.bench_function("deserialize_ping_bincode_legacy", |b| {
+    group.bench_function("deserialize_ping_versioned", |b| {
         b.iter(|| {
-            icn_encoding::decode_bincode_legacy::<NetworkMessage>(black_box(&bincode_bytes))
-                .unwrap()
+            icn_encoding::decode_versioned::<NetworkMessage>(black_box(&versioned_bytes)).unwrap()
         });
     });
 
@@ -108,9 +107,9 @@ fn bench_message_serialization(c: &mut Criterion) {
     // Log size comparison
     let json_bytes = serde_json::to_vec(&msg).unwrap();
     println!(
-        "Postcard: {} bytes, Bincode: {} bytes, JSON: {} bytes",
+        "Postcard (wire): {} bytes, Postcard (storage): {} bytes, JSON: {} bytes",
         postcard_bytes.len(),
-        bincode_bytes.len(),
+        versioned_bytes.len(),
         json_bytes.len()
     );
 
@@ -219,10 +218,10 @@ fn bench_message_sizes(c: &mut Criterion) {
         });
     });
 
-    group.bench_function("measure_ping_size_bincode_legacy", |b| {
+    group.bench_function("measure_ping_size_versioned", |b| {
         let msg = create_ping_message(1);
         b.iter(|| {
-            let bytes = icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap();
+            let bytes = icn_encoding::encode_versioned(black_box(&msg)).unwrap();
             bytes.len()
         });
     });

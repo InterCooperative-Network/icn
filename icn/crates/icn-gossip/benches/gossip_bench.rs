@@ -82,25 +82,24 @@ fn bench_gossip_entry_serialization(c: &mut Criterion) {
         b.iter(|| icn_encoding::decode::<GossipEntry>(black_box(&serialized_postcard)).unwrap());
     });
 
-    // Benchmark bincode legacy encoding (backward compatibility)
-    group.bench_function("serialize_bincode_legacy", |b| {
-        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&entry)).unwrap());
+    // Benchmark versioned storage encoding (with version prefix)
+    group.bench_function("serialize_versioned", |b| {
+        b.iter(|| icn_encoding::encode_versioned(black_box(&entry)).unwrap());
     });
 
-    let serialized_bincode = icn_encoding::encode_bincode_legacy(&entry).unwrap();
+    let serialized_versioned = icn_encoding::encode_versioned(&entry).unwrap();
 
-    group.bench_function("deserialize_bincode_legacy", |b| {
+    group.bench_function("deserialize_versioned", |b| {
         b.iter(|| {
-            icn_encoding::decode_bincode_legacy::<GossipEntry>(black_box(&serialized_bincode))
-                .unwrap()
+            icn_encoding::decode_versioned::<GossipEntry>(black_box(&serialized_versioned)).unwrap()
         });
     });
 
     // Log size comparison
     println!(
-        "Postcard: {} bytes, Bincode: {} bytes",
+        "Postcard (wire): {} bytes, Postcard (storage): {} bytes",
         serialized_postcard.len(),
-        serialized_bincode.len()
+        serialized_versioned.len()
     );
 
     group.finish();

@@ -151,7 +151,7 @@ pub mod steward {
                 };
 
                 // Serialize message
-                let data = match icn_encoding::encode_bincode_legacy(&steward_msg) {
+                let data = match icn_encoding::encode(&steward_msg) {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to serialize steward message: {}", e);
@@ -208,7 +208,7 @@ pub mod steward {
                 }
 
                 // Parse steward message
-                match icn_encoding::decode_bincode_legacy::<StewardMessage>(&data) {
+                match icn_encoding::decode::<StewardMessage>(&data) {
                     Ok(msg) => {
                         debug!(
                             "Received steward message on topic {}: {:?}",

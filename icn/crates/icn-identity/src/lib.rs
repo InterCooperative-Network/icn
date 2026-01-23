@@ -156,14 +156,12 @@ impl HybridSignatureOrClassical {
         // SAFETY: HybridSignature is a simple struct with byte arrays that always serializes
         // successfully. Encoding cannot fail for well-formed data.
         #[allow(clippy::expect_used)]
-        icn_encoding::encode_bincode_legacy(self)
-            .expect("HybridSignature serialization is infallible")
+        icn_encoding::encode(self).expect("HybridSignature serialization is infallible")
     }
 
     /// Parse from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        icn_encoding::decode_bincode_legacy(bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
+        icn_encoding::decode(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
     }
 }
 

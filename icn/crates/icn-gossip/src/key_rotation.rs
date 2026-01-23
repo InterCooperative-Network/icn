@@ -252,9 +252,9 @@ mod tests {
             signature_new: vec![9, 10, 11, 12],
         };
 
-        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let serialized = icn_encoding::encode(&msg).expect("serialize");
         let deserialized: KeyRotationMessage =
-            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
+            icn_encoding::decode(&serialized).expect("deserialize");
         assert_eq!(msg, deserialized);
     }
 

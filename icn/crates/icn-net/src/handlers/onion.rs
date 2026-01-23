@@ -98,7 +98,7 @@ impl ConnectionContext {
                 icn_obs::metrics::privacy::onion_messages_delivered_inc();
 
                 // Attempt to deserialize as NetworkMessage and forward
-                match icn_encoding::decode_bincode_legacy::<NetworkMessage>(&payload) {
+                match icn_encoding::decode::<NetworkMessage>(&payload) {
                     Ok(inner_msg) => {
                         debug!(
                             "Extracted inner message: {:?}",

@@ -47,7 +47,7 @@ fn test_encrypt_sign_decrypt_flow() {
     // ========== ALICE SIDE: ENCRYPT AND SIGN ==========
 
     // 1. Serialize the message
-    let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+    let plaintext = icn_encoding::encode(&message).unwrap();
 
     // 2. Encrypt for Bob using X25519 keys
     let sequence = 42;
@@ -66,7 +66,7 @@ fn test_encrypt_sign_decrypt_flow() {
     assert_eq!(encrypted_envelope.sequence, sequence);
 
     // 3. Serialize the encrypted envelope
-    let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted_envelope).unwrap();
+    let encrypted_bytes = icn_encoding::encode(&encrypted_envelope).unwrap();
 
     // 4. Sign the encrypted envelope
     let signed_envelope = SignedEnvelope::new(
@@ -95,7 +95,7 @@ fn test_encrypt_sign_decrypt_flow() {
 
     // 2. Deserialize the encrypted envelope
     let received_encrypted: EncryptedEnvelope =
-        icn_encoding::decode_bincode_legacy(&signed_envelope.payload).unwrap();
+        icn_encoding::decode(&signed_envelope.payload).unwrap();
 
     // Verify envelope metadata
     assert_eq!(received_encrypted.from, *alice_bundle.did());
@@ -107,8 +107,7 @@ fn test_encrypt_sign_decrypt_flow() {
         .unwrap();
 
     // 4. Deserialize the plaintext message
-    let decrypted_message: SecretMessage =
-        icn_encoding::decode_bincode_legacy(&decrypted_bytes).unwrap();
+    let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
 
     // ========== VERIFICATION ==========
     assert_eq!(decrypted_message, message);
@@ -131,7 +130,7 @@ fn test_wrong_recipient_cannot_decrypt() {
     };
 
     // Alice encrypts for Bob
-    let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+    let plaintext = icn_encoding::encode(&message).unwrap();
     let encrypted_envelope = EncryptedEnvelope::encrypt(
         alice_bundle.did(),
         bob_bundle.did(),
@@ -165,7 +164,7 @@ fn test_tampering_detected_after_encryption() {
     };
 
     // Encrypt the message
-    let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+    let plaintext = icn_encoding::encode(&message).unwrap();
     let mut encrypted_envelope = EncryptedEnvelope::encrypt(
         alice_bundle.did(),
         bob_bundle.did(),
@@ -197,7 +196,7 @@ fn test_signature_protects_encrypted_envelope() {
     };
 
     // Encrypt and sign
-    let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+    let plaintext = icn_encoding::encode(&message).unwrap();
     let encrypted_envelope = EncryptedEnvelope::encrypt(
         alice_bundle.did(),
         bob_bundle.did(),
@@ -208,7 +207,7 @@ fn test_signature_protects_encrypted_envelope() {
     )
     .unwrap();
 
-    let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted_envelope).unwrap();
+    let encrypted_bytes = icn_encoding::encode(&encrypted_envelope).unwrap();
     let mut signed_envelope = SignedEnvelope::new(
         alice_bundle.did(),
         &alice_bundle.keypair().unwrap(),
@@ -238,7 +237,7 @@ fn test_multiple_encrypted_messages_different_nonces() {
             timestamp: 1234567890 + seq,
         };
 
-        let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+        let plaintext = icn_encoding::encode(&message).unwrap();
         let encrypted_envelope = EncryptedEnvelope::encrypt(
             alice_bundle.did(),
             bob_bundle.did(),
@@ -254,8 +253,7 @@ fn test_multiple_encrypted_messages_different_nonces() {
             .decrypt(&bob_bundle.x25519_secret(), &alice_bundle.x25519_public())
             .unwrap();
 
-        let decrypted_message: SecretMessage =
-            icn_encoding::decode_bincode_legacy(&decrypted_bytes).unwrap();
+        let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
         assert_eq!(decrypted_message, message);
     }
 }
@@ -272,7 +270,7 @@ fn test_large_encrypted_message() {
         timestamp: 1234567890,
     };
 
-    let plaintext = icn_encoding::encode_bincode_legacy(&message).unwrap();
+    let plaintext = icn_encoding::encode(&message).unwrap();
     let encrypted_envelope = EncryptedEnvelope::encrypt(
         alice_bundle.did(),
         bob_bundle.did(),
@@ -288,8 +286,7 @@ fn test_large_encrypted_message() {
         .decrypt(&bob_bundle.x25519_secret(), &alice_bundle.x25519_public())
         .unwrap();
 
-    let decrypted_message: SecretMessage =
-        icn_encoding::decode_bincode_legacy(&decrypted_bytes).unwrap();
+    let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
     assert_eq!(decrypted_message.content, large_content);
 }
 
@@ -441,7 +438,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     };
 
     // Serialize the secret message
-    let plaintext = icn_encoding::encode_bincode_legacy(&secret_message)?;
+    let plaintext = icn_encoding::encode(&secret_message)?;
 
     // Encrypt using X25519 keys retrieved from network
     let bob_x25519_public = alice_has_bob_key.unwrap();
@@ -458,7 +455,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     )?;
 
     // Serialize and sign the encrypted envelope
-    let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted_envelope)?;
+    let encrypted_bytes = icn_encoding::encode(&encrypted_envelope)?;
     let signed_envelope = SignedEnvelope::new(
         alice.identity_bundle.did(),
         &alice.identity_bundle.keypair().unwrap(),
@@ -506,8 +503,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     assert_eq!(signed_envelope.payload_type, PayloadType::Encrypted);
 
     // Deserialize the encrypted envelope
-    let received_encrypted: EncryptedEnvelope =
-        icn_encoding::decode_bincode_legacy(&signed_envelope.payload)?;
+    let received_encrypted: EncryptedEnvelope = icn_encoding::decode(&signed_envelope.payload)?;
 
     // Decrypt using Bob's X25519 secret key and Alice's public key
     let alice_x25519_public = bob_has_alice_key.unwrap();
@@ -519,7 +515,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     )?;
 
     // Deserialize the plaintext message
-    let decrypted_message: SecretMessage = icn_encoding::decode_bincode_legacy(&decrypted_bytes)?;
+    let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes)?;
 
     println!(
         "✓ Bob decrypted the message: '{}'",
@@ -560,7 +556,7 @@ async fn test_broadcast_path_not_encrypted() -> Result<()> {
         content: "Broadcast announcement".to_string(),
         timestamp: 1234567890,
     };
-    let plaintext = icn_encoding::encode_bincode_legacy(&message)?;
+    let plaintext = icn_encoding::encode(&message)?;
 
     // Create signed envelope with PayloadType::Gossip (not Encrypted)
     let signed_envelope = SignedEnvelope::new(
@@ -603,8 +599,7 @@ async fn test_broadcast_path_not_encrypted() -> Result<()> {
     );
 
     // Verify we can read the payload directly (no decryption needed)
-    let decoded_message: SecretMessage =
-        icn_encoding::decode_bincode_legacy(&signed_envelope.payload)?;
+    let decoded_message: SecretMessage = icn_encoding::decode(&signed_envelope.payload)?;
     assert_eq!(decoded_message, message);
 
     println!("✓ Broadcast message received without encryption - correct behavior");
@@ -736,8 +731,7 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
     println!("✓ Bob verified Alice's signature");
 
     // Extract encrypted envelope
-    let encrypted_env: EncryptedEnvelope =
-        icn_encoding::decode_bincode_legacy(&signed_env.payload)?;
+    let encrypted_env: EncryptedEnvelope = icn_encoding::decode(&signed_env.payload)?;
 
     // Get Alice's X25519 public key
     let alice_x25519_public = bob

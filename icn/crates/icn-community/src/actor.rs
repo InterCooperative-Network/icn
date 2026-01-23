@@ -502,7 +502,7 @@ impl CommunityActor {
 
     async fn announce_update(&self, community: &Community) {
         if let Some(gossip) = &self.gossip {
-            match icn_encoding::encode_bincode_legacy(community) {
+            match icn_encoding::encode(community) {
                 Ok(data) => {
                     let mut gossip_actor = gossip.write().await;
                     match gossip_actor.publish(COMMUNITY_TOPIC, data).await {

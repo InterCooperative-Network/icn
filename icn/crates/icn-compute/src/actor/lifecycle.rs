@@ -278,7 +278,7 @@ impl ComputeActor {
                                 expected: outcome_to_value(&first_result.outcome),
                                 actual: outcome_to_value(&conflicting.outcome),
                             },
-                            additional_data: icn_encoding::encode_bincode_legacy(&(
+                            additional_data: icn_encoding::encode(&(
                                 first_result.fuel_used,
                                 conflicting.fuel_used,
                             ))

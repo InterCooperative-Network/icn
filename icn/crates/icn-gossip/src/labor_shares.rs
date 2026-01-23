@@ -221,9 +221,9 @@ mod tests {
         };
 
         // Use binary serialization (gossip messages are binary)
-        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let serialized = icn_encoding::encode(&msg).expect("serialize");
         let deserialized: LaborShareMessage =
-            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
+            icn_encoding::decode(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
@@ -244,9 +244,8 @@ mod tests {
             collateral_description: Some("Equipment lien".to_string()),
         };
 
-        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
-        let deserialized: BondMessage =
-            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
+        let serialized = icn_encoding::encode(&msg).expect("serialize");
+        let deserialized: BondMessage = icn_encoding::decode(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
@@ -263,9 +262,8 @@ mod tests {
             timestamp: 1736467100,
         };
 
-        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
-        let deserialized: BondMessage =
-            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
+        let serialized = icn_encoding::encode(&msg).expect("serialize");
+        let deserialized: BondMessage = icn_encoding::decode(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }

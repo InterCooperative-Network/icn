@@ -450,7 +450,7 @@ pub async fn handle_snapshot_coordination(
     snapshot_coordinator: SnapshotCoordinatorHandle,
     gossip_handle: GossipHandle,
 ) {
-    match icn_encoding::decode_bincode_legacy::<icn_snapshot::SnapshotMessage>(&entry_data) {
+    match icn_encoding::decode::<icn_snapshot::SnapshotMessage>(&entry_data) {
         Ok(snapshot_msg) => {
             match snapshot_coordinator
                 .write()
@@ -461,14 +461,13 @@ pub async fn handle_snapshot_coordination(
                 Ok(response_msgs) => {
                     // Broadcast any response messages
                     for response_msg in response_msgs {
-                        let response_bytes =
-                            match icn_encoding::encode_bincode_legacy(&response_msg) {
-                                Ok(bytes) => bytes,
-                                Err(e) => {
-                                    warn!("Failed to serialize snapshot response: {}", e);
-                                    continue;
-                                }
-                            };
+                        let response_bytes = match icn_encoding::encode(&response_msg) {
+                            Ok(bytes) => bytes,
+                            Err(e) => {
+                                warn!("Failed to serialize snapshot response: {}", e);
+                                continue;
+                            }
+                        };
 
                         let mut gossip_guard = gossip_handle.write().await;
                         match gossip_guard
@@ -499,7 +498,7 @@ pub async fn handle_snapshot_coordination(
 
 /// Handle compute topic messages
 pub async fn handle_compute_message(entry_data: Vec<u8>, compute_handle: ComputeHandleHolder) {
-    match icn_encoding::decode_bincode_legacy::<icn_compute::ComputeMessage>(&entry_data) {
+    match icn_encoding::decode::<icn_compute::ComputeMessage>(&entry_data) {
         Ok(compute_msg) => {
             if let Some(handle) = compute_handle.read().await.as_ref() {
                 if let Err(e) = handle.handle_gossip(compute_msg).await {
@@ -515,7 +514,7 @@ pub async fn handle_compute_message(entry_data: Vec<u8>, compute_handle: Compute
 
 /// Handle dispute filing messages
 pub async fn handle_dispute_message(entry_data: Vec<u8>, dispute_handle: DisputeHandleHolder) {
-    match icn_encoding::decode_bincode_legacy::<icn_ccl::DisputeMessage>(&entry_data) {
+    match icn_encoding::decode::<icn_ccl::DisputeMessage>(&entry_data) {
         Ok(dispute_msg) => {
             if let Some(handle) = dispute_handle.read().await.as_ref() {
                 match dispute_msg {
@@ -622,7 +621,7 @@ pub async fn handle_node_profile(
 
 /// Handle cooperative update messages
 pub async fn handle_coop_update(entry_data: Vec<u8>, coop_store: Arc<icn_coop::CoopStore>) {
-    match icn_encoding::decode_bincode_legacy::<icn_coop::Cooperative>(&entry_data) {
+    match icn_encoding::decode::<icn_coop::Cooperative>(&entry_data) {
         Ok(coop) => {
             let existing = coop_store.get_cooperative(&coop.id);
             if existing.is_ok() {
@@ -659,7 +658,7 @@ pub async fn handle_coop_update(entry_data: Vec<u8>, coop_store: Arc<icn_coop::C
 ///
 /// Uses last-write-wins merge strategy based on `updated_at` timestamp.
 pub async fn handle_community_update(entry_data: Vec<u8>, community_store: CommunityStoreHandle) {
-    match icn_encoding::decode_bincode_legacy::<icn_community::Community>(&entry_data) {
+    match icn_encoding::decode::<icn_community::Community>(&entry_data) {
         Ok(remote_community) => {
             // Check for existing community and use last-write-wins merge
             match community_store.get(&remote_community.id) {

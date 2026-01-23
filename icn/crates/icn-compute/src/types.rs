@@ -99,7 +99,7 @@ pub struct ComputeTask {
 impl ComputeTask {
     /// Compute the task hash
     pub fn hash(&self) -> TaskHash {
-        let bytes = icn_encoding::encode_bincode_legacy(self).unwrap_or_default();
+        let bytes = icn_encoding::encode(self).unwrap_or_default();
         *blake3::hash(&bytes).as_bytes()
     }
 
@@ -533,8 +533,8 @@ mod tests {
             task_hash: [0u8; 32],
             executor: "did:icn:bob".into(),
         };
-        let bytes = icn_encoding::encode_bincode_legacy(&msg).unwrap();
-        let decoded: ComputeMessage = icn_encoding::decode_bincode_legacy(&bytes).unwrap();
+        let bytes = icn_encoding::encode(&msg).unwrap();
+        let decoded: ComputeMessage = icn_encoding::decode(&bytes).unwrap();
 
         // Verify correct variant and executor
         assert!(
