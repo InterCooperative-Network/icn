@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use crate::context::RpcContext;
 use crate::server::RpcServer;
 use crate::types::RpcResponse;
 
@@ -10,7 +11,16 @@ pub async fn handle_policy_set(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "policy.set called"
+        );
+    }
+
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -46,7 +56,7 @@ pub async fn handle_policy_set(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to set policy: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -55,7 +65,15 @@ pub async fn handle_policy_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "policy.get called"
+        );
+    }
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -89,7 +107,16 @@ pub async fn handle_policy_list(
     id: u64,
     _params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "policy.list called"
+        );
+    }
+
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -107,7 +134,15 @@ pub async fn handle_policy_remove(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "policy.remove called"
+        );
+    }
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -141,7 +176,16 @@ pub async fn handle_quota_usage(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "quota.usage called"
+        );
+    }
+
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -170,7 +214,7 @@ pub async fn handle_quota_usage(
             let result = serde_json::to_value(usage).unwrap_or_default();
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get usage: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -179,7 +223,15 @@ pub async fn handle_quota_list(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "quota.list called"
+        );
+    }
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -204,6 +256,6 @@ pub async fn handle_quota_list(
             let result = serde_json::to_value(usage_records).unwrap_or_default();
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list usage: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }

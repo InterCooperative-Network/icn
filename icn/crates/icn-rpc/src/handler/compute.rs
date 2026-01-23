@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::auth::RpcTokenClaims;
+use crate::context::RpcContext;
 use crate::server::RpcServer;
 use crate::types::{
     CodeType, RpcResponse, SubmitTaskRequest, SubmitTaskResponse, TaskResultInfo, TaskStatusInfo,
@@ -13,9 +13,17 @@ pub async fn handle_compute_submit(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
     use base64::Engine;
+
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "compute.submit called"
+        );
+    }
 
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
@@ -32,16 +40,15 @@ pub async fn handle_compute_submit(
     };
 
     // Get authenticated submitter DID (or fallback for unauthenticated dev mode)
-    let submitter = claims
-        .as_ref()
-        .map(|c| c.sub.clone())
+    let submitter = ctx
+        .map(|c| c.caller_did.to_string())
         .unwrap_or_else(|| "rpc:anonymous".to_string());
 
-    // Get coop_id: prefer request, fallback to JWT claims
+    // Get coop_id: prefer request, fallback to ctx
     let coop_id = request
         .coop_id
         .clone()
-        .or_else(|| claims.as_ref().and_then(|c| c.coop_id.clone()));
+        .or_else(|| ctx.and_then(|c| c.coop_id.clone()));
 
     // Convert resource_profile from request to compute ResourceProfile
     let resource_profile = request.resource_profile.as_ref().map(|rp| {
@@ -141,7 +148,7 @@ pub async fn handle_compute_submit(
             };
             RpcResponse::success(id, serde_json::to_value(response).unwrap_or_default())
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to submit task: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -150,7 +157,16 @@ pub async fn handle_compute_status(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "compute.status called"
+        );
+    }
+
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -253,7 +269,7 @@ pub async fn handle_compute_status(
             RpcResponse::success(id, serde_json::to_value(info).unwrap_or_default())
         }
         Ok(None) => RpcResponse::error(id, -32000, "Task not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -262,8 +278,16 @@ pub async fn handle_compute_cancel(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "compute.cancel called"
+        );
+    }
+
     let compute_handle = match state.compute_handle() {
         Some(handle) => handle,
         None => {
@@ -306,10 +330,12 @@ pub async fn handle_compute_cancel(
         .unwrap_or_else(|| "Cancelled by submitter".to_string());
 
     // Get authenticated caller DID (or fallback for unauthenticated dev mode)
-    let caller_did = claims.map(|c| c.sub.as_str()).unwrap_or("rpc:anonymous");
+    let caller_did_str = ctx
+        .map(|c| c.caller_did.to_string())
+        .unwrap_or_else(|| "rpc:anonymous".to_string());
 
     match compute_handle
-        .cancel_task(&hash_bytes, caller_did, reason)
+        .cancel_task(&hash_bytes, &caller_did_str, reason)
         .await
     {
         Ok(_) => {
@@ -324,6 +350,6 @@ pub async fn handle_compute_cancel(
             };
             RpcResponse::success(id, serde_json::to_value(response).unwrap_or_default())
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cancel task: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }

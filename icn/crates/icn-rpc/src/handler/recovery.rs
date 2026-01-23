@@ -7,7 +7,7 @@ use tracing::info;
 use icn_identity::recovery::{RecoveryAttestation, RecoveryEvent, RecoveryStatus};
 use icn_identity::Did;
 
-use crate::auth::RpcTokenClaims;
+use crate::context::RpcContext;
 use crate::server::RpcServer;
 use crate::types::{RecoveryAttestationInfo, RecoveryEventInfo, RpcResponse};
 
@@ -16,8 +16,16 @@ pub async fn handle_recovery_initiate(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.initiate called"
+        );
+    }
+
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -25,9 +33,9 @@ pub async fn handle_recovery_initiate(
         }
     };
 
-    // Get the new DID from authenticated claims
-    let new_did_str = match claims {
-        Some(c) => &c.sub,
+    // Get the new DID from authenticated context
+    let new_did_str = match ctx {
+        Some(c) => c.caller_did.to_string(),
         None => {
             return RpcResponse::error(id, -32001, "Authentication required".to_string());
         }
@@ -60,7 +68,7 @@ pub async fn handle_recovery_initiate(
         }
     };
 
-    let new_did = match Did::from_str(new_did_str) {
+    let new_did = match Did::from_str(&new_did_str) {
         Ok(d) => d,
         Err(e) => {
             return RpcResponse::error(id, -32602, format!("Invalid new_did: {e}"));
@@ -75,12 +83,12 @@ pub async fn handle_recovery_initiate(
     let recovery_json = match serde_json::to_vec(&recovery) {
         Ok(j) => j,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
-        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     info!(
@@ -102,7 +110,16 @@ pub async fn handle_recovery_attest(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.attest called"
+        );
+    }
+
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -138,14 +155,14 @@ pub async fn handle_recovery_attest(
             return RpcResponse::error(id, -32000, "Recovery not found".to_string());
         }
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -158,7 +175,7 @@ pub async fn handle_recovery_attest(
     ) {
         Ok(a) => a,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to create attestation: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -166,7 +183,7 @@ pub async fn handle_recovery_attest(
     let threshold_reached = match recovery.add_attestation(attestation) {
         Ok(t) => t,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to add attestation: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -174,12 +191,12 @@ pub async fn handle_recovery_attest(
     let recovery_json = match serde_json::to_vec(&recovery) {
         Ok(j) => j,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
-        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     info!(
@@ -198,7 +215,19 @@ pub async fn handle_recovery_attest(
 }
 
 /// Handle recovery.list RPC call - list all recovery events
-pub async fn handle_recovery_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+pub async fn handle_recovery_list(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.list called"
+        );
+    }
+
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -209,7 +238,7 @@ pub async fn handle_recovery_list(id: u64, state: &Arc<RpcServer>) -> RpcRespons
     let items = match store.scan(b"recovery:") {
         Ok(i) => i,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to scan recoveries: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -232,7 +261,15 @@ pub async fn handle_recovery_status(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.status called"
+        );
+    }
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -260,14 +297,14 @@ pub async fn handle_recovery_status(
             return RpcResponse::error(id, -32000, "Recovery not found".to_string());
         }
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     let recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -305,7 +342,16 @@ pub async fn handle_recovery_finalize(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.finalize called"
+        );
+    }
+
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -333,14 +379,14 @@ pub async fn handle_recovery_finalize(
             return RpcResponse::error(id, -32000, "Recovery not found".to_string());
         }
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -349,19 +395,19 @@ pub async fn handle_recovery_finalize(
 
     // Finalize
     if let Err(e) = recovery.finalize() {
-        return RpcResponse::error(id, -32000, format!("Failed to finalize: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     // Save updated recovery
     let recovery_json = match serde_json::to_vec(&recovery) {
         Ok(j) => j,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
-        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     info!(
@@ -384,8 +430,16 @@ pub async fn handle_recovery_cancel(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "recovery.cancel called"
+        );
+    }
+
     let store = match state.store_handle() {
         Some(s) => s,
         None => {
@@ -393,9 +447,9 @@ pub async fn handle_recovery_cancel(
         }
     };
 
-    // Get the canceller DID from authenticated claims
-    let canceller_did_str = match claims {
-        Some(c) => &c.sub,
+    // Get the canceller DID from authenticated context
+    let canceller_did_str = match ctx {
+        Some(c) => c.caller_did.to_string(),
         None => {
             return RpcResponse::error(id, -32001, "Authentication required".to_string());
         }
@@ -415,7 +469,7 @@ pub async fn handle_recovery_cancel(
     };
 
     // Parse canceller DID
-    let canceller_did = match Did::from_str(canceller_did_str) {
+    let canceller_did = match Did::from_str(&canceller_did_str) {
         Ok(d) => d,
         Err(e) => {
             return RpcResponse::error(id, -32602, format!("Invalid canceller DID: {e}"));
@@ -430,32 +484,32 @@ pub async fn handle_recovery_cancel(
             return RpcResponse::error(id, -32000, "Recovery not found".to_string());
         }
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to load recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     let mut recovery: RecoveryEvent = match serde_json::from_slice(&recovery_data) {
         Ok(r) => r,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to parse recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     // Cancel
     if let Err(e) = recovery.cancel(canceller_did.clone(), params.reason.clone()) {
-        return RpcResponse::error(id, -32000, format!("Failed to cancel: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     // Save updated recovery
     let recovery_json = match serde_json::to_vec(&recovery) {
         Ok(j) => j,
         Err(e) => {
-            return RpcResponse::error(id, -32000, format!("Failed to serialize recovery: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
     if let Err(e) = store.put(recovery_key.as_bytes(), &recovery_json) {
-        return RpcResponse::error(id, -32000, format!("Failed to save recovery: {e}"));
+        return RpcResponse::internal_error(id, e);
     }
 
     info!(
