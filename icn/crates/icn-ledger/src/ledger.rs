@@ -237,13 +237,13 @@ pub struct ForkStats {
 }
 
 /// Key prefix for cached balances in storage
-const BALANCE_PREFIX: &str = "ledger:balance:";
+pub(crate) const BALANCE_PREFIX: &str = "ledger:balance:";
 
 // Suspicious rate threshold moved to OracleConfig for per-pair configuration (Issue #474)
 // Use oracle.config().get_suspicious_rate_threshold(&pair) instead
 
 /// Key prefix for cleared volume index (total credits received per account/currency)
-const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
+pub(crate) const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
 
 /// Key prefix for archived entries (from rollback operations)
 pub(crate) const ARCHIVE_PREFIX: &str = "ledger:archive:";
@@ -280,11 +280,11 @@ pub struct Ledger {
     pub(crate) store: Arc<dyn Store>,
 
     /// Cached balances (in-memory for fast queries)
-    cached_balances: HashMap<Did, AccountBalances>,
+    pub(crate) cached_balances: HashMap<Did, AccountBalances>,
 
     /// Cleared volume index: tracks total credits received per (account, currency)
     /// Used for O(1) credit limit calculations based on transaction history
-    cleared_volume_index: HashMap<(Did, String), i64>,
+    pub(crate) cleared_volume_index: HashMap<(Did, String), i64>,
 
     /// Optional gossip handle for distributed synchronization
     gossip: Option<GossipHandle>,
@@ -315,7 +315,7 @@ pub struct Ledger {
 
     /// Journal version counter for snapshot isolation (M7 fix)
     /// Incremented on each entry append to detect concurrent modifications
-    journal_version: u64,
+    pub(crate) journal_version: u64,
 
     /// Optional event emitter for real-time notifications
     /// When set, ledger operations emit events for WebSocket/notification systems
@@ -2586,23 +2586,17 @@ impl Ledger {
 
     /// Get account balance for a specific currency
     pub fn get_balance(&self, account_id: &Did, currency: &str) -> i64 {
-        self.cached_balances
-            .get(account_id)
-            .map(|b| b.get(currency))
-            .unwrap_or(0)
+        crate::ledger_impl::balances::get_balance(self, account_id, currency)
     }
 
     /// Get all balances for an account
     pub fn get_account_balances(&self, account_id: &Did) -> AccountBalances {
-        self.cached_balances
-            .get(account_id)
-            .cloned()
-            .unwrap_or_else(|| AccountBalances::new(account_id.clone()))
+        crate::ledger_impl::balances::get_account_balances(self, account_id)
     }
 
     /// Get all balances across all accounts
     pub fn get_all_balances(&self) -> HashMap<Did, AccountBalances> {
-        self.cached_balances.clone()
+        crate::ledger_impl::balances::get_all_balances(self)
     }
 
     /// Get total cleared volume for an account in a currency (O(1) lookup)
@@ -2616,8 +2610,7 @@ impl Ledger {
     ///
     /// Performance: O(1) - uses the pre-computed cleared volume index
     pub fn total_cleared_by(&self, account_id: &Did, currency: &str) -> Result<i64> {
-        let key = (account_id.clone(), currency.to_string());
-        Ok(*self.cleared_volume_index.get(&key).unwrap_or(&0))
+        crate::ledger_impl::balances::total_cleared_by(self, account_id, currency)
     }
 
     /// Recompute all balances and cleared volumes from journal entries (for verification)
@@ -2628,62 +2621,7 @@ impl Ledger {
     /// 3. Validate the version hasn't changed before applying
     /// 4. If version changed, return error (caller should retry)
     pub fn recompute_balances(&mut self) -> Result<()> {
-        // M7 Fix: Capture journal version at snapshot time for isolation
-        let snapshot_version = self.journal_version;
-
-        info!(
-            cached_account_count = self.cached_balances.len(),
-            cleared_volume_count = self.cleared_volume_index.len(),
-            snapshot_version,
-            "Recomputing all balances and cleared volumes from journal"
-        );
-
-        // Take snapshot of entries
-        let entries = self.get_all_entries()?;
-        let balances = compute_all_balances(&entries)?;
-
-        // Also recompute cleared volume index
-        let mut cleared_volumes: HashMap<(Did, String), i64> = HashMap::new();
-        for entry in &entries {
-            for delta in &entry.accounts {
-                if let Some(credit) = delta.credit {
-                    let key = (delta.account_id.clone(), delta.currency.clone());
-                    *cleared_volumes.entry(key).or_insert(0) += credit;
-                }
-            }
-        }
-
-        // M7 Fix: Validate journal version hasn't changed during recomputation
-        // This prevents the race condition where concurrent entry appends are lost
-        if self.journal_version != snapshot_version {
-            warn!(
-                snapshot_version,
-                current_version = self.journal_version,
-                "Journal modified during balance recomputation - aborting to prevent data loss"
-            );
-            icn_obs::metrics::ledger::recompute_aborted_version_mismatch_inc();
-            anyhow::bail!(
-                "Journal modified during balance recomputation (version {} -> {}). \
-                 Retry the operation to ensure data consistency.",
-                snapshot_version,
-                self.journal_version
-            );
-        }
-
-        // Safe to apply - journal hasn't changed during our computation
-        self.cached_balances = balances;
-        self.cleared_volume_index = cleared_volumes;
-        self.save_cached_balances()?;
-        self.save_cleared_volume_index()?;
-
-        info!(
-            entry_count = entries.len(),
-            account_count = self.cached_balances.len(),
-            cleared_volume_count = self.cleared_volume_index.len(),
-            snapshot_version,
-            "Balance and cleared volume recomputation complete"
-        );
-        Ok(())
+        crate::ledger_impl::balances::recompute_balances(self)
     }
 
     /// Recompute balances with automatic retry on version mismatch
@@ -2691,23 +2629,7 @@ impl Ledger {
     /// This is a convenience wrapper around `recompute_balances` that handles
     /// the race condition by retrying up to `max_retries` times.
     pub fn recompute_balances_with_retry(&mut self, max_retries: usize) -> Result<()> {
-        for attempt in 0..=max_retries {
-            match self.recompute_balances() {
-                Ok(()) => return Ok(()),
-                Err(e) if attempt < max_retries && e.to_string().contains("Journal modified") => {
-                    warn!(
-                        attempt = attempt + 1,
-                        max_retries, "Balance recomputation retry due to concurrent modification"
-                    );
-                    // Small delay to reduce contention
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        anyhow::bail!(
-            "Balance recomputation failed after {max_retries} retries due to concurrent modifications"
-        );
+        crate::ledger_impl::balances::recompute_balances_with_retry(self, max_retries)
     }
 
     /// Verify ledger integrity
@@ -2742,72 +2664,22 @@ impl Ledger {
 
     /// Load cached balances from storage
     fn load_cached_balances(&mut self) -> Result<()> {
-        let prefix = BALANCE_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-
-        for (_key, value) in pairs {
-            let balances: AccountBalances = serde_json::from_slice(&value)?;
-            self.cached_balances
-                .insert(balances.account_id.clone(), balances);
-        }
-
-        debug!("Loaded {} cached balances", self.cached_balances.len());
-        Ok(())
+        crate::ledger_impl::balances::load_cached_balances(self)
     }
 
     /// Save cached balances to storage
     fn save_cached_balances(&self) -> Result<()> {
-        for (account_id, balances) in &self.cached_balances {
-            let key = format!("{}{}", BALANCE_PREFIX, serde_json::to_string(account_id)?);
-            let value = serde_json::to_vec(balances)?;
-            self.store.put(key.as_bytes(), &value)?;
-        }
-
-        Ok(())
+        crate::ledger_impl::balances::save_cached_balances(self)
     }
 
     /// Load cleared volume index from storage
     fn load_cleared_volume_index(&mut self) -> Result<()> {
-        let prefix = CLEARED_VOLUME_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-
-        for (key, value) in pairs {
-            // Key format: "ledger:cleared_volume:{did}:{currency}"
-            let key_str = String::from_utf8_lossy(&key);
-            if let Some(rest) = key_str.strip_prefix(CLEARED_VOLUME_PREFIX) {
-                // Parse the composite key - format is "did:currency"
-                // Use rfind to find the last colon, since DIDs can contain colons
-                if let Some(last_colon) = rest.rfind(':') {
-                    let did_str = &rest[..last_colon];
-                    let currency = &rest[last_colon + 1..];
-
-                    if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{did_str}\"")) {
-                        if let Ok(volume) = serde_json::from_slice::<i64>(&value) {
-                            self.cleared_volume_index
-                                .insert((did, currency.to_string()), volume);
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!(
-            "Loaded {} cleared volume entries",
-            self.cleared_volume_index.len()
-        );
-        Ok(())
+        crate::ledger_impl::balances::load_cleared_volume_index(self)
     }
 
     /// Save cleared volume index to storage
     fn save_cleared_volume_index(&self) -> Result<()> {
-        for ((account_id, currency), volume) in &self.cleared_volume_index {
-            // Store with composite key: "{prefix}{did}:{currency}"
-            let key = format!("{CLEARED_VOLUME_PREFIX}{account_id}:{currency}");
-            let value = serde_json::to_vec(volume)?;
-            self.store.put(key.as_bytes(), &value)?;
-        }
-
-        Ok(())
+        crate::ledger_impl::balances::save_cleared_volume_index(self)
     }
 
     /// Get the last merge decision (for reporting)
