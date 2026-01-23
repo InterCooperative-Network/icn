@@ -4,7 +4,9 @@
 //! from storage. These functions are extracted from the main Ledger implementation
 //! for better code organization.
 
-use crate::ledger::{ArchiveRecord, Ledger, PaginationCursor, ARCHIVE_PREFIX, JOURNAL_PREFIX, JOURNAL_TS_PREFIX};
+use crate::ledger::{
+    ArchiveRecord, Ledger, PaginationCursor, ARCHIVE_PREFIX, JOURNAL_PREFIX, JOURNAL_TS_PREFIX,
+};
 use crate::types::{ContentHash, JournalEntry};
 use anyhow::Result;
 use icn_identity::Did;
@@ -335,7 +337,10 @@ pub(crate) fn get_entries_filtered_paginated(
 }
 
 /// Get archived entries for a specific rollback timestamp
-pub(crate) fn get_archived_entries(ledger: &Ledger, archive_timestamp: u64) -> Result<Vec<JournalEntry>> {
+pub(crate) fn get_archived_entries(
+    ledger: &Ledger,
+    archive_timestamp: u64,
+) -> Result<Vec<JournalEntry>> {
     let prefix = format!("{ARCHIVE_PREFIX}{archive_timestamp}:");
     let pairs = ledger.store.scan(prefix.as_bytes())?;
 

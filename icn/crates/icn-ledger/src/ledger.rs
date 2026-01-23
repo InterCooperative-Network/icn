@@ -254,7 +254,7 @@ const WITNESS_PREFIX: &str = "ledger:witnesses:";
 
 /// Record of an archived entry (from rollback operations)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct ArchiveRecord {
+pub struct ArchiveRecord {
     /// The archived journal entry
     pub entry: JournalEntry,
     /// Unix timestamp when the entry was archived
