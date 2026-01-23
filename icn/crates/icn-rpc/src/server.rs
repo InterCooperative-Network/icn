@@ -102,6 +102,7 @@ pub struct RpcServer {
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
     governance_handle: Option<Box<dyn GovernanceOps>>,
     compute_handle: Option<ComputeHandle>,
+    compute_service: Option<Arc<icn_api::ComputeService>>,
     trust_handle: Option<Arc<RwLock<TrustGraph>>>,
     store_handle: Option<Arc<dyn Store>>,
     dispute_manager: Option<Arc<RwLock<DisputeManager>>>,
@@ -126,6 +127,7 @@ impl RpcServer {
             gossip_handle: None,
             governance_handle: None,
             compute_handle: None,
+            compute_service: None,
             trust_handle: None,
             store_handle: None,
             dispute_manager: None,
@@ -152,6 +154,7 @@ impl RpcServer {
             gossip_handle: None,
             governance_handle: None,
             compute_handle: None,
+            compute_service: None,
             trust_handle: None,
             store_handle: None,
             dispute_manager: None,
@@ -245,7 +248,9 @@ impl RpcServer {
 
     /// Set the compute handle (called after ComputeActor spawns)
     pub fn set_compute_handle(&mut self, handle: ComputeHandle) {
-        self.compute_handle = Some(handle);
+        self.compute_handle = Some(handle.clone());
+        // Also initialize the ComputeService
+        self.compute_service = Some(Arc::new(icn_api::ComputeService::new(handle)));
     }
 
     /// Set the trust graph handle (called after TrustGraph initializes)
@@ -330,6 +335,11 @@ impl RpcServer {
     /// Get compute handle (for handler modules)
     pub fn compute_handle(&self) -> Option<&ComputeHandle> {
         self.compute_handle.as_ref()
+    }
+
+    /// Get compute service (for handler modules)
+    pub fn compute_service(&self) -> Option<&Arc<icn_api::ComputeService>> {
+        self.compute_service.as_ref()
     }
 
     /// Get store handle (for handler modules)

@@ -3,57 +3,40 @@
 //! Provides distributed compute operations for the gateway API.
 //! This is a simplified interface that can be backed by:
 //! 1. In-memory task tracking (for standalone gateway)
-//! 2. ComputeHandle (when integrated with daemon)
+//! 2. ComputeService (when integrated with daemon)
 
 use crate::api::compute::ResourceProfileRequest;
 use anyhow::Result;
-use icn_compute::{
-    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, ResourceProfile, TaskCode,
-    TaskPriority, TaskStatus,
-};
-use std::collections::HashMap;
-use std::sync::RwLock;
+use icn_compute::TaskCode;
+use std::sync::Arc;
 
 /// Hash type for task identification
 pub type TaskHash = [u8; 32];
 
 /// Compute manager for gateway API
 pub struct ComputeManager {
-    /// Compute handle from daemon (if connected)
-    compute_handle: Option<ComputeHandle>,
-    /// Local task cache for tracking submitted tasks
-    tasks: RwLock<HashMap<TaskHash, TaskInfo>>,
-}
-
-/// Task info for tracking
-#[derive(Clone, Debug)]
-pub struct TaskInfo {
-    pub task_id: String,
-    pub submitter: String,
-    pub status: String,
-    pub submitted_at: u64,
+    /// Compute service (shared layer)
+    compute_service: Option<Arc<icn_api::ComputeService>>,
 }
 
 impl ComputeManager {
     /// Create a new compute manager (standalone mode)
     pub fn new() -> Self {
         ComputeManager {
-            compute_handle: None,
-            tasks: RwLock::new(HashMap::new()),
+            compute_service: None,
         }
     }
 
     /// Create a compute manager with daemon connection
-    pub fn with_handle(handle: ComputeHandle) -> Self {
+    pub fn with_service(service: Arc<icn_api::ComputeService>) -> Self {
         ComputeManager {
-            compute_handle: Some(handle),
-            tasks: RwLock::new(HashMap::new()),
+            compute_service: Some(service),
         }
     }
 
-    /// Set compute handle (for late binding)
-    pub fn set_handle(&mut self, handle: ComputeHandle) {
-        self.compute_handle = Some(handle);
+    /// Set compute service (for late binding)
+    pub fn set_service(&mut self, service: Arc<icn_api::ComputeService>) {
+        self.compute_service = Some(service);
     }
 
     /// Submit a compute task (CCL code)
@@ -101,183 +84,98 @@ impl ComputeManager {
         payment_currency: Option<String>,
         resource_profile: Option<ResourceProfileRequest>,
     ) -> Result<TaskHash> {
-        let now = icn_time::current_timestamp_millis();
+        let compute_service = self
+            .compute_service
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Compute not available - daemon not connected"))?;
 
-        // Convert relative deadline to absolute timestamp
-        let absolute_deadline = deadline_ms.map(|ms| now + ms);
-
-        // Parse priority string (case-insensitive)
-        let task_priority = match priority.to_lowercase().as_str() {
-            "low" => TaskPriority::Low,
-            "normal" => TaskPriority::Normal,
-            "high" => TaskPriority::High,
-            "critical" => TaskPriority::Critical,
-            _ => TaskPriority::Normal, // Default to normal for invalid values
+        // Build API context
+        let api_ctx = icn_api::ApiContext {
+            caller_did: submitter.clone(),
+            coop_id: coop_id.clone(),
         };
 
-        // Determine required capabilities based on code type
-        let required_capabilities = match &code {
-            TaskCode::Ccl(_) | TaskCode::CclRef { .. } => vec![ExecutorCapability::Ccl],
-            TaskCode::WasmInline(_) | TaskCode::WasmRef(_) => vec![ExecutorCapability::Wasm],
+        // Convert TaskCode to API params
+        let (code_str, wasm_bytes, code_type) = match code {
+            TaskCode::Ccl(c) => (Some(c), None, icn_api::compute::CodeTypeParam::Ccl),
+            TaskCode::WasmInline(b) => {
+                let encoded =
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &b);
+                (None, Some(encoded), icn_api::compute::CodeTypeParam::Wasm)
+            }
+            TaskCode::CclRef { .. } => {
+                anyhow::bail!("CclRef not supported via gateway API");
+            }
+            TaskCode::WasmRef(_) => {
+                anyhow::bail!("WasmRef not supported via gateway API");
+            }
         };
 
-        let task = ComputeTask {
-            id: task_id.clone(),
-            submitter: submitter.clone(),
-            coop_id,
-            code,
-            inputs,
-            fuel_limit: FuelLimit(fuel_limit),
-            required_capabilities,
-            priority: task_priority,
-            created_at: now,
-            deadline: absolute_deadline,
+        // Convert inputs to JSON
+        let inputs_json = if inputs.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::from_slice(&inputs).unwrap_or(serde_json::Value::Null)
+        };
+
+        let params = icn_api::SubmitTaskParams {
+            task_id,
+            code: code_str,
+            wasm_bytes,
+            code_type,
+            inputs: inputs_json,
+            fuel_limit,
+            priority: icn_api::compute::TaskPriorityParam::from_str(priority),
+            deadline_ms,
             payment_rate,
             payment_currency,
-            resource_profile: resource_profile.map(|rp| ResourceProfile {
+            coop_id: None, // Already in api_ctx
+            resource_profile: resource_profile.map(|rp| icn_api::compute::ResourceProfileParam {
                 cpu_cores: rp.cpu_cores,
                 memory_mb: rp.memory_mb,
                 storage_mb: rp.storage_mb,
                 network_mbps: rp.network_mbps,
-                gpu_spec: None, // GPU not exposed via REST API yet
-                duration_estimate: rp
-                    .duration_estimate_secs
-                    .map(std::time::Duration::from_secs),
+                duration_estimate_secs: rp.duration_estimate_secs,
             }),
-            actor_mode: None,             // Not actor mode (Phase 16D)
-            placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
-            federation_constraints: None, // No federation constraints from API (Phase 21)
-            estimated_value: None,       // Issue #478: Computed from task value or set by client
-            verification: None,          // Issue #478: Auto-determined from estimated_value
         };
 
-        // Validate task before submission
-        task.validate()
-            .map_err(|e| anyhow::anyhow!("Invalid task: {e}"))?;
-
-        // If we have a daemon handle, use it
-        if let Some(ref handle) = self.compute_handle {
-            let hash = handle
-                .submit(task)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to submit task: {e}"))?;
-
-            // Track locally
-            let info = TaskInfo {
-                task_id,
-                submitter,
-                status: "pending".to_string(),
-                submitted_at: now,
-            };
-
-            let mut tasks = self
-                .tasks
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            tasks.insert(hash, info);
-
-            Ok(hash)
-        } else {
-            anyhow::bail!("Compute not available - daemon not connected")
-        }
+        compute_service
+            .submit_task(&api_ctx, params)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to submit task: {e}"))
     }
 
     /// Get task status
     pub async fn get_status(&self, task_hash: TaskHash) -> Result<Option<ComputeTaskStatus>> {
-        if let Some(ref handle) = self.compute_handle {
-            match handle.status(task_hash).await {
-                Ok(Some(status)) => {
-                    let result = match status {
-                        TaskStatus::Pending => ComputeTaskStatus {
-                            task_hash: hex::encode(task_hash),
-                            status: "pending".to_string(),
-                            executor: None,
-                            result: None,
-                        },
-                        TaskStatus::Claimed { executor, .. } => ComputeTaskStatus {
-                            task_hash: hex::encode(task_hash),
-                            status: "claimed".to_string(),
-                            executor: Some(executor),
-                            result: None,
-                        },
-                        TaskStatus::Completed { result } => {
-                            let (outcome, output, error) = match &result.outcome {
-                                icn_compute::ExecutionOutcome::Success(data) => {
-                                    let output: Option<serde_json::Value> =
-                                        serde_json::from_slice(data).ok();
-                                    ("success".to_string(), output, None)
-                                }
-                                icn_compute::ExecutionOutcome::Failed(e) => {
-                                    ("failed".to_string(), None, Some(e.clone()))
-                                }
-                                icn_compute::ExecutionOutcome::OutOfFuel => {
-                                    ("out_of_fuel".to_string(), None, None)
-                                }
-                                icn_compute::ExecutionOutcome::Timeout => {
-                                    ("timeout".to_string(), None, None)
-                                }
-                            };
+        let compute_service = self
+            .compute_service
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Compute not available - daemon not connected"))?;
 
-                            ComputeTaskStatus {
-                                task_hash: hex::encode(task_hash),
-                                status: "completed".to_string(),
-                                executor: Some(result.executor.clone()),
-                                result: Some(ComputeResult {
-                                    outcome,
-                                    output,
-                                    error,
-                                    fuel_used: result.fuel_used,
-                                    duration_ms: result.duration_ms,
-                                }),
-                            }
-                        }
-                        TaskStatus::Failed { reason } => ComputeTaskStatus {
-                            task_hash: hex::encode(task_hash),
-                            status: "failed".to_string(),
-                            executor: None,
-                            result: Some(ComputeResult {
-                                outcome: "failed".to_string(),
-                                output: None,
-                                error: Some(reason),
-                                fuel_used: 0,
-                                duration_ms: 0,
-                            }),
-                        },
-                        TaskStatus::Cancelled { reason, .. } => ComputeTaskStatus {
-                            task_hash: hex::encode(task_hash),
-                            status: "cancelled".to_string(),
-                            executor: None,
-                            result: Some(ComputeResult {
-                                outcome: "cancelled".to_string(),
-                                output: None,
-                                error: Some(reason),
-                                fuel_used: 0,
-                                duration_ms: 0,
-                            }),
-                        },
-                    };
-                    Ok(Some(result))
-                }
-                Ok(None) => Ok(None),
-                Err(e) => anyhow::bail!("Failed to get status: {e}"),
-            }
-        } else {
-            // Check local cache
-            let tasks = self
-                .tasks
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        // We need an API context for the service call - use anonymous for get_status
+        let api_ctx = icn_api::ApiContext {
+            caller_did: "did:icn:gateway-anonymous".to_string(),
+            coop_id: None,
+        };
 
-            if let Some(info) = tasks.get(&task_hash) {
+        match compute_service.get_status(&api_ctx, &task_hash).await {
+            Ok(status) => {
+                // Convert API response to gateway response
                 Ok(Some(ComputeTaskStatus {
-                    task_hash: hex::encode(task_hash),
-                    status: info.status.clone(),
-                    executor: None,
-                    result: None,
+                    task_hash: status.task_hash,
+                    status: status.status,
+                    executor: status.executor,
+                    result: status.result.map(|r| ComputeResult {
+                        outcome: r.outcome,
+                        output: r.output,
+                        error: r.error,
+                        fuel_used: r.fuel_used,
+                        duration_ms: r.duration_ms,
+                    }),
                 }))
-            } else {
-                Ok(None)
             }
+            Err(icn_api::ApiError::TaskNotFound(_)) => Ok(None),
+            Err(e) => anyhow::bail!("Failed to get status: {e}"),
         }
     }
 
@@ -288,15 +186,20 @@ impl ComputeManager {
         requester: String,
         reason: String,
     ) -> Result<()> {
-        if let Some(ref handle) = self.compute_handle {
-            handle
-                .cancel_task(&task_hash, &requester, reason)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to cancel task: {e}"))?;
-            Ok(())
-        } else {
-            anyhow::bail!("Compute not available - daemon not connected")
-        }
+        let compute_service = self
+            .compute_service
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Compute not available - daemon not connected"))?;
+
+        let api_ctx = icn_api::ApiContext {
+            caller_did: requester,
+            coop_id: None,
+        };
+
+        compute_service
+            .cancel_task(&api_ctx, &task_hash, Some(reason))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to cancel task: {e}"))
     }
 }
 
@@ -336,7 +239,7 @@ mod tests {
     #[test]
     fn test_compute_manager_new() {
         let mgr = ComputeManager::new();
-        assert!(mgr.compute_handle.is_none());
+        assert!(mgr.compute_service.is_none());
     }
 
     #[tokio::test]
@@ -361,217 +264,8 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not connected"));
     }
 
-    #[tokio::test]
-    async fn test_submit_invalid_fuel() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                50, // Below minimum (100)
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("too low"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_invalid_did() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "not-a-did".to_string(), // Invalid DID format
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                10_000,
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid submitter DID"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_empty_task_id() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "".to_string(), // Empty ID
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                10_000,
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_payment_rate_too_high() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                10_000,
-                "normal",
-                None,
-                Some(2_000_000), // Above max (1M)
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Payment rate too high"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_fuel_too_high() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                20_000_000, // Above max (10M)
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("too high"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_task_id_too_long() {
-        let mgr = ComputeManager::new();
-        let long_id = "x".repeat(300); // >256 chars
-        let result = mgr
-            .submit_task(
-                long_id,
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                10_000,
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("too long"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_empty_code() {
-        let mgr = ComputeManager::new();
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                "".to_string(), // Empty code
-                vec![],
-                10_000,
-                "normal",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot be empty"));
-    }
-
-    #[tokio::test]
-    async fn test_submit_priority_variants() {
-        let mgr = ComputeManager::new();
-
-        // All valid priorities should work (fail only because daemon not connected)
-        for priority in [
-            "low", "normal", "high", "critical", "LOW", "HIGH", "CrItIcAl",
-        ] {
-            let result = mgr
-                .submit_task(
-                    "task-1".to_string(),
-                    "did:icn:alice".to_string(),
-                    Some("test-coop".to_string()),
-                    r#"{"name": "Test"}"#.to_string(),
-                    vec![],
-                    10_000,
-                    priority,
-                    None,
-                    None,
-                    None,
-                )
-                .await;
-
-            // Should fail because daemon not connected, not because of priority
-            assert!(result.is_err());
-            assert!(
-                result.unwrap_err().to_string().contains("not connected"),
-                "Priority '{priority}' should be valid"
-            );
-        }
-
-        // Invalid priority defaults to "normal", so should also fail at daemon stage
-        let result = mgr
-            .submit_task(
-                "task-1".to_string(),
-                "did:icn:alice".to_string(),
-                Some("test-coop".to_string()),
-                r#"{"name": "Test"}"#.to_string(),
-                vec![],
-                10_000,
-                "invalid_priority",
-                None,
-                None,
-                None,
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not connected"));
-    }
+    // Note: validation tests now happen in ComputeService (icn-api)
+    // so we don't need to duplicate them here
 
     #[tokio::test]
     async fn test_get_status_without_daemon() {
@@ -579,9 +273,9 @@ mod tests {
         let hash = [0u8; 32];
         let result = mgr.get_status(hash).await;
 
-        // Without daemon, falls back to local cache - unknown task returns None
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_none());
+        // Without daemon, should error
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not connected"));
     }
 
     #[tokio::test]

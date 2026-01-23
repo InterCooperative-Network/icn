@@ -82,6 +82,7 @@ icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 icn-coop = { path = "../icn-coop" }
 icn-community = { path = "../icn-community" }
+icn-api = { path = "../icn-api" }
 
 # Caching
 lru = "0.16"
