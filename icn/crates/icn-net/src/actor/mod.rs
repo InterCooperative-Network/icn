@@ -8,7 +8,6 @@
 
 mod connection;
 mod messages;
-mod state;
 
 use anyhow::{Context, Result};
 #[cfg(test)]
@@ -1357,26 +1356,26 @@ mod tests {
         // Alice supports E2E encryption
         assert!(
             handle
-                .peer_has_capability(&alice_did, CapabilityFlags::E2E_ENCRYPTION)
+                .peer_has_capability(alice_did, CapabilityFlags::E2E_ENCRYPTION)
                 .await
         );
 
         // Bob does not support E2E encryption
         assert!(
             !handle
-                .peer_has_capability(&bob_did, CapabilityFlags::E2E_ENCRYPTION)
+                .peer_has_capability(bob_did, CapabilityFlags::E2E_ENCRYPTION)
                 .await
         );
 
         // Both support signed messages
         assert!(
             handle
-                .peer_has_capability(&alice_did, CapabilityFlags::SIGNED_MESSAGES)
+                .peer_has_capability(alice_did, CapabilityFlags::SIGNED_MESSAGES)
                 .await
         );
         assert!(
             handle
-                .peer_has_capability(&bob_did, CapabilityFlags::SIGNED_MESSAGES)
+                .peer_has_capability(bob_did, CapabilityFlags::SIGNED_MESSAGES)
                 .await
         );
 
@@ -1385,7 +1384,7 @@ mod tests {
         let unknown_did = unknown_keypair.did();
         assert!(
             !handle
-                .peer_has_capability(&unknown_did, CapabilityFlags::E2E_ENCRYPTION)
+                .peer_has_capability(unknown_did, CapabilityFlags::E2E_ENCRYPTION)
                 .await
         );
     }

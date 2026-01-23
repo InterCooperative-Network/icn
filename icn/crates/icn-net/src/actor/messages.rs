@@ -98,11 +98,13 @@ impl NetworkActor {
                         let version_info =
                             crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
                         let topology_info =
-                            self.topology_config.as_ref().map(|topo_cfg| crate::TopologyInfo {
-                                region: topo_cfg.region.clone(),
-                                cluster_id: topo_cfg.cluster_id.clone(),
-                                role: topo_cfg.role,
-                            });
+                            self.topology_config
+                                .as_ref()
+                                .map(|topo_cfg| crate::TopologyInfo {
+                                    region: topo_cfg.region.clone(),
+                                    cluster_id: topo_cfg.cluster_id.clone(),
+                                    role: topo_cfg.role,
+                                });
 
                         // Build Hello message with PQ binding proof if available
                         #[cfg(feature = "post-quantum")]
