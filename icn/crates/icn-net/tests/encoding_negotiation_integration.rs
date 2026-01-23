@@ -64,23 +64,23 @@ fn test_remote_node_without_postcard() {
     );
 }
 
-/// Test that messages can roundtrip with bincode when postcard is not negotiated
+/// Test that deprecated use_postcard=false still produces valid postcard encoding
 #[test]
-fn test_bincode_fallback_roundtrip() -> Result<()> {
+fn test_deprecated_param_uses_postcard() -> Result<()> {
     let alice = KeyPair::generate()?.did().clone();
     let bob = KeyPair::generate()?.did().clone();
 
     let original = NetworkMessage::ping(alice.clone(), bob.clone());
 
-    // Simulate: both nodes don't support postcard, use bincode
+    // Note: use_postcard parameter is deprecated; always uses postcard
     let use_postcard = false;
     let enable_compression = true;
 
     let bytes = original.to_bytes_negotiated(use_postcard, enable_compression)?;
 
-    // Verify wire format byte indicates bincode
+    // Verify wire format byte indicates postcard (bincode support removed)
     let (encoding, _) = EncodingFormat::from_wire_byte(bytes[0])?;
-    assert_eq!(encoding, EncodingFormat::Bincode);
+    assert_eq!(encoding, EncodingFormat::Postcard);
 
     let decoded = NetworkMessage::from_bytes_negotiated(&bytes)?;
 
@@ -118,62 +118,61 @@ fn test_postcard_roundtrip() -> Result<()> {
     Ok(())
 }
 
-/// Test that postcard encoding produces smaller messages than bincode
+/// Test that encoding is consistent regardless of deprecated use_postcard parameter
 #[test]
-fn test_postcard_more_compact() -> Result<()> {
+fn test_encoding_consistency() -> Result<()> {
     let alice = KeyPair::generate()?.did().clone();
     let bob = KeyPair::generate()?.did().clone();
 
     let msg = NetworkMessage::ping(alice, bob);
 
-    let bincode_bytes = msg.to_bytes_negotiated(false, false)?;
-    let postcard_bytes = msg.to_bytes_negotiated(true, false)?;
+    // Note: use_postcard parameter is deprecated; both calls use postcard encoding
+    let bytes_false = msg.to_bytes_negotiated(false, false)?;
+    let bytes_true = msg.to_bytes_negotiated(true, false)?;
 
     println!(
-        "Message size comparison: bincode={} bytes, postcard={} bytes",
-        bincode_bytes.len(),
-        postcard_bytes.len()
+        "Message sizes: param=false {} bytes, param=true {} bytes",
+        bytes_false.len(),
+        bytes_true.len()
     );
 
-    // Postcard should typically be more compact for most messages
-    // (though for very small messages the difference may be negligible)
-    // Both should decode correctly regardless of which is smaller
-    let decoded_bincode = NetworkMessage::from_bytes_negotiated(&bincode_bytes)?;
-    let decoded_postcard = NetworkMessage::from_bytes_negotiated(&postcard_bytes)?;
+    // Both should produce identical output since bincode support was removed
+    assert_eq!(
+        bytes_false, bytes_true,
+        "Both should produce identical postcard encoding"
+    );
 
-    assert!(matches!(
-        decoded_bincode.payload,
-        MessagePayload::Ping { .. }
-    ));
-    assert!(matches!(
-        decoded_postcard.payload,
-        MessagePayload::Ping { .. }
-    ));
+    // Both should decode correctly
+    let decoded_false = NetworkMessage::from_bytes_negotiated(&bytes_false)?;
+    let decoded_true = NetworkMessage::from_bytes_negotiated(&bytes_true)?;
+
+    assert!(matches!(decoded_false.payload, MessagePayload::Ping { .. }));
+    assert!(matches!(decoded_true.payload, MessagePayload::Ping { .. }));
 
     Ok(())
 }
 
-/// Test mixed encoding scenario: sender uses postcard, receiver can decode
+/// Test encoding/decoding roundtrip with different parameter values
 #[test]
-fn test_cross_encoding_decode() -> Result<()> {
+fn test_encoding_decode_roundtrip() -> Result<()> {
     let alice = KeyPair::generate()?.did().clone();
     let bob = KeyPair::generate()?.did().clone();
 
     let msg = NetworkMessage::ping(alice.clone(), bob.clone());
 
-    // Alice sends with postcard
-    let postcard_bytes = msg.to_bytes_negotiated(true, false)?;
+    // Test with use_postcard=true
+    let bytes_true = msg.to_bytes_negotiated(true, false)?;
 
-    // Bob receives and decodes (from_bytes_negotiated auto-detects encoding)
-    let decoded = NetworkMessage::from_bytes_negotiated(&postcard_bytes)?;
+    // Decode and verify
+    let decoded = NetworkMessage::from_bytes_negotiated(&bytes_true)?;
 
     assert_eq!(decoded.from, alice);
     assert_eq!(decoded.to, Some(bob.clone()));
     assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
 
-    // Now test bincode sender
-    let bincode_bytes = msg.to_bytes_negotiated(false, false)?;
-    let decoded = NetworkMessage::from_bytes_negotiated(&bincode_bytes)?;
+    // Test with use_postcard=false (parameter is deprecated but should still work)
+    let bytes_false = msg.to_bytes_negotiated(false, false)?;
+    let decoded = NetworkMessage::from_bytes_negotiated(&bytes_false)?;
 
     assert_eq!(decoded.from, alice);
     assert_eq!(decoded.to, Some(bob.clone()));
@@ -247,9 +246,9 @@ fn test_version_info_in_hello() -> Result<()> {
     Ok(())
 }
 
-/// Test that compression works with both encodings
+/// Test that compression reduces message size
 #[test]
-fn test_compression_with_both_encodings() -> Result<()> {
+fn test_compression_reduces_size() -> Result<()> {
     use icn_gossip::{types::GossipEntry, GossipMessage, VectorClock};
 
     let alice = KeyPair::generate()?.did().clone();
@@ -275,34 +274,34 @@ fn test_compression_with_both_encodings() -> Result<()> {
 
     let msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip);
 
-    // Test bincode + compression
-    let bincode_compressed = msg.to_bytes_negotiated(false, true)?;
-    let bincode_uncompressed = msg.to_bytes_negotiated(false, false)?;
+    // Test compression effectiveness (use_postcard param is deprecated, both use postcard)
+    let compressed = msg.to_bytes_negotiated(true, true)?;
+    let uncompressed = msg.to_bytes_negotiated(true, false)?;
 
     assert!(
-        bincode_compressed.len() < bincode_uncompressed.len(),
-        "Bincode compression should reduce size"
+        compressed.len() < uncompressed.len(),
+        "Compression should reduce size for large messages"
     );
 
-    // Test postcard + compression
-    let postcard_compressed = msg.to_bytes_negotiated(true, true)?;
-    let postcard_uncompressed = msg.to_bytes_negotiated(true, false)?;
+    // Test with deprecated parameter value (should produce same result)
+    let compressed_deprecated = msg.to_bytes_negotiated(false, true)?;
+    let uncompressed_deprecated = msg.to_bytes_negotiated(false, false)?;
 
-    assert!(
-        postcard_compressed.len() < postcard_uncompressed.len(),
-        "Postcard compression should reduce size"
+    assert_eq!(
+        compressed, compressed_deprecated,
+        "Deprecated param should produce identical output"
+    );
+    assert_eq!(
+        uncompressed, uncompressed_deprecated,
+        "Deprecated param should produce identical output"
     );
 
     // All should decode correctly
-    let decoded1 = NetworkMessage::from_bytes_negotiated(&bincode_compressed)?;
-    let decoded2 = NetworkMessage::from_bytes_negotiated(&bincode_uncompressed)?;
-    let decoded3 = NetworkMessage::from_bytes_negotiated(&postcard_compressed)?;
-    let decoded4 = NetworkMessage::from_bytes_negotiated(&postcard_uncompressed)?;
+    let decoded1 = NetworkMessage::from_bytes_negotiated(&compressed)?;
+    let decoded2 = NetworkMessage::from_bytes_negotiated(&uncompressed)?;
 
     assert!(matches!(decoded1.payload, MessagePayload::Gossip(_)));
     assert!(matches!(decoded2.payload, MessagePayload::Gossip(_)));
-    assert!(matches!(decoded3.payload, MessagePayload::Gossip(_)));
-    assert!(matches!(decoded4.payload, MessagePayload::Gossip(_)));
 
     Ok(())
 }

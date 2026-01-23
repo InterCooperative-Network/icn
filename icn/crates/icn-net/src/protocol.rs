@@ -803,19 +803,16 @@ impl NetworkMessage {
     /// - format_byte high nibble (bits 4-7): encoding format (1=postcard)
     /// - format_byte low nibble (bits 0-3): compression format (0=none, 1=zstd)
     ///
-    /// Note: Legacy bincode support has been removed. All encoding uses postcard.
+    /// Note: The `_use_postcard` parameter is deprecated and ignored. All encoding
+    /// now uses postcard exclusively. The parameter is retained for API compatibility.
     pub fn to_bytes_negotiated(
         &self,
-        use_postcard: bool,
+        _use_postcard: bool,
         enable_compression: bool,
     ) -> Result<Vec<u8>> {
-        let encoding = if use_postcard {
-            EncodingFormat::Postcard
-        } else {
-            EncodingFormat::Bincode // Legacy enum value for backward compat
-        };
+        // Always use postcard encoding; bincode support has been removed
+        let encoding = EncodingFormat::Postcard;
 
-        // Note: Both paths use postcard now; bincode support has been removed
         let raw_bytes = icn_encoding::encode(self).context("Failed to serialize message")?;
 
         let bytes_before = raw_bytes.len();
@@ -1927,11 +1924,11 @@ mod tests {
 
         let msg = NetworkMessage::ping(alice.clone(), bob.clone());
 
-        // Legacy wire format (0x00) without compression
+        // Note: use_postcard parameter is now ignored; always uses postcard (0x10)
         let bytes = msg.to_bytes_negotiated(false, false).unwrap();
         assert_eq!(
-            bytes[0], 0x00,
-            "Should be legacy format without compression"
+            bytes[0], 0x10,
+            "Should be postcard format (use_postcard param is deprecated)"
         );
 
         let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
@@ -2056,11 +2053,11 @@ mod tests {
 
         let msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip_msg);
 
-        // Legacy format with compression
+        // Note: use_postcard parameter is now ignored; always uses postcard
         let bytes = msg.to_bytes_negotiated(false, true).unwrap();
         assert_eq!(
-            bytes[0], 0x01,
-            "Should be legacy format with zstd compression"
+            bytes[0], 0x11,
+            "Should be postcard format with zstd compression (use_postcard param is deprecated)"
         );
 
         let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
@@ -2119,23 +2116,25 @@ mod tests {
     #[test]
     fn test_decode_legacy_format_message() {
         // Verify that messages with legacy wire format marker (0x0X) decode correctly.
+        // Note: This tests the decoder's ability to handle legacy format input,
+        // even though we now always encode with postcard format.
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let msg = NetworkMessage::ping(alice.clone(), bob.clone());
 
-        // Create message with legacy wire format marker (use_postcard = false)
-        let legacy_bytes = msg.to_bytes_negotiated(false, false).unwrap();
+        // Encode with postcard (use_postcard param is now ignored)
+        let bytes = msg.to_bytes_negotiated(false, false).unwrap();
 
-        // Verify wire byte indicates legacy format (high nibble = 0)
+        // Verify wire byte indicates postcard format (high nibble = 1)
         assert_eq!(
-            legacy_bytes[0] >> 4,
-            0,
-            "Should use legacy wire format marker"
+            bytes[0] >> 4,
+            1,
+            "Should use postcard wire format (use_postcard param is deprecated)"
         );
 
-        // Decoder should handle legacy format marker correctly
-        let decoded = NetworkMessage::from_bytes_negotiated(&legacy_bytes).unwrap();
+        // Decoder should handle the message correctly
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
 
         assert_eq!(decoded.from, alice);
         assert_eq!(decoded.to, Some(bob));
@@ -2144,7 +2143,8 @@ mod tests {
 
     #[test]
     fn test_decode_legacy_format_compressed_message() {
-        // Test decoding legacy wire format with compression enabled
+        // Test decoding messages with compression enabled.
+        // Note: use_postcard param is now deprecated; always uses postcard format.
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
@@ -2168,17 +2168,17 @@ mod tests {
 
         let msg = NetworkMessage::gossip(alice.clone(), Some(bob), gossip_msg);
 
-        // Create message with legacy wire format + zstd (use_postcard = false, compression = true)
-        let legacy_compressed = msg.to_bytes_negotiated(false, true).unwrap();
+        // Create compressed message (use_postcard param is now ignored)
+        let compressed = msg.to_bytes_negotiated(false, true).unwrap();
 
-        // Verify wire byte indicates legacy format + zstd (high nibble = 0, low nibble = 1)
+        // Verify wire byte indicates postcard + zstd (high nibble = 1, low nibble = 1)
         assert_eq!(
-            legacy_compressed[0], 0x01,
-            "Should use legacy format + zstd"
+            compressed[0], 0x11,
+            "Should use postcard format + zstd (use_postcard param is deprecated)"
         );
 
-        // Decoder should handle legacy format with compression correctly
-        let decoded = NetworkMessage::from_bytes_negotiated(&legacy_compressed).unwrap();
+        // Decoder should handle compressed message correctly
+        let decoded = NetworkMessage::from_bytes_negotiated(&compressed).unwrap();
         assert_eq!(decoded.from, alice);
         assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
     }
