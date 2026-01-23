@@ -37,6 +37,12 @@ pub struct SemanticVersion {
     pub patch: u32,
 }
 
+impl Default for SemanticVersion {
+    fn default() -> Self {
+        Self::new(0, 0, 0)
+    }
+}
+
 impl SemanticVersion {
     /// Create a new semantic version
     pub const fn new(major: u32, minor: u32, patch: u32) -> Self {
@@ -162,16 +168,23 @@ pub struct ContractMetadata {
     /// Version number (incrementing, for backwards compatibility)
     pub version: u32,
     /// Semantic version (e.g., 1.2.3)
+    /// Defaults to 0.<version>.0 for pre-1.0 development if not explicitly set
+    #[serde(default)]
     pub semantic_version: SemanticVersion,
     /// Minimum interpreter version required to execute this contract
+    #[serde(default)]
     pub min_interpreter_version: Option<SemanticVersion>,
     /// List of versions this contract is compatible with
+    #[serde(default)]
     pub compatible_versions: Vec<SemanticVersion>,
     /// Whether this version is deprecated
+    #[serde(default)]
     pub deprecated: bool,
     /// Reason for deprecation (if deprecated)
+    #[serde(default)]
     pub deprecated_reason: Option<String>,
     /// Successor version to upgrade to (if deprecated)
+    #[serde(default)]
     pub successor_version: Option<SemanticVersion>,
     /// Owner/deployer DID
     pub owner: String,
@@ -193,10 +206,14 @@ impl ContractMetadata {
     /// Create metadata from a contract and deployer info
     ///
     /// Returns an error if the contract cannot be hashed.
+    /// 
+    /// Note: Semantic version defaults to 0.<version>.0 (pre-1.0 development).
+    /// Use `with_semantic_version()` to set an explicit semver.
     pub fn from_contract(contract: &Contract, owner: &str, version: u32) -> Result<Self> {
         let code_hash = compute_hash(contract)?;
-        // Generate semantic version from numeric version (1 -> 1.0.0, 12 -> 12.0.0, etc.)
-        let semantic_version = SemanticVersion::new(version, 0, 0);
+        // Default semantic version to 0.<version>.0 for pre-1.0 development
+        // This allows compatible minor version upgrades (0.1.0 -> 0.2.0 are incompatible per semver)
+        let semantic_version = SemanticVersion::new(0, version, 0);
         
         Ok(ContractMetadata {
             code_hash,
@@ -540,15 +557,20 @@ impl ContractRegistry {
     }
 
     /// Get full metadata for all versions of a contract by name
+    /// 
+    /// Store-aware: loads metadata from persistent storage on cache miss.
     pub async fn list_versions_metadata(&self, name: &str) -> Result<Vec<ContractMetadata>> {
         let name_index = self.name_index.read().await;
-        let metadata = self.metadata.read().await;
 
         if let Some(versions) = name_index.get(name) {
-            Ok(versions
-                .iter()
-                .filter_map(|(_, hash)| metadata.get(hash).cloned())
-                .collect())
+            let mut result = Vec::new();
+            for (_, hash) in versions {
+                // Use get_metadata which is store-aware
+                if let Some(meta) = self.get_metadata(hash).await? {
+                    result.push(meta);
+                }
+            }
+            Ok(result)
         } else {
             Ok(vec![])
         }
@@ -557,17 +579,18 @@ impl ContractRegistry {
     /// Resolve contract by name and semantic version
     ///
     /// Returns the contract hash if found.
+    /// Store-aware: loads metadata from persistent storage on cache miss.
     pub async fn get_by_semantic_version(
         &self,
         name: &str,
         version: &SemanticVersion,
     ) -> Result<Option<ContentHash>> {
-        let metadata = self.metadata.read().await;
         let name_index = self.name_index.read().await;
 
         if let Some(versions) = name_index.get(name) {
             for (_, hash) in versions {
-                if let Some(meta) = metadata.get(hash) {
+                // Use get_metadata which is store-aware
+                if let Some(meta) = self.get_metadata(hash).await? {
                     if meta.semantic_version == *version {
                         return Ok(Some(*hash));
                     }
@@ -622,9 +645,55 @@ impl ContractRegistry {
         Ok(())
     }
 
+    /// Update the semantic version for a deployed contract
+    ///
+    /// Updates both in-memory cache and persistent storage if available.
+    /// This allows correcting the semantic version after deployment.
+    pub async fn set_semantic_version(
+        &self,
+        hash: &ContentHash,
+        semantic_version: SemanticVersion,
+    ) -> Result<()> {
+        let hash_hex = hex::encode(hash);
+
+        // Update in-memory metadata
+        {
+            let mut metadata = self.metadata.write().await;
+            let meta = metadata
+                .get_mut(hash)
+                .ok_or_else(|| RegistryError::NotFound(hash_hex.clone()))?;
+
+            meta.semantic_version = semantic_version;
+
+            // Update persistent store if available
+            if let Some(store) = &self.store {
+                let metadata_key = format!("metadata:{hash_hex}");
+                let metadata_bytes = icn_encoding::encode_versioned(meta)
+                    .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
+                store
+                    .put(metadata_key.as_bytes(), &metadata_bytes)
+                    .map_err(|e| RegistryError::StorageError(e.to_string()))?;
+            }
+        }
+
+        tracing::info!(
+            hash = %hash_hex,
+            semver = %semantic_version,
+            "Contract semantic version updated"
+        );
+
+        Ok(())
+    }
+
     /// Get the upgrade path from one version to another
     ///
     /// Returns a list of versions to upgrade through, or None if no path exists.
+    /// 
+    /// An upgrade is considered valid if:
+    /// - The target version can be used in place of the source version (backwards compatible)
+    /// - For major >= 1.0: same major version and target >= source
+    /// - For major == 0: same major and minor versions and target >= source
+    ///
     /// Currently returns direct upgrade if compatible, or None.
     /// Future: Could implement multi-step migration paths.
     pub async fn get_upgrade_path(
@@ -663,7 +732,9 @@ impl ContractRegistry {
             return Ok(None);
         };
 
-        // Check if direct upgrade is compatible
+        // Check if target version is backwards-compatible with source version
+        // This means: can we use to_version in place of from_version?
+        // For valid upgrade: same major version family AND to_version >= from_version
         if to.is_compatible_with(from_version) {
             Ok(Some(vec![*from_version, *to_version]))
         } else {
@@ -985,11 +1056,12 @@ mod tests {
             .unwrap();
 
         let meta = registry.get_metadata(&hash).await.unwrap().unwrap();
-        assert_eq!(meta.semantic_version, SemanticVersion::new(1, 0, 0));
+        // Version 1 maps to 0.1.0 (pre-1.0 development)
+        assert_eq!(meta.semantic_version, SemanticVersion::new(0, 1, 0));
     }
 
     #[tokio::test]
-    async fn test_with_semantic_version() {
+    async fn test_set_semantic_version() {
         let registry = ContractRegistry::new();
         let contract = create_test_contract("CustomVersionTest");
 
@@ -998,13 +1070,17 @@ mod tests {
             .await
             .unwrap();
 
-        // Update metadata with custom semantic version
+        // Set a custom semantic version using the public API
         let custom_version = SemanticVersion::new(2, 5, 3);
-        let meta = registry.get_metadata(&hash).await.unwrap().unwrap();
-        let updated_meta = meta.with_semantic_version(custom_version);
+        registry
+            .set_semantic_version(&hash, custom_version)
+            .await
+            .unwrap();
 
-        assert_eq!(updated_meta.semantic_version, custom_version);
-        assert_eq!(updated_meta.version, 1); // Numeric version unchanged
+        // Verify it was updated
+        let meta = registry.get_metadata(&hash).await.unwrap().unwrap();
+        assert_eq!(meta.semantic_version, custom_version);
+        assert_eq!(meta.version, 1); // Numeric version unchanged
     }
 
     #[tokio::test]
@@ -1041,7 +1117,7 @@ mod tests {
     async fn test_get_by_semantic_version() {
         let registry = ContractRegistry::new();
 
-        // Deploy with version 1 (will be 1.0.0)
+        // Deploy with version 1 (will be 0.1.0 per pre-1.0 convention)
         let contract = create_test_contract("BySemanticVersion");
         let hash = registry
             .deploy(contract.clone(), "did:icn:owner", Some(1))
@@ -1049,18 +1125,18 @@ mod tests {
             .unwrap();
 
         // Resolve by semantic version
-        let v1_0_0 = SemanticVersion::new(1, 0, 0);
+        let v0_1_0 = SemanticVersion::new(0, 1, 0);
         let resolved = registry
-            .get_by_semantic_version("BySemanticVersion", &v1_0_0)
+            .get_by_semantic_version("BySemanticVersion", &v0_1_0)
             .await
             .unwrap();
 
         assert_eq!(resolved, Some(hash));
 
         // Non-existent semantic version
-        let v2_0_0 = SemanticVersion::new(2, 0, 0);
+        let v0_2_0 = SemanticVersion::new(0, 2, 0);
         let not_found = registry
-            .get_by_semantic_version("BySemanticVersion", &v2_0_0)
+            .get_by_semantic_version("BySemanticVersion", &v0_2_0)
             .await
             .unwrap();
         assert!(not_found.is_none());
@@ -1110,10 +1186,16 @@ mod tests {
     async fn test_get_upgrade_path_compatible() {
         let registry = ContractRegistry::new();
 
-        // Deploy v1.0.0
+        // Deploy v1.0.0 explicitly
         let contract1 = create_test_contract("UpgradePath");
-        let _hash1 = registry
+        let hash1 = registry
             .deploy(contract1, "did:icn:owner", Some(1))
+            .await
+            .unwrap();
+
+        // Set explicit semantic version 1.0.0 using public API
+        registry
+            .set_semantic_version(&hash1, SemanticVersion::new(1, 0, 0))
             .await
             .unwrap();
 
@@ -1130,13 +1212,11 @@ mod tests {
             .await
             .unwrap();
 
-        // Update metadata to use compatible semantic versions (1.0.0 and 1.1.0)
-        {
-            let mut metadata = registry.metadata.write().await;
-            if let Some(meta) = metadata.get_mut(&hash2) {
-                meta.semantic_version = SemanticVersion::new(1, 1, 0);
-            }
-        }
+        // Set explicit semantic version 1.1.0 using public API
+        registry
+            .set_semantic_version(&hash2, SemanticVersion::new(1, 1, 0))
+            .await
+            .unwrap();
 
         let v1_0_0 = SemanticVersion::new(1, 0, 0);
         let v1_1_0 = SemanticVersion::new(1, 1, 0);
@@ -1228,5 +1308,38 @@ mod tests {
             meta.successor_version,
             Some(SemanticVersion::new(3, 0, 0))
         );
+    }
+
+    #[test]
+    fn test_backwards_compatible_deserialization() {
+        // Test that old metadata (without new fields) can still deserialize
+        // This simulates stored metadata from before the version management feature
+        let old_metadata_json = r#"{
+            "code_hash": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "name": "OldContract",
+            "version": 1,
+            "owner": "did:icn:test",
+            "deployed_at": 1234567890,
+            "description": null,
+            "participants": [],
+            "currency": null,
+            "rules": [],
+            "visibility": "Private"
+        }"#;
+
+        let meta: ContractMetadata = serde_json::from_str(old_metadata_json)
+            .expect("Failed to deserialize old metadata");
+
+        // Verify defaults were applied
+        assert_eq!(meta.semantic_version, SemanticVersion::default());
+        assert_eq!(meta.min_interpreter_version, None);
+        assert_eq!(meta.compatible_versions.len(), 0);
+        assert!(!meta.deprecated);
+        assert_eq!(meta.deprecated_reason, None);
+        assert_eq!(meta.successor_version, None);
+
+        // Verify original fields are intact
+        assert_eq!(meta.name, "OldContract");
+        assert_eq!(meta.version, 1);
     }
 }
