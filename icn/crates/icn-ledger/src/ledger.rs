@@ -253,6 +253,10 @@ pub(crate) const ARCHIVE_PREFIX: &str = "ledger:archive:";
 const WITNESS_PREFIX: &str = "ledger:witnesses:";
 
 /// Record of an archived entry (from rollback operations)
+///
+/// This struct is public because it's part of the `Ledger` API - callers may need
+/// to inspect archived entries from rollback operations. It's also used internally
+/// by [`crate::ledger_impl::queries::get_archived_entries`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchiveRecord {
     /// The archived journal entry

@@ -3,6 +3,18 @@
 //! This module contains read-only query operations that retrieve journal entries
 //! from storage. These functions are extracted from the main Ledger implementation
 //! for better code organization.
+//!
+//! # Testing
+//!
+//! Tests for these functions are located in the main `ledger.rs` test module
+//! (`crates/icn-ledger/src/ledger.rs`). The tests use the public `Ledger` API
+//! which delegates to these functions, ensuring the public interface remains
+//! stable while allowing internal reorganization.
+//!
+//! Key test functions:
+//! - `test_append_and_retrieve_entry` - tests `get_entry()`
+//! - `test_pagination_basic`, `test_pagination_last_page`, etc. - tests pagination functions
+//! - Integration tests in `crates/icn-ledger/tests/` also exercise these functions
 
 use crate::ledger::{
     ArchiveRecord, Ledger, PaginationCursor, ARCHIVE_PREFIX, JOURNAL_PREFIX, JOURNAL_TS_PREFIX,
