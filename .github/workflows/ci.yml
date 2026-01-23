@@ -162,6 +162,9 @@ jobs:
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'true'
+          aggressive: 'true'
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -171,6 +174,16 @@ jobs:
 
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin --locked
+
+      - name: Pre-tarpaulin cleanup
+        run: |
+          echo "Cleaning build artifacts before tarpaulin..."
+          # Remove debug artifacts from cache - tarpaulin needs fresh instrumented builds
+          rm -rf ./icn/target/debug/deps || true
+          rm -rf ./icn/target/debug/build || true
+          rm -rf ./icn/target/debug/.fingerprint || true
+          # Show remaining space
+          df -h /
 
       - name: Generate coverage
         run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
