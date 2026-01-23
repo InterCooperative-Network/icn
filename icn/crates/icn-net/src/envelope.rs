@@ -419,8 +419,7 @@ impl SignedEnvelope {
         payload_type: PayloadType,
         payload: &T,
     ) -> Result<Self> {
-        let payload_bytes =
-            icn_encoding::encode(payload).context("Failed to serialize payload")?;
+        let payload_bytes = icn_encoding::encode(payload).context("Failed to serialize payload")?;
         Self::new(from, keypair, sequence, payload_type, payload_bytes)
     }
 }

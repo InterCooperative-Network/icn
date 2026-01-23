@@ -516,8 +516,7 @@ fn test_combined_topic_encryption_with_obfuscation() {
     let unpadded = obfuscator.unpad_message(&padded).unwrap();
 
     // Deserialize
-    let received_encrypted: icn_privacy::EncryptedTopic =
-        icn_encoding::decode(&unpadded).unwrap();
+    let received_encrypted: icn_privacy::EncryptedTopic = icn_encoding::decode(&unpadded).unwrap();
 
     // Decrypt
     let decrypted = encryptor.decrypt(&received_encrypted).unwrap();

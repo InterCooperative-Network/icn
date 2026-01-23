@@ -113,18 +113,17 @@ fn bench_task_operations(c: &mut Criterion) {
         b.iter(|| icn_encoding::decode::<ComputeTask>(black_box(&serialized_postcard)).unwrap());
     });
 
-    // Benchmark bincode legacy encoding (backward compatibility)
-    group.bench_function("serialize_task_bincode_legacy", |b| {
+    // Benchmark versioned storage encoding (with version prefix)
+    group.bench_function("serialize_task_versioned", |b| {
         let task = create_test_task(1);
-        b.iter(|| icn_encoding::encode(black_box(&task)).unwrap());
+        b.iter(|| icn_encoding::encode_versioned(black_box(&task)).unwrap());
     });
 
-    let serialized_bincode = icn_encoding::encode(&task).unwrap();
+    let serialized_versioned = icn_encoding::encode_versioned(&task).unwrap();
 
-    group.bench_function("deserialize_task_bincode_legacy", |b| {
+    group.bench_function("deserialize_task_versioned", |b| {
         b.iter(|| {
-            icn_encoding::decode::<ComputeTask>(black_box(&serialized_bincode))
-                .unwrap()
+            icn_encoding::decode_versioned::<ComputeTask>(black_box(&serialized_versioned)).unwrap()
         });
     });
 
@@ -137,9 +136,9 @@ fn bench_task_operations(c: &mut Criterion) {
     // Log size comparison
     let json_bytes = serde_json::to_vec(&task).unwrap();
     println!(
-        "Postcard: {} bytes, Bincode: {} bytes, JSON: {} bytes",
+        "Postcard (wire): {} bytes, Postcard (storage): {} bytes, JSON: {} bytes",
         serialized_postcard.len(),
-        serialized_bincode.len(),
+        serialized_versioned.len(),
         json_bytes.len()
     );
 

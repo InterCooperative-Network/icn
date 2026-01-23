@@ -461,14 +461,13 @@ pub async fn handle_snapshot_coordination(
                 Ok(response_msgs) => {
                     // Broadcast any response messages
                     for response_msg in response_msgs {
-                        let response_bytes =
-                            match icn_encoding::encode(&response_msg) {
-                                Ok(bytes) => bytes,
-                                Err(e) => {
-                                    warn!("Failed to serialize snapshot response: {}", e);
-                                    continue;
-                                }
-                            };
+                        let response_bytes = match icn_encoding::encode(&response_msg) {
+                            Ok(bytes) => bytes,
+                            Err(e) => {
+                                warn!("Failed to serialize snapshot response: {}", e);
+                                continue;
+                            }
+                        };
 
                         let mut gossip_guard = gossip_handle.write().await;
                         match gossip_guard

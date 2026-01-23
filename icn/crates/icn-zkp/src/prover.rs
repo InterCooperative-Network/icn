@@ -239,15 +239,15 @@ impl ZkProver {
                 self.prove_age(*threshold, &age_att, issuer_pk, &context)?
             }
             ProofType::Citizenship { country_code } => {
-                let cit_att: CitizenshipAttestation =
-                    icn_encoding::decode(&attestation.payload).map_err(|e| {
+                let cit_att: CitizenshipAttestation = icn_encoding::decode(&attestation.payload)
+                    .map_err(|e| {
                         ProverError::InvalidAttestation(format!("citizenship attestation: {e}"))
                     })?;
                 self.prove_citizenship(*country_code, &cit_att, issuer_pk, &context)?
             }
             ProofType::Membership { org_did } => {
-                let mem_att: MembershipAttestation =
-                    icn_encoding::decode(&attestation.payload).map_err(|e| {
+                let mem_att: MembershipAttestation = icn_encoding::decode(&attestation.payload)
+                    .map_err(|e| {
                         ProverError::InvalidAttestation(format!("membership attestation: {e}"))
                     })?;
                 // Pad subject_anchor to 32 bytes for DID creation

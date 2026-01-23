@@ -107,8 +107,7 @@ fn test_encrypt_sign_decrypt_flow() {
         .unwrap();
 
     // 4. Deserialize the plaintext message
-    let decrypted_message: SecretMessage =
-        icn_encoding::decode(&decrypted_bytes).unwrap();
+    let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
 
     // ========== VERIFICATION ==========
     assert_eq!(decrypted_message, message);
@@ -254,8 +253,7 @@ fn test_multiple_encrypted_messages_different_nonces() {
             .decrypt(&bob_bundle.x25519_secret(), &alice_bundle.x25519_public())
             .unwrap();
 
-        let decrypted_message: SecretMessage =
-            icn_encoding::decode(&decrypted_bytes).unwrap();
+        let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
         assert_eq!(decrypted_message, message);
     }
 }
@@ -288,8 +286,7 @@ fn test_large_encrypted_message() {
         .decrypt(&bob_bundle.x25519_secret(), &alice_bundle.x25519_public())
         .unwrap();
 
-    let decrypted_message: SecretMessage =
-        icn_encoding::decode(&decrypted_bytes).unwrap();
+    let decrypted_message: SecretMessage = icn_encoding::decode(&decrypted_bytes).unwrap();
     assert_eq!(decrypted_message.content, large_content);
 }
 
@@ -506,8 +503,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     assert_eq!(signed_envelope.payload_type, PayloadType::Encrypted);
 
     // Deserialize the encrypted envelope
-    let received_encrypted: EncryptedEnvelope =
-        icn_encoding::decode(&signed_envelope.payload)?;
+    let received_encrypted: EncryptedEnvelope = icn_encoding::decode(&signed_envelope.payload)?;
 
     // Decrypt using Bob's X25519 secret key and Alice's public key
     let alice_x25519_public = bob_has_alice_key.unwrap();
@@ -603,8 +599,7 @@ async fn test_broadcast_path_not_encrypted() -> Result<()> {
     );
 
     // Verify we can read the payload directly (no decryption needed)
-    let decoded_message: SecretMessage =
-        icn_encoding::decode(&signed_envelope.payload)?;
+    let decoded_message: SecretMessage = icn_encoding::decode(&signed_envelope.payload)?;
     assert_eq!(decoded_message, message);
 
     println!("✓ Broadcast message received without encryption - correct behavior");
@@ -736,8 +731,7 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
     println!("✓ Bob verified Alice's signature");
 
     // Extract encrypted envelope
-    let encrypted_env: EncryptedEnvelope =
-        icn_encoding::decode(&signed_env.payload)?;
+    let encrypted_env: EncryptedEnvelope = icn_encoding::decode(&signed_env.payload)?;
 
     // Get Alice's X25519 public key
     let alice_x25519_public = bob

@@ -102,38 +102,30 @@ fn get_message_topic_and_data(
     use icn_compute::ComputeMessage;
 
     match compute_msg {
-        ComputeMessage::TaskSubmitted(_) => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::TaskClaimed { .. } => (
-            icn_compute::TOPIC_CLAIM,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::TaskResult(_) => (
-            icn_compute::TOPIC_RESULT,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::TaskCancelled { .. } => (
-            icn_compute::TOPIC_CANCEL,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::ExecutorAnnounce { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::PlacementRequest { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::PlacementOffer { .. } => (
-            icn_compute::TOPIC_CLAIM,
-            icn_encoding::encode(compute_msg),
-        ),
-        ComputeMessage::NodeCapacityAnnounce { .. } => (
-            icn_compute::TOPIC_SUBMIT,
-            icn_encoding::encode(compute_msg),
-        ),
+        ComputeMessage::TaskSubmitted(_) => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskClaimed { .. } => {
+            (icn_compute::TOPIC_CLAIM, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskResult(_) => {
+            (icn_compute::TOPIC_RESULT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::TaskCancelled { .. } => {
+            (icn_compute::TOPIC_CANCEL, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::ExecutorAnnounce { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::PlacementRequest { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::PlacementOffer { .. } => {
+            (icn_compute::TOPIC_CLAIM, icn_encoding::encode(compute_msg))
+        }
+        ComputeMessage::NodeCapacityAnnounce { .. } => {
+            (icn_compute::TOPIC_SUBMIT, icn_encoding::encode(compute_msg))
+        }
         ComputeMessage::CheckpointQuery { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
             icn_encoding::encode(compute_msg),

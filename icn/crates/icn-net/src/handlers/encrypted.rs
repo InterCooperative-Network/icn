@@ -46,19 +46,18 @@ impl ConnectionContext {
             .unwrap_or_else(|| "none".to_string());
 
         // 1. Deserialize EncryptedEnvelope from the signed payload
-        let encrypted: EncryptedEnvelope =
-            match icn_encoding::decode(&envelope.payload) {
-                Ok(enc) => enc,
-                Err(e) => {
-                    warn!(
-                        trace_id = %trace_id,
-                        sender = %envelope.from,
-                        "Failed to deserialize EncryptedEnvelope: {}", e
-                    );
-                    icn_obs::metrics::network::encryption_rejected_inc("deserialization_failed");
-                    return;
-                }
-            };
+        let encrypted: EncryptedEnvelope = match icn_encoding::decode(&envelope.payload) {
+            Ok(enc) => enc,
+            Err(e) => {
+                warn!(
+                    trace_id = %trace_id,
+                    sender = %envelope.from,
+                    "Failed to deserialize EncryptedEnvelope: {}", e
+                );
+                icn_obs::metrics::network::encryption_rejected_inc("deserialization_failed");
+                return;
+            }
+        };
 
         // 2. Verify we are the intended recipient
         if encrypted.to != self.own_did {

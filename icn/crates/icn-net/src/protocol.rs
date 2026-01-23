@@ -667,8 +667,7 @@ impl NetworkMessage {
 
     /// Serialize to bytes using bincode (legacy format, no compression header)
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let bytes = icn_encoding::encode(self)
-            .context("Failed to serialize network message")?;
+        let bytes = icn_encoding::encode(self).context("Failed to serialize network message")?;
 
         if bytes.len() > MAX_MESSAGE_SIZE {
             anyhow::bail!(
@@ -689,8 +688,8 @@ impl NetworkMessage {
     ///
     /// Use this for peers that support MESSAGE_COMPRESSION capability.
     pub fn to_bytes_compressed(&self, enable_compression: bool) -> Result<Vec<u8>> {
-        let raw_bytes = icn_encoding::encode(self)
-            .context("Failed to serialize network message")?;
+        let raw_bytes =
+            icn_encoding::encode(self).context("Failed to serialize network message")?;
 
         // Track bytes before compression for metrics
         let bytes_before = raw_bytes.len();
@@ -755,8 +754,8 @@ impl NetworkMessage {
             );
         }
 
-        let msg: NetworkMessage = icn_encoding::decode(bytes)
-            .context("Failed to deserialize network message")?;
+        let msg: NetworkMessage =
+            icn_encoding::decode(bytes).context("Failed to deserialize network message")?;
 
         // Validate protocol version
         Self::validate_version(msg.version)?;
@@ -791,8 +790,8 @@ impl NetworkMessage {
             CompressionFormat::Zstd => decompress_bounded(payload, MAX_MESSAGE_SIZE)?,
         };
 
-        let msg: NetworkMessage = icn_encoding::decode(&decompressed)
-            .context("Failed to deserialize network message")?;
+        let msg: NetworkMessage =
+            icn_encoding::decode(&decompressed).context("Failed to deserialize network message")?;
 
         Self::validate_version(msg.version)?;
         Ok(msg)
@@ -905,8 +904,9 @@ impl NetworkMessage {
         };
 
         let msg: NetworkMessage = match encoding {
-            EncodingFormat::Bincode => icn_encoding::decode(&decompressed)
-                .context("Failed to deserialize with bincode")?,
+            EncodingFormat::Bincode => {
+                icn_encoding::decode(&decompressed).context("Failed to deserialize with bincode")?
+            }
             EncodingFormat::Postcard => icn_encoding::decode(&decompressed)
                 .context("Failed to deserialize with postcard")?,
         };

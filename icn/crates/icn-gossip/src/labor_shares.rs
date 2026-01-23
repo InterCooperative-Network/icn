@@ -245,8 +245,7 @@ mod tests {
         };
 
         let serialized = icn_encoding::encode(&msg).expect("serialize");
-        let deserialized: BondMessage =
-            icn_encoding::decode(&serialized).expect("deserialize");
+        let deserialized: BondMessage = icn_encoding::decode(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
@@ -264,8 +263,7 @@ mod tests {
         };
 
         let serialized = icn_encoding::encode(&msg).expect("serialize");
-        let deserialized: BondMessage =
-            icn_encoding::decode(&serialized).expect("deserialize");
+        let deserialized: BondMessage = icn_encoding::decode(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
