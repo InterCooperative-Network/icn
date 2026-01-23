@@ -7,6 +7,35 @@ use icn_compute::{
     TaskPriority, TaskStatus,
 };
 
+// ============================================================================
+// Validation Constants
+// ============================================================================
+
+/// Minimum task ID length
+pub const MIN_TASK_ID_LEN: usize = 1;
+/// Maximum task ID length
+pub const MAX_TASK_ID_LEN: usize = 256;
+/// Minimum fuel limit for compute tasks
+pub const MIN_FUEL_LIMIT: u64 = 100;
+/// Maximum fuel limit for compute tasks
+pub const MAX_FUEL_LIMIT: u64 = 10_000_000;
+/// Maximum payment rate per unit of fuel
+pub const MAX_PAYMENT_RATE: u64 = 1_000_000;
+/// Minimum CPU cores for resource profile (practical minimum)
+pub const MIN_CPU_CORES: f64 = 0.1;
+/// Maximum CPU cores for resource profile
+pub const MAX_CPU_CORES: f64 = 256.0;
+/// Minimum memory in MB for resource profile
+pub const MIN_MEMORY_MB: u64 = 1;
+/// Maximum memory in MB for resource profile
+pub const MAX_MEMORY_MB: u64 = 1_000_000;
+/// Maximum storage in MB for resource profile
+pub const MAX_STORAGE_MB: u64 = 10_000_000;
+/// Minimum network bandwidth in Mbps
+pub const MIN_NETWORK_MBPS: f64 = 0.1;
+/// Maximum network bandwidth in Mbps
+pub const MAX_NETWORK_MBPS: f64 = 100_000.0;
+
 /// Task ID type
 pub type TaskId = [u8; 32];
 
@@ -168,14 +197,18 @@ pub struct SubmitTaskParams {
 impl SubmitTaskParams {
     /// Validate task parameters
     pub fn validate(&self) -> Result<(), ApiError> {
-        // Validate task_id
-        if self.task_id.is_empty() {
-            return Err(ApiError::ValidationError("Task ID cannot be empty".into()));
+        // Validate task_id length
+        if self.task_id.len() < MIN_TASK_ID_LEN {
+            return Err(ApiError::ValidationError(format!(
+                "Task ID cannot be empty (min {} char)",
+                MIN_TASK_ID_LEN
+            )));
         }
-        if self.task_id.len() > 256 {
-            return Err(ApiError::ValidationError(
-                "Task ID too long (max 256 chars)".into(),
-            ));
+        if self.task_id.len() > MAX_TASK_ID_LEN {
+            return Err(ApiError::ValidationError(format!(
+                "Task ID too long (max {} chars)",
+                MAX_TASK_ID_LEN
+            )));
         }
 
         // Validate code is not empty (if provided)
@@ -194,24 +227,27 @@ impl SubmitTaskParams {
             }
         }
 
-        // Validate fuel limit (100 to 10M)
-        if self.fuel_limit < 100 {
-            return Err(ApiError::ValidationError(
-                "Fuel limit too low (min 100)".into(),
-            ));
+        // Validate fuel limit
+        if self.fuel_limit < MIN_FUEL_LIMIT {
+            return Err(ApiError::ValidationError(format!(
+                "Fuel limit too low (min {})",
+                MIN_FUEL_LIMIT
+            )));
         }
-        if self.fuel_limit > 10_000_000 {
-            return Err(ApiError::ValidationError(
-                "Fuel limit too high (max 10M)".into(),
-            ));
+        if self.fuel_limit > MAX_FUEL_LIMIT {
+            return Err(ApiError::ValidationError(format!(
+                "Fuel limit too high (max {})",
+                MAX_FUEL_LIMIT
+            )));
         }
 
-        // Validate payment rate if provided (max 1M)
+        // Validate payment rate if provided
         if let Some(rate) = self.payment_rate {
-            if rate > 1_000_000 {
-                return Err(ApiError::ValidationError(
-                    "Payment rate too high (max 1M)".into(),
-                ));
+            if rate > MAX_PAYMENT_RATE {
+                return Err(ApiError::ValidationError(format!(
+                    "Payment rate too high (max {})",
+                    MAX_PAYMENT_RATE
+                )));
             }
         }
 
@@ -267,34 +303,38 @@ impl ResourceProfileParam {
     /// Validate resource profile
     pub fn validate(&self) -> Result<(), ApiError> {
         if let Some(cpu) = self.cpu_cores {
-            if cpu <= 0.0 || cpu > 256.0 {
-                return Err(ApiError::ValidationError(
-                    "CPU cores must be between 0 and 256".into(),
-                ));
+            if !(MIN_CPU_CORES..=MAX_CPU_CORES).contains(&cpu) {
+                return Err(ApiError::ValidationError(format!(
+                    "CPU cores must be between {} and {}",
+                    MIN_CPU_CORES, MAX_CPU_CORES
+                )));
             }
         }
 
         if let Some(mem) = self.memory_mb {
-            if mem == 0 || mem > 1_000_000 {
-                return Err(ApiError::ValidationError(
-                    "Memory must be between 1 and 1,000,000 MB".into(),
-                ));
+            if !(MIN_MEMORY_MB..=MAX_MEMORY_MB).contains(&mem) {
+                return Err(ApiError::ValidationError(format!(
+                    "Memory must be between {} and {} MB",
+                    MIN_MEMORY_MB, MAX_MEMORY_MB
+                )));
             }
         }
 
         if let Some(storage) = self.storage_mb {
-            if storage > 10_000_000 {
-                return Err(ApiError::ValidationError(
-                    "Storage must be <= 10,000,000 MB".into(),
-                ));
+            if storage > MAX_STORAGE_MB {
+                return Err(ApiError::ValidationError(format!(
+                    "Storage must be <= {} MB",
+                    MAX_STORAGE_MB
+                )));
             }
         }
 
         if let Some(net) = self.network_mbps {
-            if net <= 0.0 || net > 100_000.0 {
-                return Err(ApiError::ValidationError(
-                    "Network bandwidth must be between 0 and 100,000 Mbps".into(),
-                ));
+            if !(MIN_NETWORK_MBPS..=MAX_NETWORK_MBPS).contains(&net) {
+                return Err(ApiError::ValidationError(format!(
+                    "Network bandwidth must be between {} and {} Mbps",
+                    MIN_NETWORK_MBPS, MAX_NETWORK_MBPS
+                )));
             }
         }
 
