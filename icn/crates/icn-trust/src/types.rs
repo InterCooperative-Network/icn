@@ -237,7 +237,7 @@ impl std::error::Error for TrustScoreError {}
 /// assert!(TrustScore::new(-0.1).is_err());
 /// assert!(TrustScore::new(f64::NAN).is_err());
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TrustScore(f64);
 
 impl TrustScore {
@@ -455,6 +455,26 @@ impl PartialOrd<TrustScore> for f64 {
 impl PartialOrd<f64> for TrustScore {
     fn partial_cmp(&self, other: &f64) -> Option<std::cmp::Ordering> {
         self.0.partial_cmp(other)
+    }
+}
+
+// Safety: NaN is rejected at construction time, so TrustScore always contains
+// a valid f64 that satisfies the requirements for Eq (reflexive equality).
+impl Eq for TrustScore {}
+
+// Safety: NaN is rejected at construction time, so TrustScore always contains
+// a valid f64 that satisfies the requirements for Ord (total ordering).
+impl Ord for TrustScore {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Since NaN is rejected at construction, partial_cmp will never return None.
+        // We use total_cmp for a branchless comparison that handles all f64 edge cases.
+        self.0.total_cmp(&other.0)
+    }
+}
+
+impl PartialOrd for TrustScore {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

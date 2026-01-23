@@ -15,19 +15,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Trust edge for anomaly detection
-#[derive(Debug, Clone)]
-pub struct TrustEdge {
-    /// Source DID
-    pub from: Did,
-    /// Target DID
-    pub to: Did,
-    /// Trust score
-    pub score: f64,
-    /// Creation timestamp
-    pub created_at: u64,
-}
-
 /// Detected trust anomaly
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
