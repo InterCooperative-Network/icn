@@ -31,6 +31,7 @@ pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::Attestatio
 pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
 pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
 pub type EvidenceValidatorHandle = Arc<icn_trust::EvidenceValidator>;
+pub type EntityHandleType = icn_entity::EntityHandle;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -75,6 +76,8 @@ pub struct NotificationDeps {
     pub nat_dial_config: NatDialConfig,
     /// Evidence validator for trust attestation verification
     pub evidence_validator: Option<EvidenceValidatorHandle>,
+    /// Entity handle for entity registry operations
+    pub entity_handle: Option<EntityHandleType>,
 }
 
 /// Handle trust attestation entries
@@ -728,6 +731,33 @@ pub async fn handle_federation_message(
     }
 }
 
+/// Handle entity update entries from gossip
+///
+/// Uses last-write-wins merge strategy based on `updated_at` timestamp.
+pub async fn handle_entity_update(entry_data: Vec<u8>, entity_handle: EntityHandleType) {
+    match icn_encoding::decode_versioned::<icn_entity::CooperativeEntity>(&entry_data) {
+        Ok(remote_entity) => {
+            // Apply the update via the entity handle (which handles last-write-wins internally)
+            if let Err(e) = entity_handle
+                .apply_gossip_update(remote_entity.clone())
+                .await
+            {
+                warn!(
+                    entity_id = %remote_entity.id,
+                    error = %e,
+                    "Failed to apply entity update from gossip"
+                );
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                "Failed to deserialize entity from gossip"
+            );
+        }
+    }
+}
+
 /// Create the notification callback that routes gossip entries to handlers
 ///
 /// This returns a callback that can be set on the GossipActor to receive
@@ -850,6 +880,14 @@ pub fn create_notification_callback(
                 tokio::spawn(async move {
                     handle_community_update(data, community_store).await;
                 });
+            }
+        } else if topic == icn_entity::ENTITY_TOPIC {
+            if let Some(data) = entry_data {
+                if let Some(entity_handle) = deps.entity_handle.clone() {
+                    tokio::spawn(async move {
+                        handle_entity_update(data, entity_handle).await;
+                    });
+                }
             }
         } else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY
             || topic == icn_federation::TOPIC_FEDERATION_TRUST

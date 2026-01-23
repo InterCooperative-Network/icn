@@ -33,7 +33,7 @@ pub struct GatewayHandles {
     /// Ledger handle for balance queries
     pub ledger: Option<icn_gateway::LedgerHandle>,
     /// Entity handle for entity management
-    pub entity: Option<super::init_entity::EntityHandle>,
+    pub entity: Option<icn_entity::EntityHandle>,
     /// Steward handle for SDIS ceremonies
     pub steward: Option<icn_steward::StewardHandle>,
     /// Agreement manager for inter-cooperative agreements

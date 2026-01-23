@@ -270,9 +270,14 @@ async fn spawn_actors_with_identity(
     icn_obs::metrics::supervisor::actor_spawned_inc("community");
     let community_store = community_services.community_store.clone();
 
-    // Initialize entity services (persistent storage)
-    let entity_services = super::init_entity::init_entity_services(config)?;
+    // Initialize entity services with gossip synchronization
+    let entity_services =
+        super::init_entity::init_entity_services(config, gossip_handle.clone(), did.clone())
+            .await?;
     icn_obs::metrics::supervisor::actor_spawned_inc("entity");
+
+    // Store entity handle for notification routing
+    let entity_handle = entity_services.entity_handle.clone();
 
     // Store handles for gateway integration
     gateway_handles.coop = Some(coop_handle);
@@ -386,6 +391,7 @@ async fn spawn_actors_with_identity(
         &node_profile_handle,
         &federation_handler_for_notifications,
         &contract_registry_holder,
+        &entity_handle,
         config,
         shutdown_tx,
         background_tasks,
@@ -777,6 +783,7 @@ async fn configure_gossip_actor(
     node_profile_handle: &Arc<RwLock<crate::node::NodeProfile>>,
     federation_handler: &Option<Arc<icn_federation::FederationGossipHandler>>,
     contract_registry_holder: &Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>,
+    entity_handle: &icn_entity::EntityHandle,
     config: &Config,
     shutdown_tx: &ShutdownTx,
     background_tasks: &mut JoinSet<()>,
@@ -826,6 +833,7 @@ async fn configure_gossip_actor(
             contract_registry: contract_registry_holder.clone(),
             nat_dial_config: config.network.nat_dial.clone(),
             evidence_validator,
+            entity_handle: Some(entity_handle.clone()), // Pass entity handle for gossip sync
         },
     );
 

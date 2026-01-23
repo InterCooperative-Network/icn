@@ -344,6 +344,9 @@ pub enum EntityStatus {
         /// When split
         split_at: u64,
     },
+
+    /// Entity has been deleted (tombstone for gossip sync)
+    Deleted,
 }
 
 impl EntityStatus {
@@ -359,6 +362,7 @@ impl EntityStatus {
             EntityStatus::Dissolved { .. }
                 | EntityStatus::Merged { .. }
                 | EntityStatus::Split { .. }
+                | EntityStatus::Deleted
         )
     }
 }
@@ -375,6 +379,7 @@ impl std::fmt::Display for EntityStatus {
             EntityStatus::Split { into, .. } => {
                 write!(f, "Split into {} entities", into.len())
             }
+            EntityStatus::Deleted => write!(f, "Deleted"),
         }
     }
 }

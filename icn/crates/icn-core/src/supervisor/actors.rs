@@ -17,7 +17,7 @@ pub struct GatewayActorHandles {
     pub governance: Option<Arc<dyn icn_governance::GovernanceOps + Send + Sync>>,
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     pub ledger: Option<icn_gateway::LedgerHandle>,
-    pub entity: Option<super::init_entity::EntityHandle>,
+    pub entity: Option<icn_entity::EntityHandle>,
     pub steward: Option<icn_steward::StewardHandle>,
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
 }
