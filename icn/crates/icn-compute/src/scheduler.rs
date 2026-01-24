@@ -1569,7 +1569,8 @@ mod tests {
         let capacity = NodeCapacity::sense_system_resources();
 
         assert!(capacity.cpu_cores_total > 0.0);
-        // cpu_cores_available can be 0 when system is under heavy load
+        // cpu_cores_available can be 0 when system is under heavy load (load avg >= cores)
+        // This is valid behavior, not a test failure
         assert!(capacity.cpu_cores_available >= 0.0);
         assert!(capacity.memory_mb_total > 0);
         assert!(capacity.memory_mb_available > 0);

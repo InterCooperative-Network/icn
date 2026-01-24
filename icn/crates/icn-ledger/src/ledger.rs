@@ -296,7 +296,7 @@ pub struct Ledger {
     pub(crate) fork_resolver: ForkResolver,
 
     /// Freeze manager for emergency member freezes (Issue #25)
-    freeze_manager: FreezeManager,
+    pub(crate) freeze_manager: FreezeManager,
 
     /// Byzantine fault detector (Phase 18)
     pub(crate) misbehavior_detector:
@@ -314,7 +314,7 @@ pub struct Ledger {
 
     /// Optional event emitter for real-time notifications
     /// When set, ledger operations emit events for WebSocket/notification systems
-    event_emitter: Option<SharedEventEmitter>,
+    pub(crate) event_emitter: Option<SharedEventEmitter>,
 
     /// Domain ID for this ledger (used in event payloads)
     domain_id: Option<String>,
@@ -2327,23 +2327,7 @@ impl Ledger {
     /// * `reason` - Reason for freezing (for audit trail)
     /// * `duration_seconds` - Optional duration (None = indefinite)
     pub fn freeze_member(&mut self, did: Did, reason: String, duration_seconds: Option<u64>) {
-        info!(
-            did = %did,
-            reason = %reason,
-            duration = ?duration_seconds,
-            "Freezing member account"
-        );
-        self.freeze_manager
-            .freeze(did.clone(), reason.clone(), duration_seconds);
-
-        // Emit freeze event
-        if let Some(ref emitter) = self.event_emitter {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            emitter.emit_member_frozen(&did, reason, None, None, duration_seconds, now);
-        }
+        crate::ledger_impl::freeze_ops::freeze_member(self, did, reason, duration_seconds)
     }
 
     /// Freeze a member with full metadata (for governance integration)
@@ -2355,35 +2339,14 @@ impl Ledger {
         proposal_id: Option<String>,
         frozen_by: Option<Did>,
     ) {
-        info!(
-            did = %did,
-            reason = %reason,
-            proposal = ?proposal_id,
-            "Freezing member account via governance"
-        );
-        self.freeze_manager.freeze_with_metadata(
-            did.clone(),
-            reason.clone(),
+        crate::ledger_impl::freeze_ops::freeze_member_with_metadata(
+            self,
+            did,
+            reason,
             duration_seconds,
-            proposal_id.clone(),
-            frozen_by.clone(),
-        );
-
-        // Emit freeze event
-        if let Some(ref emitter) = self.event_emitter {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            emitter.emit_member_frozen(
-                &did,
-                reason,
-                frozen_by.as_ref(),
-                proposal_id,
-                duration_seconds,
-                now,
-            );
-        }
+            proposal_id,
+            frozen_by,
+        )
     }
 
     /// Unfreeze a member account
@@ -2391,25 +2354,7 @@ impl Ledger {
     /// This is also an emergency action requiring super-majority approval,
     /// unless the freeze has expired.
     pub fn unfreeze_member(&mut self, did: &Did, reason: String) -> Option<FrozenMember> {
-        info!(
-            did = %did,
-            reason = %reason,
-            "Unfreezing member account"
-        );
-        let result = self.freeze_manager.unfreeze(did, reason.clone());
-
-        // Emit unfreeze event if member was unfrozen
-        if result.is_some() {
-            if let Some(ref emitter) = self.event_emitter {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                emitter.emit_member_unfrozen(did, reason, None, None, now);
-            }
-        }
-
-        result
+        crate::ledger_impl::freeze_ops::unfreeze_member(self, did, reason)
     }
 
     /// Unfreeze a member with full metadata (for governance integration)
@@ -2420,56 +2365,38 @@ impl Ledger {
         proposal_id: Option<String>,
         unfrozen_by: Option<Did>,
     ) -> Option<FrozenMember> {
-        info!(
-            did = %did,
-            reason = %reason,
-            proposal = ?proposal_id,
-            "Unfreezing member account via governance"
-        );
-        let result = self.freeze_manager.unfreeze_with_metadata(
+        crate::ledger_impl::freeze_ops::unfreeze_member_with_metadata(
+            self,
             did,
-            reason.clone(),
-            proposal_id.clone(),
-            unfrozen_by.clone(),
-        );
-
-        // Emit unfreeze event if member was unfrozen
-        if result.is_some() {
-            if let Some(ref emitter) = self.event_emitter {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                emitter.emit_member_unfrozen(did, reason, unfrozen_by.as_ref(), proposal_id, now);
-            }
-        }
-
-        result
+            reason,
+            proposal_id,
+            unfrozen_by,
+        )
     }
 
     /// Check if a member is currently frozen
     pub fn is_member_frozen(&mut self, did: &Did) -> bool {
-        self.freeze_manager.is_frozen(did)
+        crate::ledger_impl::freeze_ops::is_member_frozen(self, did)
     }
 
     /// Get the freeze record for a member if frozen
     pub fn get_freeze_record(&mut self, did: &Did) -> Option<&FrozenMember> {
-        self.freeze_manager.get_frozen(did)
+        crate::ledger_impl::freeze_ops::get_freeze_record(self, did)
     }
 
     /// List all currently frozen members
     pub fn list_frozen_members(&mut self) -> Vec<&FrozenMember> {
-        self.freeze_manager.list_frozen()
+        crate::ledger_impl::freeze_ops::list_frozen_members(self)
     }
 
     /// Get count of frozen members
     pub fn frozen_member_count(&mut self) -> usize {
-        self.freeze_manager.frozen_count()
+        crate::ledger_impl::freeze_ops::frozen_member_count(self)
     }
 
     /// Clean up expired freezes
     pub fn cleanup_expired_freezes(&mut self) -> usize {
-        self.freeze_manager.cleanup_expired()
+        crate::ledger_impl::freeze_ops::cleanup_expired_freezes(self)
     }
 
     /// Transfer balances from old_did to new_did during recovery
