@@ -36,10 +36,8 @@
 //! ```
 
 use icn_entity::EntityId;
-use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
 
@@ -98,10 +96,6 @@ pub enum AccessError {
         /// Required review period
         review_period: u64,
     },
-
-    /// Storage backend error
-    #[error("Storage error: {0}")]
-    StorageError(String),
 }
 
 /// Result type for access operations
@@ -298,11 +292,6 @@ pub struct ResourceAccess {
 
     /// Timestamp of last stewardship review (for review_period enforcement)
     pub last_review: Option<u64>,
-
-    /// Timestamp of last transfer (for audit trail)
-    /// Set when access is transferred to a new holder via ResourceAccessStore::transfer()
-    #[serde(default)]
-    pub last_transferred_at: Option<u64>,
 }
 
 impl ResourceAccess {
@@ -326,7 +315,6 @@ impl ResourceAccess {
             revoked: false,
             revocation_reason: None,
             last_review: None,
-            last_transferred_at: None,
         }
     }
 
@@ -643,9 +631,6 @@ impl ResourceAccess {
     }
 
     /// Validate transfer (enforces no-profit rule)
-    /// Validate transfer price against anti-speculation rules
-    ///
-    /// Returns error if price > 0 and no_profit_transfer is enabled.
     pub fn validate_transfer(&self, price: Option<i64>) -> Result<()> {
         if self.rules.no_profit_transfer {
             // Any paid transfer is considered profit-seeking
@@ -656,88 +641,6 @@ impl ResourceAccess {
             }
         }
         Ok(())
-    }
-
-    /// Validate all preconditions for transferring this access to a new holder
-    ///
-    /// This method performs comprehensive validation including:
-    /// 1. Access is not revoked
-    /// 2. Transfer price complies with no-profit rules
-    /// 3. HandoffProcedure steps are completed (for Stewardship)
-    ///
-    /// Handoff validation uses exact segment matching to prevent gaming.
-    /// For example, logging "Failed to transfer credentials" will NOT satisfy
-    /// a step requiring "Transfer credentials".
-    ///
-    /// # Arguments
-    /// * `price` - Optional transfer price for validation
-    ///
-    /// # Returns
-    /// * `Ok(())` if all preconditions are met
-    /// * `Err(AccessError)` describing the validation failure
-    pub fn validate_transfer_preconditions(&self, price: Option<i64>) -> Result<()> {
-        // Check access is not revoked
-        if self.revoked {
-            return Err(AccessError::Revoked(
-                self.revocation_reason
-                    .clone()
-                    .unwrap_or_else(|| "Access revoked".to_string()),
-            ));
-        }
-
-        // Validate transfer price (no-profit rule)
-        self.validate_transfer(price)?;
-
-        // For Stewardship, validate HandoffProcedure steps are completed
-        if let AccessModel::Stewardship { duties, .. } = &self.model {
-            self.validate_handoff_steps(duties)?;
-        }
-
-        Ok(())
-    }
-
-    /// Validate that all required handoff steps have been completed
-    ///
-    /// Uses exact segment matching: the step text must appear as a complete
-    /// segment (separated by common delimiters) in a usage log entry.
-    fn validate_handoff_steps(&self, duties: &[StewardshipDuty]) -> Result<()> {
-        // Find HandoffProcedure duty if it exists
-        let handoff_duty = duties.iter().find_map(|d| match d {
-            StewardshipDuty::HandoffProcedure { steps } => Some(steps),
-            _ => None,
-        });
-
-        if let Some(required_steps) = handoff_duty {
-            for step in required_steps {
-                if !self.is_handoff_step_completed(step) {
-                    return Err(AccessError::DutyUnfulfilled(format!(
-                        "Handoff step not completed: {}",
-                        step
-                    )));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Check if a specific handoff step has been completed
-    ///
-    /// Uses exact segment matching to prevent gaming. The step must appear
-    /// as a complete segment in the usage log, not just as a substring.
-    fn is_handoff_step_completed(&self, step: &str) -> bool {
-        let step_lower = step.to_lowercase();
-        self.usage_log.iter().any(|event| {
-            let desc_lower = event.description.to_lowercase();
-            // Exact match on full description
-            if desc_lower == step_lower {
-                return true;
-            }
-            // Segment match: step appears as complete segment between delimiters
-            desc_lower
-                .split(&[',', ';', '.', '-', ':', '|'][..])
-                .any(|segment| segment.trim() == step_lower)
-        })
     }
 
     /// Get time until expiration (if applicable)
@@ -755,361 +658,317 @@ impl ResourceAccess {
     }
 }
 
-// =============================================================================
-// ResourceAccessStore - Persistent storage for resource access records
-// =============================================================================
-
-/// Key prefix for primary resource access records
-const ACCESS_PREFIX: &str = "resource_access:data:";
-
-/// Key prefix for holder index entries (maps holder -> list of resource_ids)
-const HOLDER_INDEX_PREFIX: &str = "resource_access:holder_index:";
-
-/// Deserialize holder index with error logging
-///
-/// Returns empty vec on deserialization failure but logs the error for
-/// corruption detection. This allows graceful degradation while maintaining
-/// visibility into data integrity issues.
-fn deserialize_holder_index(bytes: &[u8], context: &str) -> Vec<String> {
-    match serde_json::from_slice(bytes) {
-        Ok(index) => index,
-        Err(e) => {
-            error!(
-                context = %context,
-                error = %e,
-                bytes_len = bytes.len(),
-                "Failed to deserialize holder index - possible data corruption"
-            );
-            Vec::new()
-        }
-    }
-}
-
-/// Trait for storing and managing resource access records
-///
-/// Provides CRUD operations for [`ResourceAccess`] records with support for
-/// efficient querying by holder via secondary indexes.
-///
-/// # Implementations
-///
-/// - [`SledResourceAccessStore`]: Production-ready Sled-backed implementation
-///
-/// # Implementation Requirements
-///
-/// **Implementers MUST maintain the holder index** to ensure `list_by_holder()` works correctly:
-///
-/// - `put()`: Add resource_id to the new holder's index; if holder changed, remove from old holder's index
-/// - `remove()`: Remove resource_id from the holder's index
-/// - `transfer()`: Remove from old holder's index, add to new holder's index
-///
-/// The provided default `transfer()` relies on `put()` to maintain indexes. If your implementation
-/// uses a different indexing strategy, you MUST override `transfer()` to maintain consistency.
-///
-/// # Index Retention Policy
-///
-/// Index entries (holder -> resource mappings) are intentionally retained even when
-/// access is revoked. This design choice enables:
-///
-/// 1. **Audit trails**: Historical queries can reconstruct who held access to what resources
-/// 2. **Dispute resolution**: Revocation reasons and timestamps remain queryable
-/// 3. **Analytics**: Usage patterns and access history inform governance decisions
-///
-/// Callers should filter by `revoked` status when listing active access. The `list_by_holder`
-/// method returns all records (including revoked) to support audit use cases.
-///
-/// To permanently remove a record and its indexes, use `remove()` instead of revocation.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use icn_ledger::use_access::{ResourceAccessStore, SledResourceAccessStore, ResourceAccess};
-///
-/// let store = SledResourceAccessStore::new(sled_backend);
-///
-/// // Grant access
-/// store.put(&access)?;
-///
-/// // Query by holder
-/// let resources = store.list_by_holder(&holder_id)?;
-///
-/// // Transfer to new holder
-/// let (old_holder, updated) = store.transfer("resource-1", new_holder, None, timestamp)?;
-/// ```
+/// Storage trait for resource access persistence
 pub trait ResourceAccessStore: Send + Sync {
-    /// Get resource access by resource_id
-    ///
-    /// # Returns
-    /// - `Ok(Some(access))` if the resource exists
-    /// - `Ok(None)` if the resource does not exist
-    /// - `Err` on storage errors
-    fn get(&self, resource_id: &str) -> anyhow::Result<Option<ResourceAccess>>;
+    /// Grant access to a resource
+    fn grant(&self, access: ResourceAccess) -> anyhow::Result<()>;
 
-    /// Store or update resource access
-    ///
-    /// Creates or updates the primary record and maintains holder index consistency.
-    /// If the holder index update fails, a best-effort rollback of the primary record
-    /// is attempted. Rollback failures are logged but do not change the returned error.
-    fn put(&self, access: &ResourceAccess) -> anyhow::Result<()>;
+    /// Revoke access to a resource
+    fn revoke(&self, resource_id: &str, holder: &EntityId, reason: String) -> anyhow::Result<()>;
 
-    /// Remove resource access and clean up all associated indexes
-    ///
-    /// This permanently deletes the record. For audit-preserving removal, use
-    /// `ResourceAccess::revoke()` followed by `put()` instead.
-    fn remove(&self, resource_id: &str) -> anyhow::Result<()>;
+    /// Get access record for a specific resource and holder
+    fn get(&self, resource_id: &str, holder: &EntityId) -> anyhow::Result<Option<ResourceAccess>>;
 
-    /// List all resource access records for a given holder
-    ///
-    /// Returns all records including revoked ones to support audit queries.
-    /// Filter by `!access.revoked` for active access only.
-    ///
-    /// # Performance Note
-    ///
-    /// The default implementation uses an N+1 query pattern: one query to get
-    /// the holder's resource ID list, then one query per resource to fetch details.
-    /// This is acceptable for typical workloads (< 50 resources per holder) but
-    /// may need optimization for holders with many resources. Consider monitoring
-    /// via metrics and implementing batch loading if needed.
+    /// List all access records for a specific holder
     fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>>;
 
-    /// Transfer resource access to a new holder
-    ///
-    /// This is a default implementation that validates preconditions and persists
-    /// the transfer. Implementations with secondary indexes (like `SledResourceAccessStore`)
-    /// should override this to maintain index consistency.
-    ///
-    /// # Validation
-    /// Uses `ResourceAccess::validate_transfer_preconditions()` which enforces:
-    /// 1. Access is not revoked
-    /// 2. No-profit transfer rules
-    /// 3. HandoffProcedure completion (for Stewardship access)
-    ///
-    /// # Arguments
-    /// * `resource_id` - The resource to transfer
-    /// * `new_holder` - Entity receiving access
-    /// * `price` - Optional transfer price (for validation)
-    /// * `current_time` - Transfer timestamp for audit trail
-    ///
-    /// # Returns
-    /// A tuple of (old_holder, updated ResourceAccess with new holder)
-    fn transfer(
-        &self,
-        resource_id: &str,
-        new_holder: EntityId,
-        price: Option<i64>,
-        current_time: u64,
-    ) -> Result<(EntityId, ResourceAccess)> {
-        // Get existing access
-        let mut access = self
-            .get(resource_id)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?
-            .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
+    /// List all access records for a specific resource
+    fn list_by_resource(&self, resource_id: &str) -> anyhow::Result<Vec<ResourceAccess>>;
 
-        // Validate all transfer preconditions
-        access.validate_transfer_preconditions(price)?;
+    /// Find expired access records at the given timestamp
+    fn find_expired(&self, current_time: u64) -> anyhow::Result<Vec<ResourceAccess>>;
 
-        // Store old holder for event emission
-        let old_holder = access.holder.clone();
-
-        // Update holder and record transfer timestamp for audit trail
-        access.holder = new_holder;
-        access.last_transferred_at = Some(current_time);
-
-        // Persist the updated access
-        self.put(&access)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?;
-
-        Ok((old_holder, access))
-    }
+    /// Find idle access records (not used recently)
+    fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>>;
 }
 
 /// Sled-backed resource access store
+///
+/// Keys are structured as:
+/// - Primary: `ledger:resource_access:<resource_id>:<holder>` -> ResourceAccess (JSON)
+/// - Index: `ledger:resource_access:idx:holder:<holder>:<resource_id>` -> primary key bytes
+/// - Index: `ledger:resource_access:idx:resource:<resource_id>:<holder>` -> primary key bytes
+///
+/// Index values contain the primary key, enabling single-lookup queries without
+/// the N+1 I/O pattern of key-only indexes.
 pub struct SledResourceAccessStore {
-    store: Arc<dyn Store>,
+    store: std::sync::Arc<dyn icn_store::Store>,
 }
 
 impl SledResourceAccessStore {
-    /// Create a new resource access store
-    pub fn new(store: Arc<dyn Store>) -> Self {
+    /// Create a new resource access store using the given storage backend
+    pub fn new(store: std::sync::Arc<dyn icn_store::Store>) -> Self {
         Self { store }
     }
 
-    fn access_key(resource_id: &str) -> Vec<u8> {
-        format!("{ACCESS_PREFIX}{}", resource_id).into_bytes()
+    /// Key prefix for all resource access records
+    const ACCESS_PREFIX: &'static [u8] = b"ledger:resource_access:";
+
+    /// Primary key for access record: ledger:resource_access:<resource_id>:<holder>
+    fn access_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
+        format!("ledger:resource_access:{}:{}", resource_id, holder).into_bytes()
     }
 
-    fn holder_index_key(holder: &EntityId) -> Vec<u8> {
-        format!("{HOLDER_INDEX_PREFIX}{}", holder).into_bytes()
+    /// Index key for holder lookup: ledger:resource_access:idx:holder:<holder>:<resource_id>
+    fn holder_index_key(holder: &EntityId, resource_id: &str) -> Vec<u8> {
+        format!(
+            "ledger:resource_access:idx:holder:{}:{}",
+            holder, resource_id
+        )
+        .into_bytes()
+    }
+
+    /// Index key for resource lookup: ledger:resource_access:idx:resource:<resource_id>:<holder>
+    fn resource_index_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
+        format!(
+            "ledger:resource_access:idx:resource:{}:{}",
+            resource_id, holder
+        )
+        .into_bytes()
+    }
+
+    /// Prefix for holder index scan
+    fn holder_prefix(holder: &EntityId) -> Vec<u8> {
+        format!("ledger:resource_access:idx:holder:{}:", holder).into_bytes()
+    }
+
+    /// Prefix for resource index scan
+    fn resource_prefix(resource_id: &str) -> Vec<u8> {
+        format!("ledger:resource_access:idx:resource:{}:", resource_id).into_bytes()
+    }
+
+    /// Extract resource_id from a holder index key by stripping the holder prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:holder:<holder>:<resource_id>`
+    /// Given the prefix `ledger:resource_access:idx:holder:<holder>:`, we extract the resource_id
+    /// which is everything after that prefix.
+    fn extract_resource_id_from_holder_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<String> {
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain resource_id after prefix");
+        }
+        let resource_id_bytes = &key[prefix.len()..];
+        let resource_id = std::str::from_utf8(resource_id_bytes)?;
+        Ok(resource_id.to_string())
+    }
+
+    /// Extract holder EntityId from a resource index key by stripping the resource prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:resource:<resource_id>:<holder>`
+    /// Given the prefix `ledger:resource_access:idx:resource:<resource_id>:`, we extract the holder
+    /// which is everything after that prefix.
+    fn extract_holder_from_resource_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<EntityId> {
+        use std::str::FromStr;
+
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain holder after prefix");
+        }
+        let holder_bytes = &key[prefix.len()..];
+        let holder_str = std::str::from_utf8(holder_bytes)?;
+        EntityId::from_str(holder_str)
+            .map_err(|e| anyhow::anyhow!("Failed to parse EntityId: {}", e))
     }
 }
 
 impl ResourceAccessStore for SledResourceAccessStore {
-    fn get(&self, resource_id: &str) -> anyhow::Result<Option<ResourceAccess>> {
-        let key = Self::access_key(resource_id);
-        match self.store.get(&key)? {
-            Some(bytes) => {
-                let access: ResourceAccess = serde_json::from_slice(&bytes)?;
-                Ok(Some(access))
+    fn grant(&self, access: ResourceAccess) -> anyhow::Result<()> {
+        let key = Self::access_key(&access.resource_id, &access.holder);
+        let holder_idx = Self::holder_index_key(&access.holder, &access.resource_id);
+        let resource_idx = Self::resource_index_key(&access.resource_id, &access.holder);
+
+        // Serialize access record
+        let value = serde_json::to_vec(&access)?;
+
+        // Store primary record and indexes with best-effort rollback on failure.
+        // Note: These writes are not atomic. If a rollback fails, the store may be left
+        // in an inconsistent state (primary record without indexes). Recovery requires
+        // calling grant() again to overwrite the orphaned record.
+        //
+        // Index values store the primary key to enable single-lookup queries
+        // (avoids N+1 I/O pattern in list_by_* methods).
+        //
+        // 1. Write primary record
+        self.store.put(&key, &value)?;
+        // 2. Write holder index with primary key as value; on failure, delete primary record
+        if let Err(err) = self.store.put(&holder_idx, &key) {
+            // Best-effort rollback of primary record
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after holder index write failed"
+                );
             }
-            None => Ok(None),
+            return Err(err);
         }
-    }
-
-    fn put(&self, access: &ResourceAccess) -> anyhow::Result<()> {
-        let key = Self::access_key(&access.resource_id);
-        let bytes = serde_json::to_vec(access)?;
-        self.store.put(&key, &bytes)?;
-
-        // Update holder index for list_by_holder queries
-        let holder_key = Self::holder_index_key(&access.holder);
-        let mut holder_resources: Vec<String> = self
-            .store
-            .get(&holder_key)?
-            .map(|b| deserialize_holder_index(&b, &format!("put:{}", access.holder)))
-            .unwrap_or_default();
-
-        if !holder_resources.contains(&access.resource_id) {
-            holder_resources.push(access.resource_id.clone());
-            let holder_bytes = serde_json::to_vec(&holder_resources)?;
-            if let Err(index_err) = self.store.put(&holder_key, &holder_bytes) {
-                // Best-effort rollback: try to delete the primary record
-                // to maintain consistency between primary and index
-                if let Err(rollback_err) = self.store.delete(&key) {
-                    error!(
-                        resource_id = %access.resource_id,
-                        index_error = %index_err,
-                        rollback_error = %rollback_err,
-                        "Failed to rollback primary record after holder index update failed. \
-                         Database may be in inconsistent state."
-                    );
-                }
-                return Err(index_err);
+        // 3. Write resource index with primary key as value; on failure, delete holder index and primary record
+        if let Err(err) = self.store.put(&resource_idx, &key) {
+            // Best-effort rollback of previously written entries
+            if let Err(rollback_err) = self.store.delete(&holder_idx) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback holder index after resource index write failed"
+                );
             }
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after resource index write failed"
+                );
+            }
+            return Err(err);
         }
 
         Ok(())
     }
 
-    fn remove(&self, resource_id: &str) -> anyhow::Result<()> {
-        // Get the access to remove it from holder index
-        if let Some(access) = self.get(resource_id)? {
-            let holder_key = Self::holder_index_key(&access.holder);
-            let mut holder_resources: Vec<String> = self
-                .store
-                .get(&holder_key)?
-                .map(|b| deserialize_holder_index(&b, &format!("remove:{}", access.holder)))
-                .unwrap_or_default();
+    /// Revoke access to a resource
+    ///
+    /// This marks the access record as revoked but intentionally retains the
+    /// index entries for audit trail purposes. The revoked record remains
+    /// discoverable via `list_by_holder` and `list_by_resource` queries,
+    /// allowing cooperatives to track historical access patterns.
+    ///
+    /// Callers should filter results by `access.is_revoked()` if they only
+    /// want active access records. The `find_expired` and `find_idle` methods
+    /// already filter out revoked records.
+    fn revoke(&self, resource_id: &str, holder: &EntityId, reason: String) -> anyhow::Result<()> {
+        let key = Self::access_key(resource_id, holder);
 
-            holder_resources.retain(|r| r != resource_id);
-            let holder_bytes = serde_json::to_vec(&holder_resources)?;
-            self.store.put(&holder_key, &holder_bytes)?;
+        // Load existing access
+        if let Some(bytes) = self.store.get(&key)? {
+            let mut access: ResourceAccess = serde_json::from_slice(&bytes)?;
+
+            // Revoke it (index entries are intentionally retained for audit trail)
+            access.revoke(reason);
+
+            // Save updated record
+            let value = serde_json::to_vec(&access)?;
+            self.store.put(&key, &value)?;
+
+            Ok(())
+        } else {
+            anyhow::bail!(
+                "Access not found for resource {} and holder {}",
+                resource_id,
+                holder
+            );
         }
+    }
 
-        let key = Self::access_key(resource_id);
-        self.store.delete(&key)?;
-        Ok(())
+    fn get(&self, resource_id: &str, holder: &EntityId) -> anyhow::Result<Option<ResourceAccess>> {
+        let key = Self::access_key(resource_id, holder);
+
+        if let Some(bytes) = self.store.get(&key)? {
+            let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+            Ok(Some(access))
+        } else {
+            Ok(None)
+        }
     }
 
     fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>> {
-        let holder_key = Self::holder_index_key(holder);
-        let resource_ids: Vec<String> = self
-            .store
-            .get(&holder_key)?
-            .map(|b| deserialize_holder_index(&b, &format!("list_by_holder:{}", holder)))
-            .unwrap_or_default();
+        let prefix = Self::holder_prefix(holder);
+        let index_entries = self.store.scan(&prefix)?;
 
-        let mut accesses = Vec::new();
-        for resource_id in resource_ids {
-            if let Some(access) = self.get(&resource_id)? {
-                accesses.push(access);
+        let mut results = Vec::new();
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract resource_id from key and do second lookup
+                let resource_id = Self::extract_resource_id_from_holder_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(&resource_id, holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
             }
         }
-        Ok(accesses)
+
+        Ok(results)
     }
 
-    /// Transfer resource access to a new holder with index maintenance.
-    ///
-    /// # Transaction Boundary Warning
-    ///
-    /// This operation performs three sequential writes that are NOT atomic:
-    /// 1. Remove resource from old holder's index
-    /// 2. Update the resource access record (holder + timestamp)
-    /// 3. Add resource to new holder's index (via `put()`)
-    ///
-    /// If step 3 fails after step 1 succeeds, the resource will be temporarily
-    /// orphaned (not in either holder's index). The resource data remains intact
-    /// and can be recovered by calling `put()` again. For applications requiring
-    /// stronger consistency, consider wrapping this in application-level retry logic.
-    ///
-    /// A future enhancement could use sled's transactional API for true atomicity.
-    fn transfer(
-        &self,
-        resource_id: &str,
-        new_holder: EntityId,
-        price: Option<i64>,
-        current_time: u64,
-    ) -> Result<(EntityId, ResourceAccess)> {
-        // Get existing access
-        let mut access = match self.get(resource_id) {
-            Ok(Some(a)) => a,
-            Ok(None) => {
-                icn_obs::metrics::ledger::resource_access_transfer_not_found_inc();
-                return Err(AccessError::Revoked(format!(
-                    "Resource {} not found",
-                    resource_id
-                )));
-            }
-            Err(e) => {
-                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
-                return Err(AccessError::StorageError(e.to_string()));
-            }
-        };
+    fn list_by_resource(&self, resource_id: &str) -> anyhow::Result<Vec<ResourceAccess>> {
+        let prefix = Self::resource_prefix(resource_id);
+        let index_entries = self.store.scan(&prefix)?;
 
-        // Validate all transfer preconditions using shared helper
-        if let Err(e) = access.validate_transfer_preconditions(price) {
-            icn_obs::metrics::ledger::resource_access_transfer_validation_failed_inc();
-            return Err(e);
+        let mut results = Vec::new();
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract holder from key and do second lookup
+                let holder = Self::extract_holder_from_resource_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(resource_id, &holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
+            }
         }
 
-        // Store old holder for event emission and index cleanup
-        let old_holder = access.holder.clone();
+        Ok(results)
+    }
 
-        // Remove resource from old holder's index
-        let old_holder_key = Self::holder_index_key(&old_holder);
-        let mut old_holder_resources: Vec<String> = self
-            .store
-            .get(&old_holder_key)
-            .map_err(|e| {
-                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
-                AccessError::StorageError(e.to_string())
-            })?
-            .map(|b| deserialize_holder_index(&b, &format!("transfer:{}", old_holder)))
-            .unwrap_or_default();
-        old_holder_resources.retain(|r| r != resource_id);
-        let old_holder_bytes = serde_json::to_vec(&old_holder_resources).map_err(|e| {
-            icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
-            AccessError::StorageError(e.to_string())
-        })?;
-        self.store
-            .put(&old_holder_key, &old_holder_bytes)
-            .map_err(|e| {
-                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
-                AccessError::StorageError(e.to_string())
-            })?;
+    fn find_expired(&self, current_time: u64) -> anyhow::Result<Vec<ResourceAccess>> {
+        let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
 
-        // Update holder and record transfer timestamp for audit trail
-        access.holder = new_holder;
-        access.last_transferred_at = Some(current_time);
+        let mut expired = Vec::new();
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            // Index entries store primary keys as values, not JSON data
+            if key.windows(4).any(|w| w == b"idx:") {
+                continue;
+            }
+            // Also skip empty values for backward compatibility
+            if value.is_empty() {
+                continue;
+            }
+            let access: ResourceAccess = serde_json::from_slice(&value)?;
+            if access.is_expired(current_time) && !access.is_revoked() {
+                expired.push(access);
+            }
+        }
 
-        // Persist the updated access (this also adds to new holder's index)
-        self.put(&access).map_err(|e| {
-            icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
-            AccessError::StorageError(e.to_string())
-        })?;
+        Ok(expired)
+    }
 
-        // Record successful transfer metric
-        icn_obs::metrics::ledger::resource_access_transfer_inc();
+    fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>> {
+        let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
 
-        Ok((old_holder, access))
+        let mut idle = Vec::new();
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            // Index entries store primary keys as values, not JSON data
+            if key.windows(4).any(|w| w == b"idx:") {
+                continue;
+            }
+            // Also skip empty values for backward compatibility
+            if value.is_empty() {
+                continue;
+            }
+            let access: ResourceAccess = serde_json::from_slice(&value)?;
+            if access.is_idle(current_time, max_idle) && !access.is_revoked() {
+                idle.push(access);
+            }
+        }
+
+        Ok(idle)
     }
 }
 
@@ -1803,461 +1662,393 @@ mod tests {
         assert_eq!(event.event_type, Some(DutyEventType::Maintenance));
     }
 
-    // =============================================================================
-    // ResourceAccessStore Tests
-    // =============================================================================
-
-    #[test]
-    fn test_resource_access_store_basic_operations() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let entity = create_test_entity();
-        let access = ResourceAccess::new(
-            "tool-001".to_string(),
-            entity.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-
-        // Put and get
-        access_store.put(&access).unwrap();
-        let retrieved = access_store.get("tool-001").unwrap();
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().resource_id, "tool-001");
-
-        // List by holder
-        let holder_accesses = access_store.list_by_holder(&entity).unwrap();
-        assert_eq!(holder_accesses.len(), 1);
-        assert_eq!(holder_accesses[0].resource_id, "tool-001");
-
-        // Remove
-        access_store.remove("tool-001").unwrap();
-        let retrieved = access_store.get("tool-001").unwrap();
-        assert!(retrieved.is_none());
-    }
-
-    #[test]
-    fn test_resource_access_transfer_success() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        )
-        .with_rules(AntiSpeculationRules::standard());
-
-        access_store.put(&access).unwrap();
-
-        // Verify initial holder index
-        let alice_resources = access_store.list_by_holder(&alice).unwrap();
-        assert_eq!(alice_resources.len(), 1);
-        assert_eq!(alice_resources[0].resource_id, "tool-001");
-
-        // Free transfer should succeed
-        let current_time = access.granted_at + 3600;
-        let (old_holder, updated_access) = access_store
-            .transfer("tool-001", bob.clone(), None, current_time)
-            .unwrap();
-
-        assert_eq!(old_holder, alice);
-        assert_eq!(updated_access.holder, bob);
-        assert_eq!(updated_access.resource_id, "tool-001");
-
-        // Verify it's persisted
-        let retrieved = access_store.get("tool-001").unwrap().unwrap();
-        assert_eq!(retrieved.holder, bob);
-
-        // Verify holder index cleanup: resource removed from old holder's index
-        let alice_resources_after = access_store.list_by_holder(&alice).unwrap();
-        assert!(
-            alice_resources_after.is_empty(),
-            "Resource should be removed from old holder's index"
-        );
-
-        // Verify holder index: resource added to new holder's index
-        let bob_resources = access_store.list_by_holder(&bob).unwrap();
-        assert_eq!(
-            bob_resources.len(),
-            1,
-            "Resource should be in new holder's index"
-        );
-        assert_eq!(bob_resources[0].resource_id, "tool-001");
-    }
-
-    #[test]
-    fn test_resource_access_transfer_profit_blocked() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        )
-        .with_rules(AntiSpeculationRules::standard());
-
-        access_store.put(&access).unwrap();
-
-        // Paid transfer should fail (no_profit_transfer = true)
-        let current_time = access.granted_at + 3600;
-        let result = access_store.transfer("tool-001", bob, Some(100), current_time);
-
-        assert!(matches!(result, Err(AccessError::ProfitTransferNotAllowed)));
-    }
-
-    #[test]
-    fn test_stewardship_handoff_procedure_validation() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let handoff_steps = vec![
-            "Document all tasks".to_string(),
-            "Meet with new steward".to_string(),
-            "Transfer credentials".to_string(),
-        ];
-
-        let mut access = ResourceAccess::new(
-            "community-garden".to_string(),
-            alice.clone(),
-            AccessModel::Stewardship {
-                duties: vec![StewardshipDuty::HandoffProcedure {
-                    steps: handoff_steps.clone(),
-                }],
-                review_period_seconds: 90 * 24 * 3600,
-            },
-        );
-
-        // Without handoff steps completed, transfer should fail
-        access_store.put(&access).unwrap();
-        let result = access_store.transfer(
-            "community-garden",
-            bob.clone(),
-            None,
-            access.granted_at + 1000,
-        );
-        assert!(matches!(result, Err(AccessError::DutyUnfulfilled(_))));
-
-        // Complete all handoff steps
-        access
-            .record_usage(
-                access.granted_at + 100,
-                "Document all tasks - completed".to_string(),
-            )
-            .unwrap();
-        access
-            .record_usage(
-                access.granted_at + 200,
-                "Meet with new steward - done".to_string(),
-            )
-            .unwrap();
-        access
-            .record_usage(
-                access.granted_at + 300,
-                "Transfer credentials - complete".to_string(),
-            )
-            .unwrap();
-
-        access_store.put(&access).unwrap();
-
-        // Now transfer should succeed
-        let (old_holder, updated_access) = access_store
-            .transfer(
-                "community-garden",
-                bob.clone(),
-                None,
-                access.granted_at + 1000,
-            )
-            .unwrap();
-
-        assert_eq!(old_holder, alice);
-        assert_eq!(updated_access.holder, bob);
-
-        // Verify holder index cleanup after stewardship transfer
-        let alice_resources = access_store.list_by_holder(&alice).unwrap();
-        assert!(
-            alice_resources.is_empty(),
-            "Resource should be removed from old holder's index"
-        );
-        let bob_resources = access_store.list_by_holder(&bob).unwrap();
-        assert_eq!(
-            bob_resources.len(),
-            1,
-            "Resource should be in new holder's index"
-        );
-    }
-
-    #[test]
-    fn test_transfer_revoked_access_fails() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let mut access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-
-        // Revoke access
-        access.revoke("Policy violation".to_string());
-        access_store.put(&access).unwrap();
-
-        // Transfer should fail
-        let result = access_store.transfer("tool-001", bob, None, access.granted_at + 1000);
-        assert!(matches!(result, Err(AccessError::Revoked(_))));
-    }
-
-    #[test]
-    fn test_transfer_nonexistent_resource_fails() {
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let bob = create_test_entity();
-        let result = access_store.transfer("nonexistent", bob, None, 1234567890);
-        assert!(matches!(result, Err(AccessError::Revoked(_))));
-    }
-
-    // =============================================================================
-    // Edge Case Tests (per code review recommendations)
-    // =============================================================================
-
-    #[test]
-    fn test_handoff_with_empty_steps_allows_transfer() {
-        // When HandoffProcedure has empty steps, transfer should succeed
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::Stewardship {
-                duties: vec![StewardshipDuty::HandoffProcedure {
-                    steps: vec![], // Empty steps
-                }],
-                review_period_seconds: 90 * 24 * 3600,
-            },
-        );
-
-        access_store.put(&access).unwrap();
-
-        // Transfer should succeed since no steps are required
-        let result = access_store.transfer("tool-001", bob.clone(), None, access.granted_at + 1000);
-        assert!(result.is_ok());
-        let (old_holder, updated) = result.unwrap();
-        assert_eq!(old_holder, alice);
-        assert_eq!(updated.holder, bob);
-    }
-
-    #[test]
-    fn test_multiple_holders_index_isolation() {
-        // Verify that holder indexes are properly isolated
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-        let charlie = create_test_entity();
-
-        // Alice holds tool-001 and tool-002
-        let access1 = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-        let access2 = ResourceAccess::new(
-            "tool-002".to_string(),
-            alice.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-
-        // Bob holds tool-003
-        let access3 = ResourceAccess::new(
-            "tool-003".to_string(),
-            bob.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-
-        access_store.put(&access1).unwrap();
-        access_store.put(&access2).unwrap();
-        access_store.put(&access3).unwrap();
-
-        // Verify Alice has 2 resources
-        let alice_resources = access_store.list_by_holder(&alice).unwrap();
-        assert_eq!(alice_resources.len(), 2);
-
-        // Verify Bob has 1 resource
-        let bob_resources = access_store.list_by_holder(&bob).unwrap();
-        assert_eq!(bob_resources.len(), 1);
-        assert_eq!(bob_resources[0].resource_id, "tool-003");
-
-        // Verify Charlie has 0 resources
-        let charlie_resources = access_store.list_by_holder(&charlie).unwrap();
-        assert!(charlie_resources.is_empty());
-
-        // Transfer tool-001 from Alice to Charlie
-        let _ = access_store
-            .transfer("tool-001", charlie.clone(), None, 1000)
-            .unwrap();
-
-        // Verify Alice now has 1 resource
-        let alice_resources = access_store.list_by_holder(&alice).unwrap();
-        assert_eq!(alice_resources.len(), 1);
-        assert_eq!(alice_resources[0].resource_id, "tool-002");
-
-        // Verify Charlie now has 1 resource
-        let charlie_resources = access_store.list_by_holder(&charlie).unwrap();
-        assert_eq!(charlie_resources.len(), 1);
-        assert_eq!(charlie_resources[0].resource_id, "tool-001");
-
-        // Verify Bob's resources unchanged
-        let bob_resources = access_store.list_by_holder(&bob).unwrap();
-        assert_eq!(bob_resources.len(), 1);
-    }
-
-    #[test]
-    fn test_handoff_step_gaming_prevention() {
-        // Verify that "Failed to <step>" doesn't pass validation for "<step>"
-        let alice = create_test_entity();
-
-        let mut access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice,
-            AccessModel::Stewardship {
-                duties: vec![StewardshipDuty::HandoffProcedure {
-                    steps: vec!["Transfer credentials".to_string()],
-                }],
-                review_period_seconds: 90 * 24 * 3600,
-            },
-        );
-
-        // Log a failure message that contains the step text
-        access
-            .record_usage(
-                access.granted_at + 100,
-                "Failed to transfer credentials due to system error".to_string(),
-            )
-            .unwrap();
-
-        // Validation should FAIL because "transfer credentials" is not a complete segment
-        let result = access.validate_transfer_preconditions(None);
-        assert!(
-            result.is_err(),
-            "Gaming attempt should be rejected - 'Failed to transfer credentials' should not match 'Transfer credentials'"
-        );
-    }
-
-    #[test]
-    fn test_handoff_step_exact_segment_matching() {
-        // Verify exact segment matching works correctly
-        let alice = create_test_entity();
-
-        let mut access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice,
-            AccessModel::Stewardship {
-                duties: vec![StewardshipDuty::HandoffProcedure {
-                    steps: vec!["Transfer credentials".to_string()],
-                }],
-                review_period_seconds: 90 * 24 * 3600,
-            },
-        );
-
-        // Log with proper segment delimiter
-        access
-            .record_usage(
-                access.granted_at + 100,
-                "Completed: Transfer credentials - verified by witness".to_string(),
-            )
-            .unwrap();
-
-        // Validation should PASS because "Transfer credentials" is a complete segment
-        let result = access.validate_transfer_preconditions(None);
-        assert!(
-            result.is_ok(),
-            "Proper segment-delimited step should be accepted"
-        );
-    }
-
-    #[test]
-    fn test_handoff_duplicate_steps() {
-        // Verify handling of duplicate step names
-        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let access_store = SledResourceAccessStore::new(store);
-
-        let alice = create_test_entity();
-        let bob = create_test_entity();
-
-        let mut access = ResourceAccess::new(
-            "tool-001".to_string(),
-            alice.clone(),
-            AccessModel::Stewardship {
-                duties: vec![StewardshipDuty::HandoffProcedure {
-                    steps: vec![
-                        "Sign document".to_string(),
-                        "Sign document".to_string(), // Duplicate
-                    ],
-                }],
-                review_period_seconds: 90 * 24 * 3600,
-            },
-        );
-
-        access_store.put(&access).unwrap();
-
-        // Only log the step once
-        access
-            .record_usage(access.granted_at + 100, "Sign document".to_string())
-            .unwrap();
-        access_store.put(&access).unwrap();
-
-        // Transfer should succeed (same step logged once satisfies both duplicates)
-        let result = access_store.transfer("tool-001", bob, None, access.granted_at + 1000);
-        assert!(
-            result.is_ok(),
-            "Single log entry should satisfy duplicate steps"
-        );
+    // ResourceAccessStore tests
+    mod store_tests {
+        use super::*;
+        use icn_store::Store;
+        use std::sync::Arc;
+
+        fn create_test_store() -> Arc<dyn Store> {
+            Arc::new(icn_store::SledStore::temporary().unwrap())
+        }
+
+        #[test]
+        fn test_grant_and_get_access() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+            let access = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+
+            // Grant access
+            access_store.grant(access.clone()).unwrap();
+
+            // Retrieve it
+            let retrieved = access_store.get("tool-001", &holder).unwrap();
+            assert!(retrieved.is_some());
+            let retrieved = retrieved.unwrap();
+            assert_eq!(retrieved.resource_id, "tool-001");
+            assert_eq!(retrieved.holder, holder);
+        }
+
+        #[test]
+        fn test_revoke_access() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+            let access = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+
+            // Grant access
+            access_store.grant(access.clone()).unwrap();
+
+            // Revoke it
+            access_store
+                .revoke("tool-001", &holder, "Policy violation".to_string())
+                .unwrap();
+
+            // Check it's revoked
+            let retrieved = access_store.get("tool-001", &holder).unwrap().unwrap();
+            assert!(retrieved.is_revoked());
+            assert_eq!(
+                retrieved.revocation_reason,
+                Some("Policy violation".to_string())
+            );
+        }
+
+        #[test]
+        fn test_list_by_holder() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+
+            // Grant multiple resources to the same holder
+            let access1 = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let access2 = ResourceAccess::new(
+                "tool-002".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 14 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 2,
+                },
+            );
+
+            access_store.grant(access1).unwrap();
+            access_store.grant(access2).unwrap();
+
+            // List by holder
+            let accesses = access_store.list_by_holder(&holder).unwrap();
+            assert_eq!(accesses.len(), 2);
+
+            let resource_ids: Vec<String> =
+                accesses.iter().map(|a| a.resource_id.clone()).collect();
+            assert!(resource_ids.contains(&"tool-001".to_string()));
+            assert!(resource_ids.contains(&"tool-002".to_string()));
+        }
+
+        #[test]
+        fn test_list_by_resource() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder1 = create_test_entity();
+            let holder2 = create_test_entity();
+
+            // Grant same resource to multiple holders
+            let access1 = ResourceAccess::new(
+                "workshop".to_string(),
+                holder1.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let access2 = ResourceAccess::new(
+                "workshop".to_string(),
+                holder2.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+
+            access_store.grant(access1).unwrap();
+            access_store.grant(access2).unwrap();
+
+            // List by resource
+            let accesses = access_store.list_by_resource("workshop").unwrap();
+            assert_eq!(accesses.len(), 2);
+
+            let holders: Vec<EntityId> = accesses.iter().map(|a| a.holder.clone()).collect();
+            assert!(holders.contains(&holder1));
+            assert!(holders.contains(&holder2));
+        }
+
+        #[test]
+        fn test_find_expired() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder1 = create_test_entity();
+            let holder2 = create_test_entity();
+
+            // Create access that expires in 1 hour
+            let mut access1 = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder1.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 3600, // 1 hour
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let grant_time = 1000;
+            access1.granted_at = grant_time;
+            access1.expires_at = Some(grant_time + 3600);
+
+            // Create access that doesn't expire (stewardship)
+            let access2 = ResourceAccess::new(
+                "garden".to_string(),
+                holder2.clone(),
+                AccessModel::Stewardship {
+                    duties: vec![],
+                    review_period_seconds: 90 * 24 * 3600,
+                },
+            );
+
+            access_store.grant(access1).unwrap();
+            access_store.grant(access2).unwrap();
+
+            // Check expired at time after expiration
+            let current_time = grant_time + 7200; // 2 hours later
+            let expired = access_store.find_expired(current_time).unwrap();
+
+            assert_eq!(expired.len(), 1);
+            assert_eq!(expired[0].resource_id, "tool-001");
+        }
+
+        #[test]
+        fn test_find_idle() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder1 = create_test_entity();
+            let holder2 = create_test_entity();
+
+            // Create access with no usage
+            let mut access1 = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder1.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 30 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let grant_time = 1000;
+            access1.granted_at = grant_time;
+
+            // Create access with recent usage
+            let mut access2 = ResourceAccess::new(
+                "tool-002".to_string(),
+                holder2.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 30 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            access2.granted_at = grant_time;
+            // Record usage within the last day (current_time - 12 hours)
+            access2
+                .record_usage(
+                    grant_time + 2 * 24 * 3600 - 12 * 3600,
+                    "Used recently".to_string(),
+                )
+                .unwrap();
+
+            access_store.grant(access1).unwrap();
+            access_store.grant(access2).unwrap();
+
+            // Find idle with max_idle of 1 day
+            let current_time = grant_time + 2 * 24 * 3600;
+            let max_idle = 24 * 3600; // 1 day
+            let idle = access_store.find_idle(current_time, max_idle).unwrap();
+
+            assert_eq!(idle.len(), 1);
+            assert_eq!(idle[0].resource_id, "tool-001");
+        }
+
+        #[test]
+        fn test_revoke_nonexistent_access() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+
+            // Try to revoke non-existent access
+            let result = access_store.revoke("nonexistent", &holder, "Reason".to_string());
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_find_expired_excludes_revoked() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+
+            // Create expired access
+            let mut access = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 3600, // 1 hour
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let grant_time = 1000;
+            access.granted_at = grant_time;
+            access.expires_at = Some(grant_time + 3600);
+
+            access_store.grant(access).unwrap();
+
+            // Revoke it
+            access_store
+                .revoke("tool-001", &holder, "Test".to_string())
+                .unwrap();
+
+            // Check expired (should not include revoked)
+            let current_time = grant_time + 7200;
+            let expired = access_store.find_expired(current_time).unwrap();
+            assert_eq!(expired.len(), 0);
+        }
+
+        #[test]
+        fn test_find_idle_excludes_revoked() {
+            let store = create_test_store();
+            let access_store = SledResourceAccessStore::new(store);
+
+            let holder = create_test_entity();
+
+            // Create idle access
+            let mut access = ResourceAccess::new(
+                "tool-001".to_string(),
+                holder.clone(),
+                AccessModel::UseAccess {
+                    duration_seconds: 30 * 24 * 3600,
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            );
+            let grant_time = 1000;
+            access.granted_at = grant_time;
+
+            access_store.grant(access).unwrap();
+
+            // Revoke it
+            access_store
+                .revoke("tool-001", &holder, "Test".to_string())
+                .unwrap();
+
+            // Check idle (should not include revoked)
+            let current_time = grant_time + 2 * 24 * 3600;
+            let max_idle = 24 * 3600;
+            let idle = access_store.find_idle(current_time, max_idle).unwrap();
+            assert_eq!(idle.len(), 0);
+        }
+
+        #[test]
+        fn test_concurrent_grant_and_query() {
+            // Verify thread-safety of Arc<dyn Store> usage
+            // Spawns multiple threads calling grant() and list_by_holder() simultaneously
+            use std::thread;
+
+            let store = create_test_store();
+            let access_store = Arc::new(SledResourceAccessStore::new(store));
+            let holder = create_test_entity();
+
+            const NUM_THREADS: usize = 4;
+            const GRANTS_PER_THREAD: usize = 10;
+
+            let mut handles = Vec::new();
+
+            // Spawn writer threads
+            for t in 0..NUM_THREADS {
+                let access_store = Arc::clone(&access_store);
+                let holder = holder.clone();
+                handles.push(thread::spawn(move || {
+                    for i in 0..GRANTS_PER_THREAD {
+                        let resource_id = format!("tool-{}-{}", t, i);
+                        let access = ResourceAccess::new(
+                            resource_id,
+                            holder.clone(),
+                            AccessModel::UseAccess {
+                                duration_seconds: 7 * 24 * 3600,
+                                renewable: true,
+                                max_accumulated: 4,
+                            },
+                        );
+                        access_store.grant(access).unwrap();
+                    }
+                }));
+            }
+
+            // Spawn reader threads
+            for _ in 0..NUM_THREADS {
+                let access_store = Arc::clone(&access_store);
+                let holder = holder.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..GRANTS_PER_THREAD {
+                        // Just query, don't assert count since it's concurrent
+                        let _ = access_store.list_by_holder(&holder);
+                    }
+                }));
+            }
+
+            // Wait for all threads
+            for handle in handles {
+                handle.join().expect("Thread panicked");
+            }
+
+            // Verify final count
+            let final_count = access_store.list_by_holder(&holder).unwrap().len();
+            assert_eq!(
+                final_count,
+                NUM_THREADS * GRANTS_PER_THREAD,
+                "Expected {} grants, got {}",
+                NUM_THREADS * GRANTS_PER_THREAD,
+                final_count
+            );
+        }
     }
 }

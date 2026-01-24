@@ -274,150 +274,230 @@ fn test_proposal_payload_type_name() {
     assert!(!payload.is_emergency());
 }
 
-#[tokio::test]
-async fn test_resource_access_transfer_with_events() {
-    use icn_ledger::{
-        create_shared_emitter, LedgerEvent, ResourceAccessStore, SledResourceAccessStore,
-    };
-    use icn_store::SledStore;
-    use std::sync::Arc;
-
-    // Setup
-    let store = Arc::new(SledStore::temporary().unwrap());
-    let access_store = SledResourceAccessStore::new(store);
-    let event_emitter = create_shared_emitter();
-    let mut receiver = event_emitter.subscribe();
-
-    let alice_keypair = KeyPair::generate().unwrap();
-    let alice = EntityId::from_did(alice_keypair.did());
-    let bob_keypair = KeyPair::generate().unwrap();
-    let bob = EntityId::from_did(bob_keypair.did());
-
-    // Create and store access for Alice
-    let access = icn_ledger::ResourceAccess::new(
-        "community-tool".to_string(),
-        alice.clone(),
-        icn_ledger::AccessModel::UseAccess {
-            duration_seconds: 7 * 24 * 3600, // 1 week
-            renewable: true,
-            max_accumulated: 4,
-        },
-    )
-    .with_rules(icn_ledger::AntiSpeculationRules::standard());
-
-    access_store.put(&access).unwrap();
-
-    // Transfer to Bob (free transfer - should succeed)
-    let current_time = access.granted_at + 3600;
-    let (old_holder, updated_access) = access_store
-        .transfer("community-tool", bob.clone(), None, current_time)
-        .unwrap();
-
-    // Verify transfer
-    assert_eq!(old_holder, alice);
-    assert_eq!(updated_access.holder, bob);
-
-    // Emit event
-    let access_model_str = match updated_access.model {
-        icn_ledger::AccessModel::UseAccess { .. } => "UseAccess",
-        icn_ledger::AccessModel::Stewardship { .. } => "Stewardship",
-    };
-
-    event_emitter.emit_resource_access_transferred(
-        updated_access.resource_id.clone(),
-        old_holder.to_string(),
-        updated_access.holder.to_string(),
-        None,
-        access_model_str.to_string(),
-        current_time,
-    );
-
-    // Verify event was emitted
-    let event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
-        .await
-        .expect("timeout")
-        .expect("receive error");
-
-    match event {
-        LedgerEvent::ResourceAccessTransferred(transfer_event) => {
-            assert_eq!(transfer_event.resource_id, "community-tool");
-            assert_eq!(transfer_event.from_holder, alice.to_string());
-            assert_eq!(transfer_event.to_holder, bob.to_string());
-            assert_eq!(transfer_event.price, None);
-            assert_eq!(transfer_event.access_model, "UseAccess");
-            assert_eq!(transfer_event.transferred_at, current_time);
-        }
-        _ => panic!("Expected ResourceAccessTransferred event"),
-    }
-}
-
-#[test]
-fn test_stewardship_handoff_procedure_complete_flow() {
+// Integration tests for ResourceAccessStore
+mod store_integration {
+    use super::*;
     use icn_ledger::{ResourceAccessStore, SledResourceAccessStore};
     use icn_store::SledStore;
     use std::sync::Arc;
 
-    let store = Arc::new(SledStore::temporary().unwrap());
-    let access_store = SledResourceAccessStore::new(store);
+    #[test]
+    fn test_cooperative_tool_access_scenario() {
+        // Setup: Create a store for a cooperative's resource access records
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
 
-    let alice_keypair = KeyPair::generate().unwrap();
-    let alice = EntityId::from_did(alice_keypair.did());
-    let bob_keypair = KeyPair::generate().unwrap();
-    let bob = EntityId::from_did(bob_keypair.did());
+        // Three members want to access the cooperative's woodworking shop
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let _carol = EntityId::from_did(KeyPair::generate().unwrap().did());
 
-    let handoff_steps = vec![
-        "Document maintenance schedule".to_string(),
-        "Train incoming steward".to_string(),
-        "Transfer access keys".to_string(),
-    ];
+        // Grant access to Alice and Bob
+        let alice_access = ResourceAccess::new(
+            "woodworking-shop".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600, // 30 days
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
 
-    // Create stewardship access with handoff procedure
-    let mut access = icn_ledger::ResourceAccess::new(
-        "community-workshop".to_string(),
-        alice.clone(),
-        icn_ledger::AccessModel::Stewardship {
-            duties: vec![icn_ledger::StewardshipDuty::HandoffProcedure {
-                steps: handoff_steps.clone(),
-            }],
-            review_period_seconds: 90 * 24 * 3600,
-        },
-    );
+        let bob_access = ResourceAccess::new(
+            "woodworking-shop".to_string(),
+            bob.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
 
-    let current_time = access.granted_at + 1000;
+        access_store.grant(alice_access.clone()).unwrap();
+        access_store.grant(bob_access.clone()).unwrap();
 
-    // Complete handoff steps
-    // Note: Use delimiter format (colon) so segment matching recognizes the step
-    access
-        .record_usage(
-            current_time,
-            "Document maintenance schedule: completed".to_string(),
-        )
-        .unwrap();
-    access
-        .record_usage(
-            current_time + 100,
-            "Train incoming steward: completed training session".to_string(),
-        )
-        .unwrap();
-    access
-        .record_usage(
-            current_time + 200,
-            "Transfer access keys: keys securely transferred".to_string(),
-        )
-        .unwrap();
+        // List all access for the woodworking shop
+        let shop_accesses = access_store.list_by_resource("woodworking-shop").unwrap();
+        assert_eq!(shop_accesses.len(), 2);
 
-    access_store.put(&access).unwrap();
+        // Alice has access to multiple resources
+        let alice_tool_access = ResourceAccess::new(
+            "table-saw".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600, // 7 days
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        access_store.grant(alice_tool_access).unwrap();
 
-    // Now transfer should succeed
-    let (old_holder, updated_access) = access_store
-        .transfer("community-workshop", bob.clone(), None, current_time + 300)
-        .unwrap();
+        // Check Alice's total access grants
+        let alice_accesses = access_store.list_by_holder(&alice).unwrap();
+        assert_eq!(alice_accesses.len(), 2);
 
-    assert_eq!(old_holder, alice);
-    assert_eq!(updated_access.holder, bob);
+        // Revoke Bob's access due to policy violation
+        access_store
+            .revoke(
+                "woodworking-shop",
+                &bob,
+                "Repeated safety violations".to_string(),
+            )
+            .unwrap();
 
-    // Verify persisted
-    let retrieved = access_store.get("community-workshop").unwrap().unwrap();
-    assert_eq!(retrieved.holder, bob);
-    assert_eq!(retrieved.usage_log.len(), 3); // All handoff steps recorded
+        // Verify revocation
+        let bob_access_after = access_store.get("woodworking-shop", &bob).unwrap().unwrap();
+        assert!(bob_access_after.is_revoked());
+        assert_eq!(
+            bob_access_after.revocation_reason,
+            Some("Repeated safety violations".to_string())
+        );
+    }
+
+    #[test]
+    fn test_expired_access_cleanup() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Grant short-term access to Alice (1 hour)
+        let mut alice_access = ResourceAccess::new(
+            "guest-wifi".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 3600, // 1 hour
+                renewable: false,
+                max_accumulated: 1,
+            },
+        );
+        let grant_time = 1000;
+        alice_access.granted_at = grant_time;
+        alice_access.expires_at = Some(grant_time + 3600);
+
+        // Grant long-term stewardship to Bob
+        let bob_access = ResourceAccess::new(
+            "community-garden".to_string(),
+            bob.clone(),
+            AccessModel::Stewardship {
+                duties: vec![],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        access_store.grant(alice_access).unwrap();
+        access_store.grant(bob_access).unwrap();
+
+        // Check expired access after 2 hours
+        let current_time = grant_time + 7200;
+        let expired = access_store.find_expired(current_time).unwrap();
+
+        assert_eq!(expired.len(), 1);
+        assert_eq!(expired[0].resource_id, "guest-wifi");
+        assert_eq!(expired[0].holder, alice);
+    }
+
+    #[test]
+    fn test_idle_access_detection() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Alice hasn't used her access
+        let mut alice_access = ResourceAccess::new(
+            "3d-printer".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        let grant_time = 1000;
+        alice_access.granted_at = grant_time;
+
+        // Bob used his access recently
+        let mut bob_access = ResourceAccess::new(
+            "laser-cutter".to_string(),
+            bob.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        bob_access.granted_at = grant_time;
+
+        // Record Bob's usage within the idle period
+        let current_time = grant_time + 10 * 24 * 3600; // 10 days later
+        bob_access
+            .record_usage(current_time - 3 * 24 * 3600, "Used for project".to_string())
+            .unwrap();
+
+        access_store.grant(alice_access).unwrap();
+        access_store.grant(bob_access).unwrap();
+
+        // Find idle access (7 day threshold)
+        let max_idle = 7 * 24 * 3600;
+        let idle = access_store.find_idle(current_time, max_idle).unwrap();
+
+        assert_eq!(idle.len(), 1);
+        assert_eq!(idle[0].resource_id, "3d-printer");
+        assert_eq!(idle[0].holder, alice);
+    }
+
+    #[test]
+    fn test_resource_access_governance_workflow() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        // Scenario: Governance proposal to grant access is approved
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Create governance proposal for access
+        let domain_id = GovernanceDomainId::new("maker-coop");
+        let proposer_keypair = KeyPair::generate().unwrap();
+
+        let _proposal = Proposal::new(
+            domain_id,
+            proposer_keypair.did().clone(),
+            "Grant CNC Machine Access".to_string(),
+            "Alice has completed safety training and needs CNC access for project".to_string(),
+            ProposalPayload::ResourceAccess {
+                action: ResourceAccessAction::Grant {
+                    model: AccessModel::UseAccess {
+                        duration_seconds: 90 * 24 * 3600, // 90 days
+                        renewable: true,
+                        max_accumulated: 4,
+                    },
+                },
+                resource_id: "cnc-machine".to_string(),
+                holder: alice.clone(),
+                reason: "Completed safety certification".to_string(),
+            },
+        );
+
+        // After proposal passes (simulated), grant access
+        let access = ResourceAccess::new(
+            "cnc-machine".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 90 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        access_store.grant(access).unwrap();
+
+        // Verify access was granted
+        let granted_access = access_store.get("cnc-machine", &alice).unwrap();
+        assert!(granted_access.is_some());
+        let access = granted_access.unwrap();
+        assert_eq!(access.resource_id, "cnc-machine");
+        assert!(access.is_valid(access.granted_at));
+    }
 }
