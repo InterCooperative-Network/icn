@@ -243,10 +243,8 @@ impl LedgerEventBridge {
             LedgerEvent::ResourceAccessTransferred(rat) => {
                 // Use default coop_id since resource events are ledger-wide
                 // In the future, could extract coop_id from resource metadata
-                let coop_id = self.default_coop_id.clone();
-                // Clone needed: coop_id used both in event struct and as broadcast key
                 let gateway_event = GatewayEvent::ResourceAccessTransferred {
-                    coop_id: coop_id.clone(),
+                    coop_id: self.default_coop_id.clone(),
                     resource_id: rat.resource_id,
                     from_holder: rat.from_holder,
                     to_holder: rat.to_holder,
@@ -255,7 +253,7 @@ impl LedgerEventBridge {
                     transferred_at: rat.transferred_at,
                 };
                 self.gateway_broadcaster
-                    .broadcast(&coop_id, gateway_event)
+                    .broadcast(&self.default_coop_id, gateway_event)
                     .await;
                 debug!("Forwarded ResourceAccessTransferred event");
             }
