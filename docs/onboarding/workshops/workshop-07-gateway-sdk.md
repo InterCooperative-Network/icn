@@ -172,25 +172,28 @@ sdk/typescript/
 ### Steps
 1. Create a test script `test-auth.ts`:
    ```typescript
-   import { IcnClient } from '@icn/sdk';
+   import { ICNClient } from '@icn/client';
 
    async function main() {
      // Create client
-     const client = new IcnClient({
-       endpoint: 'http://localhost:8080',
+     const client = new ICNClient({
+       baseUrl: 'http://localhost:8080',
      });
 
-     // Load identity (from keystore or generate)
-     const identity = await client.loadIdentity({
-       keystorePath: process.env.ICN_DATA + '/keystore.age',
-       passphrase: process.env.ICN_PASSPHRASE,
+     // Note: The SDK handles authentication via challenge-response
+     // when you call protected endpoints. You can also explicitly
+     // authenticate if needed.
+
+     // Get a challenge
+     const challenge = await client.getChallenge();
+     console.log('Got challenge:', challenge.challenge);
+
+     // Verify with signature (SDK handles key management)
+     const token = await client.verify({
+       did: 'did:icn:your-did',
+       signature: 'your-signature',
      });
-
-     console.log('Loaded DID:', identity.did);
-
-     // Authenticate
-     const token = await client.authenticate();
-     console.log('Got JWT token:', token.substring(0, 20) + '...');
+     console.log('Got JWT token:', token.token.substring(0, 20) + '...');
 
      // Now client is authenticated for protected endpoints
    }
@@ -217,27 +220,23 @@ sdk/typescript/
 ### Steps
 1. Create `test-ledger.ts`:
    ```typescript
-   import { IcnClient } from '@icn/sdk';
+   import { ICNClient } from '@icn/client';
 
    async function main() {
-     const client = new IcnClient({
-       endpoint: 'http://localhost:8080',
+     const client = new ICNClient({
+       baseUrl: 'http://localhost:8080',
+       token: 'your-jwt-token', // From authentication step
      });
 
-     await client.loadIdentity({ /* ... */ });
-     await client.authenticate();
-
-     // Get balance
-     const balance = await client.ledger.getBalance();
+     // Get balance for an account
+     const balance = await client.getBalance('your-account-id');
      console.log('Current balance:', balance);
 
-     // Transfer (if you have funds)
-     // const result = await client.ledger.transfer({
-     //   to: 'did:icn:recipient...',
-     //   amount: 10,
-     //   memo: 'test transfer'
-     // });
-     // console.log('Transfer result:', result);
+     // Note: The SDK provides methods for ledger operations.
+     // Check the SDK README for the complete API:
+     // - client.getBalance(accountId)
+     // - client.getLedgerHead()
+     // - client.getLedgerHistory(options)
    }
 
    main().catch(console.error);
@@ -266,19 +265,17 @@ GET  /ledger/history?did=<your-did>&limit=10
 ### Steps
 1. Extend your script to query trust:
    ```typescript
+   import { ICNClient } from '@icn/client';
+
    // Get trust score between two DIDs
-   const trust = await client.trust.getScore({
-     from: myDid,
-     to: 'did:icn:somepeer...'
+   const trust = await client.getTrustScore({
+     from: 'did:icn:my-did',
+     to: 'did:icn:peer-did'
    });
    console.log('Trust score:', trust);
 
    // Add a trust edge (requires auth)
-   await client.trust.addEdge({
-     to: 'did:icn:somepeer...',
-     score: 0.5,
-     dimension: 'social'
-   });
+   // Note: Check SDK API for exact method signatures
    ```
 
 ### Trust API endpoints
@@ -302,32 +299,34 @@ POST /trust/edge { to, score, dimension }
 ### Steps
 1. Create `test-websocket.ts`:
    ```typescript
-   import { IcnClient } from '@icn/sdk';
+   import { ICNClient, ICNSubscription } from '@icn/client';
 
    async function main() {
-     const client = new IcnClient({
-       endpoint: 'http://localhost:8080',
+     const client = new ICNClient({
+       baseUrl: 'http://localhost:8080',
+       token: 'your-jwt-token',
      });
 
-     await client.loadIdentity({ /* ... */ });
-     await client.authenticate();
-
-     // Connect to WebSocket
-     const ws = await client.connectWebSocket();
-
-     // Subscribe to events
-     ws.on('ledger:entry', (entry) => {
-       console.log('New ledger entry:', entry);
-     });
-
-     ws.on('trust:update', (update) => {
-       console.log('Trust update:', update);
+     // Subscribe to cooperative events
+     const subscription = client.subscribe('coop-id', {
+       onEvent: (event) => {
+         console.log('Event received:', event);
+       },
+       onError: (error) => {
+         console.error('Subscription error:', error);
+       },
+       onClose: () => {
+         console.log('Connection closed');
+       },
      });
 
      console.log('Listening for events... (Ctrl+C to exit)');
 
      // Keep running
      await new Promise(() => {});
+
+     // Cleanup when done
+     subscription.close();
    }
 
    main().catch(console.error);
