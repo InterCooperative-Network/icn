@@ -637,6 +637,9 @@ impl ResourceAccess {
     }
 
     /// Validate transfer (enforces no-profit rule)
+    /// Validate transfer price against anti-speculation rules
+    ///
+    /// Returns error if price > 0 and no_profit_transfer is enabled.
     pub fn validate_transfer(&self, price: Option<i64>) -> Result<()> {
         if self.rules.no_profit_transfer {
             // Any paid transfer is considered profit-seeking
@@ -647,6 +650,88 @@ impl ResourceAccess {
             }
         }
         Ok(())
+    }
+
+    /// Validate all preconditions for transferring this access to a new holder
+    ///
+    /// This method performs comprehensive validation including:
+    /// 1. Access is not revoked
+    /// 2. Transfer price complies with no-profit rules
+    /// 3. HandoffProcedure steps are completed (for Stewardship)
+    ///
+    /// Handoff validation uses exact segment matching to prevent gaming.
+    /// For example, logging "Failed to transfer credentials" will NOT satisfy
+    /// a step requiring "Transfer credentials".
+    ///
+    /// # Arguments
+    /// * `price` - Optional transfer price for validation
+    ///
+    /// # Returns
+    /// * `Ok(())` if all preconditions are met
+    /// * `Err(AccessError)` describing the validation failure
+    pub fn validate_transfer_preconditions(&self, price: Option<i64>) -> Result<()> {
+        // Check access is not revoked
+        if self.revoked {
+            return Err(AccessError::Revoked(
+                self.revocation_reason
+                    .clone()
+                    .unwrap_or_else(|| "Access revoked".to_string()),
+            ));
+        }
+
+        // Validate transfer price (no-profit rule)
+        self.validate_transfer(price)?;
+
+        // For Stewardship, validate HandoffProcedure steps are completed
+        if let AccessModel::Stewardship { duties, .. } = &self.model {
+            self.validate_handoff_steps(duties)?;
+        }
+
+        Ok(())
+    }
+
+    /// Validate that all required handoff steps have been completed
+    ///
+    /// Uses exact segment matching: the step text must appear as a complete
+    /// segment (separated by common delimiters) in a usage log entry.
+    fn validate_handoff_steps(&self, duties: &[StewardshipDuty]) -> Result<()> {
+        // Find HandoffProcedure duty if it exists
+        let handoff_duty = duties.iter().find_map(|d| match d {
+            StewardshipDuty::HandoffProcedure { steps } => Some(steps),
+            _ => None,
+        });
+
+        if let Some(required_steps) = handoff_duty {
+            for step in required_steps {
+                if !self.is_handoff_step_completed(step) {
+                    return Err(AccessError::DutyUnfulfilled(format!(
+                        "Handoff step not completed: {}",
+                        step
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a specific handoff step has been completed
+    ///
+    /// Uses exact segment matching to prevent gaming. The step must appear
+    /// as a complete segment in the usage log, not just as a substring.
+    fn is_handoff_step_completed(&self, step: &str) -> bool {
+        let step_lower = step.to_lowercase();
+        self.usage_log.iter().any(|event| {
+            let desc_lower = event.description.to_lowercase();
+            // Exact match on full description
+            if desc_lower == step_lower {
+                return true;
+            }
+            // Segment match: step appears as complete segment between delimiters
+            desc_lower
+                .split(&[',', ';', '.', '-', ':', '|'][..])
+                .any(|segment| segment.trim() == step_lower)
+        })
     }
 
     /// Get time until expiration (if applicable)
@@ -674,7 +759,34 @@ const ACCESS_PREFIX: &str = "resource_access:data:";
 /// Key prefix for holder index entries (maps holder -> list of resource_ids)
 const HOLDER_INDEX_PREFIX: &str = "resource_access:holder_index:";
 
+/// Deserialize holder index with error logging
+///
+/// Returns empty vec on deserialization failure but logs the error for
+/// corruption detection. This allows graceful degradation while maintaining
+/// visibility into data integrity issues.
+fn deserialize_holder_index(bytes: &[u8], context: &str) -> Vec<String> {
+    match serde_json::from_slice(bytes) {
+        Ok(index) => index,
+        Err(e) => {
+            error!(
+                context = %context,
+                error = %e,
+                bytes_len = bytes.len(),
+                "Failed to deserialize holder index - possible data corruption"
+            );
+            Vec::new()
+        }
+    }
+}
+
 /// Trait for storing and managing resource access records
+///
+/// Provides CRUD operations for [`ResourceAccess`] records with support for
+/// efficient querying by holder via secondary indexes.
+///
+/// # Implementations
+///
+/// - [`SledResourceAccessStore`]: Production-ready Sled-backed implementation
 ///
 /// # Index Retention Policy
 ///
@@ -689,8 +801,30 @@ const HOLDER_INDEX_PREFIX: &str = "resource_access:holder_index:";
 /// method returns all records (including revoked) to support audit use cases.
 ///
 /// To permanently remove a record and its indexes, use `remove()` instead of revocation.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use icn_ledger::use_access::{ResourceAccessStore, SledResourceAccessStore, ResourceAccess};
+///
+/// let store = SledResourceAccessStore::new(sled_backend);
+///
+/// // Grant access
+/// store.put(&access)?;
+///
+/// // Query by holder
+/// let resources = store.list_by_holder(&holder_id)?;
+///
+/// // Transfer to new holder
+/// let (old_holder, updated) = store.transfer("resource-1", new_holder, None, timestamp)?;
+/// ```
 pub trait ResourceAccessStore: Send + Sync {
     /// Get resource access by resource_id
+    ///
+    /// # Returns
+    /// - `Ok(Some(access))` if the resource exists
+    /// - `Ok(None)` if the resource does not exist
+    /// - `Err` on storage errors
     fn get(&self, resource_id: &str) -> anyhow::Result<Option<ResourceAccess>>;
 
     /// Store or update resource access
@@ -714,17 +848,21 @@ pub trait ResourceAccessStore: Send + Sync {
 
     /// Transfer resource access to a new holder
     ///
-    /// This method enforces:
-    /// 1. validate_transfer() - no-profit rule
-    /// 2. HandoffProcedure validation (for Stewardship)
-    /// 3. Updates holder in the access record
-    /// 4. Persists the change
+    /// This is a default implementation that validates preconditions and persists
+    /// the transfer. Implementations with secondary indexes (like `SledResourceAccessStore`)
+    /// should override this to maintain index consistency.
+    ///
+    /// # Validation
+    /// Uses `ResourceAccess::validate_transfer_preconditions()` which enforces:
+    /// 1. Access is not revoked
+    /// 2. No-profit transfer rules
+    /// 3. HandoffProcedure completion (for Stewardship access)
     ///
     /// # Arguments
     /// * `resource_id` - The resource to transfer
     /// * `new_holder` - Entity receiving access
     /// * `price` - Optional transfer price (for validation)
-    /// * `current_time` - Current timestamp
+    /// * `_current_time` - Reserved for future audit/timestamp features
     ///
     /// # Returns
     /// A tuple of (old_holder, updated ResourceAccess with new holder)
@@ -741,46 +879,8 @@ pub trait ResourceAccessStore: Send + Sync {
             .map_err(|e| AccessError::StorageError(e.to_string()))?
             .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
 
-        // Validate access is not revoked
-        if access.revoked {
-            return Err(AccessError::Revoked(
-                access
-                    .revocation_reason
-                    .clone()
-                    .unwrap_or_else(|| "Access revoked".to_string()),
-            ));
-        }
-
-        // Validate transfer price (no-profit rule)
-        access.validate_transfer(price)?;
-
-        // For Stewardship, validate HandoffProcedure steps are completed
-        if let AccessModel::Stewardship { duties, .. } = &access.model {
-            // Check if HandoffProcedure duty exists
-            let handoff_duty = duties.iter().find_map(|d| match d {
-                StewardshipDuty::HandoffProcedure { steps } => Some(steps),
-                _ => None,
-            });
-
-            if let Some(required_steps) = handoff_duty {
-                // Verify all handoff steps are recorded in usage_log
-                for step in required_steps {
-                    let step_completed = access.usage_log.iter().any(|event| {
-                        event
-                            .description
-                            .to_lowercase()
-                            .contains(&step.to_lowercase())
-                    });
-
-                    if !step_completed {
-                        return Err(AccessError::DutyUnfulfilled(format!(
-                            "Handoff step not completed: {}",
-                            step
-                        )));
-                    }
-                }
-            }
-        }
+        // Validate all transfer preconditions
+        access.validate_transfer_preconditions(price)?;
 
         // Store old holder for event emission
         let old_holder = access.holder.clone();
@@ -838,7 +938,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let mut holder_resources: Vec<String> = self
             .store
             .get(&holder_key)?
-            .and_then(|b| serde_json::from_slice(&b).ok())
+            .map(|b| deserialize_holder_index(&b, &format!("put:{}", access.holder)))
             .unwrap_or_default();
 
         if !holder_resources.contains(&access.resource_id) {
@@ -870,7 +970,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
             let mut holder_resources: Vec<String> = self
                 .store
                 .get(&holder_key)?
-                .and_then(|b| serde_json::from_slice(&b).ok())
+                .map(|b| deserialize_holder_index(&b, &format!("remove:{}", access.holder)))
                 .unwrap_or_default();
 
             holder_resources.retain(|r| r != resource_id);
@@ -888,7 +988,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let resource_ids: Vec<String> = self
             .store
             .get(&holder_key)?
-            .and_then(|b| serde_json::from_slice(&b).ok())
+            .map(|b| deserialize_holder_index(&b, &format!("list_by_holder:{}", holder)))
             .unwrap_or_default();
 
         let mut accesses = Vec::new();
@@ -905,7 +1005,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
         resource_id: &str,
         new_holder: EntityId,
         price: Option<i64>,
-        current_time: u64,
+        _current_time: u64,
     ) -> Result<(EntityId, ResourceAccess)> {
         // Get existing access
         let mut access = self
@@ -913,50 +1013,8 @@ impl ResourceAccessStore for SledResourceAccessStore {
             .map_err(|e| AccessError::StorageError(e.to_string()))?
             .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
 
-        // Validate access is not revoked
-        if access.revoked {
-            return Err(AccessError::Revoked(
-                access
-                    .revocation_reason
-                    .clone()
-                    .unwrap_or_else(|| "Access revoked".to_string()),
-            ));
-        }
-
-        // Validate transfer price (no-profit rule)
-        access.validate_transfer(price)?;
-
-        // For Stewardship, validate HandoffProcedure steps are completed
-        if let AccessModel::Stewardship { duties, .. } = &access.model {
-            // Check if HandoffProcedure duty exists
-            let handoff_duty = duties.iter().find_map(|d| match d {
-                StewardshipDuty::HandoffProcedure { steps } => Some(steps),
-                _ => None,
-            });
-
-            if let Some(required_steps) = handoff_duty {
-                // Verify all handoff steps are recorded in usage_log
-                // Use exact matching to prevent false positives from partial matches
-                for step in required_steps {
-                    let step_lower = step.to_lowercase();
-                    let step_completed = access.usage_log.iter().any(|event| {
-                        event
-                            .description
-                            .to_lowercase()
-                            .split(&[',', ';', '.', '-'][..])
-                            .any(|segment| segment.trim() == step_lower)
-                            || event.description.to_lowercase() == step_lower
-                    });
-
-                    if !step_completed {
-                        return Err(AccessError::DutyUnfulfilled(format!(
-                            "Handoff step not completed: {}",
-                            step
-                        )));
-                    }
-                }
-            }
-        }
+        // Validate all transfer preconditions using shared helper
+        access.validate_transfer_preconditions(price)?;
 
         // Store old holder for event emission and index cleanup
         let old_holder = access.holder.clone();
@@ -967,7 +1025,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
             .store
             .get(&old_holder_key)
             .map_err(|e| AccessError::StorageError(e.to_string()))?
-            .and_then(|b| serde_json::from_slice(&b).ok())
+            .map(|b| deserialize_holder_index(&b, &format!("transfer:{}", old_holder)))
             .unwrap_or_default();
         old_holder_resources.retain(|r| r != resource_id);
         let old_holder_bytes = serde_json::to_vec(&old_holder_resources)
@@ -978,10 +1036,6 @@ impl ResourceAccessStore for SledResourceAccessStore {
 
         // Update holder
         access.holder = new_holder;
-
-        // Record the transfer time for tracking purposes
-        // (current_time can be used by callers for audit/logging if needed)
-        let _ = current_time;
 
         // Persist the updated access (this also adds to new holder's index)
         self.put(&access)
@@ -1922,5 +1976,220 @@ mod tests {
         let bob = create_test_entity();
         let result = access_store.transfer("nonexistent", bob, None, 1234567890);
         assert!(matches!(result, Err(AccessError::Revoked(_))));
+    }
+
+    // =============================================================================
+    // Edge Case Tests (per code review recommendations)
+    // =============================================================================
+
+    #[test]
+    fn test_handoff_with_empty_steps_allows_transfer() {
+        // When HandoffProcedure has empty steps, transfer should succeed
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = create_test_entity();
+        let bob = create_test_entity();
+
+        let access = ResourceAccess::new(
+            "tool-001".to_string(),
+            alice.clone(),
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec![], // Empty steps
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        access_store.put(&access).unwrap();
+
+        // Transfer should succeed since no steps are required
+        let result = access_store.transfer("tool-001", bob.clone(), None, access.granted_at + 1000);
+        assert!(result.is_ok());
+        let (old_holder, updated) = result.unwrap();
+        assert_eq!(old_holder, alice);
+        assert_eq!(updated.holder, bob);
+    }
+
+    #[test]
+    fn test_multiple_holders_index_isolation() {
+        // Verify that holder indexes are properly isolated
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = create_test_entity();
+        let bob = create_test_entity();
+        let charlie = create_test_entity();
+
+        // Alice holds tool-001 and tool-002
+        let access1 = ResourceAccess::new(
+            "tool-001".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        let access2 = ResourceAccess::new(
+            "tool-002".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        // Bob holds tool-003
+        let access3 = ResourceAccess::new(
+            "tool-003".to_string(),
+            bob.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        access_store.put(&access1).unwrap();
+        access_store.put(&access2).unwrap();
+        access_store.put(&access3).unwrap();
+
+        // Verify Alice has 2 resources
+        let alice_resources = access_store.list_by_holder(&alice).unwrap();
+        assert_eq!(alice_resources.len(), 2);
+
+        // Verify Bob has 1 resource
+        let bob_resources = access_store.list_by_holder(&bob).unwrap();
+        assert_eq!(bob_resources.len(), 1);
+        assert_eq!(bob_resources[0].resource_id, "tool-003");
+
+        // Verify Charlie has 0 resources
+        let charlie_resources = access_store.list_by_holder(&charlie).unwrap();
+        assert!(charlie_resources.is_empty());
+
+        // Transfer tool-001 from Alice to Charlie
+        let _ = access_store
+            .transfer("tool-001", charlie.clone(), None, 1000)
+            .unwrap();
+
+        // Verify Alice now has 1 resource
+        let alice_resources = access_store.list_by_holder(&alice).unwrap();
+        assert_eq!(alice_resources.len(), 1);
+        assert_eq!(alice_resources[0].resource_id, "tool-002");
+
+        // Verify Charlie now has 1 resource
+        let charlie_resources = access_store.list_by_holder(&charlie).unwrap();
+        assert_eq!(charlie_resources.len(), 1);
+        assert_eq!(charlie_resources[0].resource_id, "tool-001");
+
+        // Verify Bob's resources unchanged
+        let bob_resources = access_store.list_by_holder(&bob).unwrap();
+        assert_eq!(bob_resources.len(), 1);
+    }
+
+    #[test]
+    fn test_handoff_step_gaming_prevention() {
+        // Verify that "Failed to <step>" doesn't pass validation for "<step>"
+        let alice = create_test_entity();
+
+        let mut access = ResourceAccess::new(
+            "tool-001".to_string(),
+            alice,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Transfer credentials".to_string()],
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Log a failure message that contains the step text
+        access
+            .record_usage(
+                access.granted_at + 100,
+                "Failed to transfer credentials due to system error".to_string(),
+            )
+            .unwrap();
+
+        // Validation should FAIL because "transfer credentials" is not a complete segment
+        let result = access.validate_transfer_preconditions(None);
+        assert!(
+            result.is_err(),
+            "Gaming attempt should be rejected - 'Failed to transfer credentials' should not match 'Transfer credentials'"
+        );
+    }
+
+    #[test]
+    fn test_handoff_step_exact_segment_matching() {
+        // Verify exact segment matching works correctly
+        let alice = create_test_entity();
+
+        let mut access = ResourceAccess::new(
+            "tool-001".to_string(),
+            alice,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Transfer credentials".to_string()],
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Log with proper segment delimiter
+        access
+            .record_usage(
+                access.granted_at + 100,
+                "Completed: Transfer credentials - verified by witness".to_string(),
+            )
+            .unwrap();
+
+        // Validation should PASS because "Transfer credentials" is a complete segment
+        let result = access.validate_transfer_preconditions(None);
+        assert!(
+            result.is_ok(),
+            "Proper segment-delimited step should be accepted"
+        );
+    }
+
+    #[test]
+    fn test_handoff_duplicate_steps() {
+        // Verify handling of duplicate step names
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = create_test_entity();
+        let bob = create_test_entity();
+
+        let mut access = ResourceAccess::new(
+            "tool-001".to_string(),
+            alice.clone(),
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec![
+                        "Sign document".to_string(),
+                        "Sign document".to_string(), // Duplicate
+                    ],
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        access_store.put(&access).unwrap();
+
+        // Only log the step once
+        access
+            .record_usage(access.granted_at + 100, "Sign document".to_string())
+            .unwrap();
+        access_store.put(&access).unwrap();
+
+        // Transfer should succeed (same step logged once satisfies both duplicates)
+        let result = access_store.transfer("tool-001", bob, None, access.granted_at + 1000);
+        assert!(
+            result.is_ok(),
+            "Single log entry should satisfy duplicate steps"
+        );
     }
 }

@@ -241,13 +241,22 @@ impl LedgerEventBridge {
             }
 
             LedgerEvent::ResourceAccessTransferred(rat) => {
-                // Resource access transfers are logged but not yet forwarded to WebSocket
-                // In the future, we could add a ResourceAccessTransferred gateway event
+                // TODO(resource-access-websocket): Add WebSocket forwarding for resource access transfers
+                //
+                // Implementation steps:
+                // 1. Add GatewayEvent::ResourceAccessTransferred variant to events.rs
+                // 2. Determine coop_id from resource or use default
+                // 3. Broadcast to relevant WebSocket subscribers
+                //
+                // This will enable real-time notifications for:
+                // - Resource stewardship changes
+                // - Access handoffs between community members
+                // - Audit trail visibility in cooperative dashboards
                 debug!(
                     resource_id = %rat.resource_id,
                     from = %rat.from_holder,
                     to = %rat.to_holder,
-                    "ResourceAccessTransferred event (not forwarded)"
+                    "ResourceAccessTransferred event (not yet forwarded to WebSocket)"
                 );
             }
         }
