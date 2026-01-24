@@ -20,6 +20,9 @@ Time estimates are per module. Total target: 3-6 weeks.
 | 9 | Operations and deployment | 1-2 days | 1 day |
 | 10 | Contributor workflow | 1 day | 0.5 day |
 | 11 | Federation (advanced) | 2 days | 1 day |
+| 12 | Observability and metrics | 1-2 days | 1 day |
+| 13 | Security and privacy | 1-2 days | 1 day |
+| 14 | Governance and CCL deep dive | 2 days | 1 day |
 
 ## Weekly pacing examples
 
@@ -36,3 +39,6 @@ Time estimates are per module. Total target: 3-6 weeks.
 - Week 2: Modules 4-6
 - Week 3: Modules 7-8
 - Week 4: Modules 9-10 + capstone
+
+### Optional deep dives (1-2 weeks)
+- Modules 11-14 can be taken after the core track for system-level depth
