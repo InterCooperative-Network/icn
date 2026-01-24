@@ -593,4 +593,144 @@ mod tests {
         // Enforcement should skip this resource (verified by checking is_revoked)
         assert!(access.is_revoked());
     }
+
+    /// End-to-end integration test with tokio time mocking.
+    ///
+    /// Tests the full actor lifecycle: spawn → periodic tick → enforcement check → revocation.
+    /// Uses `start_paused = true` to control time advancement and verify periodic behavior.
+    #[tokio::test(start_paused = true)]
+    async fn test_periodic_enforcement_integration() {
+        use tokio::sync::broadcast;
+        use tokio::time::Duration;
+
+        // Create mock store
+        let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
+
+        // Create a resource that is already past its idle limit
+        // Set granted_at to 30 days ago (relative to current system time)
+        let current_time = icn_time::current_timestamp_secs();
+        let thirty_days_ago = current_time.saturating_sub(30 * 24 * 3600);
+
+        let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let mut access = ResourceAccess::new(
+            "idle-resource".to_string(),
+            entity.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 90 * 24 * 3600, // 90 days
+                renewable: true,
+                max_accumulated: 4,
+            },
+        )
+        .with_rules(AntiSpeculationRules::strict()); // 7-day idle limit
+
+        // Override granted_at and record last usage 30 days ago
+        // This makes the resource idle for 30 days, exceeding the 7-day limit
+        access.granted_at = thirty_days_ago;
+        access
+            .record_usage(thirty_days_ago, "Initial use".to_string())
+            .unwrap();
+
+        // Add to store
+        store
+            .write()
+            .await
+            .add_resource("idle-resource".to_string(), access);
+
+        // Also add a recently-used resource that should NOT be revoked
+        let entity2 = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let mut active_access = ResourceAccess::new(
+            "active-resource".to_string(),
+            entity2.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 90 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        )
+        .with_rules(AntiSpeculationRules::strict());
+
+        // Record recent usage (just now)
+        active_access
+            .record_usage(current_time, "Recent use".to_string())
+            .unwrap();
+
+        store
+            .write()
+            .await
+            .add_resource("active-resource".to_string(), active_access);
+
+        // Create shutdown channel
+        let (shutdown_tx, shutdown_rx) = broadcast::channel::<()>(1);
+
+        // Spawn actor with short interval (5 seconds for test)
+        let config = ResourceEnforcerConfig {
+            check_interval_seconds: 5,
+            batch_size: 100,
+            enabled: true,
+        };
+
+        let handle = ResourceAccessEnforcerActor::spawn(config, store.clone(), shutdown_rx);
+
+        // Allow initial startup jitter to complete (max 0.5s jitter for 5s interval)
+        // Advance time past the jitter
+        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::task::yield_now().await;
+
+        // Advance time past the first interval tick (5 seconds)
+        tokio::time::advance(Duration::from_secs(6)).await;
+        tokio::task::yield_now().await;
+
+        // Give the actor time to process
+        tokio::time::advance(Duration::from_millis(100)).await;
+        tokio::task::yield_now().await;
+
+        // Verify stats show at least one check was performed
+        let stats = handle.get_stats().await.unwrap();
+        assert!(
+            stats.checks_performed >= 1,
+            "Expected at least 1 check, got {}",
+            stats.checks_performed
+        );
+
+        // Verify the idle resource was revoked
+        let store_read = store.read().await;
+        let resources = store_read.list_all().unwrap();
+        drop(store_read);
+
+        let idle_resource = resources
+            .iter()
+            .find(|(id, _)| id == "idle-resource")
+            .map(|(_, access)| access);
+        let active_resource = resources
+            .iter()
+            .find(|(id, _)| id == "active-resource")
+            .map(|(_, access)| access);
+
+        assert!(
+            idle_resource.is_some(),
+            "Idle resource should still exist in store"
+        );
+        assert!(
+            idle_resource.unwrap().is_revoked(),
+            "Idle resource should be revoked"
+        );
+
+        assert!(
+            active_resource.is_some(),
+            "Active resource should still exist in store"
+        );
+        assert!(
+            !active_resource.unwrap().is_revoked(),
+            "Active resource should NOT be revoked"
+        );
+
+        // Verify revocation events were emitted
+        let events = store.read().await.events.lock().unwrap().clone();
+        assert_eq!(events.len(), 1, "Should have exactly 1 revocation event");
+        assert_eq!(events[0].resource_id, "idle-resource");
+        assert!(events[0].reason.contains("idle"));
+
+        // Clean shutdown
+        let _ = shutdown_tx.send(());
+    }
 }
