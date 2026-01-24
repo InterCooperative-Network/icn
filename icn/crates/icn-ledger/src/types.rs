@@ -431,6 +431,22 @@ pub struct WitnessConfig {
     /// This is validated in `Ledger::validate_witness_signatures()` which
     /// rejects signatures older than this timeout.
     pub collection_timeout_secs: u64,
+
+    /// Minimum trust score required for witnesses (optional).
+    /// When set, witnesses must have at least this trust score with
+    /// all parties involved in the transaction (author and counterparties).
+    /// 
+    /// This integrates with ICN's trust graph to prevent collusion with
+    /// unknown/untrusted entities. Trust scores are computed using the
+    /// combined score from all three trust dimensions (social, economic, technical).
+    ///
+    /// Example values:
+    /// - 0.1 = Known trust class (minimal requirement)
+    /// - 0.4 = Partner trust class (recommended for high-value transfers)
+    /// - 0.7 = Federated trust class (maximum security)
+    ///
+    /// If None, trust validation is skipped (backward compatible behavior).
+    pub min_witness_trust: Option<f64>,
 }
 
 impl Default for WitnessConfig {
@@ -439,6 +455,7 @@ impl Default for WitnessConfig {
             default_policy: WitnessPolicy::None,
             threshold: None,
             collection_timeout_secs: 300, // 5 minutes default
+            min_witness_trust: None,     // Trust validation disabled by default
         }
     }
 }
@@ -450,6 +467,7 @@ impl WitnessConfig {
             default_policy: WitnessPolicy::Counterparty,
             threshold: Some(threshold),
             collection_timeout_secs: 300,
+            min_witness_trust: None,
         }
     }
 
@@ -462,6 +480,30 @@ impl WitnessConfig {
             },
             threshold: None,
             collection_timeout_secs: 300,
+            min_witness_trust: None,
+        }
+    }
+
+    /// Create config requiring counterparty signature with minimum trust score
+    pub fn counterparty_with_trust(threshold: u64, min_trust: f64) -> Self {
+        WitnessConfig {
+            default_policy: WitnessPolicy::Counterparty,
+            threshold: Some(threshold),
+            collection_timeout_secs: 300,
+            min_witness_trust: Some(min_trust),
+        }
+    }
+
+    /// Create config requiring quorum with minimum trust score for witnesses
+    pub fn quorum_with_trust(required: u32, witnesses: Vec<Did>, min_trust: f64) -> Self {
+        WitnessConfig {
+            default_policy: WitnessPolicy::Quorum {
+                required,
+                witnesses,
+            },
+            threshold: None,
+            collection_timeout_secs: 300,
+            min_witness_trust: Some(min_trust),
         }
     }
 

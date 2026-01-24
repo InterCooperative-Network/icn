@@ -303,7 +303,7 @@ pub struct Ledger {
         Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Trust graph for entry validation (wrapped in RwLock for live updates)
-    trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
+    pub(crate) trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
 
     /// Minimum trust score for entry acceptance
     min_trust_for_entry: f64,
