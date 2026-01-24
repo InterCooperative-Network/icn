@@ -472,3 +472,97 @@ async fn test_oversized_batch_rejected() {
         err_msg
     );
 }
+
+/// Test that the background flusher eventually flushes single messages
+/// even when no new messages arrive.
+///
+/// This test verifies the `start_batch_flusher` background task behavior:
+/// 1. A single message is sent to a batching-enabled actor
+/// 2. Without any additional messages, the background flusher should
+///    eventually flush the pending message after max_delay expires
+#[tokio::test]
+async fn test_background_flusher_flushes_single_message() {
+    use icn_gossip::{start_batch_flusher, GossipHandle};
+
+    let kp = KeyPair::generate().unwrap();
+
+    // Create gossip actor with short max_delay for faster test
+    let gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
+    let gossip_handle: GossipHandle = Arc::new(tokio::sync::RwLock::new(gossip));
+
+    // Configure batching with short delay
+    let config = BatchingConfig {
+        max_batch_size: 100, // Large so size doesn't trigger flush
+        max_delay: Duration::from_millis(20), // Short delay for test
+        ..BatchingConfig::default()
+    };
+
+    {
+        let mut gossip = gossip_handle.write().await;
+        gossip.set_keypair(kp.clone());
+        gossip.set_batching_config(config);
+    }
+
+    // Track sent messages
+    let sent_messages: Arc<Mutex<Vec<GossipMessage>>> = Arc::new(Mutex::new(Vec::new()));
+    let sent_clone = sent_messages.clone();
+
+    {
+        let mut gossip = gossip_handle.write().await;
+        gossip.set_send_callback(Arc::new(move |_recipient, message| {
+            sent_clone.lock().unwrap().push(message);
+        }));
+    }
+
+    // Create shutdown channel
+    let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+
+    // Start the background flusher
+    let flusher_handle = start_batch_flusher(gossip_handle.clone(), shutdown_rx);
+
+    // Send a single message
+    {
+        let gossip = gossip_handle.read().await;
+        let msg = GossipMessage::Announce {
+            hash: [1u8; 32],
+            author: kp.did().clone(),
+            clock: icn_gossip::VectorClock::new(),
+            topic: "test".to_string(),
+        };
+        gossip.send_message(Some(kp.did().clone()), msg);
+    }
+
+    // Verify no batch has been sent yet (message is pending)
+    assert!(
+        sent_messages.lock().unwrap().is_empty(),
+        "Message should be pending in batch, not sent immediately"
+    );
+
+    // Wait for the background flusher to run (max_delay + buffer)
+    // The flusher checks at max_delay/2 intervals, so we wait 2-3x max_delay
+    tokio::time::sleep(Duration::from_millis(60)).await;
+
+    // The background flusher should have flushed the pending message
+    {
+        let sent = sent_messages.lock().unwrap();
+        assert_eq!(
+            sent.len(),
+            1,
+            "Background flusher should have flushed the single pending message"
+        );
+
+        if let GossipMessage::Batch { messages, .. } = &sent[0] {
+            assert_eq!(
+                messages.len(),
+                1,
+                "Batch should contain exactly one message"
+            );
+        } else {
+            panic!("Expected Batch message from background flusher");
+        }
+    } // Lock guard dropped here before await
+
+    // Clean shutdown
+    let _ = shutdown_tx.send(());
+    let _ = flusher_handle.await;
+}
