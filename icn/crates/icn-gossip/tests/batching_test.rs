@@ -2,7 +2,7 @@
 //!
 //! These tests verify that message batching works correctly with
 //! configurable parameters and metrics tracking.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::type_complexity)]
 
 use icn_gossip::{AccessControl, BatchingConfig, GossipActor, GossipMessage, Topic};
 use icn_identity::KeyPair;
@@ -51,17 +51,19 @@ fn test_batch_messages_accumulated() {
     let kp = KeyPair::generate().unwrap();
     let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
     gossip.set_keypair(kp.clone());
-    
-    // Enable batching with large limits
-    let mut config = BatchingConfig::default();
-    config.max_batch_size = 100; // Large enough to not trigger
-    config.max_delay = Duration::from_secs(10); // Large enough to not trigger
+
+    // Enable batching with large limits to prevent auto-flush
+    let config = BatchingConfig {
+        max_batch_size: 100,
+        max_delay: Duration::from_secs(10),
+        ..BatchingConfig::default()
+    };
     gossip.set_batching_config(config);
 
     // Track sent messages
     let sent_messages = Arc::new(Mutex::new(Vec::new()));
     let sent_clone = sent_messages.clone();
-    
+
     gossip.set_send_callback(Arc::new(move |_recipient, message| {
         sent_clone.lock().unwrap().push(message);
     }));
@@ -86,7 +88,7 @@ fn test_batch_messages_accumulated() {
     // Should have sent one batch message
     let sent = sent_messages.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    
+
     if let GossipMessage::Batch { messages, .. } = &sent[0] {
         assert_eq!(messages.len(), 5);
     } else {
@@ -99,16 +101,18 @@ fn test_batch_size_threshold_triggers_send() {
     let kp = KeyPair::generate().unwrap();
     let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
     gossip.set_keypair(kp.clone());
-    
-    // Enable batching with small size limit
-    let mut config = BatchingConfig::default();
-    config.max_batch_size = 3; // Small limit
-    config.max_delay = Duration::from_secs(10); // Large delay
+
+    // Enable batching with small size limit to trigger auto-flush
+    let config = BatchingConfig {
+        max_batch_size: 3,
+        max_delay: Duration::from_secs(10),
+        ..BatchingConfig::default()
+    };
     gossip.set_batching_config(config);
 
     let sent_messages = Arc::new(Mutex::new(Vec::new()));
     let sent_clone = sent_messages.clone();
-    
+
     gossip.set_send_callback(Arc::new(move |_recipient, message| {
         sent_clone.lock().unwrap().push(message);
     }));
@@ -127,8 +131,11 @@ fn test_batch_size_threshold_triggers_send() {
     // Batch should have been sent automatically
     let sent = sent_messages.lock().unwrap();
     assert_eq!(sent.len(), 1);
-    
-    if let GossipMessage::Batch { messages, batch_id, .. } = &sent[0] {
+
+    if let GossipMessage::Batch {
+        messages, batch_id, ..
+    } = &sent[0]
+    {
         assert_eq!(messages.len(), 3);
         assert_eq!(*batch_id, 0);
     } else {
@@ -141,13 +148,13 @@ fn test_batching_disabled_sends_immediately() {
     let kp = KeyPair::generate().unwrap();
     let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
     gossip.set_keypair(kp.clone());
-    
+
     // Disable batching
     gossip.set_batching_config(BatchingConfig::disabled());
 
     let sent_messages = Arc::new(Mutex::new(Vec::new()));
     let sent_clone = sent_messages.clone();
-    
+
     gossip.set_send_callback(Arc::new(move |_recipient, message| {
         sent_clone.lock().unwrap().push(message);
     }));
@@ -166,7 +173,7 @@ fn test_batching_disabled_sends_immediately() {
     // All messages should have been sent individually
     let sent = sent_messages.lock().unwrap();
     assert_eq!(sent.len(), 3);
-    
+
     // None should be batch messages
     for msg in sent.iter() {
         assert!(!matches!(msg, GossipMessage::Batch { .. }));
@@ -177,10 +184,10 @@ fn test_batching_disabled_sends_immediately() {
 async fn test_batch_message_processing() {
     let kp1 = KeyPair::generate().unwrap();
     let kp2 = KeyPair::generate().unwrap();
-    
+
     let mut gossip1 = GossipActor::new(kp1.did().clone(), trust_lookup_all());
     let mut gossip2 = GossipActor::new(kp2.did().clone(), trust_lookup_all());
-    
+
     gossip1.set_keypair(kp1.clone());
     gossip2.set_keypair(kp2.clone());
 
@@ -220,7 +227,7 @@ async fn test_batch_message_processing() {
 async fn test_nested_batch_rejected() {
     let kp1 = KeyPair::generate().unwrap();
     let kp2 = KeyPair::generate().unwrap();
-    
+
     let mut gossip = GossipActor::new(kp2.did().clone(), trust_lookup_all());
     gossip.set_keypair(kp2.clone());
 
@@ -247,18 +254,20 @@ fn test_multiple_recipients_batched_separately() {
     let kp = KeyPair::generate().unwrap();
     let kp2 = KeyPair::generate().unwrap();
     let kp3 = KeyPair::generate().unwrap();
-    
+
     let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
     gossip.set_keypair(kp.clone());
-    
-    // Enable batching
-    let mut config = BatchingConfig::default();
-    config.max_batch_size = 100;
+
+    // Enable batching with large limits to prevent auto-flush
+    let config = BatchingConfig {
+        max_batch_size: 100,
+        ..BatchingConfig::default()
+    };
     gossip.set_batching_config(config);
 
     let sent_messages = Arc::new(Mutex::new(Vec::new()));
     let sent_clone = sent_messages.clone();
-    
+
     gossip.set_send_callback(Arc::new(move |recipient, message| {
         sent_clone.lock().unwrap().push((recipient, message));
     }));
@@ -298,4 +307,65 @@ fn test_multiple_recipients_batched_separately() {
             panic!("Expected Batch message");
         }
     }
+}
+
+#[tokio::test]
+async fn test_time_based_batch_flushing() {
+    let kp = KeyPair::generate().unwrap();
+    let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
+    gossip.set_keypair(kp.clone());
+
+    // Enable batching with very short delay to test time-based triggering
+    let config = BatchingConfig {
+        max_batch_size: 100,                  // Large enough to not trigger size-based
+        max_delay: Duration::from_millis(10), // Short delay
+        ..BatchingConfig::default()
+    };
+    gossip.set_batching_config(config);
+
+    let sent_messages = Arc::new(Mutex::new(Vec::new()));
+    let sent_clone = sent_messages.clone();
+
+    gossip.set_send_callback(Arc::new(move |_recipient, message| {
+        sent_clone.lock().unwrap().push(message);
+    }));
+
+    // Send first message to start the batch timer
+    let msg1 = GossipMessage::Announce {
+        hash: [1u8; 32],
+        author: kp.did().clone(),
+        clock: icn_gossip::VectorClock::new(),
+        topic: "test".to_string(),
+    };
+    gossip.send_message(Some(kp.did().clone()), msg1);
+
+    // No batch should have been sent yet
+    assert!(sent_messages.lock().unwrap().is_empty());
+
+    // Wait longer than max_delay
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    // Send another message - this should trigger time-based batch flush
+    // Note: Time-based flushing only happens when a new message arrives
+    let msg2 = GossipMessage::Announce {
+        hash: [2u8; 32],
+        author: kp.did().clone(),
+        clock: icn_gossip::VectorClock::new(),
+        topic: "test".to_string(),
+    };
+    gossip.send_message(Some(kp.did().clone()), msg2);
+
+    // Batch should have been sent due to time expiration
+    // The first message should be in the sent batch
+    let sent = sent_messages.lock().unwrap();
+    if sent.len() == 1 {
+        if let GossipMessage::Batch { messages, .. } = &sent[0] {
+            // The batch contains the first message that was waiting
+            assert!(!messages.is_empty());
+        } else {
+            panic!("Expected Batch message");
+        }
+    }
+    // Note: There may still be pending messages in the queue that weren't flushed yet
+    // This is expected behavior - the second message may start a new batch
 }

@@ -14,15 +14,22 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 
 /// Compress batch data with zstd
+///
+/// Note: This is infrastructure for future batch compression and is not yet
+/// wired into the gossip protocol. See `GossipMessage::Batch::compressed`.
+#[allow(dead_code)]
 fn compress_batch(data: &[u8]) -> Result<Vec<u8>> {
     zstd::encode_all(data, 3).context("Failed to compress batch")
 }
 
 /// Decompress batch data with zstd
+///
+/// Note: This is infrastructure for future batch compression and is not yet
+/// wired into the gossip protocol. See `GossipMessage::Batch::compressed`.
+#[allow(dead_code)]
 fn decompress_batch(data: &[u8]) -> Result<Vec<u8>> {
     zstd::decode_all(data).context("Failed to decompress batch")
 }
-
 
 /// Callback for sending gossip messages to peers
 /// Parameters: (recipient_did, message)
@@ -812,22 +819,43 @@ impl GossipActor {
             return;
         }
 
-        // Add to pending batch
-        let batch_len = {
-            let mut batches = self.pending_batches.lock().unwrap();
+        // Add to pending batch and check if this is the first message
+        let (batch_len, is_first_message) = {
+            let Ok(mut batches) = self.pending_batches.lock() else {
+                // Mutex poisoned - fall back to immediate send
+                warn!("Batch mutex poisoned, sending immediately");
+                self.send_message_immediate(recipient, message);
+                return;
+            };
             let batch = batches.entry(recipient.clone()).or_default();
+            let is_first = batch.is_empty();
             batch.push(message);
-            batch.len()
+            (batch.len(), is_first)
         };
 
+        // Initialize batch timer when the first message is added
+        // This ensures max_delay is measured from when batching started
+        if is_first_message {
+            if let Ok(mut time_guard) = self.last_batch_time.lock() {
+                time_guard.insert(recipient.clone(), Instant::now());
+            }
+        }
+
         // Check if batch should be sent
-        let batch_bytes = batch_len * 500; // Rough estimate
-        
-        let time_exceeded = self.last_batch_time
+        // Conservative size estimate: 500 bytes per message average.
+        // This is intentionally conservative to prevent oversized batches.
+        // Most announce messages are ~200 bytes, but responses can be larger.
+        let batch_bytes = batch_len * 500;
+
+        let time_exceeded = self
+            .last_batch_time
             .lock()
-            .unwrap()
-            .get(&recipient)
-            .map(|t| t.elapsed() >= self.batching_config.max_delay)
+            .ok()
+            .and_then(|guard| {
+                guard
+                    .get(&recipient)
+                    .map(|t| t.elapsed() >= self.batching_config.max_delay)
+            })
             .unwrap_or(false);
 
         let should_send = batch_len >= self.batching_config.max_batch_size
@@ -841,45 +869,64 @@ impl GossipActor {
 
     /// Flush pending batch for a recipient
     pub fn flush_batch(&self, recipient: &Option<Did>) {
-        let messages = self.pending_batches.lock().unwrap().remove(recipient);
-        
-        if let Some(messages) = messages {
-            if messages.is_empty() {
+        let messages = {
+            let Ok(mut batches) = self.pending_batches.lock() else {
+                warn!("Batch mutex poisoned, cannot flush");
                 return;
-            }
+            };
+            batches.remove(recipient)
+        };
 
-            let batch_id = {
-                let mut id = self.next_batch_id.lock().unwrap();
+        let Some(messages) = messages else {
+            return;
+        };
+
+        if messages.is_empty() {
+            return;
+        }
+
+        let batch_id = match self.next_batch_id.lock() {
+            Ok(mut id) => {
                 let current = *id;
                 *id = id.wrapping_add(1);
                 current
-            };
+            }
+            Err(_) => {
+                warn!("Batch ID mutex poisoned, using 0");
+                0u64
+            }
+        };
 
-            // For now, we don't compress at this layer - compression happens at the 
-            // network/protocol layer when the entire Batch message is serialized
-            let compressed = false;
+        // For now, we don't compress at this layer - compression happens at the
+        // network/protocol layer when the entire Batch message is serialized
+        let compressed = false;
 
-            // Record metrics
-            icn_obs::metrics::gossip::batch_size_record(messages.len());
-            icn_obs::metrics::gossip::batches_sent_inc();
+        // Record metrics
+        icn_obs::metrics::gossip::batches_sent_inc();
+        icn_obs::metrics::gossip::batch_size_record(messages.len());
 
-            let batch_msg = GossipMessage::Batch {
-                batch_id,
-                messages,
-                compressed,
-            };
+        let batch_msg = GossipMessage::Batch {
+            batch_id,
+            messages,
+            compressed,
+        };
 
-            self.send_message_immediate(recipient.clone(), batch_msg);
-            self.last_batch_time
-                .lock()
-                .unwrap()
-                .insert(recipient.clone(), Instant::now());
+        self.send_message_immediate(recipient.clone(), batch_msg);
+
+        if let Ok(mut time_guard) = self.last_batch_time.lock() {
+            time_guard.insert(recipient.clone(), Instant::now());
         }
     }
 
     /// Flush all pending batches
     pub fn flush_all_batches(&self) {
-        let recipients: Vec<Option<Did>> = self.pending_batches.lock().unwrap().keys().cloned().collect();
+        let recipients: Vec<Option<Did>> = {
+            let Ok(batches) = self.pending_batches.lock() else {
+                warn!("Batch mutex poisoned, cannot flush all");
+                return;
+            };
+            batches.keys().cloned().collect()
+        };
         for recipient in recipients {
             self.flush_batch(&recipient);
         }

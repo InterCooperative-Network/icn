@@ -155,9 +155,7 @@ fn bench_message_batching(c: &mut Criterion) {
                     })
                     .collect();
 
-                b.iter(|| {
-                    icn_encoding::encode(black_box(&messages)).unwrap()
-                });
+                b.iter(|| icn_encoding::encode(black_box(&messages)).unwrap());
             },
         );
     }
@@ -175,30 +173,29 @@ fn bench_message_batching(c: &mut Criterion) {
             .collect();
 
         // Individual serialization
-        group.bench_function(
-            BenchmarkId::new("individual", batch_size),
-            |b| {
-                b.iter(|| {
-                    let mut total_size = 0;
-                    for msg in &messages {
-                        let encoded = icn_encoding::encode(black_box(msg)).unwrap();
-                        total_size += encoded.len();
-                    }
-                    total_size
-                });
-            },
-        );
+        group.bench_function(BenchmarkId::new("individual", batch_size), |b| {
+            b.iter(|| {
+                let mut total_size = 0;
+                for msg in &messages {
+                    let encoded = icn_encoding::encode(black_box(msg)).unwrap();
+                    total_size += encoded.len();
+                }
+                total_size
+            });
+        });
 
-        // Batch serialization
-        group.bench_function(
-            BenchmarkId::new("batched", batch_size),
-            |b| {
-                b.iter(|| {
-                    let encoded = icn_encoding::encode(black_box(&messages)).unwrap();
-                    encoded.len()
-                });
-            },
-        );
+        // Batch serialization (using actual GossipMessage::Batch for accurate comparison)
+        let batch_message = icn_gossip::GossipMessage::Batch {
+            batch_id: 0,
+            messages: messages.clone(),
+            compressed: false,
+        };
+        group.bench_function(BenchmarkId::new("batched", batch_size), |b| {
+            b.iter(|| {
+                let encoded = icn_encoding::encode(black_box(&batch_message)).unwrap();
+                encoded.len()
+            });
+        });
     }
 
     group.finish();

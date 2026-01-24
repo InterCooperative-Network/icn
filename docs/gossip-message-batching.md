@@ -100,8 +100,10 @@ A batch is sent when ANY of these conditions is met:
 
 1. **Size Limit**: `max_batch_size` messages accumulated
 2. **Byte Limit**: Total message size exceeds `max_batch_bytes`
-3. **Time Limit**: `max_delay` elapsed since last batch send
+3. **Time Check**: When a new message arrives, if `max_delay` has elapsed since the last batch send, the current batch is sent
 4. **Manual Flush**: `flush_all_batches()` called
+
+**Note**: There is no background timer that automatically flushes batches after `max_delay`. Time-based flushing is evaluated only when a new message arrives or when you call `flush_all_batches()`. A batch containing a single message may remain pending until one of these events occurs.
 
 ## Manual Batch Flushing
 

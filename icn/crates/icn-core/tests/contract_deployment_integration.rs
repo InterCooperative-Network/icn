@@ -198,6 +198,7 @@ impl TestNode {
                             icn_gossip::GossipMessage::StorageContentNotFoundMsg { .. } => {
                                 "StorageContentNotFoundMsg"
                             }
+                            icn_gossip::GossipMessage::Batch { .. } => "Batch",
                         };
 
                         let result = if let Some(target_did) = recipient {

@@ -42,7 +42,11 @@ impl GossipActor {
     }
 
     /// Inner implementation of handle_message (for latency tracking)
-    pub(crate) async fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+    pub(crate) async fn handle_message_inner(
+        &mut self,
+        sender: &Did,
+        message: GossipMessage,
+    ) -> Result<()> {
         // H7 fix: Trust-gated message handling
         // Check sender's trust score before processing messages
         const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum

@@ -1,6 +1,15 @@
 //! Batch message handlers
 //!
 //! Handlers for processing batched gossip messages.
+//!
+//! # Implementation Note
+//!
+//! The batch handler duplicates the message dispatch logic from `protocol.rs`
+//! (`handle_message_inner`). This is intentional to avoid async recursion issues
+//! that would arise from calling `handle_message` recursively for each message
+//! in a batch. While this creates maintenance overhead (new message types must
+//! be added in both places), it provides cleaner error handling and prevents
+//! nested batch recursion.
 
 use crate::gossip::GossipActor;
 use crate::types::GossipMessage;
@@ -147,7 +156,9 @@ impl GossipActor {
                     self.handle_storage_challenge(sender, challenge)
                 }
 
-                GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
+                GossipMessage::StorageProofMsg { proof } => {
+                    self.handle_storage_proof(sender, proof)
+                }
 
                 GossipMessage::StorageContentNotFoundMsg { response } => {
                     self.handle_storage_content_not_found(sender, response)
