@@ -70,7 +70,7 @@
 //!     resource_profile: None,
 //! };
 //!
-//! let task_id = service.submit_task(&ctx, params).await?;
+//! let task_hash = service.submit_task(&ctx, params).await?;
 //! # Ok(())
 //! # }
 //! ```

@@ -81,7 +81,8 @@ let compute_service = ComputeService::new(compute_handle);
 All service methods require an `ApiContext` for authentication:
 
 ```rust
-use icn_api::{ApiContext, SubmitTaskParams, compute::*};
+use icn_api::{ApiContext, SubmitTaskParams};
+use icn_api::compute::{CodeTypeParam, TaskPriorityParam};
 
 // Build API context from authenticated request
 let ctx = ApiContext {
@@ -105,8 +106,8 @@ let params = SubmitTaskParams {
     resource_profile: None,
 };
 
-// Call service
-let task_id = compute_service.submit_task(&ctx, params).await?;
+// Call service - returns task hash (32-byte identifier)
+let task_hash = compute_service.submit_task(&ctx, params).await?;
 ```
 
 ### Error Handling
@@ -117,7 +118,7 @@ Services return `Result<T, ApiError>`. Transport adapters map `ApiError` to thei
 use icn_api::ApiError;
 
 match compute_service.submit_task(&ctx, params).await {
-    Ok(task_id) => { /* success */ }
+    Ok(task_hash) => { /* success - task_hash is [u8; 32] */ }
     Err(ApiError::ValidationError(msg)) => {
         // Handle validation error (HTTP 400, JSON-RPC -32602)
     }
@@ -176,7 +177,7 @@ pub async fn handle_compute_submit(
     
     // Call service
     match compute_service.submit_task(&api_ctx, params).await {
-        Ok(task_id) => RpcResponse::success(id, task_id),
+        Ok(task_hash) => RpcResponse::success(id, task_hash),
         Err(e) => RpcResponse::error(id, e.to_rpc_code(), e.to_string()),
     }
 }

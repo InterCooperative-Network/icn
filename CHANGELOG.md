@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Shared API Service Layer (2026-01-24)
+
+**icn-api Crate for Unified RPC/Gateway Logic** (PR #827):
+- New `icn-api` crate providing shared service implementations between `icn-rpc` (JSON-RPC) and `icn-gateway` (REST/WebSocket)
+- `ComputeService` with unified task submission, status queries, and cancellation
+- `ApiError` type with transport-agnostic error handling and RPC code mapping
+- `ApiContext` for consistent caller authentication across services
+- Permission scope system (`scopes.rs`) with wildcard matching support
+- Comprehensive validation with named constants (fuel limits, resource bounds)
+- Full documentation with architecture diagrams, usage examples, and migration guide
+
+**Benefits**:
+- Single source of truth for business logic (eliminates ~557 LOC duplication)
+- Consistent behavior across all API transports
+- Testable services independent of transport concerns
+- Foundation for Phase 2 (LedgerService, GovernanceService, TrustService)
+
 ### Added - Action Items and Internal Exchange (2026-01-17)
 
 **Action Item Tracker for Governance** (PR #714):
