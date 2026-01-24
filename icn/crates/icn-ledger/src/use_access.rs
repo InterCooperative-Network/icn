@@ -484,8 +484,8 @@ impl ResourceAccess {
     /// Performance: Uses `.filter()` for time-based filtering to correctly
     /// handle potential out-of-order events (from clock skew, etc.). Iterates
     /// in reverse to find the most recent matching event first. Complexity is
-    /// O(k) best case where k is recent events, O(n) worst case if events are
-    /// scattered through the log.
+    /// O(k) best case where k is recent events (with chronologically ordered
+    /// events), O(n) worst case if events are scattered through the log.
     pub fn check_duties(&self, current_time: u64) -> Result<()> {
         match &self.model {
             AccessModel::Stewardship { duties, .. } => {
@@ -1385,7 +1385,8 @@ mod tests {
         let base_time = 1000u64;
         access.granted_at = base_time;
 
-        // Add 500 older usage events (well before the current review period)
+        // Add 500 older usage events (outside the 7-day maintenance window)
+        // 500 events × 1 hour = ~20.8 days from base_time
         for i in 0..500 {
             let old_time = base_time + (i * 3600); // 1 hour apart
             access
@@ -1431,5 +1432,94 @@ mod tests {
 
         // Verify that maintenance is still considered current
         assert!(!access.is_idle(current_time, 7 * 24 * 3600));
+    }
+
+    #[test]
+    fn test_duty_check_with_out_of_order_events() {
+        // Verifies that .filter() correctly handles out-of-order events
+        // (e.g., from clock skew or manual insertion)
+        let entity = create_test_entity();
+        let mut access = ResourceAccess::new(
+            "workshop-tools".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::Maintenance {
+                    description: "Clean equipment".to_string(),
+                    frequency_seconds: 7 * 24 * 3600, // Weekly
+                }],
+                review_period_seconds: 30 * 24 * 3600,
+            },
+        );
+
+        let current_time = 100 * 24 * 3600u64; // 100 days in seconds
+        access.granted_at = 0;
+
+        // Insert events OUT OF ORDER to simulate clock skew:
+        // Event 1: Recent maintenance (within window) - inserted first
+        access.usage_log.push_back(UsageEvent::with_type(
+            current_time - (2 * 24 * 3600), // 2 days ago
+            "Recent cleaning".to_string(),
+            DutyEventType::Maintenance,
+        ));
+
+        // Event 2: Old event with EARLIER timestamp - inserted second (out of order)
+        access.usage_log.push_back(UsageEvent::with_type(
+            current_time - (30 * 24 * 3600), // 30 days ago
+            "Old event".to_string(),
+            DutyEventType::Maintenance,
+        ));
+
+        // Event 3: Another old event
+        access.usage_log.push_back(UsageEvent::with_type(
+            current_time - (20 * 24 * 3600), // 20 days ago
+            "Another old event".to_string(),
+            DutyEventType::Maintenance,
+        ));
+
+        // With .filter(), all events are checked regardless of order,
+        // so the recent maintenance event (2 days ago) should be found
+        let result = access.check_duties(current_time);
+        assert!(
+            result.is_ok(),
+            "check_duties should find recent event despite out-of-order insertion: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_duty_check_with_saturating_cutoff() {
+        // Verifies saturating_sub prevents underflow when current_time < frequency_seconds
+        let entity = create_test_entity();
+        let mut access = ResourceAccess::new(
+            "new-resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::Maintenance {
+                    description: "Maintain".to_string(),
+                    frequency_seconds: 1_000_000, // Large frequency
+                }],
+                review_period_seconds: 2_000_000,
+            },
+        );
+
+        // Very early timestamp (smaller than frequency_seconds)
+        let current_time = 100u64;
+        access.granted_at = 0;
+
+        // Add maintenance event at time 50
+        access.usage_log.push_back(UsageEvent::with_type(
+            50,
+            "Early maintenance".to_string(),
+            DutyEventType::Maintenance,
+        ));
+
+        // cutoff_time = 100.saturating_sub(1_000_000) = 0
+        // Event at timestamp 50 >= 0, so it should be found
+        let result = access.check_duties(current_time);
+        assert!(
+            result.is_ok(),
+            "check_duties should work with saturating cutoff: {:?}",
+            result
+        );
     }
 }
