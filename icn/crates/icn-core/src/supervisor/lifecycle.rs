@@ -973,10 +973,8 @@ async fn spawn_background_tasks(
     info!("Digest emitter spawned");
 
     // Batch flusher - ensures batched messages are flushed periodically and on shutdown
-    let _batch_flusher_handle = icn_gossip::start_batch_flusher(
-        gossip_handle.clone(),
-        shutdown_tx.subscribe(),
-    );
+    let _batch_flusher_handle =
+        icn_gossip::start_batch_flusher(gossip_handle.clone(), shutdown_tx.subscribe());
     info!("Batch flusher spawned");
 
     // Partition checker
