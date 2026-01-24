@@ -129,6 +129,10 @@ Balance(Account, Currency) = Σ credits_to_Account - Σ debits_from_Account
 ```
 
 **Conceptual example** (simplified - actual entries use `AccountDelta`):
+
+> **Warning**: This example is conceptual. Real entries use `Vec<AccountDelta>`
+> for multi-currency support. See the actual code pattern below.
+
 ```
 Entry 1: Bob → Alice: 100 USD   (Alice's USD balance +100)
 Entry 2: Alice → Carol: 30 USD  (Alice's USD balance -30)

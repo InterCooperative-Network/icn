@@ -268,6 +268,13 @@ async fn test_two_node_gossip() -> anyhow::Result<()> {
 
 If you have two terminals and want to see gossip in action:
 
+### Prerequisites
+First, verify the ports are available:
+```bash
+# Check if ports 4001 and 4002 are free
+lsof -i :4001 -i :4002 2>/dev/null || echo "Ports available"
+```
+
 ### Steps
 1. Terminal 1 - Start first node:
    ```bash

@@ -142,6 +142,14 @@ Note: The SDK handles this automatically.
    ls sdk/typescript/ 2>/dev/null || echo "SDK not found"
    ```
 
+   If the SDK is not found:
+   ```bash
+   if [ ! -d sdk/typescript ]; then
+     echo "TypeScript SDK not available. Refer to Module 7 for API specs."
+     echo "You can still use the REST API directly via curl."
+   fi
+   ```
+
 2. If SDK exists, install dependencies:
    ```bash
    cd sdk/typescript

@@ -107,6 +107,11 @@ format = "json"
      icn:local
    ```
 
+   > **Security Note**: The example above passes the passphrase via environment
+   > variable for simplicity. In production, use Docker secrets or mount a
+   > credentials file to avoid exposing passphrases in process listings or
+   > container inspect output.
+
 3. Check logs:
    ```bash
    docker logs -f icn-node
