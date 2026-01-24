@@ -34,6 +34,9 @@ pub enum GatewayError {
     #[error("Internal server error: {0}")]
     InternalError(String),
 
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     #[error("Service unavailable: {0}")]
     ServiceUnavailable(String),
 
@@ -61,6 +64,7 @@ impl GatewayError {
             GatewayError::BadRequest(_) => Some("BAD_REQUEST"),
             GatewayError::RateLimitExceeded(_) => Some("RATE_LIMIT_EXCEEDED"),
             GatewayError::BudgetExceeded(_) => Some("BUDGET_EXCEEDED"),
+            GatewayError::Conflict(_) => Some("CONFLICT"),
             GatewayError::ServiceUnavailable(_) => Some("SERVICE_UNAVAILABLE"),
             GatewayError::Fx(fx_err) => Some(fx_err.error_code()),
             // Internal errors don't expose codes
@@ -81,6 +85,7 @@ impl ResponseError for GatewayError {
             GatewayError::BadRequest(_) => StatusCode::BAD_REQUEST,
             GatewayError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
             GatewayError::BudgetExceeded(_) => StatusCode::FORBIDDEN,
+            GatewayError::Conflict(_) => StatusCode::CONFLICT,
             GatewayError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             GatewayError::SubstrateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -141,6 +146,9 @@ impl ResponseError for GatewayError {
                     t!("gateway.errors.budget_exceeded_prefix"),
                     reason
                 )
+            }
+            GatewayError::Conflict(reason) => {
+                format!("{}: {}", t!("gateway.errors.conflict_prefix"), reason)
             }
             GatewayError::ServiceUnavailable(reason) => {
                 // Log the reason for debugging but return generic message to avoid

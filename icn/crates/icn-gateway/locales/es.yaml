@@ -32,6 +32,9 @@ gateway:
     rate_limit_exceeded_prefix: "Limite de tasa excedido para DID"
     budget_exceeded_prefix: "Presupuesto excedido"
 
+    # Conflict errors
+    conflict_prefix: "Conflicto"
+
     # Server errors
     internal: "Error interno del servidor"
     service_unavailable: "Servicio temporalmente no disponible"
