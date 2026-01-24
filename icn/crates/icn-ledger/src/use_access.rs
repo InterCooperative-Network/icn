@@ -37,7 +37,7 @@
 
 use icn_entity::EntityId;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use thiserror::Error;
 
 /// Errors related to resource access
@@ -160,7 +160,8 @@ pub enum StewardshipDuty {
 ///
 /// Using structured event types instead of keyword matching provides:
 /// - Type-safe duty verification
-/// - O(1) matching instead of O(n) string search
+/// - O(1) per-event matching vs substring search/allocation on descriptions
+///   (overall duty checking still performs a linear scan over the usage log)
 /// - Clear documentation of expected event categories
 /// - Explicit metadata prevents gaming (e.g., adding "maintenance" to unrelated descriptions)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -197,6 +198,7 @@ pub struct UsageEvent {
     pub witnesses: Vec<String>,
     /// Structured duty type for explicit validation
     /// When None, falls back to keyword-based matching for backward compatibility
+    #[serde(alias = "event_type")]
     pub duty_type: Option<DutyEventType>,
 }
 
@@ -227,9 +229,12 @@ impl UsageEvent {
         self
     }
 
-    /// Validate that this event has sufficient witnesses
+    /// Validate that this event has sufficient unique witnesses
+    ///
+    /// Counts only unique witness DIDs to prevent gaming by adding duplicates.
     pub fn has_sufficient_witnesses(&self, min_witnesses: usize) -> bool {
-        self.witnesses.len() >= min_witnesses
+        let unique_witnesses: HashSet<&String> = self.witnesses.iter().collect();
+        unique_witnesses.len() >= min_witnesses
     }
 }
 
@@ -450,6 +455,50 @@ impl ResourceAccess {
         Ok(())
     }
 
+    /// Record a structured usage event with duty type and optional witnesses
+    ///
+    /// This method allows recording events with explicit duty types for type-safe
+    /// validation, rather than relying on keyword matching in descriptions.
+    ///
+    /// # Arguments
+    /// * `event` - The pre-constructed UsageEvent (use `UsageEvent::with_duty_type()`)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let event = UsageEvent::with_duty_type(
+    ///     timestamp,
+    ///     "Weekly maintenance completed".to_string(),
+    ///     DutyEventType::Maintenance { duty_id: Some("maint-001".to_string()) },
+    /// )
+    /// .with_witness("did:icn:witness1".to_string());
+    ///
+    /// access.record_usage_event(event)?;
+    /// ```
+    pub fn record_usage_event(&mut self, event: UsageEvent) -> Result<()> {
+        // Check if access has been revoked
+        if self.revoked {
+            return Err(AccessError::Revoked(
+                self.revocation_reason
+                    .clone()
+                    .unwrap_or_else(|| "Access revoked".to_string()),
+            ));
+        }
+
+        // Validate access is still valid (for UseAccess expiration)
+        if self.is_expired(event.timestamp) {
+            return Err(AccessError::Expired(self.expires_at.unwrap_or(0)));
+        }
+
+        self.usage_log.push_back(event);
+
+        // Bound the log size
+        while self.usage_log.len() > Self::MAX_USAGE_LOG_SIZE {
+            self.usage_log.pop_front();
+        }
+
+        Ok(())
+    }
+
     /// Revoke access with a reason
     ///
     /// Once revoked, usage cannot be recorded and the access is effectively terminated.
@@ -629,18 +678,20 @@ impl ResourceAccess {
 
     /// Validate duty completion with witness verification
     ///
-    /// This method provides stronger validation by checking:
-    /// 1. The event has the expected duty type (type-safe)
-    /// 2. The event has sufficient witnesses for accountability
+    /// This method validates that the usage event has sufficient unique witnesses
+    /// to qualify for duty completion, and that this access is a stewardship model
+    /// (since only stewardship has duties).
     ///
     /// # Arguments
     /// * `event` - The usage event to validate
-    /// * `min_witnesses` - Minimum number of witnesses required
+    /// * `min_witnesses` - Minimum number of unique witnesses required
     ///
     /// # Returns
-    /// `true` if the event is valid for duty completion, `false` otherwise
+    /// `true` if the event has at least `min_witnesses` unique witnesses and
+    /// this is a stewardship access model, `false` otherwise
     pub fn validate_duty_completion(&self, event: &UsageEvent, min_witnesses: usize) -> bool {
-        event.has_sufficient_witnesses(min_witnesses)
+        matches!(self.model, AccessModel::Stewardship { .. })
+            && event.has_sufficient_witnesses(min_witnesses)
     }
 
     /// Record that a stewardship review has been completed
@@ -1377,7 +1428,10 @@ mod tests {
         assert_eq!(event.timestamp, 1234567890);
         assert_eq!(event.description, "Maintenance completed");
         assert!(event.witnesses.is_empty());
-        assert_eq!(event.duty_type, Some(DutyEventType::Maintenance { duty_id: None }));
+        assert_eq!(
+            event.duty_type,
+            Some(DutyEventType::Maintenance { duty_id: None })
+        );
     }
 
     #[test]
@@ -1388,7 +1442,9 @@ mod tests {
         let event = UsageEvent::with_duty_type(
             1234567890,
             "Maintenance completed".to_string(),
-            DutyEventType::Maintenance { duty_id: Some("maint-001".to_string()) },
+            DutyEventType::Maintenance {
+                duty_id: Some("maint-001".to_string()),
+            },
         )
         .with_witness(witness1.clone())
         .with_witness(witness2.clone());
@@ -1445,17 +1501,27 @@ mod tests {
         let maintenance_event = UsageEvent::with_duty_type(
             1000,
             "Weekly watering".to_string(),
-            DutyEventType::Maintenance { duty_id: Some("garden-maint-1".to_string()) },
+            DutyEventType::Maintenance {
+                duty_id: Some("garden-maint-1".to_string()),
+            },
         );
-        assert!(matches!(maintenance_event.duty_type, Some(DutyEventType::Maintenance { .. })));
+        assert!(matches!(
+            maintenance_event.duty_type,
+            Some(DutyEventType::Maintenance { .. })
+        ));
 
         // Test CommunityBenefit with duty_id
         let benefit_event = UsageEvent::with_duty_type(
             2000,
             "Workshop hosted".to_string(),
-            DutyEventType::CommunityBenefit { duty_id: Some("workshop-2025".to_string()) },
+            DutyEventType::CommunityBenefit {
+                duty_id: Some("workshop-2025".to_string()),
+            },
         );
-        assert!(matches!(benefit_event.duty_type, Some(DutyEventType::CommunityBenefit { .. })));
+        assert!(matches!(
+            benefit_event.duty_type,
+            Some(DutyEventType::CommunityBenefit { .. })
+        ));
 
         // Test HandoffStep
         let handoff_event = UsageEvent::with_duty_type(
@@ -1463,14 +1529,17 @@ mod tests {
             "Documented current state".to_string(),
             DutyEventType::HandoffStep { step_index: 0 },
         );
-        assert!(matches!(handoff_event.duty_type, Some(DutyEventType::HandoffStep { step_index: 0 })));
+        assert!(matches!(
+            handoff_event.duty_type,
+            Some(DutyEventType::HandoffStep { step_index: 0 })
+        ));
 
         // Test General
-        let general_event = UsageEvent::with_duty_type(
-            4000,
-            "Regular use".to_string(),
-            DutyEventType::General,
-        );
-        assert!(matches!(general_event.duty_type, Some(DutyEventType::General)));
+        let general_event =
+            UsageEvent::with_duty_type(4000, "Regular use".to_string(), DutyEventType::General);
+        assert!(matches!(
+            general_event.duty_type,
+            Some(DutyEventType::General)
+        ));
     }
 }
