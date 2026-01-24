@@ -481,10 +481,11 @@ impl ResourceAccess {
     /// It first tries structured event types (O(1) matching), then falls
     /// back to keyword matching for backward compatibility.
     ///
-    /// Performance: Uses time-based early termination with `.take_while()` to stop
-    /// scanning once events older than the relevant time window are encountered.
-    /// Since events are logged chronologically and we iterate in reverse, this
-    /// provides O(k) complexity where k is the number of recent events.
+    /// Performance: Uses `.filter()` for time-based filtering to correctly
+    /// handle potential out-of-order events (from clock skew, etc.). Iterates
+    /// in reverse to find the most recent matching event first. Complexity is
+    /// O(k) best case where k is recent events, O(n) worst case if events are
+    /// scattered through the log.
     pub fn check_duties(&self, current_time: u64) -> Result<()> {
         match &self.model {
             AccessModel::Stewardship { duties, .. } => {
@@ -494,15 +495,16 @@ impl ResourceAccess {
                             description,
                             frequency_seconds,
                         } => {
-                            // Find last maintenance event
+                            // Find last maintenance event within the time window
                             // Priority: structured event type > keyword matching
-                            // Optimization: Stop scanning once we reach events older than the window
+                            // Note: Using filter instead of take_while for correctness with
+                            // potentially out-of-order events (clock skew, etc.)
                             let cutoff_time = current_time.saturating_sub(*frequency_seconds);
                             let last_maintenance = self
                                 .usage_log
                                 .iter()
                                 .rev()
-                                .take_while(|e| e.timestamp >= cutoff_time) // Stop at older events
+                                .filter(|e| e.timestamp >= cutoff_time)
                                 .find(|e| {
                                     // First check structured event type (O(1))
                                     if let Some(event_type) = &e.event_type {
@@ -533,13 +535,14 @@ impl ResourceAccess {
                         } => {
                             // Count reports in the period
                             // Reports are any usage event with Report type or any event (for backward compat)
-                            // Optimization: Stop scanning once we reach events older than the period
+                            // Note: Using filter instead of take_while for correctness with
+                            // potentially out-of-order events (clock skew, etc.)
                             let period_start = current_time.saturating_sub(*period_seconds);
                             let report_count = self
                                 .usage_log
                                 .iter()
                                 .rev()
-                                .take_while(|e| e.timestamp >= period_start) // Stop at older events
+                                .filter(|e| e.timestamp >= period_start)
                                 .filter(|e| {
                                     // Count structured Report events or any event for backward compat
                                     if let Some(event_type) = &e.event_type {
@@ -1395,7 +1398,7 @@ mod tests {
 
         // Add recent events in CHRONOLOGICAL order (oldest first)
         // This matches real-world usage where record_usage() appends events sequentially
-        // The take_while() optimization relies on events being in timestamp order
+        // The filter() approach handles out-of-order events correctly for robustness
 
         // Report 1 (10 days ago) - oldest of the recent events
         let report_time_1 = current_time - (10 * 24 * 3600);
