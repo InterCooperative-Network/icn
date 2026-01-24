@@ -87,7 +87,7 @@ pub use fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
 pub use freeze::{FreezeManager, FrozenMember, UnfreezeEvent};
-pub use ledger::{Ledger, PaginationCursor};
+pub use ledger::{ForkStats, Ledger, PaginationCursor};
 pub use membership::{MembershipStore, SledMembershipStore};
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use progressive_limits::{
