@@ -88,6 +88,8 @@ self.wire_gossip_to_ledger().await?;
    ```bash
    grep -r "pub struct.*Handle" icn/crates/ --include="*.rs" | head -10
    ```
+   > **Note**: These shell commands are for learning purposes. When automating
+   > searches in ICN development, prefer using IDE search or dedicated tools.
 
 2. Open `icn/crates/icn-gossip/src/gossip.rs`
 3. Find the `GossipHandle` definition
@@ -104,6 +106,7 @@ self.wire_gossip_to_ledger().await?;
 
 1. **Message-passing handles** (e.g., `NetworkActor`):
    ```rust
+   // icn/crates/icn-net/src/actor.rs:122
    pub struct NetworkHandle {
        tx: mpsc::Sender<NetworkCommand>,
    }
@@ -119,7 +122,7 @@ self.wire_gossip_to_ledger().await?;
 
 2. **Shared-state handles** (e.g., `GossipActor`):
    ```rust
-   // From icn/crates/icn-gossip/src/gossip.rs
+   // icn/crates/icn-gossip/src/gossip.rs:1876
    pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
    // Usage requires acquiring lock:
@@ -152,6 +155,7 @@ message passing. Different actors use different patterns based on their needs.
 
 ### Expected pattern
 ```rust
+// See icn/crates/icn-core/src/runtime.rs:24 for broadcast channel creation
 // Broadcast allows multiple receivers
 let (shutdown_tx, _) = broadcast::channel::<()>(1);
 

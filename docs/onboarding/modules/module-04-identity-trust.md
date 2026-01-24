@@ -255,9 +255,11 @@ pub enum RotationReason {
 
 ### 8. Hardware-Backed Keys (TPM/HSM)
 
-> **Note**: TPM/HSM support is planned for Phase 22 (Security Hardening).
-> The APIs shown below represent the intended design. Software keys are
-> currently used in all deployments.
+> **Current Status**: ⏳ Planned for Phase 22 (Security Hardening)
+>
+> TPM/HSM support is not yet implemented. The APIs shown below represent the
+> intended design. All current deployments use software-backed Age-encrypted
+> keystores.
 
 For production deployments, ICN supports **hardware security modules** that protect
 private keys from software extraction:
