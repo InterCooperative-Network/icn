@@ -5,8 +5,8 @@
 //! and conflict resolution when partitioned nodes reconnect.
 
 use icn_gossip::{
-    AccessControl, GossipActor, GossipMessage, PartitionConfig, PartitionDetector, PartitionHealer,
-    Topic, VectorClock,
+    AccessControl, BatchingConfig, GossipActor, GossipMessage, PartitionConfig, PartitionDetector,
+    PartitionHealer, Topic, VectorClock,
 };
 use icn_identity::KeyPair;
 use icn_trust::TrustClass;
@@ -27,6 +27,9 @@ fn create_test_gossip_with_partition(
     let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
 
     let mut gossip = GossipActor::new(did, trust_lookup);
+
+    // Disable batching to ensure immediate message delivery for tests
+    gossip.set_batching_config(BatchingConfig::disabled());
 
     // Configure partition detector with short threshold for testing
     let config = PartitionConfig {
