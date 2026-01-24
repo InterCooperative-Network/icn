@@ -430,7 +430,7 @@ mod store_integration {
             },
         );
         bob_access.granted_at = grant_time;
-        
+
         // Record Bob's usage within the idle period
         let current_time = grant_time + 10 * 24 * 3600; // 10 days later
         bob_access

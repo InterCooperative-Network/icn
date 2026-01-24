@@ -684,9 +684,9 @@ pub trait ResourceAccessStore: Send + Sync {
 /// Sled-backed resource access store
 ///
 /// Keys are structured as:
-/// - Primary: `access:<resource_id>:<holder>` -> ResourceAccess (JSON)
-/// - Index: `access_by_holder:<holder>:<resource_id>` -> "" (empty value, key-only index)
-/// - Index: `access_by_resource:<resource_id>:<holder>` -> "" (empty value, key-only index)
+/// - Primary: `ledger:resource_access:<resource_id>:<holder>` -> ResourceAccess (JSON)
+/// - Index: `ledger:resource_access:idx:holder:<holder>:<resource_id>` -> "" (empty value, key-only index)
+/// - Index: `ledger:resource_access:idx:resource:<resource_id>:<holder>` -> "" (empty value, key-only index)
 pub struct SledResourceAccessStore {
     store: std::sync::Arc<dyn icn_store::Store>,
 }
@@ -697,104 +697,71 @@ impl SledResourceAccessStore {
         Self { store }
     }
 
-    /// Primary key for access record: access:<resource_id>:<holder>
+    /// Key prefix for all resource access records
+    const ACCESS_PREFIX: &'static [u8] = b"ledger:resource_access:";
+
+    /// Primary key for access record: ledger:resource_access:<resource_id>:<holder>
     fn access_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
-        format!("access:{}:{}", resource_id, holder).into_bytes()
+        format!("ledger:resource_access:{}:{}", resource_id, holder).into_bytes()
     }
 
-    /// Index key for holder lookup: access_by_holder:<holder>:<resource_id>
+    /// Index key for holder lookup: ledger:resource_access:idx:holder:<holder>:<resource_id>
     fn holder_index_key(holder: &EntityId, resource_id: &str) -> Vec<u8> {
-        format!("access_by_holder:{}:{}", holder, resource_id).into_bytes()
+        format!(
+            "ledger:resource_access:idx:holder:{}:{}",
+            holder, resource_id
+        )
+        .into_bytes()
     }
 
-    /// Index key for resource lookup: access_by_resource:<resource_id>:<holder>
+    /// Index key for resource lookup: ledger:resource_access:idx:resource:<resource_id>:<holder>
     fn resource_index_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
-        format!("access_by_resource:{}:{}", resource_id, holder).into_bytes()
+        format!(
+            "ledger:resource_access:idx:resource:{}:{}",
+            resource_id, holder
+        )
+        .into_bytes()
     }
 
     /// Prefix for holder index scan
     fn holder_prefix(holder: &EntityId) -> Vec<u8> {
-        format!("access_by_holder:{}:", holder).into_bytes()
+        format!("ledger:resource_access:idx:holder:{}:", holder).into_bytes()
     }
 
     /// Prefix for resource index scan
     fn resource_prefix(resource_id: &str) -> Vec<u8> {
-        format!("access_by_resource:{}:", resource_id).into_bytes()
+        format!("ledger:resource_access:idx:resource:{}:", resource_id).into_bytes()
     }
 
-    /// Prefix for scanning all access records
-    const ACCESS_PREFIX: &'static [u8] = b"access:";
-
-    /// Parse resource_id and holder from an index key
-    fn parse_holder_index_key(key: &[u8]) -> anyhow::Result<(EntityId, String)> {
-        use std::str::FromStr;
-        
-        let key_str = std::str::from_utf8(key)?;
-        let parts: Vec<&str> = key_str.split(':').collect();
-        if parts.len() < 3 || parts[0] != "access_by_holder" {
-            anyhow::bail!("Invalid holder index key format");
+    /// Extract resource_id from a holder index key by stripping the holder prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:holder:<holder>:<resource_id>`
+    /// Given the prefix `ledger:resource_access:idx:holder:<holder>:`, we extract the resource_id
+    /// which is everything after that prefix.
+    fn extract_resource_id_from_holder_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<String> {
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain resource_id after prefix");
         }
-        // Reconstruct EntityId from parts (entity:icn:type:id)
-        // parts[1] contains the full entity string after "access_by_holder:"
-        let entity_and_resource = &key_str["access_by_holder:".len()..];
-        
-        // Split on the first occurrence of ":entity:icn:" to separate holder from resource_id
-        // EntityId format: entity:icn:<type>:<identifier>
-        // We need to find where the EntityId ends and resource_id begins
-        let entity_prefix = "entity:icn:";
-        if let Some(entity_start) = entity_and_resource.find(entity_prefix) {
-            // Find the end of EntityId by counting colons (entity:icn:type:identifier = 4 parts)
-            let after_entity_prefix = &entity_and_resource[entity_start..];
-            let entity_parts: Vec<&str> = after_entity_prefix.split(':').collect();
-            if entity_parts.len() >= 4 {
-                // EntityId is the first 4 parts
-                let entity_str = entity_parts[..4].join(":");
-                let holder = EntityId::from_str(&entity_str)?;
-                // Resource ID is everything after the EntityId and the separating colon
-                let entity_end = entity_start + entity_str.len();
-                let resource_id = if entity_end + 1 < entity_and_resource.len() {
-                    entity_and_resource[entity_end + 1..].to_string()
-                } else {
-                    String::new()
-                };
-                return Ok((holder, resource_id));
-            }
-        }
-        
-        anyhow::bail!("Invalid holder index key format: could not parse EntityId");
+        let resource_id_bytes = &key[prefix.len()..];
+        let resource_id = std::str::from_utf8(resource_id_bytes)?;
+        Ok(resource_id.to_string())
     }
 
-    /// Parse resource_id and holder from a resource index key
-    fn parse_resource_index_key(key: &[u8]) -> anyhow::Result<(String, EntityId)> {
+    /// Extract holder EntityId from a resource index key by stripping the resource prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:resource:<resource_id>:<holder>`
+    /// Given the prefix `ledger:resource_access:idx:resource:<resource_id>:`, we extract the holder
+    /// which is everything after that prefix.
+    fn extract_holder_from_resource_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<EntityId> {
         use std::str::FromStr;
-        
-        let key_str = std::str::from_utf8(key)?;
-        let parts: Vec<&str> = key_str.split(':').collect();
-        if parts.len() < 3 || parts[0] != "access_by_resource" {
-            anyhow::bail!("Invalid resource index key format");
+
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain holder after prefix");
         }
-        
-        // Format: access_by_resource:<resource_id>:entity:icn:<type>:<identifier>
-        // Find where "entity:icn:" starts
-        let resource_and_entity = &key_str["access_by_resource:".len()..];
-        let entity_prefix = "entity:icn:";
-        
-        if let Some(entity_start) = resource_and_entity.find(entity_prefix) {
-            // Resource ID is everything before the EntityId (minus trailing colon)
-            let resource_id = if entity_start > 0 {
-                resource_and_entity[..entity_start - 1].to_string()
-            } else {
-                String::new()
-            };
-            
-            // EntityId is everything from entity_prefix onward
-            let entity_str = &resource_and_entity[entity_start..];
-            let holder = EntityId::from_str(entity_str)?;
-            
-            return Ok((resource_id, holder));
-        }
-        
-        anyhow::bail!("Invalid resource index key format: could not parse EntityId");
+        let holder_bytes = &key[prefix.len()..];
+        let holder_str = std::str::from_utf8(holder_bytes)?;
+        EntityId::from_str(holder_str)
+            .map_err(|e| anyhow::anyhow!("Failed to parse EntityId: {}", e))
     }
 }
 
@@ -807,10 +774,22 @@ impl ResourceAccessStore for SledResourceAccessStore {
         // Serialize access record
         let value = serde_json::to_vec(&access)?;
 
-        // Store primary record and indexes
+        // Store primary record and indexes with best-effort rollback on failure
+        // 1. Write primary record
         self.store.put(&key, &value)?;
-        self.store.put(&holder_idx, b"")?; // Empty value for index
-        self.store.put(&resource_idx, b"")?; // Empty value for index
+        // 2. Write holder index; on failure, delete primary record
+        if let Err(err) = self.store.put(&holder_idx, b"") {
+            // Best-effort rollback of primary record; ignore rollback error
+            let _ = self.store.delete(&key);
+            return Err(err);
+        }
+        // 3. Write resource index; on failure, delete holder index and primary record
+        if let Err(err) = self.store.put(&resource_idx, b"") {
+            // Best-effort rollback of previously written entries; ignore rollback errors
+            let _ = self.store.delete(&holder_idx);
+            let _ = self.store.delete(&key);
+            return Err(err);
+        }
 
         Ok(())
     }
@@ -821,7 +800,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
         // Load existing access
         if let Some(bytes) = self.store.get(&key)? {
             let mut access: ResourceAccess = serde_json::from_slice(&bytes)?;
-            
+
             // Revoke it
             access.revoke(reason);
 
@@ -831,13 +810,17 @@ impl ResourceAccessStore for SledResourceAccessStore {
 
             Ok(())
         } else {
-            anyhow::bail!("Access not found for resource {} and holder {}", resource_id, holder);
+            anyhow::bail!(
+                "Access not found for resource {} and holder {}",
+                resource_id,
+                holder
+            );
         }
     }
 
     fn get(&self, resource_id: &str, holder: &EntityId) -> anyhow::Result<Option<ResourceAccess>> {
         let key = Self::access_key(resource_id, holder);
-        
+
         if let Some(bytes) = self.store.get(&key)? {
             let access: ResourceAccess = serde_json::from_slice(&bytes)?;
             Ok(Some(access))
@@ -849,58 +832,68 @@ impl ResourceAccessStore for SledResourceAccessStore {
     fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>> {
         let prefix = Self::holder_prefix(holder);
         let index_entries = self.store.scan(&prefix)?;
-        
+
         let mut results = Vec::new();
         for (key, _) in index_entries {
-            let (_, resource_id) = Self::parse_holder_index_key(&key)?;
+            // Extract resource_id by stripping the holder prefix from the key
+            let resource_id = Self::extract_resource_id_from_holder_key(&key, &prefix)?;
             if let Some(access) = self.get(&resource_id, holder)? {
                 results.push(access);
             }
         }
-        
+
         Ok(results)
     }
 
     fn list_by_resource(&self, resource_id: &str) -> anyhow::Result<Vec<ResourceAccess>> {
         let prefix = Self::resource_prefix(resource_id);
         let index_entries = self.store.scan(&prefix)?;
-        
+
         let mut results = Vec::new();
         for (key, _) in index_entries {
-            let (_, holder) = Self::parse_resource_index_key(&key)?;
+            // Extract holder by stripping the resource prefix from the key
+            let holder = Self::extract_holder_from_resource_key(&key, &prefix)?;
             if let Some(access) = self.get(resource_id, &holder)? {
                 results.push(access);
             }
         }
-        
+
         Ok(results)
     }
 
     fn find_expired(&self, current_time: u64) -> anyhow::Result<Vec<ResourceAccess>> {
         let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
-        
+
         let mut expired = Vec::new();
         for (_, value) in all_entries {
+            // Skip empty values (index entries have empty values)
+            if value.is_empty() {
+                continue;
+            }
             let access: ResourceAccess = serde_json::from_slice(&value)?;
             if access.is_expired(current_time) && !access.is_revoked() {
                 expired.push(access);
             }
         }
-        
+
         Ok(expired)
     }
 
     fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>> {
         let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
-        
+
         let mut idle = Vec::new();
         for (_, value) in all_entries {
+            // Skip empty values (index entries have empty values)
+            if value.is_empty() {
+                continue;
+            }
             let access: ResourceAccess = serde_json::from_slice(&value)?;
             if access.is_idle(current_time, max_idle) && !access.is_revoked() {
                 idle.push(access);
             }
         }
-        
+
         Ok(idle)
     }
 }
@@ -1671,7 +1664,7 @@ mod tests {
             let access_store = SledResourceAccessStore::new(store);
 
             let holder = create_test_entity();
-            
+
             // Grant multiple resources to the same holder
             let access1 = ResourceAccess::new(
                 "tool-001".to_string(),
@@ -1698,8 +1691,9 @@ mod tests {
             // List by holder
             let accesses = access_store.list_by_holder(&holder).unwrap();
             assert_eq!(accesses.len(), 2);
-            
-            let resource_ids: Vec<String> = accesses.iter().map(|a| a.resource_id.clone()).collect();
+
+            let resource_ids: Vec<String> =
+                accesses.iter().map(|a| a.resource_id.clone()).collect();
             assert!(resource_ids.contains(&"tool-001".to_string()));
             assert!(resource_ids.contains(&"tool-002".to_string()));
         }
@@ -1711,7 +1705,7 @@ mod tests {
 
             let holder1 = create_test_entity();
             let holder2 = create_test_entity();
-            
+
             // Grant same resource to multiple holders
             let access1 = ResourceAccess::new(
                 "workshop".to_string(),
@@ -1738,7 +1732,7 @@ mod tests {
             // List by resource
             let accesses = access_store.list_by_resource("workshop").unwrap();
             assert_eq!(accesses.len(), 2);
-            
+
             let holders: Vec<EntityId> = accesses.iter().map(|a| a.holder.clone()).collect();
             assert!(holders.contains(&holder1));
             assert!(holders.contains(&holder2));
@@ -1751,7 +1745,7 @@ mod tests {
 
             let holder1 = create_test_entity();
             let holder2 = create_test_entity();
-            
+
             // Create access that expires in 1 hour
             let mut access1 = ResourceAccess::new(
                 "tool-001".to_string(),
@@ -1782,7 +1776,7 @@ mod tests {
             // Check expired at time after expiration
             let current_time = grant_time + 7200; // 2 hours later
             let expired = access_store.find_expired(current_time).unwrap();
-            
+
             assert_eq!(expired.len(), 1);
             assert_eq!(expired[0].resource_id, "tool-001");
         }
@@ -1794,7 +1788,7 @@ mod tests {
 
             let holder1 = create_test_entity();
             let holder2 = create_test_entity();
-            
+
             // Create access with no usage
             let mut access1 = ResourceAccess::new(
                 "tool-001".to_string(),
@@ -1820,7 +1814,12 @@ mod tests {
             );
             access2.granted_at = grant_time;
             // Record usage within the last day (current_time - 12 hours)
-            access2.record_usage(grant_time + 2 * 24 * 3600 - 12 * 3600, "Used recently".to_string()).unwrap();
+            access2
+                .record_usage(
+                    grant_time + 2 * 24 * 3600 - 12 * 3600,
+                    "Used recently".to_string(),
+                )
+                .unwrap();
 
             access_store.grant(access1).unwrap();
             access_store.grant(access2).unwrap();
@@ -1829,7 +1828,7 @@ mod tests {
             let current_time = grant_time + 2 * 24 * 3600;
             let max_idle = 24 * 3600; // 1 day
             let idle = access_store.find_idle(current_time, max_idle).unwrap();
-            
+
             assert_eq!(idle.len(), 1);
             assert_eq!(idle[0].resource_id, "tool-001");
         }
@@ -1840,7 +1839,7 @@ mod tests {
             let access_store = SledResourceAccessStore::new(store);
 
             let holder = create_test_entity();
-            
+
             // Try to revoke non-existent access
             let result = access_store.revoke("nonexistent", &holder, "Reason".to_string());
             assert!(result.is_err());
@@ -1852,7 +1851,7 @@ mod tests {
             let access_store = SledResourceAccessStore::new(store);
 
             let holder = create_test_entity();
-            
+
             // Create expired access
             let mut access = ResourceAccess::new(
                 "tool-001".to_string(),
@@ -1870,7 +1869,9 @@ mod tests {
             access_store.grant(access).unwrap();
 
             // Revoke it
-            access_store.revoke("tool-001", &holder, "Test".to_string()).unwrap();
+            access_store
+                .revoke("tool-001", &holder, "Test".to_string())
+                .unwrap();
 
             // Check expired (should not include revoked)
             let current_time = grant_time + 7200;
@@ -1884,7 +1885,7 @@ mod tests {
             let access_store = SledResourceAccessStore::new(store);
 
             let holder = create_test_entity();
-            
+
             // Create idle access
             let mut access = ResourceAccess::new(
                 "tool-001".to_string(),
@@ -1901,7 +1902,9 @@ mod tests {
             access_store.grant(access).unwrap();
 
             // Revoke it
-            access_store.revoke("tool-001", &holder, "Test".to_string()).unwrap();
+            access_store
+                .revoke("tool-001", &holder, "Test".to_string())
+                .unwrap();
 
             // Check idle (should not include revoked)
             let current_time = grant_time + 2 * 24 * 3600;
