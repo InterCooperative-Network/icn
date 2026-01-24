@@ -338,8 +338,33 @@ impl Default for ResourceRefreshConfig {
 }
 
 impl ResourceRefreshConfig {
+    /// Create a validated configuration with custom values.
+    ///
+    /// # Arguments
+    /// * `refresh_interval_secs` - Interval between refreshes (must be > 0)
+    /// * `change_threshold` - Threshold for detecting changes (must be in 0.0..=1.0)
+    ///
+    /// # Returns
+    /// `Ok(config)` if values are valid, `Err` with explanation otherwise.
+    pub fn new(refresh_interval_secs: u64, change_threshold: f64) -> Result<Self, &'static str> {
+        if refresh_interval_secs == 0 {
+            return Err("refresh_interval_secs must be > 0");
+        }
+        if !(0.0..=1.0).contains(&change_threshold) {
+            return Err("change_threshold must be in range [0.0, 1.0]");
+        }
+        Ok(Self {
+            refresh_interval_secs,
+            change_threshold,
+        })
+    }
+
     /// Create config with custom refresh interval
+    ///
+    /// # Panics
+    /// Panics if interval_secs is 0 (use `new()` for fallible construction)
     pub fn with_interval(interval_secs: u64) -> Self {
+        assert!(interval_secs > 0, "refresh_interval_secs must be > 0");
         Self {
             refresh_interval_secs: interval_secs,
             ..Default::default()
@@ -347,7 +372,14 @@ impl ResourceRefreshConfig {
     }
 
     /// Create config with custom change threshold
+    ///
+    /// # Panics
+    /// Panics if threshold is outside [0.0, 1.0] (use `new()` for fallible construction)
     pub fn with_threshold(threshold: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&threshold),
+            "change_threshold must be in range [0.0, 1.0]"
+        );
         Self {
             change_threshold: threshold,
             ..Default::default()
@@ -384,30 +416,66 @@ impl ResourceChangeType {
 }
 
 impl NodeCapacity {
-    /// Sense current system resources
+    /// Sense current system resources and return a capacity snapshot.
     ///
-    /// This is a placeholder implementation. In a real system, this would:
-    /// - Query /proc/stat for CPU info
-    /// - Query /proc/meminfo for memory info
-    /// - Query filesystem for storage
-    /// - Detect GPU devices via nvidia-smi or similar
+    /// This function queries the operating system for real resource availability.
+    /// On Linux, it reads from /proc filesystem. On other platforms, it falls
+    /// back to reasonable defaults.
     ///
-    /// For now, it returns a sensible default capacity.
+    /// # Implementation Status
+    ///
+    /// - **CPU**: Uses load average from /proc/loadavg to estimate available cores
+    /// - **Memory**: Reads MemTotal and MemAvailable from /proc/meminfo
+    /// - **Storage**: *Placeholder* - returns 100GB (TODO: use statvfs)
+    /// - **Network**: *Placeholder* - returns 1Gbps (TODO: measure bandwidth)
+    /// - **GPU**: *Placeholder* - returns empty list (TODO: parse nvidia-smi/ROCm)
     pub fn sense_system_resources() -> Self {
         let now = icn_time::current_timestamp_millis();
 
-        // In a real implementation, these would come from system queries
-        // For now, use reasonable defaults based on typical hardware
+        let cpu_total = num_cpus::get() as f64;
+        let cpu_available = Self::get_available_cpu_cores(cpu_total);
+
         Self {
-            cpu_cores_total: num_cpus::get() as f64,
-            cpu_cores_available: num_cpus::get() as f64,
+            cpu_cores_total: cpu_total,
+            cpu_cores_available: cpu_available,
             memory_mb_total: Self::get_total_memory_mb(),
             memory_mb_available: Self::get_available_memory_mb(),
-            storage_mb_available: 100_000, // 100GB default
-            network_mbps: 1000.0,          // 1Gbps default
+            // TODO: Implement actual storage sensing via statvfs
+            storage_mb_available: 100_000, // Placeholder: 100GB
+            // TODO: Implement actual network bandwidth measurement
+            network_mbps: 1000.0, // Placeholder: 1Gbps
             gpu_devices: Self::detect_gpus(),
             updated_at: now,
         }
+    }
+
+    /// Get available CPU cores based on system load.
+    ///
+    /// Uses the 1-minute load average from /proc/loadavg to estimate
+    /// how many cores are available for new work.
+    #[cfg(target_os = "linux")]
+    fn get_available_cpu_cores(total_cores: f64) -> f64 {
+        std::fs::read_to_string("/proc/loadavg")
+            .ok()
+            .and_then(|content| {
+                // /proc/loadavg format: "0.25 0.35 0.30 1/234 12345"
+                // First field is 1-minute load average
+                content
+                    .split_whitespace()
+                    .next()
+                    .and_then(|load| load.parse::<f64>().ok())
+            })
+            .map(|load_avg| {
+                // Available = total - load, clamped to [0, total]
+                (total_cores - load_avg).max(0.0).min(total_cores)
+            })
+            .unwrap_or(total_cores) // Fallback: assume all cores available
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_available_cpu_cores(total_cores: f64) -> f64 {
+        // Non-Linux: assume 70% of cores available as heuristic
+        total_cores * 0.7
     }
 
     /// Get total system memory in MB
@@ -499,10 +567,13 @@ impl NodeCapacity {
             changes.push(ResourceChangeType::Memory);
         }
 
-        // Check storage change (uses available as baseline since no total field exists)
-        let storage_change = if self.storage_mb_available > 0 {
+        // Check storage change
+        // Use the larger value as baseline to ensure stable comparison
+        // (e.g., 100GB -> 50GB = 50% change, not 100%)
+        let storage_baseline = self.storage_mb_available.max(other.storage_mb_available);
+        let storage_change = if storage_baseline > 0 {
             (self.storage_mb_available as f64 - other.storage_mb_available as f64).abs()
-                / self.storage_mb_available as f64
+                / storage_baseline as f64
         } else {
             0.0
         };

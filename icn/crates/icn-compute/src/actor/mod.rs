@@ -95,6 +95,8 @@ pub struct ComputeActor {
     resource_refresh_config: crate::scheduler::ResourceRefreshConfig,
     /// Current cached resource profile
     cached_capacity: Arc<Mutex<Option<crate::scheduler::NodeCapacity>>>,
+    /// Shutdown signal sender for graceful termination
+    shutdown_tx: tokio::sync::broadcast::Sender<()>,
 }
 
 impl ComputeActor {
@@ -129,6 +131,7 @@ impl ComputeActor {
             federated_announce_rate_limiter: Arc::new(Mutex::new(HashMap::new())),
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
+            shutdown_tx: tokio::sync::broadcast::channel(1).0,
         }
     }
 
@@ -368,7 +371,7 @@ impl ComputeActor {
             });
         }
 
-        // Spawn resource refresh task
+        // Spawn resource refresh task with graceful shutdown
         {
             let own_did = self.own_did.clone();
             let executor_registry_clone = Arc::clone(&self.executor_registry);
@@ -376,6 +379,7 @@ impl ComputeActor {
             let send_callback_clone = self.send_callback.clone();
             let event_callback_clone = self.event_callback.clone();
             let refresh_config = self.resource_refresh_config.clone();
+            let mut shutdown_rx = self.shutdown_tx.subscribe();
 
             tokio::spawn(async move {
                 let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
@@ -387,71 +391,75 @@ impl ComputeActor {
                 interval.tick().await;
 
                 loop {
-                    interval.tick().await;
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Sense current resources
+                            let new_capacity = crate::scheduler::NodeCapacity::sense_system_resources();
 
-                    // Sense current resources
-                    let new_capacity = crate::scheduler::NodeCapacity::sense_system_resources();
+                            // Record refresh metric
+                            icn_obs::metrics::compute::resource_refresh_inc();
 
-                    // Record refresh metric
-                    icn_obs::metrics::compute::resource_refresh_inc();
-
-                    // Check for changes
-                    let mut cached = cached_capacity_clone.lock().await;
-                    let changes = if let Some(ref old_capacity) = *cached {
-                        new_capacity.detect_changes(old_capacity, refresh_config.change_threshold)
-                    } else {
-                        // First refresh - no previous capacity to compare
-                        vec![]
-                    };
-
-                    // Update cache
-                    *cached = Some(new_capacity.clone());
-                    drop(cached);
-
-                    // Record change metrics and emit events
-                    if !changes.is_empty() {
-                        tracing::info!(
-                            changes = ?changes,
-                            cpu_available = new_capacity.cpu_cores_available,
-                            memory_available = new_capacity.memory_mb_available,
-                            gpu_count = new_capacity.gpu_devices.len(),
-                            "Resource profile changed significantly"
-                        );
-
-                        for change_type in &changes {
-                            icn_obs::metrics::compute::resource_changes_inc(change_type.as_str());
-                        }
-
-                        // Emit event if callback is configured
-                        if let Some(ref event_cb) = event_callback_clone {
-                            let event = crate::actor::ComputeEvent::ResourcesChanged {
-                                executor: own_did.clone(),
-                                capacity: new_capacity.clone(),
-                                changes: changes.clone(),
+                            // Check for changes
+                            let mut cached = cached_capacity_clone.lock().await;
+                            let changes = if let Some(ref old_capacity) = *cached {
+                                new_capacity.detect_changes(old_capacity, refresh_config.change_threshold)
+                            } else {
+                                // First refresh - no previous capacity to compare
+                                vec![]
                             };
-                            event_cb(event);
+
+                            // Update cache
+                            *cached = Some(new_capacity.clone());
+                            drop(cached);
+
+                            // Record change metrics and emit events
+                            if !changes.is_empty() {
+                                tracing::info!(
+                                    changes = ?changes,
+                                    cpu_available = new_capacity.cpu_cores_available,
+                                    memory_available = new_capacity.memory_mb_available,
+                                    gpu_count = new_capacity.gpu_devices.len(),
+                                    "Resource profile changed significantly"
+                                );
+
+                                for change_type in &changes {
+                                    icn_obs::metrics::compute::resource_changes_inc(change_type.as_str());
+                                }
+
+                                // Emit event if callback is configured
+                                if let Some(ref event_cb) = event_callback_clone {
+                                    let event = crate::actor::ComputeEvent::ResourcesChanged {
+                                        executor: own_did.clone(),
+                                        capacity: new_capacity.clone(),
+                                        changes: changes.clone(),
+                                    };
+                                    event_cb(event);
+                                }
+
+                                // Announce capacity via gossip only when changes detected
+                                if let Some(ref send_cb) = send_callback_clone {
+                                    let msg = crate::types::ComputeMessage::NodeCapacityAnnounce {
+                                        executor: own_did.clone(),
+                                        capacity: new_capacity.clone(),
+                                    };
+                                    send_cb(msg);
+                                }
+                            }
+
+                            // Update executor registry with new capacity
+                            let mut registry = executor_registry_clone.lock().await;
+                            if let Some(info) = registry.get_mut(&own_did) {
+                                info.capacity = Some(new_capacity);
+                                tracing::debug!(
+                                    "Updated own executor capacity in registry"
+                                );
+                            }
+                            drop(registry);
                         }
-                    }
-
-                    // Update executor registry with new capacity
-                    let mut registry = executor_registry_clone.lock().await;
-                    if let Some(info) = registry.get_mut(&own_did) {
-                        info.capacity = Some(new_capacity.clone());
-                        tracing::debug!(
-                            cpu_available = new_capacity.cpu_cores_available,
-                            memory_available = new_capacity.memory_mb_available,
-                            "Updated own executor capacity in registry"
-                        );
-                    }
-                    drop(registry);
-
-                    // Announce capacity via gossip
-                    if let Some(ref send_cb) = send_callback_clone {
-                        let msg = crate::types::ComputeMessage::NodeCapacityAnnounce {
-                            executor: own_did.clone(),
-                            capacity: new_capacity,
-                        };
-                        send_cb(msg);
+                        _ = shutdown_rx.recv() => {
+                            tracing::info!("Resource refresh task received shutdown signal");
+                            break;
+                        }
                     }
                 }
             });
