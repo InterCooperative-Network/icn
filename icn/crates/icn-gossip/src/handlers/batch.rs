@@ -89,8 +89,10 @@ impl GossipActor {
                         anyhow::bail!("Cannot verify trust for batch sender {sender}: {e}");
                     }
                 }
+            } else {
+                // If we can't acquire lock, skip trust check (avoid blocking)
+                icn_obs::metrics::gossip::trust_check_lock_skipped_inc();
             }
-            // If we can't acquire lock, skip trust check (avoid blocking)
         }
 
         debug!(

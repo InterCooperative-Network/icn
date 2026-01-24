@@ -81,8 +81,10 @@ impl GossipActor {
                         anyhow::bail!("Cannot verify trust for message sender {sender}: {e}");
                     }
                 }
+            } else {
+                // If we can't acquire lock, skip trust check (avoid blocking)
+                icn_obs::metrics::gossip::trust_check_lock_skipped_inc();
             }
-            // If we can't acquire lock, skip trust check (avoid blocking)
         }
 
         // Phase 18 Week 3: Record contact for partition detection

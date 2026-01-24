@@ -361,6 +361,10 @@ pub fn init_descriptions() {
         "icn_gossip_batch_mutex_poisoned_total",
         "Total number of mutex poisoning events in batch processing"
     );
+    describe_counter!(
+        "icn_gossip_trust_check_lock_skipped_total",
+        "Total number of times trust check was skipped due to lock unavailability"
+    );
 
     // Scalability metrics (Phase 19)
     describe_counter!(
@@ -2205,6 +2209,12 @@ pub mod gossip {
     /// H7: Messages rejected due to low trust score
     pub fn messages_rejected_low_trust_inc() {
         counter!("icn_gossip_messages_rejected_low_trust_total").increment(1);
+    }
+
+    /// Track when trust check is skipped due to lock unavailability
+    /// This happens when try_read() fails on the trust graph lock to avoid blocking
+    pub fn trust_check_lock_skipped_inc() {
+        counter!("icn_gossip_trust_check_lock_skipped_total").increment(1);
     }
 
     // Issue #123: Message compression metrics
