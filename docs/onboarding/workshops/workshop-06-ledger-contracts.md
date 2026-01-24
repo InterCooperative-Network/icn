@@ -1,16 +1,31 @@
 # Workshop 6: Ledger and Contract Flow
 
+## Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. **Explain double-entry accounting** - Understand debits, credits, and balance computation
+2. **Navigate the Merkle-DAG** - Trace entry relationships and verify integrity
+3. **Validate transactions** - Know what checks are performed before entry acceptance
+4. **Execute CCL contracts** - Understand capability-based contract execution
+5. **Debug ledger issues** - Use logs to trace transaction flow and identify problems
+
 ## Goal
 Trace a ledger payment flow from API request to gossip propagation, and understand
 how CCL contracts execute with capabilities.
 
 ## Prerequisites
-- Completed Module 6 reading
+- Completed [Module 6: Ledger and CCL](../modules/module-06-ledger-ccl.md)
 - ICN binaries built (`cargo build`)
 - Understanding of double-entry accounting basics
 
 ## Estimated time
 3-4 hours
+
+## Related Materials
+- [Module 6: Ledger and CCL](../modules/module-06-ledger-ccl.md) - Background reading
+- [Workshop 5: Network and Gossip](./workshop-05-network-gossip.md) - How entries propagate
+- [Workshop 7: Gateway and SDK](./workshop-07-gateway-sdk.md) - API for ledger operations
 
 ## Part 1: Ledger Entry Structure
 
@@ -427,6 +442,40 @@ After completing this workshop you should be able to:
 - Understand CCL contract structure and capabilities
 - Describe fuel metering and its purpose
 - Debug ledger operations using logs
+
+## Key Takeaways
+
+| Concept | Key Point |
+|---------|-----------|
+| **JournalEntry** | Uses `Vec<AccountDelta>` for multi-currency double-entry |
+| **Merkle-DAG** | Each entry references parents; hash includes parent hashes |
+| **Balance** | Computed from sum of credits minus sum of debits per currency |
+| **Validation** | Signature + amount + balance + parents + uniqueness |
+| **CCL Capabilities** | Contracts declare required permissions (ReadLedger, WriteLedger, etc.) |
+| **Fuel Metering** | Prevents infinite loops; each operation costs fuel |
+
+## Try It Yourself
+
+**Challenge 1**: Trace a complete transaction
+1. Start the daemon with ledger debug logging:
+   ```bash
+   RUST_LOG=icn_ledger=debug ./target/debug/icnd --data-dir "$ICN_DATA"
+   ```
+2. Create a transaction via the gateway API
+3. Follow the logs to see: validation → storage → gossip announcement
+4. Query the transaction using `icnctl ledger history`
+
+**Challenge 2**: Explore the DAG structure
+1. Create several transactions
+2. Use `icnctl ledger head` to find the latest entry
+3. Trace back through parents to understand the DAG shape
+4. What happens if you create transactions in parallel?
+
+**Challenge 3**: CCL contract exploration
+Find a CCL contract in the codebase and analyze:
+- What capabilities does it require?
+- What operations does it perform?
+- How much fuel would it consume?
 
 ## Troubleshooting
 

@@ -1,16 +1,31 @@
 # Workshop 5: Network and Gossip Deep Dive
 
+## Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. **Trace message flow** - Follow a message from QUIC transport to gossip handler
+2. **Explain vector clocks** - Understand how causality is tracked between nodes
+3. **Configure topics** - Create topics with appropriate access control
+4. **Debug sync issues** - Use anti-entropy to diagnose and repair partition gaps
+5. **Write gossip tests** - Create multi-node integration tests using TestNode
+
 ## Goal
 Understand how messages flow from the transport layer through the gossip protocol,
 including topic subscriptions, vector clocks, and anti-entropy synchronization.
 
 ## Prerequisites
-- Completed Module 5 reading
+- Completed [Module 5: Networking](../modules/module-05-network.md)
 - ICN binaries built (`cargo build`)
 - Two terminal windows available
 
 ## Estimated time
 2-3 hours
+
+## Related Materials
+- [Module 5: Networking](../modules/module-05-network.md) - Background reading
+- [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Uses gossip for ledger sync
+- [CLAUDE.md Gossip Protocol](../../CLAUDE.md) - Protocol reference
 
 ## Part 1: Network Actor Structure
 
@@ -311,6 +326,39 @@ After completing this workshop you should be able to:
 - Explain vector clocks and causality tracking
 - Describe the anti-entropy protocol
 - Read and write gossip integration tests
+
+## Key Takeaways
+
+| Concept | Key Point |
+|---------|-----------|
+| **QUIC Transport** | Quinn library provides reliable, encrypted streams over UDP |
+| **Vector Clocks** | Each node maintains `{DID: counter}` map; merge takes max of each entry |
+| **Topics** | Namespaced strings (`ledger:entries`); access control per topic |
+| **Anti-Entropy** | Periodic Bloom filter exchange detects and fills gaps |
+| **Message Flow** | Network → IncomingHandler callback → GossipActor |
+
+## Try It Yourself
+
+**Challenge 1**: Simulate a network partition
+1. Start three nodes (ports 4001, 4002, 4003)
+2. Create a topic and subscribe all three
+3. Block traffic between node 1 and node 3 (e.g., firewall rule)
+4. Publish messages from node 1
+5. Watch anti-entropy heal the partition when you unblock
+
+**Challenge 2**: Write a custom gossip test
+Using the `TestNode` pattern from Part 7, write a test that:
+1. Creates 3 nodes in a chain (1↔2↔3, but not 1↔3)
+2. Publishes a message from node 1
+3. Verifies the message reaches node 3 via node 2
+4. Measures propagation delay
+
+**Challenge 3**: Explore vector clock behavior
+Add logging to trace vector clock evolution:
+```bash
+RUST_LOG=icn_gossip::sync=trace ./target/debug/icnd --data-dir "$ICN_DATA"
+```
+Observe how clocks merge when messages are received.
 
 ## Troubleshooting
 

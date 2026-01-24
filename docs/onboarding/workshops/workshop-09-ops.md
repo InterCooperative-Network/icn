@@ -1,16 +1,31 @@
 # Workshop 9: Local Deployment and Observability
 
+## Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. **Deploy ICN locally** - Run ICN via native binary or Docker
+2. **Verify health status** - Check component health via API endpoints
+3. **Monitor with Prometheus** - Scrape and query ICN metrics
+4. **Configure logging** - Adjust log levels and understand log output
+5. **Troubleshoot issues** - Diagnose common deployment problems
+
 ## Goal
 Deploy ICN locally using Docker or native binaries, verify health endpoints,
 explore Prometheus metrics, and understand logging and tracing.
 
 ## Prerequisites
-- Completed Module 9 reading
+- Completed [Module 9: Operations](../modules/module-09-ops.md)
 - Docker installed (for container deployment) or Rust toolchain (for native)
 - curl and jq installed
 
 ## Estimated time
 2-3 hours
+
+## Related Materials
+- [Module 9: Operations](../modules/module-09-ops.md) - Background reading
+- [HOMELAB_DEPLOYMENT.md](../../HOMELAB_DEPLOYMENT.md) - K3s production deployment
+- [production-hardening.md](../../production-hardening.md) - Security hardening
 
 ## Part 1: Deployment Options
 
@@ -420,6 +435,46 @@ After completing this workshop you should be able to:
 - Access and understand Prometheus metrics
 - Configure and filter logging
 - Troubleshoot common operational issues
+
+## Key Takeaways
+
+| Concept | Key Point |
+|---------|-----------|
+| **Health Endpoints** | `/health` (basic), `/health/detailed` (component status) |
+| **Metrics Port** | 9100 by default; Prometheus format |
+| **Gateway Port** | 8080 by default; REST + WebSocket |
+| **Network Port** | 4001 by default; QUIC/UDP |
+| **Log Levels** | error < warn < info < debug < trace |
+| **Log Filtering** | `RUST_LOG=icn_gossip=debug,icn_ledger=trace` |
+
+## Try It Yourself
+
+**Challenge 1**: Create a Grafana dashboard
+1. Set up Prometheus + Grafana (as shown in Part 6)
+2. Create a dashboard with:
+   - Connected peers gauge
+   - Request rate graph
+   - Gossip message throughput
+   - Ledger entry count
+
+**Challenge 2**: Alert configuration
+Create a Prometheus alerting rule for:
+- Health check failure
+- No connected peers for 5 minutes
+- Gossip message rate drops to zero
+
+**Challenge 3**: Log analysis
+1. Run with `RUST_LOG=debug` for 10 minutes
+2. Analyze the logs to answer:
+   - How many gossip messages were processed?
+   - Were there any warnings or errors?
+   - What was the most chatty component?
+
+**Challenge 4**: Multi-node deployment
+Use Docker Compose to deploy 3 ICN nodes that form a network:
+1. Nodes discover each other via mDNS
+2. Subscribe to a shared topic
+3. Verify message propagation across all nodes
 
 ## Cleanup
 

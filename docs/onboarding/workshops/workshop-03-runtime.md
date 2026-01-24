@@ -1,15 +1,30 @@
 # Workshop 3: Runtime and Actor Lifecycle
 
+## Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. **Trace startup flow** - Follow the daemon from `main()` to running actors
+2. **Explain initialization order** - Know why actors start in a specific sequence
+3. **Use handle patterns** - Understand message-passing vs shared-state handles
+4. **Coordinate shutdown** - Know how graceful shutdown works across actors
+5. **Run the daemon** - Start and interact with a local ICN node
+
 ## Goal
 Trace the daemon startup path, understand actor initialization order, and explore
 how the supervisor manages the actor lifecycle.
 
 ## Prerequisites
-- Completed Module 3 reading
+- Completed [Module 3: Runtime Architecture](../modules/module-03-runtime.md)
 - ICN binaries built (`cargo build`)
 
 ## Estimated time
 2-3 hours
+
+## Related Materials
+- [Module 3: Runtime Architecture](../modules/module-03-runtime.md) - Background reading
+- [Workshop 4: Identity and Trust](./workshop-04-identity-trust.md) - Next workshop
+- [CLAUDE.md Architecture Section](../../CLAUDE.md) - Actor communication patterns
 
 ## Part 1: Startup Path Walkthrough
 
@@ -162,21 +177,28 @@ tokio::select! {
 3. Trace how network messages reach the gossip actor
 
 ### Diagram
+
+```mermaid
+sequenceDiagram
+    participant Remote as Remote Peer
+    participant Net as NetworkActor
+    participant TLS as TLS/QUIC
+    participant Handler as IncomingMessageHandler
+    participant Gossip as GossipActor
+
+    Remote->>Net: QUIC packet
+    Net->>TLS: Decrypt & verify
+    TLS-->>Net: Decrypted bytes
+    Net->>Net: Parse NetworkMessage
+    Net->>Handler: invoke callback(msg)
+    Handler->>Gossip: handle_message(gossip_msg)
+    Gossip-->>Handler: Result<()>
+    Handler-->>Net: Continue processing
 ```
-Network receives QUIC packet
-         │
-         ▼
-   Decrypt/verify TLS
-         │
-         ▼
-   Parse NetworkMessage
-         │
-         ▼
-  IncomingMessageHandler (callback)
-         │
-         ▼
-   GossipActor.handle_message()
-```
+
+> **Why callbacks?** The callback pattern allows the supervisor to wire actors
+> together without either actor knowing about the other's implementation details.
+> This enables testing actors in isolation and swapping implementations.
 
 ### Questions to answer
 1. Why use callbacks instead of direct actor references?
@@ -239,6 +261,31 @@ After completing this workshop you should be able to:
 - Understand the handle pattern for actor communication
 - Describe how shutdown is coordinated across actors
 - Run and interact with the daemon
+
+## Key Takeaways
+
+| Concept | Key Point |
+|---------|-----------|
+| **Startup Order** | Storage → Identity → Trust → Network → Gossip → Ledger → Gateway |
+| **Handle Patterns** | Message-passing (mpsc) for commands, Arc<RwLock> for shared state |
+| **Shutdown** | Broadcast channel notifies all actors; reverse initialization order |
+| **Callback Wiring** | Enables loose coupling; supervisor connects actors without dependencies |
+| **Config Loading** | Data directory contains keystore, config, and database |
+
+## Try It Yourself
+
+**Challenge 1**: Add debug logging to trace message flow
+```bash
+RUST_LOG=icn_gossip=debug,icn_net=debug ./target/debug/icnd --data-dir "$ICN_DATA"
+```
+Watch the logs as you interact with the daemon. Can you identify:
+- When a peer connects?
+- When gossip messages are exchanged?
+- When the ledger processes an entry?
+
+**Challenge 2**: Explore the actor handles
+Use `grep` to find all the different handle types in the codebase. Which ones use
+message-passing and which use shared state?
 
 ## Troubleshooting
 

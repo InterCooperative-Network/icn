@@ -1,16 +1,31 @@
 # Workshop 7: Gateway Auth and SDK Usage
 
+## Learning Objectives
+
+By the end of this workshop, you will be able to:
+
+1. **Authenticate via challenge-response** - Obtain and use JWT tokens for API access
+2. **Navigate the REST API** - Know which endpoints are available and how to use them
+3. **Use the TypeScript SDK** - Perform ledger and trust operations programmatically
+4. **Handle WebSocket events** - Subscribe to real-time updates from cooperatives
+5. **Understand rate limiting** - Know the limits and how trust affects them
+
 ## Goal
 Authenticate against the ICN gateway API, understand the challenge-response flow,
 and use the TypeScript SDK to interact with the ledger.
 
 ## Prerequisites
-- Completed Module 7 reading
+- Completed [Module 7: Gateway and SDK](../modules/module-07-gateway-sdk.md)
 - ICN daemon running (`icnd`)
 - Node.js 18+ installed (for SDK exercises)
 
 ## Estimated time
 2-3 hours
+
+## Related Materials
+- [Module 7: Gateway and SDK](../modules/module-07-gateway-sdk.md) - Background reading
+- [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Ledger operations
+- [TypeScript SDK README](../../sdk/typescript/README.md) - SDK reference (if available)
 
 ## Part 1: Gateway Architecture
 
@@ -397,6 +412,46 @@ After completing this workshop you should be able to:
 - Use the TypeScript SDK for ledger and trust operations
 - Connect to WebSocket for real-time events
 - Understand rate limiting and error handling
+
+## Key Takeaways
+
+| Concept | Key Point |
+|---------|-----------|
+| **Auth Flow** | GET challenge → sign with DID key → POST verify → receive JWT |
+| **JWT Token** | Include as `Authorization: Bearer <token>` header |
+| **Protected Routes** | /ledger/*, /trust/*, /governance/*, /compute/* require auth |
+| **Public Routes** | /health, /metrics, /auth/* are unauthenticated |
+| **WebSocket** | Connect to /ws with JWT in query string for real-time events |
+| **Rate Limits** | Trust level affects limits (Isolated: 10/sec, Federated: 200/sec) |
+
+## Try It Yourself
+
+**Challenge 1**: Build a simple CLI client
+Create a Node.js script that:
+1. Gets a challenge from the gateway
+2. Signs it (use a test key or mock)
+3. Verifies to get a JWT
+4. Fetches your balance
+
+**Challenge 2**: Monitor real-time events
+1. Connect to the WebSocket endpoint
+2. Subscribe to a cooperative's events
+3. Trigger an action (e.g., create a ledger entry in another terminal)
+4. Observe the event arrive
+
+**Challenge 3**: Explore rate limiting behavior
+```bash
+# Test different trust levels (if you can simulate them)
+# or just observe the headers:
+curl -v http://localhost:8080/health 2>&1 | grep -i rate
+```
+
+**Challenge 4**: Error handling
+Try to trigger each error condition and handle it gracefully:
+- Expired token
+- Invalid signature
+- Rate limit exceeded
+- Missing authentication
 
 ## Troubleshooting
 
