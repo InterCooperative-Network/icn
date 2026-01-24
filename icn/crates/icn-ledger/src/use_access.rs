@@ -292,8 +292,11 @@ impl ResourceAccess {
                 }
 
                 // Renew from current time or expiration, whichever is later
-                let renewal_base = self.expires_at.map(|exp| exp.max(current_time)).unwrap_or(current_time);
-                self.expires_at = Some(renewal_base + duration_seconds);
+                let renewal_base = self
+                    .expires_at
+                    .map(|exp| exp.max(current_time))
+                    .unwrap_or(current_time);
+                self.expires_at = Some(renewal_base.saturating_add(*duration_seconds));
                 self.renewal_count += 1;
 
                 Ok(())
@@ -326,10 +329,10 @@ impl ResourceAccess {
     /// Check if resource is idle (no recent usage)
     pub fn is_idle(&self, current_time: u64, max_idle_seconds: u64) -> bool {
         if let Some(last_usage) = self.usage_log.back() {
-            current_time - last_usage.timestamp > max_idle_seconds
+            current_time.saturating_sub(last_usage.timestamp) > max_idle_seconds
         } else {
             // No usage recorded - idle since granted
-            current_time - self.granted_at > max_idle_seconds
+            current_time.saturating_sub(self.granted_at) > max_idle_seconds
         }
     }
 
@@ -338,9 +341,9 @@ impl ResourceAccess {
         // Check idle period
         if self.is_idle(current_time, self.rules.max_idle_period_seconds) {
             let idle_seconds = if let Some(last_usage) = self.usage_log.back() {
-                current_time - last_usage.timestamp
+                current_time.saturating_sub(last_usage.timestamp)
             } else {
-                current_time - self.granted_at
+                current_time.saturating_sub(self.granted_at)
             };
 
             return Err(AccessError::IdleTooLong {
@@ -363,17 +366,18 @@ impl ResourceAccess {
                             frequency_seconds,
                         } => {
                             // Check if maintenance was performed within frequency
+                            // Uses case-insensitive matching for "maintenance" keyword
                             let last_maintenance = self
                                 .usage_log
                                 .iter()
                                 .rev()
-                                .find(|e| e.description.contains("maintenance"))
+                                .find(|e| e.description.to_lowercase().contains("maintenance"))
                                 .map(|e| e.timestamp);
 
                             let overdue = if let Some(last) = last_maintenance {
-                                current_time - last > *frequency_seconds
+                                current_time.saturating_sub(last) > *frequency_seconds
                             } else {
-                                current_time - self.granted_at > *frequency_seconds
+                                current_time.saturating_sub(self.granted_at) > *frequency_seconds
                             };
 
                             if overdue {
@@ -406,11 +410,12 @@ impl ResourceAccess {
                             description,
                             due_by,
                         } => {
-                            // Check if benefit was provided before deadline
+                            // Check if benefit was provided before deadline (case-insensitive)
+                            let description_lower = description.to_lowercase();
                             let benefit_provided = self
                                 .usage_log
                                 .iter()
-                                .any(|e| e.description.contains(&description.to_lowercase()));
+                                .any(|e| e.description.to_lowercase().contains(&description_lower));
 
                             if !benefit_provided && current_time >= *due_by {
                                 return Err(AccessError::DutyUnfulfilled(format!(
@@ -431,10 +436,10 @@ impl ResourceAccess {
     }
 
     /// Validate transfer (enforces no-profit rule)
-    pub fn validate_transfer(&self, _price: Option<i64>) -> Result<()> {
+    pub fn validate_transfer(&self, price: Option<i64>) -> Result<()> {
         if self.rules.no_profit_transfer {
             // Any paid transfer is considered profit-seeking
-            if let Some(price) = _price {
+            if let Some(price) = price {
                 if price > 0 {
                     return Err(AccessError::ProfitTransferNotAllowed);
                 }
@@ -445,8 +450,7 @@ impl ResourceAccess {
 
     /// Get time until expiration (if applicable)
     pub fn time_until_expiration(&self, current_time: u64) -> Option<u64> {
-        self.expires_at
-            .map(|exp| exp.saturating_sub(current_time))
+        self.expires_at.map(|exp| exp.saturating_sub(current_time))
     }
 
     /// Get time since last usage
@@ -769,9 +773,7 @@ mod tests {
         // Record more than MAX_USAGE_LOG_SIZE events
         for i in 0..1500 {
             let time = access.granted_at + i * 3600;
-            access
-                .record_usage(time, format!("Usage {}", i))
-                .unwrap();
+            access.record_usage(time, format!("Usage {}", i)).unwrap();
         }
 
         // Log should be bounded

@@ -38,7 +38,10 @@ fn test_resource_access_proposal_creation() {
 
     assert_eq!(proposal.title, "Grant Tool Access");
     assert_eq!(proposal.proposer, proposer);
-    assert!(matches!(proposal.state, icn_governance::ProposalState::Draft));
+    assert!(matches!(
+        proposal.state,
+        icn_governance::ProposalState::Draft
+    ));
 }
 
 #[test]
@@ -66,7 +69,10 @@ fn test_resource_access_revocation_proposal() {
     );
 
     assert_eq!(proposal.title, "Revoke Tool Access");
-    assert!(matches!(proposal.state, icn_governance::ProposalState::Draft));
+    assert!(matches!(
+        proposal.state,
+        icn_governance::ProposalState::Draft
+    ));
 }
 
 #[test]
