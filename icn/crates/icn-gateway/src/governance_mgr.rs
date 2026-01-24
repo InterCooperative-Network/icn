@@ -526,6 +526,7 @@ impl GovernanceManager {
     ///
     /// # Panics
     /// Panics if used in actor-backed mode (only works in standalone mode).
+    #[allow(clippy::expect_used)] // Test helper - panic is acceptable
     pub fn insert_test_proposal(&self, proposal: Proposal) {
         if self.governance_handle.is_some() {
             panic!("insert_test_proposal can only be used in standalone mode");

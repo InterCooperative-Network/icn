@@ -119,8 +119,10 @@ async fn test_initiate_dissolution_success() {
     let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create a test entity
-    let mut entity = CooperativeEntity::cooperative("dissolution-test", "Test Coop").unwrap();
+    // Create a test entity with governance domain matching the test proposals
+    let mut entity = CooperativeEntity::cooperative("dissolution-test", "Test Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active; // Set to Active so it can be dissolved
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -184,7 +186,9 @@ async fn test_initiate_dissolution_requires_active_status() {
     let alice = test_identity();
 
     // Create a test entity with Suspended status
-    let mut entity = CooperativeEntity::cooperative("suspended-test", "Suspended Coop").unwrap();
+    let mut entity = CooperativeEntity::cooperative("suspended-test", "Suspended Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Suspended {
         reason: "Test suspension".to_string(),
         suspended_at: 1000,
@@ -227,8 +231,10 @@ async fn test_cancel_dissolution_success() {
     let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create and set up entity
-    let mut entity = CooperativeEntity::cooperative("cancel-test", "Cancel Coop").unwrap();
+    // Create and set up entity with governance domain matching test proposals
+    let mut entity = CooperativeEntity::cooperative("cancel-test", "Cancel Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active; // Set to Active so it can be dissolved
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -292,8 +298,10 @@ async fn test_dissolution_requires_authorization() {
     let alice = test_identity();
     let bob = test_identity();
 
-    // Create entity with alice as founder
-    let entity = CooperativeEntity::cooperative("auth-test", "Auth Coop").unwrap();
+    // Create entity with alice as founder and governance domain
+    let entity = CooperativeEntity::cooperative("auth-test", "Auth Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
 
@@ -327,8 +335,10 @@ async fn test_complete_dissolution_requires_no_members() {
     let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create an active entity
-    let mut entity = CooperativeEntity::cooperative("complete-test", "Complete Coop").unwrap();
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("complete-test", "Complete Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active;
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -384,8 +394,10 @@ async fn test_complete_dissolution_success() {
     let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create an active entity
-    let mut entity = CooperativeEntity::cooperative("complete-success", "Complete Coop").unwrap();
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("complete-success", "Complete Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active;
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -455,8 +467,10 @@ async fn test_complete_dissolution_requires_waiting_period() {
     let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create an active entity
-    let mut entity = CooperativeEntity::cooperative("wait-test", "Wait Coop").unwrap();
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("wait-test", "Wait Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active;
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -509,8 +523,10 @@ async fn test_dissolving_entity_allows_removing_last_founder() {
     let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Create an active entity
-    let mut entity = CooperativeEntity::cooperative("founder-test", "Founder Coop").unwrap();
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("founder-test", "Founder Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
     entity.status = icn_entity::EntityStatus::Active;
     let entity_id = entity.id.clone();
     entity_mgr.register(entity).await.unwrap();
@@ -564,4 +580,180 @@ async fn test_dissolving_entity_allows_removing_last_founder() {
 
     let remove_resp2 = test::call_service(&app, remove_req2).await;
     assert_eq!(remove_resp2.status(), 204); // Should succeed - entity is dissolving (204 No Content)
+}
+
+#[actix_web::test]
+async fn test_dissolving_entity_allows_removing_regular_members() {
+    let (app, entity_mgr, _audit_mgr, governance_mgr) = create_test_app().await;
+    let alice = test_identity();
+    let bob = test_identity();
+
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("member-test", "Member Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let alice_membership =
+        Membership::active(alice_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(alice_membership).await.unwrap();
+
+    // Add bob as regular member (not founder)
+    let bob_id = EntityId::from_did(bob.did());
+    let bob_entity = CooperativeEntity::individual(bob.did(), bob_id.to_string());
+    entity_mgr.register(bob_entity).await.unwrap();
+    let bob_membership =
+        Membership::active(bob_id.clone(), entity_id.clone(), MembershipRole::Member);
+    entity_mgr.add_membership(bob_membership).await.unwrap();
+
+    // Pre-populate a proposal for this test
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-member"));
+
+    // Initiate dissolution
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let init_body = json!({
+        "proposal_id": "proposal-member",
+        "reason": "Test dissolution"
+    });
+
+    let init_req = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&init_body)
+        .to_request();
+    init_req.extensions_mut().insert(claims.clone());
+
+    let init_resp = test::call_service(&app, init_req).await;
+    assert!(
+        init_resp.status().is_success(),
+        "Expected success, got {:?}",
+        init_resp.status()
+    );
+
+    // Remove regular member bob during dissolution - should succeed
+    let remove_req = test::TestRequest::delete()
+        .uri(&format!("/entities/{}/members/{}", entity_id, bob_id))
+        .to_request();
+    remove_req.extensions_mut().insert(claims.clone());
+
+    let remove_resp = test::call_service(&app, remove_req).await;
+    assert_eq!(
+        remove_resp.status(),
+        204,
+        "Should succeed removing regular member during dissolution"
+    );
+
+    // Verify bob was removed
+    let members = entity_mgr.get_members(&entity_id).await.unwrap();
+    assert_eq!(members.len(), 1, "Should have only alice left");
+    assert!(members.iter().any(|m| m.member_id == alice_id));
+}
+
+#[actix_web::test]
+async fn test_dissolving_entity_allows_removing_multiple_founders() {
+    let (app, entity_mgr, _audit_mgr, governance_mgr) = create_test_app().await;
+    let alice = test_identity();
+    let bob = test_identity();
+    let carol = test_identity();
+
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("multi-founder-test", "Multi Founder Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity).await.unwrap();
+
+    // Add alice, bob, and carol as founders
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let alice_membership =
+        Membership::active(alice_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(alice_membership).await.unwrap();
+
+    let bob_id = EntityId::from_did(bob.did());
+    let bob_entity = CooperativeEntity::individual(bob.did(), bob_id.to_string());
+    entity_mgr.register(bob_entity).await.unwrap();
+    let bob_membership =
+        Membership::active(bob_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(bob_membership).await.unwrap();
+
+    let carol_id = EntityId::from_did(carol.did());
+    let carol_entity = CooperativeEntity::individual(carol.did(), carol_id.to_string());
+    entity_mgr.register(carol_entity).await.unwrap();
+    let carol_membership =
+        Membership::active(carol_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(carol_membership).await.unwrap();
+
+    // Pre-populate a proposal for this test
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-multi"));
+
+    // Initiate dissolution
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let init_body = json!({
+        "proposal_id": "proposal-multi",
+        "reason": "Test dissolution"
+    });
+
+    let init_req = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&init_body)
+        .to_request();
+    init_req.extensions_mut().insert(claims.clone());
+
+    let init_resp = test::call_service(&app, init_req).await;
+    assert!(
+        init_resp.status().is_success(),
+        "Expected success, got {:?}",
+        init_resp.status()
+    );
+
+    // Remove bob (first founder removal during dissolution) - should succeed
+    let remove_req1 = test::TestRequest::delete()
+        .uri(&format!("/entities/{}/members/{}", entity_id, bob_id))
+        .to_request();
+    remove_req1.extensions_mut().insert(claims.clone());
+
+    let remove_resp1 = test::call_service(&app, remove_req1).await;
+    assert_eq!(
+        remove_resp1.status(),
+        204,
+        "Should succeed removing first founder during dissolution"
+    );
+
+    // Remove carol (second founder removal, leaving only alice) - should succeed
+    let remove_req2 = test::TestRequest::delete()
+        .uri(&format!("/entities/{}/members/{}", entity_id, carol_id))
+        .to_request();
+    remove_req2.extensions_mut().insert(claims.clone());
+
+    let remove_resp2 = test::call_service(&app, remove_req2).await;
+    assert_eq!(
+        remove_resp2.status(),
+        204,
+        "Should succeed removing second founder during dissolution"
+    );
+
+    // Remove alice (last founder) - should succeed because entity is dissolving
+    let remove_req3 = test::TestRequest::delete()
+        .uri(&format!("/entities/{}/members/{}", entity_id, alice_id))
+        .to_request();
+    remove_req3.extensions_mut().insert(claims.clone());
+
+    let remove_resp3 = test::call_service(&app, remove_req3).await;
+    assert_eq!(
+        remove_resp3.status(),
+        204,
+        "Should succeed removing last founder during dissolution"
+    );
+
+    // Verify all members removed
+    let members = entity_mgr.get_members(&entity_id).await.unwrap();
+    assert_eq!(members.len(), 0, "Should have no members left");
 }

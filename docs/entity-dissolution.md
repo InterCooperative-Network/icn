@@ -257,8 +257,9 @@ Common errors:
 - Entity does not exist
 
 ### 500 Internal Server Error
-- Dissolution audit trail is missing expected records (e.g., `DissolutionInitiated` event or `completion_date`)
+- Dissolution audit trail is missing expected records (e.g., `DissolutionInitiated` event or `completion_date`) - this indicates a data consistency issue
 - System time error (system clock before UNIX epoch)
+- Internal storage or query failures
 
 ## Rollback and Compensation
 

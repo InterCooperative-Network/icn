@@ -1181,25 +1181,64 @@ pub async fn initiate_dissolution(
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to fetch proposal: {e}")))?
         .ok_or_else(|| {
-            GatewayError::NotFound(format!("Governance proposal not found: {}", body.proposal_id))
+            GatewayError::NotFound(format!(
+                "Governance proposal not found: {}",
+                body.proposal_id
+            ))
         })?;
 
     // Verify proposal is in Accepted state
-    if !matches!(proposal.state, icn_governance::ProposalState::Accepted { .. }) {
+    if !matches!(
+        proposal.state,
+        icn_governance::ProposalState::Accepted { .. }
+    ) {
         return Err(GatewayError::BadRequest(format!(
             "Governance proposal is not approved. Current state: {:?}",
             proposal.state
         )));
     }
 
+    // Verify proposal domain matches entity's governance domain
+    // This prevents cross-domain proposal abuse (using a proposal from Domain A
+    // to dissolve an entity in Domain B)
+    if let Some(ref entity_domain) = entity.governance_domain_id {
+        if proposal.domain_id.0 != *entity_domain {
+            return Err(GatewayError::BadRequest(format!(
+                "Proposal domain '{}' does not match entity governance domain '{}'",
+                proposal.domain_id.0, entity_domain
+            )));
+        }
+    } else {
+        // Entity has no governance domain - require it for dissolution
+        return Err(GatewayError::BadRequest(
+            "Entity has no governance domain configured. Cannot validate proposal scope."
+                .to_string(),
+        ));
+    }
+
     // Record metric for dissolution initiation
     gateway_metrics::entity_dissolution_initiated_inc();
 
-    // Default waiting period: 30 days (2,592,000 seconds)
+    // Waiting period configuration
+    // Default: 30 days (2,592,000 seconds)
+    // Minimum: 1 second to prevent immediate (0-second) dissolution that could bypass
+    // governance intent. A 0-second waiting period would allow completion_date == now,
+    // enabling immediate completion without any waiting.
     const DEFAULT_WAITING_PERIOD: u64 = 30 * 24 * 60 * 60;
+    const MIN_WAITING_PERIOD: u64 = 1; // 1 second minimum
+
     let waiting_period = body
         .waiting_period_seconds
         .unwrap_or(DEFAULT_WAITING_PERIOD);
+
+    // Enforce minimum waiting period to prevent immediate dissolution
+    if waiting_period < MIN_WAITING_PERIOD {
+        return Err(GatewayError::BadRequest(format!(
+            "Waiting period {} seconds is below minimum of {} second(s). \
+             A waiting period is required to allow stakeholders time to respond.",
+            waiting_period, MIN_WAITING_PERIOD
+        )));
+    }
 
     // Calculate completion date with overflow protection
     let now = std::time::SystemTime::now()
@@ -1328,9 +1367,9 @@ pub async fn complete_dissolution(
     };
 
     // Fetch audit trail ONCE and extract all needed values (optimized query)
-    let audit_trail = audit_mgr.get_audit_trail(&entity_id, 100, 0).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get audit trail: {e}"))
-    })?;
+    let audit_trail = audit_mgr
+        .get_audit_trail(&entity_id, 100, 0)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get audit trail: {e}")))?;
 
     // Extract proposal_id, completion_date, and initiator from dissolution initiation record
     let (proposal_id, completion_date, initiator_id) = audit_trail
@@ -1343,7 +1382,11 @@ pub async fn complete_dissolution(
                 ..
             } = &record.operation
             {
-                Some((proposal_id.clone(), *completion_date, record.performed_by.clone()))
+                Some((
+                    proposal_id.clone(),
+                    *completion_date,
+                    record.performed_by.clone(),
+                ))
             } else {
                 None
             }
@@ -1434,10 +1477,15 @@ pub async fn complete_dissolution(
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to re-verify entity: {e}")))?
         .ok_or_else(|| {
-            GatewayError::NotFound(format!("Entity was deleted by another request: {entity_id}"))
+            GatewayError::NotFound(format!(
+                "Entity was deleted by another request: {entity_id}"
+            ))
         })?;
 
-    if !matches!(entity_recheck.status, icn_entity::EntityStatus::Dissolving { .. }) {
+    if !matches!(
+        entity_recheck.status,
+        icn_entity::EntityStatus::Dissolving { .. }
+    ) {
         return Err(GatewayError::Conflict(
             "Entity status changed during completion. Please retry.".to_string(),
         ));
