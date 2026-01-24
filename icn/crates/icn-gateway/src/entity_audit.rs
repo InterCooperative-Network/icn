@@ -98,6 +98,28 @@ pub enum EntityOperation {
         /// List of changes made
         changes: Vec<String>,
     },
+
+    /// Entity dissolution initiated (waiting period started)
+    DissolutionInitiated {
+        /// Governance proposal ID (required for dissolution)
+        proposal_id: String,
+        /// Expected completion date (Unix timestamp)
+        completion_date: u64,
+        /// Reason for dissolution
+        reason: String,
+    },
+
+    /// Entity dissolution completed
+    DissolutionCompleted {
+        /// Governance proposal ID that authorized the dissolution
+        proposal_id: String,
+    },
+
+    /// Entity dissolution cancelled (before completion)
+    DissolutionCancelled {
+        /// Reason for cancellation
+        reason: String,
+    },
 }
 
 impl EntityOperation {
@@ -112,6 +134,9 @@ impl EntityOperation {
             Self::MemberAdded { .. } => "member_added",
             Self::MemberRemoved { .. } => "member_removed",
             Self::MemberUpdated { .. } => "member_updated",
+            Self::DissolutionInitiated { .. } => "dissolution_initiated",
+            Self::DissolutionCompleted { .. } => "dissolution_completed",
+            Self::DissolutionCancelled { .. } => "dissolution_cancelled",
         }
     }
 }
