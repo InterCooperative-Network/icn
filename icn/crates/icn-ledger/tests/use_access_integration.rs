@@ -273,3 +273,231 @@ fn test_proposal_payload_type_name() {
     assert_eq!(payload.type_name(), "resource_access");
     assert!(!payload.is_emergency());
 }
+
+// Integration tests for ResourceAccessStore
+mod store_integration {
+    use super::*;
+    use icn_ledger::{ResourceAccessStore, SledResourceAccessStore};
+    use icn_store::SledStore;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_cooperative_tool_access_scenario() {
+        // Setup: Create a store for a cooperative's resource access records
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        // Three members want to access the cooperative's woodworking shop
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let _carol = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Grant access to Alice and Bob
+        let alice_access = ResourceAccess::new(
+            "woodworking-shop".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600, // 30 days
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        let bob_access = ResourceAccess::new(
+            "woodworking-shop".to_string(),
+            bob.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        access_store.grant(alice_access.clone()).unwrap();
+        access_store.grant(bob_access.clone()).unwrap();
+
+        // List all access for the woodworking shop
+        let shop_accesses = access_store.list_by_resource("woodworking-shop").unwrap();
+        assert_eq!(shop_accesses.len(), 2);
+
+        // Alice has access to multiple resources
+        let alice_tool_access = ResourceAccess::new(
+            "table-saw".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600, // 7 days
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        access_store.grant(alice_tool_access).unwrap();
+
+        // Check Alice's total access grants
+        let alice_accesses = access_store.list_by_holder(&alice).unwrap();
+        assert_eq!(alice_accesses.len(), 2);
+
+        // Revoke Bob's access due to policy violation
+        access_store
+            .revoke(
+                "woodworking-shop",
+                &bob,
+                "Repeated safety violations".to_string(),
+            )
+            .unwrap();
+
+        // Verify revocation
+        let bob_access_after = access_store.get("woodworking-shop", &bob).unwrap().unwrap();
+        assert!(bob_access_after.is_revoked());
+        assert_eq!(
+            bob_access_after.revocation_reason,
+            Some("Repeated safety violations".to_string())
+        );
+    }
+
+    #[test]
+    fn test_expired_access_cleanup() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Grant short-term access to Alice (1 hour)
+        let mut alice_access = ResourceAccess::new(
+            "guest-wifi".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 3600, // 1 hour
+                renewable: false,
+                max_accumulated: 1,
+            },
+        );
+        let grant_time = 1000;
+        alice_access.granted_at = grant_time;
+        alice_access.expires_at = Some(grant_time + 3600);
+
+        // Grant long-term stewardship to Bob
+        let bob_access = ResourceAccess::new(
+            "community-garden".to_string(),
+            bob.clone(),
+            AccessModel::Stewardship {
+                duties: vec![],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        access_store.grant(alice_access).unwrap();
+        access_store.grant(bob_access).unwrap();
+
+        // Check expired access after 2 hours
+        let current_time = grant_time + 7200;
+        let expired = access_store.find_expired(current_time).unwrap();
+
+        assert_eq!(expired.len(), 1);
+        assert_eq!(expired[0].resource_id, "guest-wifi");
+        assert_eq!(expired[0].holder, alice);
+    }
+
+    #[test]
+    fn test_idle_access_detection() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let bob = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Alice hasn't used her access
+        let mut alice_access = ResourceAccess::new(
+            "3d-printer".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        let grant_time = 1000;
+        alice_access.granted_at = grant_time;
+
+        // Bob used his access recently
+        let mut bob_access = ResourceAccess::new(
+            "laser-cutter".to_string(),
+            bob.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+        bob_access.granted_at = grant_time;
+
+        // Record Bob's usage within the idle period
+        let current_time = grant_time + 10 * 24 * 3600; // 10 days later
+        bob_access
+            .record_usage(current_time - 3 * 24 * 3600, "Used for project".to_string())
+            .unwrap();
+
+        access_store.grant(alice_access).unwrap();
+        access_store.grant(bob_access).unwrap();
+
+        // Find idle access (7 day threshold)
+        let max_idle = 7 * 24 * 3600;
+        let idle = access_store.find_idle(current_time, max_idle).unwrap();
+
+        assert_eq!(idle.len(), 1);
+        assert_eq!(idle[0].resource_id, "3d-printer");
+        assert_eq!(idle[0].holder, alice);
+    }
+
+    #[test]
+    fn test_resource_access_governance_workflow() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        // Scenario: Governance proposal to grant access is approved
+        let alice = EntityId::from_did(KeyPair::generate().unwrap().did());
+
+        // Create governance proposal for access
+        let domain_id = GovernanceDomainId::new("maker-coop");
+        let proposer_keypair = KeyPair::generate().unwrap();
+
+        let _proposal = Proposal::new(
+            domain_id,
+            proposer_keypair.did().clone(),
+            "Grant CNC Machine Access".to_string(),
+            "Alice has completed safety training and needs CNC access for project".to_string(),
+            ProposalPayload::ResourceAccess {
+                action: ResourceAccessAction::Grant {
+                    model: AccessModel::UseAccess {
+                        duration_seconds: 90 * 24 * 3600, // 90 days
+                        renewable: true,
+                        max_accumulated: 4,
+                    },
+                },
+                resource_id: "cnc-machine".to_string(),
+                holder: alice.clone(),
+                reason: "Completed safety certification".to_string(),
+            },
+        );
+
+        // After proposal passes (simulated), grant access
+        let access = ResourceAccess::new(
+            "cnc-machine".to_string(),
+            alice.clone(),
+            AccessModel::UseAccess {
+                duration_seconds: 90 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        access_store.grant(access).unwrap();
+
+        // Verify access was granted
+        let granted_access = access_store.get("cnc-machine", &alice).unwrap();
+        assert!(granted_access.is_some());
+        let access = granted_access.unwrap();
+        assert_eq!(access.resource_id, "cnc-machine");
+        assert!(access.is_valid(access.granted_at));
+    }
+}

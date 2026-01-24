@@ -46,6 +46,9 @@ pub enum LedgerEvent {
 
     /// A cross-currency transfer was executed
     CrossCurrencyTransfer(CrossCurrencyTransfer),
+
+    /// Resource access was transferred to a new holder
+    ResourceAccessTransferred(ResourceAccessTransferred),
 }
 
 /// Event: A new transaction was created
@@ -272,6 +275,28 @@ pub struct CrossCurrencyTransfer {
     pub domain_id: Option<String>,
 }
 
+/// Event: Resource access was transferred to a new holder
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceAccessTransferred {
+    /// Resource ID
+    pub resource_id: String,
+
+    /// Previous holder entity ID
+    pub from_holder: String,
+
+    /// New holder entity ID
+    pub to_holder: String,
+
+    /// Optional transfer price (None = free transfer)
+    pub price: Option<i64>,
+
+    /// Access model (UseAccess or Stewardship)
+    pub access_model: String,
+
+    /// Unix timestamp when transferred
+    pub transferred_at: u64,
+}
+
 /// Event emitter for broadcasting ledger events
 ///
 /// Uses a broadcast channel to allow multiple subscribers to receive events.
@@ -496,6 +521,28 @@ impl LedgerEventEmitter {
             timestamp,
             domain_id,
         }))
+    }
+
+    /// Emit a ResourceAccessTransferred event
+    pub fn emit_resource_access_transferred(
+        &self,
+        resource_id: String,
+        from_holder: String,
+        to_holder: String,
+        price: Option<i64>,
+        access_model: String,
+        transferred_at: u64,
+    ) -> usize {
+        self.emit(LedgerEvent::ResourceAccessTransferred(
+            ResourceAccessTransferred {
+                resource_id,
+                from_holder,
+                to_holder,
+                price,
+                access_model,
+                transferred_at,
+            },
+        ))
     }
 }
 

@@ -107,6 +107,17 @@ pub fn init_descriptions() {
         "Total number of dynamic limit recalculations"
     );
 
+    // Resource access transfer metrics
+    describe_counter!(
+        "icn_ledger_resource_access_transfers_total",
+        "Total number of resource access transfers completed"
+    );
+    // Labels: reason={validation_failed, storage_error, not_found, revoked}
+    describe_counter!(
+        "icn_ledger_resource_access_transfer_failures_total",
+        "Total number of resource access transfer failures (by reason label)"
+    );
+
     // Fork resolution
     describe_counter!(
         "icn_ledger_merge_conflicts_total",
@@ -277,4 +288,38 @@ pub fn entries_discarded_inc() {
 /// Set quarantine size gauge
 pub fn quarantine_size_set(count: u64) {
     gauge!("icn_ledger_quarantine_size").set(count as f64);
+}
+
+// Resource access transfer metrics
+
+/// Increment resource access transfers counter
+pub fn resource_access_transfer_inc() {
+    counter!("icn_ledger_resource_access_transfers_total").increment(1);
+}
+
+/// Increment resource access transfer failures due to validation error
+pub fn resource_access_transfer_validation_failed_inc() {
+    counter!(
+        "icn_ledger_resource_access_transfer_failures_total",
+        "reason" => "validation_failed"
+    )
+    .increment(1);
+}
+
+/// Increment resource access transfer failures due to storage error
+pub fn resource_access_transfer_storage_error_inc() {
+    counter!(
+        "icn_ledger_resource_access_transfer_failures_total",
+        "reason" => "storage_error"
+    )
+    .increment(1);
+}
+
+/// Increment resource access transfer failures due to resource not found
+pub fn resource_access_transfer_not_found_inc() {
+    counter!(
+        "icn_ledger_resource_access_transfer_failures_total",
+        "reason" => "not_found"
+    )
+    .increment(1);
 }
