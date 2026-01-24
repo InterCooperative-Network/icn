@@ -1620,8 +1620,11 @@ mod tests {
         ));
 
         // Test GeneralUsage
-        let general_event =
-            UsageEvent::with_duty_type(4000, "Regular use".to_string(), DutyEventType::GeneralUsage);
+        let general_event = UsageEvent::with_duty_type(
+            4000,
+            "Regular use".to_string(),
+            DutyEventType::GeneralUsage,
+        );
         assert!(matches!(
             general_event.duty_type,
             Some(DutyEventType::GeneralUsage)
