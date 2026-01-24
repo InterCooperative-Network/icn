@@ -1,15 +1,16 @@
 //! Resource Access Enforcer Actor initialization
 //!
-//! Spawns the ResourceAccessEnforcerActor with storage backend.
+//! Spawns the ResourceAccessEnforcerActor with storage backend and gossip integration.
 
 use anyhow::Result;
+use icn_gossip::GossipActor;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::resource_enforcer_actor::{
     ResourceAccessEnforcerActor, ResourceAccessStore, ResourceEnforcerConfig,
-    ResourceEnforcerHandle, RevocationEvent,
+    ResourceEnforcerHandle, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
 };
 use crate::runtime::ShutdownTx;
 
@@ -17,7 +18,7 @@ use crate::runtime::ShutdownTx;
 ///
 /// # Arguments
 /// * `config` - Enforcement configuration
-/// * `store` - Storage backend for ResourceAccess entries
+/// * `store` - Storage backend for ResourceAccess entries (already wrapped with gossip if needed)
 /// * `shutdown_tx` - Shutdown signal transmitter
 ///
 /// # Returns
@@ -57,6 +58,73 @@ impl ResourceAccessStore for NullResourceAccessStore {
 
     fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
         // No-op: no event bus to emit to
+        Ok(())
+    }
+}
+
+/// Gossip-aware resource access store wrapper
+///
+/// This wraps an underlying storage implementation and publishes
+/// revocation events to a gossip topic for cluster-wide notification.
+pub struct GossipResourceAccessStore {
+    /// Underlying storage implementation
+    inner: Box<dyn ResourceAccessStore>,
+    /// Gossip actor handle for publishing revocations
+    gossip_handle: Arc<RwLock<GossipActor>>,
+}
+
+impl GossipResourceAccessStore {
+    /// Create a new gossip-aware resource access store
+    pub fn new(
+        inner: Box<dyn ResourceAccessStore>,
+        gossip_handle: Arc<RwLock<GossipActor>>,
+    ) -> Self {
+        Self {
+            inner,
+            gossip_handle,
+        }
+    }
+}
+
+impl ResourceAccessStore for GossipResourceAccessStore {
+    fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>> {
+        self.inner.list_all()
+    }
+
+    fn update(&mut self, resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()> {
+        self.inner.update(resource_id, access)
+    }
+
+    fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
+        // First emit through the inner store (for local audit trail)
+        self.inner.emit_revocation(event.clone())?;
+
+        // Then publish to gossip for cluster-wide notification
+        let gossip_handle = self.gossip_handle.clone();
+        let event_clone = event.clone();
+
+        // Spawn async task to publish to gossip (don't block the enforcer)
+        tokio::spawn(async move {
+            let serialized = match serde_json::to_vec(&event_clone) {
+                Ok(data) => data,
+                Err(e) => {
+                    warn!("Failed to serialize revocation event: {}", e);
+                    return;
+                }
+            };
+
+            let mut gossip = gossip_handle.write().await;
+            if let Err(e) = gossip.publish(RESOURCE_REVOCATIONS_TOPIC, serialized).await {
+                warn!("Failed to publish revocation to gossip: {}", e);
+            } else {
+                info!(
+                    resource_id = %event_clone.resource_id,
+                    holder = %event_clone.holder,
+                    "Published revocation event to gossip"
+                );
+            }
+        });
+
         Ok(())
     }
 }

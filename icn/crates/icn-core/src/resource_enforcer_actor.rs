@@ -10,6 +10,7 @@
 //! - Validates each against idle period rules
 //! - Auto-revokes access that exceeds max_idle_period_seconds
 //! - Emits revocation events for audit trail
+//! - Publishes revocations to gossip topic for cluster-wide notification
 //!
 //! # Configuration
 //! ```rust,ignore
@@ -21,6 +22,9 @@
 //! ```
 
 use anyhow::{Context, Result};
+
+/// Gossip topic for resource access revocation events
+pub const RESOURCE_REVOCATIONS_TOPIC: &str = "resource:revocations";
 use rand::Rng;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};

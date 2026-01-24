@@ -757,6 +757,33 @@ pub async fn handle_entity_update(entry_data: Vec<u8>, entity_handle: EntityHand
     }
 }
 
+/// Handle resource revocation events from cluster
+pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
+    match serde_json::from_slice::<crate::resource_enforcer_actor::RevocationEvent>(&entry_data) {
+        Ok(event) => {
+            info!(
+                resource_id = %event.resource_id,
+                holder = %event.holder,
+                reason = %event.reason,
+                idle_seconds = event.idle_seconds,
+                "Received revocation event from cluster"
+            );
+
+            // TODO: When a real ResourceAccessStore backend is integrated,
+            // this handler should:
+            // 1. Update local cache/store with the revocation
+            // 2. Propagate to any local components that need to know
+            // 3. Emit metrics for monitoring
+            
+            // For now, just log and update metrics
+            metrics::counter!("icn_resource_revocations_received_total").increment(1);
+        }
+        Err(e) => {
+            warn!("Failed to deserialize revocation event: {}", e);
+        }
+    }
+}
+
 /// Create the notification callback that routes gossip entries to handlers
 ///
 /// This returns a callback that can be set on the GossipActor to receive
@@ -887,6 +914,12 @@ pub fn create_notification_callback(
                         handle_entity_update(data, entity_handle).await;
                     });
                 }
+            }
+        } else if topic == crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC {
+            if let Some(data) = entry_data {
+                tokio::spawn(async move {
+                    handle_resource_revocation(data).await;
+                });
             }
         } else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY
             || topic == icn_federation::TOPIC_FEDERATION_TRUST
