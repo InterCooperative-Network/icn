@@ -88,7 +88,15 @@ impl GossipActor {
             }
         }
 
-        // Dispatch to handler methods using shared dispatch logic
+        // Dispatch to handler methods using shared dispatch logic.
+        //
+        // The dispatch returns an enum indicating whether the handler executed synchronously
+        // or requires async completion:
+        // - Sync: Handler already executed; propagate result directly
+        // - AsyncResponse/AsyncPullResponse: Handler needs `.await`; extract params and call
+        //
+        // This two-phase approach (dispatch + await) avoids async recursion issues in batch
+        // handlers while maintaining a single source of truth for message routing.
         match self.dispatch_message(sender, message) {
             DispatchResult::Sync(result) => result,
             DispatchResult::AsyncResponse(sender, entry) => {
