@@ -16,6 +16,11 @@ use icn_ledger::{AccessModel, AntiSpeculationRules, ResourceAccess};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+/// Wait time for async gossip publication tasks to complete.
+/// 200ms provides margin for multi-node scenarios where gossip
+/// publication involves actor communication and potential network delays.
+const ASYNC_PUBLISH_WAIT_MS: u64 = 200;
+
 /// Mock store for testing that tracks revocation events
 struct MockResourceAccessStore {
     resources: Mutex<HashMap<String, ResourceAccess>>,
@@ -197,7 +202,7 @@ async fn test_gossip_store_wrapper_integration() {
     gossip_store.emit_revocation(event.clone()).unwrap();
 
     // Wait for async publication
-    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(ASYNC_PUBLISH_WAIT_MS)).await;
 
     // Verify event was logged locally
     let logged = revocations_log.lock().unwrap();

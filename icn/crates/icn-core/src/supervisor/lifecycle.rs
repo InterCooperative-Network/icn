@@ -1050,11 +1050,17 @@ async fn spawn_background_tasks(
         {
             let mut gossip = gossip_handle.write().await;
 
-            // Create the topic (required before subscribing)
-            gossip.create_topic(icn_gossip::Topic::new(
-                crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC.to_string(),
-                icn_gossip::AccessControl::Public,
-            ));
+            // Create the topic with explicit retention for audit trail.
+            // - 7-day retention provides sufficient window for cluster synchronization
+            // - 1000 max entries prevents unbounded growth while allowing burst activity
+            gossip.create_topic(icn_gossip::types::Topic {
+                name: crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC.to_string(),
+                acl: icn_gossip::AccessControl::Public,
+                scope: icn_gossip::types::Scope::Global,
+                min_trust_threshold: None,
+                retention: std::time::Duration::from_secs(86400 * 7), // 7 days
+                max_entries: 1000,
+            });
 
             if let Err(e) = gossip
                 .subscribe(

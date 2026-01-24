@@ -66,6 +66,20 @@ impl ResourceAccessStore for NullResourceAccessStore {
 ///
 /// This wraps an underlying storage implementation and publishes
 /// revocation events to a gossip topic for cluster-wide notification.
+///
+/// # Visibility
+///
+/// This type is public for use in integration tests and internal supervisor
+/// wiring, but is not re-exported from `icn-core`'s root. External crates
+/// should not depend on this type directly; it is an internal implementation
+/// detail of the resource enforcer subsystem.
+///
+/// # Example (internal testing)
+///
+/// ```ignore
+/// use icn_core::supervisor::init_resource_enforcer::GossipResourceAccessStore;
+/// let store = GossipResourceAccessStore::new(inner, gossip_handle);
+/// ```
 pub struct GossipResourceAccessStore {
     /// Underlying storage implementation
     inner: Box<dyn ResourceAccessStore>,
@@ -96,18 +110,20 @@ impl ResourceAccessStore for GossipResourceAccessStore {
     }
 
     fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
+        // Clone once for the async gossip task before passing ownership to inner store
+        let event_for_gossip = event.clone();
+
         // First emit through the inner store (for local audit trail)
-        self.inner.emit_revocation(event.clone())?;
+        self.inner.emit_revocation(event)?;
 
         // Then publish to gossip for cluster-wide notification
         let gossip_handle = self.gossip_handle.clone();
-        let event_clone = event.clone();
 
         // Spawn async task to publish to gossip (don't block the enforcer)
         // Note: Revocation gossip publication is best-effort. If gossip is unavailable,
         // the event may not reach other cluster nodes until the next enforcement cycle.
         tokio::spawn(async move {
-            let serialized = match serde_json::to_vec(&event_clone) {
+            let serialized = match serde_json::to_vec(&event_for_gossip) {
                 Ok(data) => data,
                 Err(e) => {
                     warn!("Failed to serialize revocation event: {}", e);
@@ -122,8 +138,8 @@ impl ResourceAccessStore for GossipResourceAccessStore {
                 metrics::counter!("icn_resource_revocation_gossip_failures_total", "reason" => "publish").increment(1);
             } else {
                 info!(
-                    resource_id = %event_clone.resource_id,
-                    holder = %event_clone.holder,
+                    resource_id = %event_for_gossip.resource_id,
+                    holder = %event_for_gossip.holder,
                     "Published revocation event to gossip"
                 );
                 metrics::counter!("icn_resource_revocation_gossip_published_total").increment(1);
@@ -143,6 +159,13 @@ mod tests {
     use icn_ledger::{AccessModel, ResourceAccess};
     use std::collections::HashMap;
     use std::sync::Mutex;
+
+    /// Wait time for async gossip publication tasks to complete.
+    /// 100ms provides sufficient margin for:
+    /// - tokio::spawn task scheduling
+    /// - Gossip actor lock acquisition
+    /// - Serialization and publication
+    const ASYNC_PUBLISH_WAIT_MS: u64 = 100;
 
     struct TestStore {
         resources: Mutex<HashMap<String, ResourceAccess>>,
@@ -306,7 +329,7 @@ mod tests {
         gossip_store.emit_revocation(event.clone()).unwrap();
 
         // Wait for async publication task
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(ASYNC_PUBLISH_WAIT_MS)).await;
 
         // Verify event was logged
         let logged_events = events_log.lock().unwrap();
