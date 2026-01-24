@@ -52,3 +52,18 @@ and practical. Use them as self-checks or as review prompts.
 - Explain the agreement lifecycle states and transitions.
 - Describe how bilateral clearing reduces settlement transactions.
 - List three types of inter-cooperative agreements and their purposes.
+
+## Module 12
+- Explain the difference between metrics, tracing, and logging in ICN.
+- Identify where metrics are registered and how they are named.
+- Describe how observability helps diagnose gossip or ledger issues.
+
+## Module 13
+- Explain ICN's three-layer security model.
+- Describe how signed envelopes and replay guards work together.
+- Explain how trust classes affect rate limiting or access control.
+
+## Module 14
+- Describe the governance lifecycle from proposal to activation.
+- Explain how CCL capabilities limit contract behavior.
+- Identify where governance decisions are enforced in the system.

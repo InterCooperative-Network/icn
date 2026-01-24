@@ -18,6 +18,13 @@ The system is built in Rust using an actor-based architecture, with components
 for identity, trust, networking, gossip synchronization, ledger accounting,
 smart contracts, and inter-cooperative federation.
 
+## Start Here: The ICN Systems Manual
+
+If you want a comprehensive, system-first explanation of ICN (how and why it
+works), start with:
+
+- `docs/onboarding/manual.md`
+
 ## Who is this curriculum for?
 
 **Foundations Track** (5-6 weeks)
@@ -52,7 +59,15 @@ smart contracts, and inter-cooperative federation.
 |--------|-------|-------------------|
 | 11 | Federation | Inter-coop agreements, clearing, netting, attestations |
 
+### Deep Dive Modules (12-14)
+| Module | Topic | What You'll Learn |
+|--------|-------|-------------------|
+| 12 | Observability | Metrics, tracing, logging, dashboards |
+| 13 | Security & Privacy | Signed envelopes, replay guards, trust gating |
+| 14 | Governance & CCL | Policy flow, capabilities, enforcement |
+
 ### Supporting Materials
+- **Textbook Manual**: System-first narrative of ICN's subsystems and rationale
 - **Workshops**: Hands-on exercises for each module with checkpoints
 - **Assessments**: Quick knowledge checks to verify understanding
 - **Patterns**: Common code patterns used throughout ICN
@@ -73,29 +88,35 @@ smart contracts, and inter-cooperative federation.
 │  Week 1: Setup → Runtime    Week 2: Identity → Ledger            │
 │  Week 3: Gateway + UI       Week 4: Ops + Contributing + Capstone│
 └──────────────────────────────────────────────────────────────────┘
+
+Optional deep dives: Modules 11-14 (federation, observability, security, governance)
 ```
 
 ## How to Use This Curriculum
 
-### Step 1: Choose Your Track
+### Step 1: Read the Systems Manual
+Start with `manual.md` for a comprehensive explanation of ICN systems and
+rationale.
+
+### Step 2: Choose Your Track
 Read `syllabus.md` and select Foundations or Accelerated based on your
 background.
 
-### Step 2: Follow Modules in Order
+### Step 3: Follow Modules in Order
 Each module builds on previous ones. Don't skip ahead unless you're confident
 in the prerequisites.
 
-### Step 3: Complete Workshops
+### Step 4: Complete Workshops
 After each module, do the corresponding workshop. These hands-on exercises
 solidify understanding and build practical skills.
 
-### Step 4: Check Understanding
+### Step 5: Check Understanding
 Use `assessments.md` to verify you've grasped key concepts before moving on.
 
-### Step 5: Reference Patterns
+### Step 6: Reference Patterns
 Consult `patterns.md` when reading unfamiliar code or writing new features.
 
-### Step 6: Complete the Capstone
+### Step 7: Complete the Capstone
 The capstone project integrates concepts from multiple modules into a
 meaningful contribution.
 
@@ -104,6 +125,7 @@ meaningful contribution.
 ```
 docs/onboarding/
 ├── README.md           # This file - start here
+├── manual.md           # System-first textbook manual
 ├── syllabus.md         # Course outline and pacing
 ├── patterns.md         # Common code patterns reference
 ├── assessments.md      # Quick knowledge checks
@@ -113,16 +135,25 @@ docs/onboarding/
 │   ├── module-00-setup.md
 │   ├── module-01-rust-fundamentals.md
 │   ├── ...
-│   └── module-11-federation.md
+│   ├── module-11-federation.md
+│   ├── module-12-observability.md
+│   ├── module-13-security-privacy.md
+│   └── module-14-governance-ccl-deep-dive.md
 ├── workshops/          # Hands-on exercises
 │   ├── workshop-00-setup.md
 │   ├── workshop-01-rust-fundamentals.md
 │   ├── ...
-│   └── workshop-11-federation.md
+│   ├── workshop-11-federation.md
+│   ├── workshop-12-observability.md
+│   ├── workshop-13-security-privacy.md
+│   └── workshop-14-governance-ccl.md
 └── tracks/             # Track-specific guidance
 ```
 
-## Quick Start Commands
+## Optional: Quick Start Commands
+
+If you are ready to build and run the codebase, use these. Otherwise, start
+with `manual.md` and the system overview modules.
 
 ```bash
 # Clone and build
