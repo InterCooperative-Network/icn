@@ -6,7 +6,9 @@ use icn_entity::{CooperativeEntity, EntityId, Membership, MembershipRole};
 use icn_gateway::api::entity;
 use icn_gateway::entity_audit::{EntityAuditManager, EntityOperation};
 use icn_gateway::entity_mgr::EntityManager;
+use icn_gateway::governance_mgr::GovernanceManager;
 use icn_gateway::TokenClaims;
+use icn_governance::{GovernanceDomainId, Proposal, ProposalId, ProposalPayload, ProposalState};
 use icn_identity::IdentityBundle;
 use icn_store::SledStore;
 use serde_json::json;
@@ -34,6 +36,34 @@ fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
     }
 }
 
+/// Test proposal ID used for dissolution tests
+const TEST_PROPOSAL_ID: &str = "proposal-123";
+
+/// Create a test proposal with Accepted state
+fn create_test_proposal(proposal_id: &str) -> Proposal {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Generate a test identity for the proposer
+    let test_proposer = IdentityBundle::generate().unwrap();
+
+    Proposal {
+        id: ProposalId::new(proposal_id),
+        domain_id: GovernanceDomainId("test-domain".to_string()),
+        proposer: test_proposer.did().clone(),
+        title: "Dissolution Proposal".to_string(),
+        description: "Test dissolution proposal".to_string(),
+        payload: ProposalPayload::Text {
+            body: "Entity dissolution proposal for testing".to_string(),
+        },
+        state: ProposalState::Accepted { closed_at: now },
+        created_at: now - 3600,
+        updated_at: now,
+    }
+}
+
 /// Create a test application with entity routes configured
 async fn create_test_app() -> (
     impl actix_web::dev::Service<
@@ -43,20 +73,34 @@ async fn create_test_app() -> (
     >,
     Arc<EntityManager>,
     Arc<EntityAuditManager>,
+    Arc<GovernanceManager>,
 ) {
     let store = Arc::new(SledStore::temporary().unwrap());
     let entity_mgr = Arc::new(EntityManager::new());
     let audit_mgr = Arc::new(EntityAuditManager::new(store));
+    let governance_mgr = Arc::new(GovernanceManager::new());
+
+    // Pre-populate governance with accepted proposals for dissolution tests
+    // Each test may use a different proposal ID
+    governance_mgr.insert_test_proposal(create_test_proposal(TEST_PROPOSAL_ID)); // proposal-123
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-202"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-303"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-456"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-complete"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-success"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-wait"));
+    governance_mgr.insert_test_proposal(create_test_proposal("proposal-founder"));
 
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(entity_mgr.clone()))
             .app_data(web::Data::new(audit_mgr.clone()))
+            .app_data(web::Data::new(governance_mgr.clone()))
             .service(web::scope("/entities").configure(entity::configure)),
     )
     .await;
 
-    (app, entity_mgr, audit_mgr)
+    (app, entity_mgr, audit_mgr, governance_mgr)
 }
 
 /// Generate a test identity bundle
@@ -72,7 +116,7 @@ fn test_identity() -> IdentityBundle {
 async fn test_initiate_dissolution_success() {
     init_logging();
 
-    let (app, entity_mgr, audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create a test entity
@@ -136,7 +180,7 @@ async fn test_initiate_dissolution_success() {
 
 #[actix_web::test]
 async fn test_initiate_dissolution_requires_active_status() {
-    let (app, entity_mgr, _audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create a test entity with Suspended status
@@ -180,7 +224,7 @@ async fn test_initiate_dissolution_requires_active_status() {
 
 #[actix_web::test]
 async fn test_cancel_dissolution_success() {
-    let (app, entity_mgr, audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create and set up entity
@@ -244,7 +288,7 @@ async fn test_cancel_dissolution_success() {
 
 #[actix_web::test]
 async fn test_dissolution_requires_authorization() {
-    let (app, entity_mgr, _audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
     let bob = test_identity();
 
@@ -280,7 +324,7 @@ async fn test_dissolution_requires_authorization() {
 
 #[actix_web::test]
 async fn test_complete_dissolution_requires_no_members() {
-    let (app, entity_mgr, _audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create an active entity
@@ -337,7 +381,7 @@ async fn test_complete_dissolution_requires_no_members() {
 
 #[actix_web::test]
 async fn test_complete_dissolution_success() {
-    let (app, entity_mgr, audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create an active entity
@@ -408,7 +452,7 @@ async fn test_complete_dissolution_success() {
 
 #[actix_web::test]
 async fn test_complete_dissolution_requires_waiting_period() {
-    let (app, entity_mgr, _audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create an active entity
@@ -462,7 +506,7 @@ async fn test_complete_dissolution_requires_waiting_period() {
 
 #[actix_web::test]
 async fn test_dissolving_entity_allows_removing_last_founder() {
-    let (app, entity_mgr, _audit_mgr) = create_test_app().await;
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
     let alice = test_identity();
 
     // Create an active entity

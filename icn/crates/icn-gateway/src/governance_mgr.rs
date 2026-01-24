@@ -519,6 +519,25 @@ impl GovernanceManager {
         Ok(proposals.get(proposal_id).cloned())
     }
 
+    /// Insert a proposal with any state (test helper)
+    ///
+    /// This method is intended for testing only. It allows inserting a proposal
+    /// with any arbitrary state, bypassing the normal proposal lifecycle.
+    ///
+    /// # Panics
+    /// Panics if used in actor-backed mode (only works in standalone mode).
+    pub fn insert_test_proposal(&self, proposal: Proposal) {
+        if self.governance_handle.is_some() {
+            panic!("insert_test_proposal can only be used in standalone mode");
+        }
+
+        let mut proposals = self
+            .proposals
+            .write()
+            .expect("Proposals lock poisoned in test");
+        proposals.insert(proposal.id.clone(), proposal);
+    }
+
     /// List all proposals
     pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
         if let Some(ref handle) = self.governance_handle {

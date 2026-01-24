@@ -32,6 +32,9 @@ gateway:
     rate_limit_exceeded_prefix: "Rate limit exceeded for DID"
     budget_exceeded_prefix: "Budget exceeded"
 
+    # Conflict errors
+    conflict_prefix: "Conflict"
+
     # Server errors
     internal: "Internal server error"
     service_unavailable: "Service temporarily unavailable"
