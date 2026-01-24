@@ -430,29 +430,9 @@ impl ResourceAccess {
 
     /// Record a usage event
     pub fn record_usage(&mut self, timestamp: u64, description: String) -> Result<()> {
-        // Check if access has been revoked
-        if self.revoked {
-            return Err(AccessError::Revoked(
-                self.revocation_reason
-                    .clone()
-                    .unwrap_or_else(|| "Access revoked".to_string()),
-            ));
-        }
-
-        // Validate access is still valid (for UseAccess expiration)
-        if self.is_expired(timestamp) {
-            return Err(AccessError::Expired(self.expires_at.unwrap_or(0)));
-        }
-
+        // Delegate to record_usage_event to avoid duplicate validation logic
         let event = UsageEvent::new(timestamp, description);
-        self.usage_log.push_back(event);
-
-        // Bound the log size
-        while self.usage_log.len() > Self::MAX_USAGE_LOG_SIZE {
-            self.usage_log.pop_front();
-        }
-
-        Ok(())
+        self.record_usage_event(event)
     }
 
     /// Record a structured usage event with duty type and optional witnesses
@@ -1453,6 +1433,29 @@ mod tests {
         assert_eq!(event.witnesses[0], witness1);
         assert_eq!(event.witnesses[1], witness2);
         assert!(event.has_sufficient_witnesses(2));
+        assert!(!event.has_sufficient_witnesses(3));
+    }
+
+    #[test]
+    fn test_witness_deduplication_prevents_gaming() {
+        // Verify that duplicate witnesses are not counted multiple times
+        // This prevents gaming by adding the same witness DID repeatedly
+        let same_witness = "did:icn:abc123".to_string();
+
+        let event = UsageEvent::with_duty_type(
+            1234567890,
+            "Maintenance completed".to_string(),
+            DutyEventType::Maintenance { duty_id: None },
+        )
+        .with_witness(same_witness.clone())
+        .with_witness(same_witness.clone())
+        .with_witness(same_witness.clone());
+
+        // Raw witness count is 3, but unique count should be 1
+        assert_eq!(event.witnesses.len(), 3);
+        assert!(event.has_sufficient_witnesses(1));
+        // Should fail because only 1 unique witness despite 3 entries
+        assert!(!event.has_sufficient_witnesses(2));
         assert!(!event.has_sufficient_witnesses(3));
     }
 
