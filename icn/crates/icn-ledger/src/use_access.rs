@@ -857,15 +857,16 @@ impl ResourceAccess {
     /// Checks that all required handoff steps have been completed with sufficient
     /// witness attestations when witness requirements are configured.
     ///
-    /// # Arguments
-    /// * `current_time` - Current timestamp for validation
-    ///
     /// # Returns
     /// * `Ok(())` if:
     ///   - No handoff procedure is defined
     ///   - Handoff procedure has no witness requirements
-    ///   - All handoff steps completed with sufficient witnesses
+    ///   - All handoff steps completed with sufficient authorized witnesses
     /// * `Err(AccessError::DutyUnfulfilled)` if handoff steps are incomplete or lack witnesses
+    ///
+    /// # Security
+    /// Only witnesses from the configured `witnesses` list are counted toward the
+    /// threshold. Unauthorized witnesses are silently ignored to prevent gaming.
     pub fn validate_handoff_completion(&self) -> Result<()> {
         // Only validate if this is a Stewardship model with HandoffProcedure
         let AccessModel::Stewardship { duties, .. } = &self.model else {
@@ -891,6 +892,9 @@ impl ResourceAccess {
             return Ok(());
         };
 
+        // Build a set of authorized witness DIDs for efficient lookup
+        let authorized_witnesses: HashSet<&String> = required_witnesses.iter().collect();
+
         // Determine minimum witness count
         // Use saturating conversion to handle systems where u32 might exceed usize::MAX
         let min_witnesses = min_witness_signatures
@@ -900,7 +904,16 @@ impl ResourceAccess {
             })
             .unwrap_or(required_witnesses.len());
 
-        // Check each step has been completed with sufficient witnesses
+        // Validate that min_witness_signatures is satisfiable
+        if min_witnesses > required_witnesses.len() {
+            return Err(AccessError::DutyUnfulfilled(format!(
+                "Handoff procedure requires {} witness signatures but only {} witnesses are configured",
+                min_witnesses,
+                required_witnesses.len()
+            )));
+        }
+
+        // Check each step has been completed with sufficient authorized witnesses
         for (step_index, step_desc) in steps.iter().enumerate() {
             let step_completed = self.usage_log.iter().any(|event| {
                 // Check if this is a handoff step event for this step index
@@ -909,15 +922,26 @@ impl ResourceAccess {
                     Some(DutyEventType::HandoffStep { step_index: idx }) if idx == step_index
                 );
 
-                // Check if it has sufficient witnesses
-                let has_witnesses = event.has_sufficient_witnesses(min_witnesses);
+                if !is_correct_step {
+                    return false;
+                }
 
-                is_correct_step && has_witnesses
+                // Count only unique witnesses that are in the authorized list
+                // This prevents:
+                // 1. Duplicate witness gaming (same DID counted multiple times)
+                // 2. Unauthorized witness gaming (random DIDs counted toward threshold)
+                let valid_witnesses: HashSet<&String> = event
+                    .witnesses
+                    .iter()
+                    .filter(|w| authorized_witnesses.contains(w))
+                    .collect();
+
+                valid_witnesses.len() >= min_witnesses
             });
 
             if !step_completed {
                 return Err(AccessError::DutyUnfulfilled(format!(
-                    "Handoff step {} not completed with {} witnesses: {}",
+                    "Handoff step {} not completed with {} authorized witnesses: {}",
                     step_index, min_witnesses, step_desc
                 )));
             }
@@ -2584,5 +2608,92 @@ mod tests {
         );
         let result = access.validate_handoff_completion();
         assert!(result.is_err(), "Duplicate witnesses should not be counted");
+    }
+
+    #[test]
+    fn test_handoff_unauthorized_witnesses_rejected() {
+        // Test that witnesses not in the authorized list are not counted
+        // This prevents gaming by having random DIDs attest to completion
+        let entity = create_test_entity();
+        let authorized_witness1 = "did:icn:authorized1".to_string();
+        let authorized_witness2 = "did:icn:authorized2".to_string();
+        let unauthorized_witness = "did:icn:attacker".to_string();
+
+        let mut access = ResourceAccess::new(
+            "high-value-resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Transfer equipment".to_string()],
+                    witnesses: Some(vec![
+                        authorized_witness1.clone(),
+                        authorized_witness2.clone(),
+                    ]),
+                    min_witness_signatures: Some(2), // Need 2 authorized witnesses
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Try to complete with one authorized and one unauthorized witness
+        // Should fail because only 1 valid witness (the other is not in the authorized list)
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Transfer equipment", 0)
+                .with_witness(authorized_witness1.clone())
+                .with_witness(unauthorized_witness.clone()), // Not authorized!
+        );
+        let result = access.validate_handoff_completion();
+        assert!(
+            result.is_err(),
+            "Should reject when unauthorized witnesses are used to meet threshold"
+        );
+
+        // Now complete with both authorized witnesses - should pass
+        access.usage_log.pop_back();
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Transfer equipment", 0)
+                .with_witness(authorized_witness1.clone())
+                .with_witness(authorized_witness2.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(
+            result.is_ok(),
+            "Should pass with all authorized witnesses: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_handoff_impossible_witness_config() {
+        // Test that configurations with min_signatures > witnesses.len() are detected
+        let entity = create_test_entity();
+        let witness = "did:icn:witness".to_string();
+
+        let access = ResourceAccess::new(
+            "resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Step 1".to_string()],
+                    witnesses: Some(vec![witness.clone()]), // Only 1 witness
+                    min_witness_signatures: Some(5),        // But need 5 signatures!
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Should fail because the configuration is impossible to satisfy
+        let result = access.validate_handoff_completion();
+        assert!(
+            result.is_err(),
+            "Should detect impossible witness configuration"
+        );
+        if let Err(AccessError::DutyUnfulfilled(msg)) = result {
+            assert!(
+                msg.contains("5 witness signatures but only 1 witnesses are configured"),
+                "Error message should explain the impossible configuration: {}",
+                msg
+            );
+        }
     }
 }
