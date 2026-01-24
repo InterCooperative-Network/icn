@@ -164,18 +164,31 @@ pub enum StewardshipDuty {
 ///   (overall duty checking still performs a linear scan over the usage log)
 /// - Clear documentation of expected event categories
 /// - Explicit metadata prevents gaming (e.g., adding "maintenance" to unrelated descriptions)
+///
+/// # Note on `duty_id` fields
+///
+/// The `duty_id` fields in `Maintenance` and `CommunityBenefit` are reserved for
+/// future use to correlate events with specific duty definitions. Currently,
+/// `check_duties()` only matches on the variant type, not the `duty_id` value.
+///
+/// Planned use cases for `duty_id`:
+/// - Tracking which specific maintenance requirement was fulfilled
+/// - Correlating events with governance-defined duty catalogs
+/// - Generating detailed compliance reports per duty
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DutyEventType {
-    /// Maintenance task completion with optional duty identifier
+    /// Maintenance task completion
     Maintenance {
-        /// Optional duty identifier for tracking specific maintenance requirements
+        /// Optional identifier correlating this event with a specific duty definition.
+        /// Reserved for future use (see enum-level docs).
         duty_id: Option<String>,
     },
     /// Usage or status report
     Report,
-    /// Community benefit provided with optional duty identifier
+    /// Community benefit provided
     CommunityBenefit {
-        /// Optional duty identifier for tracking specific benefit requirements
+        /// Optional identifier correlating this event with a specific duty definition.
+        /// Reserved for future use (see enum-level docs).
         duty_id: Option<String>,
     },
     /// Handoff procedure step completion
@@ -183,8 +196,8 @@ pub enum DutyEventType {
         /// Index of the step in the handoff procedure (0-based)
         step_index: usize,
     },
-    /// General usage (not duty-specific)
-    General,
+    /// General usage event (not duty-specific)
+    GeneralUsage,
 }
 
 /// Event recording resource usage
@@ -223,10 +236,79 @@ impl UsageEvent {
         }
     }
 
+    // === Convenience constructors for common duty types ===
+
+    /// Create a maintenance event
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let event = UsageEvent::maintenance(timestamp, "Weekly watering completed")
+    ///     .with_witness("did:icn:witness1".to_string());
+    /// access.record_usage_event(event)?;
+    /// ```
+    pub fn maintenance(timestamp: u64, description: impl Into<String>) -> Self {
+        Self::with_duty_type(
+            timestamp,
+            description.into(),
+            DutyEventType::Maintenance { duty_id: None },
+        )
+    }
+
+    /// Create a report event
+    pub fn report(timestamp: u64, description: impl Into<String>) -> Self {
+        Self::with_duty_type(timestamp, description.into(), DutyEventType::Report)
+    }
+
+    /// Create a community benefit event
+    pub fn community_benefit(timestamp: u64, description: impl Into<String>) -> Self {
+        Self::with_duty_type(
+            timestamp,
+            description.into(),
+            DutyEventType::CommunityBenefit { duty_id: None },
+        )
+    }
+
+    /// Create a handoff step event
+    pub fn handoff_step(timestamp: u64, description: impl Into<String>, step_index: usize) -> Self {
+        Self::with_duty_type(
+            timestamp,
+            description.into(),
+            DutyEventType::HandoffStep { step_index },
+        )
+    }
+
+    // === Witness management ===
+
     /// Add a witness to this event
+    ///
+    /// Witness DIDs should be in the format `did:icn:<identifier>`.
+    /// Invalid DIDs are accepted for backward compatibility but may be
+    /// rejected in future versions.
     pub fn with_witness(mut self, witness_did: String) -> Self {
         self.witnesses.push(witness_did);
         self
+    }
+
+    /// Add a validated witness to this event
+    ///
+    /// Returns `None` if the DID format is invalid.
+    /// Valid DID format: `did:icn:<identifier>` where identifier is non-empty.
+    pub fn with_validated_witness(mut self, witness_did: String) -> Option<Self> {
+        if Self::is_valid_did_format(&witness_did) {
+            self.witnesses.push(witness_did);
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    /// Check if a string is a valid DID format
+    ///
+    /// Valid format: `did:icn:<identifier>` where identifier is non-empty alphanumeric.
+    fn is_valid_did_format(did: &str) -> bool {
+        did.starts_with("did:icn:")
+            && did.len() > 8
+            && did[8..].chars().all(|c| c.is_alphanumeric() || c == ':')
     }
 
     /// Validate that this event has sufficient unique witnesses
@@ -1537,12 +1619,112 @@ mod tests {
             Some(DutyEventType::HandoffStep { step_index: 0 })
         ));
 
-        // Test General
+        // Test GeneralUsage
         let general_event =
-            UsageEvent::with_duty_type(4000, "Regular use".to_string(), DutyEventType::General);
+            UsageEvent::with_duty_type(4000, "Regular use".to_string(), DutyEventType::GeneralUsage);
         assert!(matches!(
             general_event.duty_type,
-            Some(DutyEventType::General)
+            Some(DutyEventType::GeneralUsage)
+        ));
+    }
+
+    #[test]
+    fn test_convenience_constructors() {
+        // Test maintenance convenience constructor
+        let event = UsageEvent::maintenance(1000, "Weekly watering");
+        assert!(matches!(
+            event.duty_type,
+            Some(DutyEventType::Maintenance { duty_id: None })
+        ));
+        assert_eq!(event.description, "Weekly watering");
+
+        // Test report convenience constructor
+        let event = UsageEvent::report(2000, "Monthly status update");
+        assert!(matches!(event.duty_type, Some(DutyEventType::Report)));
+
+        // Test community_benefit convenience constructor
+        let event = UsageEvent::community_benefit(3000, "Workshop hosted");
+        assert!(matches!(
+            event.duty_type,
+            Some(DutyEventType::CommunityBenefit { duty_id: None })
+        ));
+
+        // Test handoff_step convenience constructor
+        let event = UsageEvent::handoff_step(4000, "Document state", 2);
+        assert!(matches!(
+            event.duty_type,
+            Some(DutyEventType::HandoffStep { step_index: 2 })
+        ));
+    }
+
+    #[test]
+    fn test_witness_did_format_validation() {
+        // Valid DIDs
+        assert!(UsageEvent::is_valid_did_format("did:icn:abc123"));
+        assert!(UsageEvent::is_valid_did_format("did:icn:node:abc123"));
+
+        // Invalid DIDs
+        assert!(!UsageEvent::is_valid_did_format("did:icn:")); // Empty identifier
+        assert!(!UsageEvent::is_valid_did_format("did:key:abc123")); // Wrong method
+        assert!(!UsageEvent::is_valid_did_format("abc123")); // Not a DID
+        assert!(!UsageEvent::is_valid_did_format("")); // Empty
+    }
+
+    #[test]
+    fn test_with_validated_witness() {
+        let event = UsageEvent::maintenance(1000, "Task completed");
+
+        // Valid witness
+        let event = event.with_validated_witness("did:icn:witness1".to_string());
+        assert!(event.is_some());
+        let event = event.unwrap();
+        assert_eq!(event.witnesses.len(), 1);
+
+        // Invalid witness returns None
+        let event = event.with_validated_witness("invalid".to_string());
+        assert!(event.is_none());
+    }
+
+    #[test]
+    fn test_backward_compat_deserialization() {
+        // Simulate old JSON format with event_type (aliased to duty_type)
+        let old_json = r#"{
+            "timestamp": 1234567890,
+            "description": "Old event",
+            "witnesses": [],
+            "event_type": "Report"
+        }"#;
+
+        let event: UsageEvent = serde_json::from_str(old_json).unwrap();
+        assert_eq!(event.timestamp, 1234567890);
+        assert_eq!(event.description, "Old event");
+        assert!(matches!(event.duty_type, Some(DutyEventType::Report)));
+
+        // New JSON format with duty_type works too
+        let new_json = r#"{
+            "timestamp": 1234567890,
+            "description": "New event",
+            "witnesses": [],
+            "duty_type": "Report"
+        }"#;
+
+        let event: UsageEvent = serde_json::from_str(new_json).unwrap();
+        assert!(matches!(event.duty_type, Some(DutyEventType::Report)));
+
+        // Complex variant with duty_id
+        let complex_json = r#"{
+            "timestamp": 1234567890,
+            "description": "Maintenance",
+            "witnesses": ["did:icn:witness1"],
+            "duty_type": { "Maintenance": { "duty_id": "maint-001" } }
+        }"#;
+
+        let event: UsageEvent = serde_json::from_str(complex_json).unwrap();
+        assert!(matches!(
+            event.duty_type,
+            Some(DutyEventType::Maintenance {
+                duty_id: Some(ref id)
+            }) if id == "maint-001"
         ));
     }
 }
