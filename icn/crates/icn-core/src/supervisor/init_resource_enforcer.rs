@@ -63,7 +63,9 @@ impl ResourceAccessStore for NullResourceAccessStore {
     }
 
     fn apply_received_revocation(&self, _event: &RevocationEvent) -> Result<()> {
-        // No-op: no storage to update
+        // No-op: NullResourceAccessStore is used in testing/development scenarios
+        // where persistent storage is not required. In production, this is replaced
+        // with SledResourceAccessStoreAdapter for actual persistence.
         Ok(())
     }
 }
@@ -86,10 +88,16 @@ impl SledResourceAccessStoreAdapter {
 
 impl ResourceAccessStore for SledResourceAccessStoreAdapter {
     fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>> {
-        // Scan all access entries by prefix
-        // The icn-ledger trait doesn't have a list_all method, so we need to
-        // scan the store directly. For now, return empty to maintain compatibility.
-        // TODO: Extend icn-ledger trait with list_all or use store scan
+        // TODO: The icn-ledger trait doesn't have a list_all method.
+        // This limitation means the resource enforcer won't detect resources
+        // stored via icn-ledger's interface for enforcement checks.
+        // 
+        // Options to fix:
+        // 1. Extend icn-ledger trait with list_all method
+        // 2. Expose store.scan() method to scan by prefix
+        // 3. Add scan capability to this adapter by accessing store directly
+        //
+        // For now, return empty to maintain compatibility.
         Ok(Vec::new())
     }
 

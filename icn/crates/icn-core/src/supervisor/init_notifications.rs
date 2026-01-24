@@ -795,6 +795,10 @@ pub async fn handle_resource_revocation(
                     Err(e) => {
                         // If the resource access doesn't exist, it may have already been revoked
                         // or never existed on this node. This is expected in distributed systems.
+                        //
+                        // Note: This string matching is fragile but necessary since icn-ledger
+                        // doesn't expose typed errors. When icn-ledger adds structured errors,
+                        // this should be updated to match on error types instead.
                         if e.to_string().contains("Access not found") {
                             debug!(
                                 resource_id = %event.resource_id,
