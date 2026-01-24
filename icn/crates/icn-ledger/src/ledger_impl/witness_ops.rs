@@ -51,7 +51,7 @@ use tracing::debug;
 /// # Errors
 /// Returns error if any signature is invalid, expired, from the future, or
 /// has insufficient trust score
-pub(crate) fn validate_witness_signatures(
+pub(crate) async fn validate_witness_signatures(
     ledger: &Ledger,
     witnessed: &crate::types::WitnessedEntry,
 ) -> Result<()> {
@@ -124,6 +124,7 @@ pub(crate) fn validate_witness_signatures(
             // Validate trust score if required
             if let Some(min_trust) = config.min_witness_trust {
                 validate_witness_trust_score(ledger, &sig.witness, &transaction_parties, min_trust)
+                    .await
                     .with_context(|| {
                         format!("Trust validation failed for witness {}", sig.witness)
                     })?;
@@ -150,7 +151,7 @@ pub(crate) fn validate_witness_signatures(
 ///
 /// # Errors
 /// Returns error if witness has insufficient trust with any party
-fn validate_witness_trust_score(
+async fn validate_witness_trust_score(
     ledger: &Ledger,
     witness: &Did,
     parties: &HashSet<Did>,
@@ -180,7 +181,7 @@ fn validate_witness_trust_score(
         // Since we can't modify the trust graph here, we'll need to compute
         // the trust score by checking if the party has an edge to the witness
         let trust_score = {
-            let graph = trust_graph.blocking_read();
+            let graph = trust_graph.read().await;
             
             // Compute trust score from party to witness
             // Note: This uses the current trust graph's own_did perspective
