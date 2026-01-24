@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use icn_gossip::GossipActor;
-use icn_ledger::ResourceAccessStore as LedgerResourceAccessStore;
+use icn_ledger::use_access::ResourceAccessStore as LedgerResourceAccessStore;
+use icn_ledger::use_access::SledResourceAccessStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -76,40 +77,65 @@ impl ResourceAccessStore for NullResourceAccessStore {
 /// This bridges the two different trait definitions, allowing the
 /// sled-backed persistent storage to work with the resource enforcer.
 pub struct SledResourceAccessStoreAdapter {
-    inner: icn_ledger::SledResourceAccessStore,
+    inner: SledResourceAccessStore,
 }
 
 impl SledResourceAccessStoreAdapter {
     /// Create a new adapter wrapping a SledResourceAccessStore
-    pub fn new(inner: icn_ledger::SledResourceAccessStore) -> Self {
+    pub fn new(inner: SledResourceAccessStore) -> Self {
         Self { inner }
     }
 }
 
 impl ResourceAccessStore for SledResourceAccessStoreAdapter {
     fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>> {
-        // TODO: The icn-ledger trait doesn't have a list_all method.
-        // This limitation means the resource enforcer won't detect resources
-        // stored via icn-ledger's interface for enforcement checks.
-        // 
-        // Options to fix:
-        // 1. Extend icn-ledger trait with list_all method
-        // 2. Expose store.scan() method to scan by prefix
-        // 3. Add scan capability to this adapter by accessing store directly
+        // KNOWN LIMITATION: The icn-ledger trait doesn't have a list_all method.
+        // This means the resource enforcer cannot enumerate persisted resources
+        // for idle revocation enforcement checks when using this adapter.
+        //
+        // Impact: Resources stored via icn-ledger will NOT be automatically
+        // revoked when idle. Only resources stored via direct ResourceAccessStore
+        // implementations with proper list_all support will be enforced.
+        //
+        // Tracked in: Issue #850 (feat(ledger): Add list_all to ResourceAccessStore trait)
+        //
+        // Workarounds:
+        // 1. Use in-memory store for development/testing (has full list_all support)
+        // 2. Add list_all to icn-ledger's ResourceAccessStore trait
+        // 3. Access store.scan() directly if available
         //
         // For now, return empty to maintain compatibility.
         Ok(Vec::new())
     }
 
-    fn update(&mut self, _resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()> {
+    fn update(&mut self, resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()> {
+        // Validate that the access object's resource_id matches the provided resource_id.
+        // This prevents accidental updates to the wrong resource if the caller passes
+        // mismatched parameters.
+        if access.resource_id != resource_id {
+            return Err(anyhow::anyhow!(
+                "Resource ID mismatch: expected '{}', but access object has '{}'",
+                resource_id,
+                access.resource_id
+            ));
+        }
         // Re-grant the updated access (overwrites existing)
         LedgerResourceAccessStore::grant(&self.inner, access.clone())
     }
 
     fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
-        // Revocation events are handled by the GossipResourceAccessStore wrapper.
-        // This adapter only handles the persistent storage aspect.
-        Ok(())
+        // This adapter only handles the persistent storage aspect and should not
+        // be used directly for emitting revocations. Returning an error here
+        // prevents silent revocation drops if the adapter is used without the
+        // required gossip wrapper.
+        //
+        // In production, use GossipResourceAccessStore which wraps this adapter
+        // and handles gossip publication.
+        Err(anyhow::anyhow!(
+            "SledResourceAccessStoreAdapter::emit_revocation called directly; \
+             this adapter must be wrapped by GossipResourceAccessStore to \
+             publish revocation events via gossip"
+        ))
     }
 
     fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()> {

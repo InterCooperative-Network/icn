@@ -783,6 +783,32 @@ pub fn init_descriptions() {
         "Individual resource revocation events"
     );
 
+    // Resource revocation gossip metrics (cluster-wide propagation)
+    describe_counter!(
+        "icn_resource_revocations_received_total",
+        "Total revocation events received from gossip"
+    );
+    describe_counter!(
+        "icn_resource_revocations_applied_total",
+        "Revocation events successfully applied to local storage"
+    );
+    describe_counter!(
+        "icn_resource_revocations_idempotent_total",
+        "Revocation events skipped (already revoked or not present)"
+    );
+    describe_counter!(
+        "icn_resource_revocations_failed_total",
+        "Revocation events that failed to apply to local storage"
+    );
+    describe_counter!(
+        "icn_resource_revocation_gossip_published_total",
+        "Revocation events published to gossip for cluster notification"
+    );
+    describe_counter!(
+        "icn_resource_revocation_gossip_failures_total",
+        "Revocation events that failed to publish to gossip"
+    );
+
     // Core infrastructure metrics (dead-letter queue)
     describe_counter!(
         "icn_core_dead_letter_enqueued_total",

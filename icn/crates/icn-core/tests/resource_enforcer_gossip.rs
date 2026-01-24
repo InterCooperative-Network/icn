@@ -217,11 +217,16 @@ async fn test_gossip_store_wrapper_integration() {
 }
 
 #[tokio::test]
-async fn test_cross_node_revocation_propagation() {
-    // This test validates that revocation events are:
-    // 1. Published to gossip by the originating node
-    // 2. Received by other nodes via gossip
-    // 3. Applied to local storage on receiving nodes
+async fn test_revocation_storage_application_and_idempotency() {
+    // This test validates the storage application logic for revocation events:
+    // 1. Revocation events are published to gossip by the originating node
+    // 2. The apply_received_revocation method correctly updates local storage
+    // 3. Duplicate revocations are handled idempotently
+    //
+    // NOTE: This test manually calls apply_received_revocation to simulate
+    // gossip notification delivery. It does NOT test the full end-to-end
+    // gossip propagation path (that would require setting up the notification
+    // callback system and waiting for actual gossip message delivery).
 
     use icn_core::supervisor::init_resource_enforcer::GossipResourceAccessStore;
     use std::sync::Mutex;
@@ -272,9 +277,10 @@ async fn test_cross_node_revocation_propagation() {
     }
 
     let node2_inner_store = Box::new(MockResourceAccessStore::new(node2_revocations.clone()));
-    let node2_store = Arc::new(tokio::sync::RwLock::new(
-        GossipResourceAccessStore::new(node2_inner_store, node2_gossip.clone()),
-    ));
+    let node2_store = Arc::new(tokio::sync::RwLock::new(GossipResourceAccessStore::new(
+        node2_inner_store,
+        node2_gossip.clone(),
+    )));
 
     // Create a resource on node 1
     let entity = EntityId::from_did(&node1_did);
@@ -289,9 +295,7 @@ async fn test_cross_node_revocation_propagation() {
     )
     .with_rules(AntiSpeculationRules::strict());
 
-    node1_store
-        .update("cross-node-resource", &access)
-        .unwrap();
+    node1_store.update("cross-node-resource", &access).unwrap();
 
     // Node 1 emits a revocation (simulating auto-revocation by enforcer)
     let revocation_event = RevocationEvent {
@@ -312,11 +316,7 @@ async fn test_cross_node_revocation_propagation() {
     // Verify node 1 logged the revocation
     {
         let logged = node1_revocations.lock().unwrap();
-        assert_eq!(
-            logged.len(),
-            1,
-            "Node 1 should have logged the revocation"
-        );
+        assert_eq!(logged.len(), 1, "Node 1 should have logged the revocation");
         assert_eq!(logged[0].resource_id, "cross-node-resource");
         assert_eq!(logged[0].idle_seconds, 15 * 24 * 3600);
     }

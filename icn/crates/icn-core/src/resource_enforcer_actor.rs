@@ -202,6 +202,16 @@ pub trait ResourceAccessStore: Send + Sync {
     /// This is called when a revocation event is received from the cluster.
     /// The implementation should update the local storage to mark the access as revoked.
     /// Returns Ok if the revocation was applied or if it was already revoked (idempotent).
+    ///
+    /// # Design Note: `&self` vs `&mut self`
+    ///
+    /// This method intentionally takes `&self` instead of `&mut self` so that it can be
+    /// invoked while the store is held under a shared/read lock, allowing concurrent
+    /// processing of received revocations from multiple gossip messages.
+    ///
+    /// Implementors **must** use interior mutability (e.g., wrapping internal state in
+    /// `RwLock`, `Mutex`, or using atomic operations) to perform any necessary updates
+    /// in a thread-safe way.
     fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()>;
 }
 
