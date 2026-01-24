@@ -210,6 +210,7 @@ impl LedgerNotificationTrigger {
             LedgerEvent::BatchBalanceChanged(_) => {}
             LedgerEvent::ForkResolved(_) => {}
             LedgerEvent::RollbackPerformed(_) => {}
+            LedgerEvent::ResourceAccessTransferred(_) => {}
         }
 
         Ok(())

@@ -109,8 +109,8 @@ pub use types::{
 
 // Use-based resource access (anti-rent-seeking)
 pub use use_access::{
-    AccessError, AccessModel, AntiSpeculationRules, DutyEventType, ResourceAccess, StewardshipDuty,
-    UsageEvent,
+    AccessError, AccessModel, AntiSpeculationRules, DutyEventType, ResourceAccess,
+    ResourceAccessStore, SledResourceAccessStore, StewardshipDuty, UsageEvent,
 };
 
 // Labor shares and cooperative bonds (Razeto integration)
@@ -127,7 +127,8 @@ pub use fx::{FxConfig, FxConversionDetails, FxError, PreparedFxTransfer};
 pub use events::{
     create_shared_emitter, BalanceChanged, BatchBalanceChanged, CrossCurrencyTransfer,
     ForkDetected, ForkResolved, LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen,
-    RollbackPerformed, SharedEventEmitter, TransactionConfirmed, TransactionCreated, Transfer,
+    ResourceAccessTransferred, RollbackPerformed, SharedEventEmitter, TransactionConfirmed,
+    TransactionCreated, Transfer,
 };
 
 // Exchange rate oracle

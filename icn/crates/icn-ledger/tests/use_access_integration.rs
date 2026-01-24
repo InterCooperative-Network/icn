@@ -273,3 +273,151 @@ fn test_proposal_payload_type_name() {
     assert_eq!(payload.type_name(), "resource_access");
     assert!(!payload.is_emergency());
 }
+
+#[tokio::test]
+async fn test_resource_access_transfer_with_events() {
+    use icn_ledger::{
+        create_shared_emitter, LedgerEvent, ResourceAccessStore, SledResourceAccessStore,
+    };
+    use icn_store::SledStore;
+    use std::sync::Arc;
+
+    // Setup
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let access_store = SledResourceAccessStore::new(store);
+    let event_emitter = create_shared_emitter();
+    let mut receiver = event_emitter.subscribe();
+
+    let alice_keypair = KeyPair::generate().unwrap();
+    let alice = EntityId::from_did(alice_keypair.did());
+    let bob_keypair = KeyPair::generate().unwrap();
+    let bob = EntityId::from_did(bob_keypair.did());
+
+    // Create and store access for Alice
+    let access = icn_ledger::ResourceAccess::new(
+        "community-tool".to_string(),
+        alice.clone(),
+        icn_ledger::AccessModel::UseAccess {
+            duration_seconds: 7 * 24 * 3600, // 1 week
+            renewable: true,
+            max_accumulated: 4,
+        },
+    )
+    .with_rules(icn_ledger::AntiSpeculationRules::standard());
+
+    access_store.put(&access).unwrap();
+
+    // Transfer to Bob (free transfer - should succeed)
+    let current_time = access.granted_at + 3600;
+    let (old_holder, updated_access) = access_store
+        .transfer("community-tool", bob.clone(), None, current_time)
+        .unwrap();
+
+    // Verify transfer
+    assert_eq!(old_holder, alice);
+    assert_eq!(updated_access.holder, bob);
+
+    // Emit event
+    let access_model_str = match updated_access.model {
+        icn_ledger::AccessModel::UseAccess { .. } => "UseAccess",
+        icn_ledger::AccessModel::Stewardship { .. } => "Stewardship",
+    };
+
+    event_emitter.emit_resource_access_transferred(
+        updated_access.resource_id.clone(),
+        old_holder.to_string(),
+        updated_access.holder.to_string(),
+        None,
+        access_model_str.to_string(),
+        current_time,
+    );
+
+    // Verify event was emitted
+    let event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+        .await
+        .expect("timeout")
+        .expect("receive error");
+
+    match event {
+        LedgerEvent::ResourceAccessTransferred(transfer_event) => {
+            assert_eq!(transfer_event.resource_id, "community-tool");
+            assert_eq!(transfer_event.from_holder, alice.to_string());
+            assert_eq!(transfer_event.to_holder, bob.to_string());
+            assert_eq!(transfer_event.price, None);
+            assert_eq!(transfer_event.access_model, "UseAccess");
+            assert_eq!(transfer_event.transferred_at, current_time);
+        }
+        _ => panic!("Expected ResourceAccessTransferred event"),
+    }
+}
+
+#[test]
+fn test_stewardship_handoff_procedure_complete_flow() {
+    use icn_ledger::{ResourceAccessStore, SledResourceAccessStore};
+    use icn_store::SledStore;
+    use std::sync::Arc;
+
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let access_store = SledResourceAccessStore::new(store);
+
+    let alice_keypair = KeyPair::generate().unwrap();
+    let alice = EntityId::from_did(alice_keypair.did());
+    let bob_keypair = KeyPair::generate().unwrap();
+    let bob = EntityId::from_did(bob_keypair.did());
+
+    let handoff_steps = vec![
+        "Document maintenance schedule".to_string(),
+        "Train incoming steward".to_string(),
+        "Transfer access keys".to_string(),
+    ];
+
+    // Create stewardship access with handoff procedure
+    let mut access = icn_ledger::ResourceAccess::new(
+        "community-workshop".to_string(),
+        alice.clone(),
+        icn_ledger::AccessModel::Stewardship {
+            duties: vec![icn_ledger::StewardshipDuty::HandoffProcedure {
+                steps: handoff_steps.clone(),
+            }],
+            review_period_seconds: 90 * 24 * 3600,
+        },
+    );
+
+    let current_time = access.granted_at + 1000;
+
+    // Complete handoff steps
+    // Note: Use delimiter format (colon) so segment matching recognizes the step
+    access
+        .record_usage(
+            current_time,
+            "Document maintenance schedule: completed".to_string(),
+        )
+        .unwrap();
+    access
+        .record_usage(
+            current_time + 100,
+            "Train incoming steward: completed training session".to_string(),
+        )
+        .unwrap();
+    access
+        .record_usage(
+            current_time + 200,
+            "Transfer access keys: keys securely transferred".to_string(),
+        )
+        .unwrap();
+
+    access_store.put(&access).unwrap();
+
+    // Now transfer should succeed
+    let (old_holder, updated_access) = access_store
+        .transfer("community-workshop", bob.clone(), None, current_time + 300)
+        .unwrap();
+
+    assert_eq!(old_holder, alice);
+    assert_eq!(updated_access.holder, bob);
+
+    // Verify persisted
+    let retrieved = access_store.get("community-workshop").unwrap().unwrap();
+    assert_eq!(retrieved.holder, bob);
+    assert_eq!(retrieved.usage_log.len(), 3); // All handoff steps recorded
+}
