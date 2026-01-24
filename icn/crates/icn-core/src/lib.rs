@@ -40,6 +40,10 @@ pub use node::{
 };
 pub use policy::{Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy};
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
+pub use resource_enforcer_actor::{
+    EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
+    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent,
+};
 pub use runtime::Runtime;
 pub use storage_challenge::{ChallengeScheduler, ChallengeSchedulerHandle};
 pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
@@ -49,8 +53,4 @@ pub use upgrade::{
 };
 pub use upgrade_actor::{
     UpgradeActor, UpgradeHandle, UpgradeMessage, UpgradeStatus, UPGRADE_TOPIC,
-};
-pub use resource_enforcer_actor::{
-    EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
-    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent,
 };

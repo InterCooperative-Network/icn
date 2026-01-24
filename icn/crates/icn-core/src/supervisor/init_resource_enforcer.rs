@@ -55,7 +55,7 @@ impl ResourceAccessStore for NullResourceAccessStore {
         Ok(())
     }
 
-    fn emit_revocation(&self, _event: RevocationEvent) -> Result<()> {
+    fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
         // No-op: no event bus to emit to
         Ok(())
     }
@@ -81,11 +81,9 @@ mod tests {
             }
         }
 
+        #[allow(dead_code)]
         fn add(&self, id: String, access: ResourceAccess) {
-            self.resources
-                .lock()
-                .map(|mut r| r.insert(id, access))
-                .ok();
+            self.resources.lock().map(|mut r| r.insert(id, access)).ok();
         }
     }
 
@@ -95,7 +93,10 @@ mod tests {
                 .resources
                 .lock()
                 .map_err(|e| anyhow::anyhow!("Lock error: {}", e))?;
-            Ok(resources.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            Ok(resources
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
         }
 
         fn update(&mut self, resource_id: &str, access: &ResourceAccess) -> Result<()> {
@@ -107,7 +108,7 @@ mod tests {
             Ok(())
         }
 
-        fn emit_revocation(&self, _event: RevocationEvent) -> Result<()> {
+        fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
             Ok(())
         }
     }

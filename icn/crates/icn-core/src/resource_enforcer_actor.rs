@@ -166,7 +166,7 @@ pub trait ResourceAccessStore: Send + Sync {
     fn update(&mut self, resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()>;
 
     /// Emit a revocation event for audit trail
-    fn emit_revocation(&self, event: RevocationEvent) -> Result<()>;
+    fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()>;
 }
 
 /// Resource Access Enforcer Actor
@@ -219,8 +219,7 @@ impl ResourceAccessEnforcerActor {
             );
 
             // Periodic enforcement check
-            let mut check_interval =
-                interval(Duration::from_secs(config.check_interval_seconds));
+            let mut check_interval = interval(Duration::from_secs(config.check_interval_seconds));
 
             loop {
                 tokio::select! {
@@ -263,6 +262,10 @@ impl ResourceAccessEnforcerActor {
     }
 
     /// Perform an enforcement check on all resource access entries
+    ///
+    /// This method batches updates to reduce lock contention. It first identifies
+    /// all resources that need revocation during a read phase, then acquires the
+    /// write lock once to perform all updates together.
     async fn perform_enforcement_check(&mut self) -> Result<EnforcementResult> {
         let current_time = icn_time::current_timestamp_secs();
         debug!("Starting enforcement check at timestamp {}", current_time);
@@ -270,21 +273,22 @@ impl ResourceAccessEnforcerActor {
         self.stats.checks_performed += 1;
         self.stats.last_check_time = Some(current_time);
 
-        let mut resources_checked = 0;
-        let mut revocations = 0;
-
-        // Lock the store and get all resource access entries
+        // Phase 1: Read all resources and identify which need revocation
         let store_read = self.store.read().await;
         let all_resources = store_read
             .list_all()
             .context("Failed to list resource access entries")?;
         drop(store_read);
 
-        // Process in batches
+        let resources_checked = all_resources.len();
+
+        // Collect resources that need revocation (resource_id, updated_access, event)
+        let mut pending_revocations: Vec<(String, icn_ledger::ResourceAccess, RevocationEvent)> =
+            Vec::new();
+
+        // Process in batches to identify revocations
         for chunk in all_resources.chunks(self.config.batch_size) {
             for (resource_id, mut access) in chunk.iter().cloned() {
-                resources_checked += 1;
-
                 // Skip already revoked resources
                 if access.is_revoked() {
                     continue;
@@ -301,22 +305,15 @@ impl ResourceAccessEnforcerActor {
                         "Automatically revoked: idle for {}s (max: {}s)",
                         idle_seconds, max_idle_seconds
                     );
-                    
+
                     info!(
                         "Revoking access for resource '{}' (holder: {}): {}",
                         resource_id, access.holder, reason
                     );
 
                     access.revoke(reason.clone());
-                    revocations += 1;
 
-                    // Update the store
-                    let mut store_write = self.store.write().await;
-                    store_write
-                        .update(&resource_id, &access)
-                        .context("Failed to update resource access")?;
-
-                    // Emit revocation event
+                    // Prepare revocation event
                     let event = RevocationEvent {
                         resource_id: resource_id.clone(),
                         holder: access.holder.clone(),
@@ -325,20 +322,31 @@ impl ResourceAccessEnforcerActor {
                         idle_seconds,
                     };
 
-                    store_write
-                        .emit_revocation(event)
-                        .context("Failed to emit revocation event")?;
-                    
-                    drop(store_write);
-
-                    // Update metrics
-                    metrics::counter!(
-                        "icn_resource_access_revoked_total",
-                        "resource_id" => resource_id.clone()
-                    )
-                    .increment(1);
+                    pending_revocations.push((resource_id, access, event));
                 }
             }
+        }
+
+        let revocations = pending_revocations.len();
+
+        // Phase 2: Acquire write lock once and apply all revocations
+        if !pending_revocations.is_empty() {
+            let mut store_write = self.store.write().await;
+
+            for (resource_id, access, event) in pending_revocations {
+                store_write
+                    .update(&resource_id, &access)
+                    .context("Failed to update resource access")?;
+
+                store_write
+                    .emit_revocation(event)
+                    .context("Failed to emit revocation event")?;
+
+                // Update per-revocation metrics
+                metrics::counter!("icn_resource_access_revoked_total").increment(1);
+            }
+
+            drop(store_write);
         }
 
         self.stats.resources_checked += resources_checked as u64;
@@ -353,8 +361,7 @@ impl ResourceAccessEnforcerActor {
         metrics::counter!("icn_resource_enforcer_checks_total").increment(1);
         metrics::counter!("icn_resource_enforcer_resources_checked_total")
             .increment(resources_checked as u64);
-        metrics::counter!("icn_resource_enforcer_revocations_total")
-            .increment(revocations as u64);
+        metrics::counter!("icn_resource_enforcer_revocations_total").increment(revocations as u64);
 
         Ok(EnforcementResult {
             resources_checked,
@@ -388,12 +395,10 @@ mod tests {
         }
 
         fn add_resource(&self, id: String, access: ResourceAccess) {
-            self.resources
-                .lock()
-                .map(|mut r| r.insert(id, access))
-                .ok();
+            self.resources.lock().map(|mut r| r.insert(id, access)).ok();
         }
 
+        #[allow(dead_code)]
         fn get_events(&self) -> Vec<RevocationEvent> {
             self.events.lock().map(|e| e.clone()).unwrap_or_default()
         }
@@ -401,24 +406,30 @@ mod tests {
 
     impl ResourceAccessStore for MockResourceAccessStore {
         fn list_all(&self) -> Result<Vec<(String, ResourceAccess)>> {
-            let resources = self.resources.lock().map_err(|e| {
-                anyhow::anyhow!("Failed to lock resources: {}", e)
-            })?;
-            Ok(resources.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            let resources = self
+                .resources
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock resources: {}", e))?;
+            Ok(resources
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect())
         }
 
         fn update(&mut self, resource_id: &str, access: &ResourceAccess) -> Result<()> {
-            let mut resources = self.resources.lock().map_err(|e| {
-                anyhow::anyhow!("Failed to lock resources: {}", e)
-            })?;
+            let mut resources = self
+                .resources
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock resources: {}", e))?;
             resources.insert(resource_id.to_string(), access.clone());
             Ok(())
         }
 
-        fn emit_revocation(&self, event: RevocationEvent) -> Result<()> {
-            let mut events = self.events.lock().map_err(|e| {
-                anyhow::anyhow!("Failed to lock events: {}", e)
-            })?;
+        fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
+            let mut events = self
+                .events
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock events: {}", e))?;
             events.push(event);
             Ok(())
         }
@@ -443,7 +454,10 @@ mod tests {
         let serialized = serde_json::to_string(&config).unwrap();
         let deserialized: ResourceEnforcerConfig = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(config.check_interval_seconds, deserialized.check_interval_seconds);
+        assert_eq!(
+            config.check_interval_seconds,
+            deserialized.check_interval_seconds
+        );
         assert_eq!(config.batch_size, deserialized.batch_size);
         assert_eq!(config.enabled, deserialized.enabled);
     }
@@ -451,7 +465,7 @@ mod tests {
     #[tokio::test]
     async fn test_enforcement_check_idle_revocation() {
         let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
-        
+
         // Create a resource with strict idle rules (7 days)
         let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
         let mut access = ResourceAccess::new(
@@ -481,11 +495,11 @@ mod tests {
         // For now, we test the logic manually
 
         let current_time = access.granted_at + 8 * 24 * 3600;
-        
+
         // Manually test the validation logic
         let validation_result = access.validate_rules(current_time);
         assert!(validation_result.is_err());
-        
+
         if let Err(icn_ledger::AccessError::IdleTooLong { idle_seconds, .. }) = validation_result {
             assert!(idle_seconds >= 7 * 24 * 3600);
         } else {
@@ -496,7 +510,7 @@ mod tests {
     #[tokio::test]
     async fn test_enforcement_skip_already_revoked() {
         let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
-        
+
         let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
         let mut access = ResourceAccess::new(
             "test-resource-002".to_string(),
