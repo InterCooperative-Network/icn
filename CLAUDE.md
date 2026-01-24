@@ -57,7 +57,7 @@ The Cargo workspace is located in the `icn/` subdirectory. All build/test comman
 - `icn-coop` - Cooperative management & lifecycle
 - `icn-community` - Community structures & civic engine
 - `icn-entity` - Unified entity model (individuals/coops/federations)
-- `icn-api` - API types and definitions
+- `icn-api` - Shared service layer for RPC and Gateway (unified validation, error handling)
 - `icn-encoding` - Serialization utilities
 - `icn-testkit` - Test utilities for multi-node scenarios
 
