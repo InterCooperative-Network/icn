@@ -224,6 +224,21 @@ use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Action for resource access proposal
+///
+/// The model is embedded in the Grant variant to ensure at compile-time
+/// that all grant proposals include an access model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResourceAccessAction {
+    /// Grant access to a resource with the specified access model
+    Grant {
+        /// The access model defining duration, renewability, and duties
+        model: icn_ledger::AccessModel,
+    },
+    /// Revoke access from a resource
+    Revoke,
+}
+
 /// Unique identifier for a proposal
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ProposalId(pub String);
@@ -615,6 +630,33 @@ pub enum ProposalPayload {
     /// Federation actions require member approval to ensure democratic control
     /// over inter-cooperative relationships.
     Federation(FederationProposal),
+
+    // === Use-Based Resource Access (anti-rent-seeking) ===
+    /// Resource access grant or revocation
+    ///
+    /// Implements use-based access model to prevent rent-seeking and speculation.
+    /// Resources are accessed based on active use rather than passive ownership.
+    ///
+    /// Access models:
+    /// - UseAccess: Time-limited, renewable access with accumulation limits
+    /// - Stewardship: Access tied to duties and responsibilities
+    ///
+    /// Enforces anti-speculation rules:
+    /// - Use it or lose it (idle revocation)
+    /// - No profit transfer (can't sell access for profit)
+    ///
+    /// Note: The access model is embedded in the `action` field for `Grant` actions,
+    /// ensuring type-safe proposals (can't create a Grant without a model).
+    ResourceAccess {
+        /// Grant (with model) or revoke access
+        action: ResourceAccessAction,
+        /// Resource identifier
+        resource_id: String,
+        /// Entity receiving/losing access
+        holder: icn_entity::EntityId,
+        /// Reason for grant/revocation
+        reason: String,
+    },
 }
 
 impl ProposalPayload {
@@ -640,6 +682,7 @@ impl ProposalPayload {
             ProposalPayload::ShareRedemption { .. } => "share_redemption",
             ProposalPayload::BondIssuance { .. } => "bond_issuance",
             ProposalPayload::Federation(_) => "federation",
+            ProposalPayload::ResourceAccess { .. } => "resource_access",
         }
     }
 

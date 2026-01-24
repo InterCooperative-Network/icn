@@ -422,6 +422,46 @@ impl GovernanceEventHandler {
             ProposalPayload::Federation(federation_proposal) => {
                 self.handle_federation_proposal(proposal_id, federation_proposal);
             }
+            // Resource access governance (use-based access model)
+            ProposalPayload::ResourceAccess {
+                action,
+                resource_id,
+                holder,
+                reason,
+            } => {
+                self.handle_resource_access(proposal_id, action, resource_id, holder, reason);
+            }
+        }
+    }
+
+    /// Handle a resource access proposal
+    ///
+    /// This handles granting or revoking use-based access to resources
+    /// as part of the anti-rent-seeking model.
+    fn handle_resource_access(
+        &self,
+        proposal_id: ProposalId,
+        action: icn_governance::ResourceAccessAction,
+        resource_id: String,
+        holder: icn_entity::EntityId,
+        reason: String,
+    ) {
+        match action {
+            icn_governance::ResourceAccessAction::Grant { model } => {
+                info!(
+                    "🔑 Resource access {} granted: {} to {} ({:?}) - {}",
+                    proposal_id.0, resource_id, holder, model, reason
+                );
+                // TODO: Integrate with ResourceAccessStore when implemented
+                // The actual storage and enforcement will be added in follow-up PRs
+            }
+            icn_governance::ResourceAccessAction::Revoke => {
+                info!(
+                    "🚫 Resource access {} revoked: {} from {} (reason: {})",
+                    proposal_id.0, resource_id, holder, reason
+                );
+                // TODO: Integrate with ResourceAccessStore when implemented
+            }
         }
     }
 
