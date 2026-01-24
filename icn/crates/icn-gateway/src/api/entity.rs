@@ -25,7 +25,9 @@
 //! appropriate role in the target entity.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
+use icn_entity::{
+    CooperativeEntity, EntityError, EntityId, EntityType, Membership, MembershipRole,
+};
 use icn_identity::Did;
 use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
@@ -1279,10 +1281,9 @@ pub async fn initiate_dissolution(
             // Success - proceed with audit trail
         }
         Err(e) => {
-            // Check if this is a concurrent modification error
-            let error_str = e.to_string();
-            if error_str.contains("Concurrent modification")
-                || error_str.contains("ConcurrentModification")
+            // Check if this is a concurrent modification error using type-safe matching
+            if e.downcast_ref::<EntityError>()
+                .is_some_and(|entity_err| matches!(entity_err, EntityError::ConcurrentModification(_)))
             {
                 return Err(GatewayError::Conflict(
                     "Entity was modified by another operation. Please retry.".to_string(),
@@ -1339,6 +1340,12 @@ pub async fn initiate_dissolution(
             }
         };
         rollback_entity.status = icn_entity::EntityStatus::Active;
+        // Use update() instead of update_if_version() for rollback because:
+        // 1. We just fetched the current entity, so we have the latest version
+        // 2. In a rollback scenario, restoring consistency is critical - we don't
+        //    want version conflicts to prevent recovery
+        // 3. If another operation modified the entity concurrently, our rollback
+        //    to Active is still safe since we're restoring a valid base state
         if let Err(rollback_err) = entity_mgr.update(rollback_entity).await {
             gateway_metrics::entity_audit_rollback_failure_inc("initiate_dissolution");
             tracing::error!(
