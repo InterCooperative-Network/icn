@@ -60,6 +60,11 @@ impl ResourceAccessStore for MockResourceAccessStore {
         self.revocations.lock().unwrap().push(event);
         Ok(())
     }
+
+    fn apply_received_revocation(&self, event: &RevocationEvent) -> anyhow::Result<()> {
+        self.revocations.lock().unwrap().push(event.clone());
+        Ok(())
+    }
 }
 
 #[tokio::test]

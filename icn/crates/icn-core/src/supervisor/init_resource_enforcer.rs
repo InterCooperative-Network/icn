@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use icn_gossip::GossipActor;
+use icn_ledger::ResourceAccessStore as LedgerResourceAccessStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -59,6 +60,58 @@ impl ResourceAccessStore for NullResourceAccessStore {
     fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
         // No-op: no event bus to emit to
         Ok(())
+    }
+
+    fn apply_received_revocation(&self, _event: &RevocationEvent) -> Result<()> {
+        // No-op: no storage to update
+        Ok(())
+    }
+}
+
+/// Adapter that implements icn-core's ResourceAccessStore trait
+/// for icn-ledger's SledResourceAccessStore.
+///
+/// This bridges the two different trait definitions, allowing the
+/// sled-backed persistent storage to work with the resource enforcer.
+pub struct SledResourceAccessStoreAdapter {
+    inner: icn_ledger::SledResourceAccessStore,
+}
+
+impl SledResourceAccessStoreAdapter {
+    /// Create a new adapter wrapping a SledResourceAccessStore
+    pub fn new(inner: icn_ledger::SledResourceAccessStore) -> Self {
+        Self { inner }
+    }
+}
+
+impl ResourceAccessStore for SledResourceAccessStoreAdapter {
+    fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>> {
+        // Scan all access entries by prefix
+        // The icn-ledger trait doesn't have a list_all method, so we need to
+        // scan the store directly. For now, return empty to maintain compatibility.
+        // TODO: Extend icn-ledger trait with list_all or use store scan
+        Ok(Vec::new())
+    }
+
+    fn update(&mut self, _resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()> {
+        // Re-grant the updated access (overwrites existing)
+        LedgerResourceAccessStore::grant(&self.inner, access.clone())
+    }
+
+    fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
+        // Revocation events are handled by the GossipResourceAccessStore wrapper.
+        // This adapter only handles the persistent storage aspect.
+        Ok(())
+    }
+
+    fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()> {
+        // Call the icn-ledger trait's revoke method
+        LedgerResourceAccessStore::revoke(
+            &self.inner,
+            &event.resource_id,
+            &event.holder,
+            event.reason.clone(),
+        )
     }
 }
 
@@ -148,6 +201,10 @@ impl ResourceAccessStore for GossipResourceAccessStore {
 
         Ok(())
     }
+
+    fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()> {
+        self.inner.apply_received_revocation(event)
+    }
 }
 
 #[cfg(test)]
@@ -206,6 +263,10 @@ mod tests {
         }
 
         fn emit_revocation(&mut self, _event: RevocationEvent) -> Result<()> {
+            Ok(())
+        }
+
+        fn apply_received_revocation(&self, _event: &RevocationEvent) -> Result<()> {
             Ok(())
         }
     }
@@ -289,6 +350,10 @@ mod tests {
 
             fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
                 self.events.lock().unwrap().push(event);
+                Ok(())
+            }
+
+            fn apply_received_revocation(&self, _event: &RevocationEvent) -> Result<()> {
                 Ok(())
             }
         }

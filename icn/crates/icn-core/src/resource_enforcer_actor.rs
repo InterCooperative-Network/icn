@@ -196,6 +196,13 @@ pub trait ResourceAccessStore: Send + Sync {
 
     /// Emit a revocation event for audit trail
     fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()>;
+
+    /// Apply a received revocation from gossip to local storage
+    ///
+    /// This is called when a revocation event is received from the cluster.
+    /// The implementation should update the local storage to mark the access as revoked.
+    /// Returns Ok if the revocation was applied or if it was already revoked (idempotent).
+    fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()>;
 }
 
 /// Resource Access Enforcer Actor

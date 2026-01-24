@@ -32,6 +32,11 @@ pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHan
 pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
 pub type EvidenceValidatorHandle = Arc<icn_trust::EvidenceValidator>;
 pub type EntityHandleType = icn_entity::EntityHandle;
+pub type ResourceAccessStoreHolder = Arc<
+    tokio::sync::RwLock<
+        Option<Arc<tokio::sync::RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>,
+    >,
+>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -78,6 +83,8 @@ pub struct NotificationDeps {
     pub evidence_validator: Option<EvidenceValidatorHandle>,
     /// Entity handle for entity registry operations
     pub entity_handle: Option<EntityHandleType>,
+    /// Resource access store holder (set after resource enforcer spawns)
+    pub resource_access_store: ResourceAccessStoreHolder,
 }
 
 /// Handle trust attestation entries
@@ -758,7 +765,10 @@ pub async fn handle_entity_update(entry_data: Vec<u8>, entity_handle: EntityHand
 }
 
 /// Handle resource revocation events from cluster
-pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
+pub async fn handle_resource_revocation(
+    entry_data: Vec<u8>,
+    store_handle: Option<&Arc<tokio::sync::RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>,
+) {
     match serde_json::from_slice::<crate::resource_enforcer_actor::RevocationEvent>(&entry_data) {
         Ok(event) => {
             info!(
@@ -769,13 +779,45 @@ pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
                 "Received revocation event from cluster"
             );
 
-            // TODO: When a real ResourceAccessStore backend is integrated,
-            // this handler should:
-            // 1. Update local cache/store with the revocation
-            // 2. Propagate to any local components that need to know
-            // 3. Emit metrics for monitoring
+            // Update local storage with the revocation if store is available
+            if let Some(store) = store_handle {
+                let store_guard = store.read().await;
+                
+                match store_guard.apply_received_revocation(&event) {
+                    Ok(()) => {
+                        info!(
+                            resource_id = %event.resource_id,
+                            holder = %event.holder,
+                            "Successfully applied revocation to local storage"
+                        );
+                        metrics::counter!("icn_resource_revocations_applied_total").increment(1);
+                    }
+                    Err(e) => {
+                        // If the resource access doesn't exist, it may have already been revoked
+                        // or never existed on this node. This is expected in distributed systems.
+                        if e.to_string().contains("Access not found") {
+                            debug!(
+                                resource_id = %event.resource_id,
+                                holder = %event.holder,
+                                "Revocation received for non-existent access (already revoked or not present)"
+                            );
+                            metrics::counter!("icn_resource_revocations_idempotent_total").increment(1);
+                        } else {
+                            warn!(
+                                resource_id = %event.resource_id,
+                                holder = %event.holder,
+                                error = %e,
+                                "Failed to apply revocation to local storage"
+                            );
+                            metrics::counter!("icn_resource_revocations_failed_total").increment(1);
+                        }
+                    }
+                }
+            } else {
+                debug!("Resource access store not available, skipping local revocation");
+            }
 
-            // For now, just log and update metrics
+            // Update metrics for received revocations
             metrics::counter!("icn_resource_revocations_received_total").increment(1);
         }
         Err(e) => {
@@ -917,8 +959,14 @@ pub fn create_notification_callback(
             }
         } else if topic == crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC {
             if let Some(data) = entry_data {
+                let store_holder = deps.resource_access_store.clone();
                 tokio::spawn(async move {
-                    handle_resource_revocation(data).await;
+                    let store_guard = store_holder.read().await;
+                    if let Some(store) = store_guard.as_ref() {
+                        handle_resource_revocation(data, Some(store)).await;
+                    } else {
+                        handle_resource_revocation(data, None).await;
+                    }
                 });
             }
         } else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY
