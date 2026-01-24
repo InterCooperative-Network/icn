@@ -1069,7 +1069,9 @@ mod tests {
 
         // Try to record usage - should fail
         let result = access.record_usage(access.granted_at + 100, "Usage attempt".to_string());
-        assert!(matches!(result, Err(AccessError::Revoked(msg)) if msg.contains("Failed duty check")));
+        assert!(
+            matches!(result, Err(AccessError::Revoked(msg)) if msg.contains("Failed duty check"))
+        );
     }
 
     #[test]
@@ -1124,6 +1126,8 @@ mod tests {
 
         // UseAccess never needs review
         assert!(!access.needs_review(access.granted_at + 365 * 24 * 3600));
-        assert!(access.check_review_period(access.granted_at + 365 * 24 * 3600).is_ok());
+        assert!(access
+            .check_review_period(access.granted_at + 365 * 24 * 3600)
+            .is_ok());
     }
 }
