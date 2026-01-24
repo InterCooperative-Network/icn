@@ -349,9 +349,12 @@ impl ResourceAccessEnforcerActor {
             resources_checked, revocations
         );
 
-        // Update metrics
-        metrics::gauge!("icn_resource_enforcer_resources_checked").set(resources_checked as f64);
-        metrics::gauge!("icn_resource_enforcer_revocations").set(revocations as f64);
+        // Update metrics - using counters for cumulative tracking
+        metrics::counter!("icn_resource_enforcer_checks_total").increment(1);
+        metrics::counter!("icn_resource_enforcer_resources_checked_total")
+            .increment(resources_checked as u64);
+        metrics::counter!("icn_resource_enforcer_revocations_total")
+            .increment(revocations as u64);
 
         Ok(EnforcementResult {
             resources_checked,
