@@ -1032,4 +1032,25 @@ fn spawn_background_tasks(
         "Connection candidate announcement task spawned (interval: {} seconds)",
         config.network.nat_dial.candidate_announce_interval_secs
     );
+
+    // Resource access enforcer
+    if config.supervisor.resource_enforcer.enabled {
+        let store = Arc::new(RwLock::new(
+            super::init_resource_enforcer::NullResourceAccessStore,
+        ));
+        if let Ok(_enforcer_handle) = super::init_resource_enforcer::spawn_resource_enforcer(
+            &config.supervisor.resource_enforcer,
+            store,
+            shutdown_tx,
+        ) {
+            info!(
+                "Resource access enforcer task spawned (interval: {} seconds)",
+                config.supervisor.resource_enforcer.check_interval_seconds
+            );
+        } else {
+            warn!("Failed to spawn resource access enforcer");
+        }
+    } else {
+        info!("Resource access enforcer disabled by configuration");
+    }
 }

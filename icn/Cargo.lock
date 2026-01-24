@@ -2885,6 +2885,7 @@ dependencies = [
  "icn-store",
  "icn-time",
  "icn-trust",
+ "metrics",
  "portpicker",
  "rand 0.8.5",
  "rustls",

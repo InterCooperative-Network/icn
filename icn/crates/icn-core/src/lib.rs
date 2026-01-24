@@ -17,6 +17,7 @@ pub mod identity;
 pub mod node;
 pub mod policy;
 pub mod replication;
+pub mod resource_enforcer_actor;
 pub mod restart;
 pub mod runtime;
 pub mod storage_challenge;
@@ -48,4 +49,8 @@ pub use upgrade::{
 };
 pub use upgrade_actor::{
     UpgradeActor, UpgradeHandle, UpgradeMessage, UpgradeStatus, UPGRADE_TOPIC,
+};
+pub use resource_enforcer_actor::{
+    EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
+    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent,
 };
