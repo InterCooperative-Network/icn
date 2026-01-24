@@ -371,3 +371,104 @@ async fn test_time_based_batch_flushing() {
     // Note: There may still be pending messages in the queue that weren't flushed yet
     // This is expected behavior - the second message may start a new batch
 }
+
+#[test]
+fn test_batch_byte_threshold_triggers_send() {
+    let kp = KeyPair::generate().unwrap();
+    let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
+    gossip.set_keypair(kp.clone());
+
+    // Enable batching with very small byte limit to ensure bytes trigger flush
+    // (but large message count limit so it's the bytes that trigger)
+    let config = BatchingConfig {
+        max_batch_size: 100,
+        max_batch_bytes: 200, // Very small byte limit - single message is ~130 bytes
+        max_delay: Duration::from_secs(10),
+        ..BatchingConfig::default()
+    };
+    gossip.set_batching_config(config);
+
+    let sent_messages = Arc::new(Mutex::new(Vec::new()));
+    let sent_clone = sent_messages.clone();
+
+    gossip.set_send_callback(Arc::new(move |_recipient, message| {
+        sent_clone.lock().unwrap().push(message);
+    }));
+
+    // Send enough messages to exceed byte limit
+    // Each Announce message is roughly 130+ bytes when serialized
+    // With 200 byte limit, 2 messages should trigger flush
+    for i in 0..3 {
+        let msg = GossipMessage::Announce {
+            hash: [i as u8; 32],
+            author: kp.did().clone(),
+            clock: icn_gossip::VectorClock::new(),
+            topic: "test".to_string(),
+        };
+        gossip.send_message(Some(kp.did().clone()), msg);
+    }
+
+    // Batch should have been sent due to byte limit
+    let sent = sent_messages.lock().unwrap();
+
+    // The test verifies that batches are sent when byte threshold is exceeded.
+    // Note: This may result in multiple batches if each message triggers the limit.
+    assert!(
+        !sent.is_empty(),
+        "At least one batch should have been sent due to byte threshold"
+    );
+
+    // Verify we got batch messages (not individual messages)
+    for msg in sent.iter() {
+        assert!(
+            matches!(msg, GossipMessage::Batch { .. }),
+            "Expected Batch message, got {:?}",
+            msg.variant_name()
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_oversized_batch_rejected() {
+    let kp1 = KeyPair::generate().unwrap();
+    let kp2 = KeyPair::generate().unwrap();
+
+    let mut gossip = GossipActor::new(kp2.did().clone(), trust_lookup_all());
+    gossip.set_keypair(kp2.clone());
+
+    // Create a topic
+    let topic = Topic::new("test:batch".to_string(), AccessControl::Public);
+    gossip.create_topic(topic);
+
+    // Create a batch with too many messages (> 100)
+    let mut messages = Vec::new();
+    for i in 0..101 {
+        messages.push(GossipMessage::Announce {
+            hash: [i as u8; 32],
+            author: kp1.did().clone(),
+            clock: icn_gossip::VectorClock::new(),
+            topic: "test:batch".to_string(),
+        });
+    }
+
+    let oversized_batch = GossipMessage::Batch {
+        batch_id: 1,
+        messages,
+        compressed: false,
+    };
+
+    // Processing should fail due to message count limit
+    let result = gossip.handle_message(kp1.did(), oversized_batch).await;
+    assert!(
+        result.is_err(),
+        "Oversized batch should be rejected: {:?}",
+        result
+    );
+
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("too large") || err_msg.contains("exceeds limit"),
+        "Error should mention size limit: {}",
+        err_msg
+    );
+}

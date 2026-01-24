@@ -818,6 +818,26 @@ impl GossipActor {
     }
 
     /// Enqueue a message for batching, or send immediately if batching is disabled
+    ///
+    /// # Batching Behavior
+    ///
+    /// Messages are accumulated in per-recipient batches and sent when ANY of:
+    /// - `max_batch_size` messages accumulated
+    /// - `max_batch_bytes` total bytes accumulated
+    /// - `max_delay` time elapsed since first message AND a new message arrives
+    ///
+    /// # Time-Based Flushing
+    ///
+    /// **Important**: Time-based flushing is evaluated when a new message is added.
+    /// A single message in a batch will NOT be sent automatically after `max_delay`
+    /// unless either:
+    /// - Another message arrives (triggering the check), OR
+    /// - The background flusher task runs (see [`start_batch_flusher`])
+    ///
+    /// The `start_batch_flusher` background task checks for expired batches every
+    /// `max_delay/2` milliseconds, ensuring batches don't wait indefinitely.
+    /// For applications requiring strict latency guarantees, use a smaller `max_delay`
+    /// or consider `BatchingConfig::low_latency()`.
     pub(crate) fn send_message_batched(&self, recipient: Option<Did>, message: GossipMessage) {
         if !self.batching_config.enabled {
             // Batching disabled - send immediately
@@ -826,6 +846,16 @@ impl GossipActor {
         }
 
         // Calculate actual serialized size of the message
+        //
+        // TODO(perf): This serializes the message to calculate its size, and then
+        // the message is serialized again when actually sent. This double-serialization
+        // adds CPU overhead. Potential optimizations:
+        // 1. Cache the serialized form and reuse it when sending
+        // 2. Use estimated sizes based on message type (less accurate but faster)
+        // 3. Track message size during message construction
+        //
+        // Benchmark before optimizing - the network I/O savings from batching
+        // likely outweigh the serialization cost for typical message sizes.
         let message_size = icn_encoding::encode(&message)
             .map(|v| v.len())
             .unwrap_or_else(|e| {
@@ -836,9 +866,21 @@ impl GossipActor {
         // Add to pending batch and track size
         let (batch_len, batch_bytes, is_first_message) = {
             let Ok(mut batches) = self.pending_batches.lock() else {
-                // Mutex poisoned - fall back to immediate send and record metric
-                // This indicates a serious bug: a thread panicked while holding the lock
-                error!("Batch mutex poisoned, sending immediately - this indicates a serious bug");
+                // Mutex poisoned - a thread panicked while holding the lock.
+                // This is a serious bug that requires investigation.
+                //
+                // Design decision: Degrade gracefully rather than panic.
+                // In a distributed system, one node crashing can cascade to others.
+                // By falling back to immediate send, we maintain availability while
+                // alerting operators via ERROR logs and metrics.
+                //
+                // Operators should alert on `icn_gossip_batch_mutex_poisoned_total > 0`
+                // and investigate immediately. Any occurrence indicates a bug that
+                // needs fixing.
+                error!(
+                    "Batch mutex poisoned, sending immediately - THIS IS A SERIOUS BUG. \
+                     Investigate immediately! Check logs for the originating panic."
+                );
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 self.send_message_immediate(recipient, message);
                 return;
@@ -916,7 +958,14 @@ impl GossipActor {
             return;
         }
 
-        // Batch IDs use wrapping_add to handle u64 overflow gracefully.
+        // Generate batch ID for tracking and debugging.
+        //
+        // Uniqueness scope: Session-local only. Batch IDs reset to 0 on restart
+        // and are not guaranteed unique across nodes or across restarts. They are
+        // intended for debugging and log correlation within a single session, not
+        // for deduplication or ordering across the network.
+        //
+        // Overflow handling: Uses wrapping_add to handle u64 overflow gracefully.
         // With 10 batches/second, it would take ~58 billion years to wrap.
         let batch_id = match self.next_batch_id.lock() {
             Ok(mut id) => {
@@ -931,8 +980,14 @@ impl GossipActor {
             }
         };
 
-        // For now, we don't compress at this layer - compression happens at the
-        // network/protocol layer when the entire Batch message is serialized
+        // Compression is deferred (Issue #330 - batching implemented, compression TBD).
+        // The infrastructure exists (compress_batch/decompress_batch) but isn't wired.
+        // When implementing:
+        // 1. Check if batch_bytes > compression_threshold
+        // 2. Compress message data with zstd (level 3 for speed/ratio balance)
+        // 3. Set compressed = true in the Batch message
+        // 4. Update handle_batch to decompress before processing
+        // 5. Add metrics for compression ratio and timing
         let compressed = false;
 
         // Record metrics
@@ -1675,6 +1730,16 @@ pub fn start_digest_emitter(
 /// This spawns a tokio task that periodically flushes batches that have
 /// exceeded their max_delay time. This ensures messages don't sit in batches
 /// indefinitely when no new messages arrive to trigger a flush.
+///
+/// # Timing Behavior
+///
+/// The flusher checks for expired batches every `max_delay/2` milliseconds.
+/// This means the maximum additional latency for a single-message batch is
+/// approximately `max_delay/2` (in the worst case where the message arrives
+/// just after a check).
+///
+/// For strict latency requirements, configure a smaller `max_delay` or use
+/// `BatchingConfig::low_latency()` which uses a 5ms delay.
 ///
 /// # Parameters
 /// - `gossip_handle`: Shared handle to the gossip actor
