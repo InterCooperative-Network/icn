@@ -575,7 +575,8 @@ async fn spawn_actors_with_identity(
         ledger_store,
         shutdown_tx,
         background_tasks,
-    );
+    )
+    .await;
 
     // Spawn steward actor if enabled
     let steward_services = super::init_steward::init_steward_services(
@@ -941,7 +942,7 @@ fn spawn_storage_challenge_scheduler(
 
 /// Spawn all background maintenance tasks
 #[allow(clippy::too_many_arguments)]
-fn spawn_background_tasks(
+async fn spawn_background_tasks(
     config: &Config,
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
     network_handle: &icn_net::NetworkHandle,
@@ -1035,23 +1036,45 @@ fn spawn_background_tasks(
 
     // Resource access enforcer
     if config.supervisor.resource_enforcer.enabled {
-        // TODO: Replace `NullResourceAccessStore` with a real persistent backend.
-        //
-        // Integration plan:
-        // 1. Storage backend:
-        //    - Use the sled-backed SledResourceAccessStore from `icn-ledger` as the
-        //      concrete implementation for `ResourceAccessStore`.
-        // 2. Persistence layout:
-        //    - Resource access entries are persisted in the ledger store using the
-        //      `ledger:resource_access:` key prefix (see icn-ledger/src/use_access.rs).
-        // 3. Revocation events:
-        //    - When access is revoked, emit revocation events via:
-        //        * a dedicated gossip topic for cluster-wide propagation, and/or
-        //        * the existing notification/observer system for local subscribers.
-        //      Wire through `spawn_resource_enforcer` so revocations are observable.
-        let store = Arc::new(RwLock::new(
-            super::init_resource_enforcer::NullResourceAccessStore,
-        ));
+        // Wrap NullResourceAccessStore with gossip integration
+        // In the future, this should be replaced with a real persistent backend
+        // (see TODO comment below about SledResourceAccessStore)
+        let inner_store = Box::new(super::init_resource_enforcer::NullResourceAccessStore);
+        let gossip_store = super::init_resource_enforcer::GossipResourceAccessStore::new(
+            inner_store,
+            gossip_handle.clone(),
+        );
+        let store = Arc::new(RwLock::new(gossip_store));
+
+        // Create and subscribe to revocations topic for cluster-wide notifications
+        {
+            let mut gossip = gossip_handle.write().await;
+
+            // Create the topic with explicit retention for audit trail.
+            // - 7-day retention provides sufficient window for cluster synchronization
+            // - 1000 max entries prevents unbounded growth while allowing burst activity
+            gossip.create_topic(icn_gossip::types::Topic {
+                name: crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC.to_string(),
+                acl: icn_gossip::AccessControl::Public,
+                scope: icn_gossip::types::Scope::Global,
+                min_trust_threshold: None,
+                retention: std::time::Duration::from_secs(86400 * 7), // 7 days
+                max_entries: 1000,
+            });
+
+            if let Err(e) = gossip
+                .subscribe(
+                    crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC,
+                    did.clone(),
+                )
+                .await
+            {
+                warn!("Failed to subscribe to resource:revocations topic: {}", e);
+            } else {
+                info!("Subscribed to resource:revocations topic");
+            }
+        }
+
         // The resource enforcer actor is fully autonomous and only needs the shutdown
         // signal via the broadcast channel. We intentionally discard the handle for now;
         // future work may expose it via the Gateway API for manual checks or statistics
@@ -1062,12 +1085,24 @@ fn spawn_background_tasks(
             shutdown_tx,
         ) {
             info!(
-                "Resource access enforcer task spawned (interval: {} seconds)",
+                "Resource access enforcer task spawned (interval: {} seconds, gossip: enabled)",
                 config.supervisor.resource_enforcer.check_interval_seconds
             );
         } else {
             warn!("Failed to spawn resource access enforcer");
         }
+
+        // TODO: Replace `NullResourceAccessStore` with a real persistent backend.
+        //
+        // Integration plan:
+        // 1. Storage backend:
+        //    - Use the sled-backed SledResourceAccessStore from `icn-ledger` as the
+        //      concrete implementation for `ResourceAccessStore`.
+        // 2. Persistence layout:
+        //    - Resource access entries are persisted in the ledger store using the
+        //      `ledger:resource_access:` key prefix (see icn-ledger/src/use_access.rs).
+        // 3. The GossipResourceAccessStore wrapper will handle cluster-wide notification
+        //    when the real backend is integrated.
     } else {
         info!("Resource access enforcer disabled by configuration");
     }

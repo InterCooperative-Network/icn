@@ -10,6 +10,7 @@
 //! - Validates each against idle period rules
 //! - Auto-revokes access that exceeds max_idle_period_seconds
 //! - Emits revocation events for audit trail
+//! - Publishes revocations to gossip topic for cluster-wide notification
 //!
 //! # Configuration
 //! ```rust,ignore
@@ -28,6 +29,9 @@ use tokio::time::{interval, Duration, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::runtime::ShutdownRx;
+
+/// Gossip topic for resource access revocation events
+pub const RESOURCE_REVOCATIONS_TOPIC: &str = "resource:revocations";
 
 /// Configuration for resource access enforcement
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
