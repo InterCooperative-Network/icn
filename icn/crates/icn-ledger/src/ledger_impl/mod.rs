@@ -6,3 +6,4 @@
 pub mod balances;
 pub mod fork_ops;
 pub mod queries;
+pub mod witness_ops;
