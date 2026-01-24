@@ -15,8 +15,10 @@ use tracing::{debug, error, info, instrument, warn};
 
 /// Compress batch data with zstd
 ///
-/// Note: This is infrastructure for future batch compression and is not yet
-/// wired into the gossip protocol. See `GossipMessage::Batch::compressed`.
+/// Infrastructure for future batch compression (will be wired when
+/// compression_threshold logic is implemented). See `GossipMessage::Batch::compressed`
+/// for the protocol-level support. Compression will be added when benchmarks show
+/// it provides benefit for typical gossip message sizes.
 #[allow(dead_code)]
 fn compress_batch(data: &[u8]) -> Result<Vec<u8>> {
     zstd::encode_all(data, 3).context("Failed to compress batch")
@@ -24,8 +26,7 @@ fn compress_batch(data: &[u8]) -> Result<Vec<u8>> {
 
 /// Decompress batch data with zstd
 ///
-/// Note: This is infrastructure for future batch compression and is not yet
-/// wired into the gossip protocol. See `GossipMessage::Batch::compressed`.
+/// Infrastructure for future batch compression. See [`compress_batch`] for details.
 #[allow(dead_code)]
 fn decompress_batch(data: &[u8]) -> Result<Vec<u8>> {
     zstd::decode_all(data).context("Failed to decompress batch")
@@ -827,7 +828,10 @@ impl GossipActor {
         // Calculate actual serialized size of the message
         let message_size = icn_encoding::encode(&message)
             .map(|v| v.len())
-            .unwrap_or(500); // Fallback to conservative estimate if serialization fails
+            .unwrap_or_else(|e| {
+                debug!(error = %e, "Failed to serialize message for size estimation, using fallback");
+                500 // Fallback to conservative estimate if serialization fails
+            });
 
         // Add to pending batch and track size
         let (batch_len, batch_bytes, is_first_message) = {

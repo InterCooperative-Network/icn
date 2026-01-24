@@ -346,7 +346,9 @@ async fn test_time_based_batch_flushing() {
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     // Send another message - this should trigger time-based batch flush
-    // Note: Time-based flushing only happens when a new message arrives
+    // Note: In production, `start_batch_flusher()` provides background flushing every
+    // `max_delay/2` milliseconds. This test manually triggers flushing by sending a message
+    // rather than relying on the background task, to avoid timing dependencies.
     let msg2 = GossipMessage::Announce {
         hash: [2u8; 32],
         author: kp.did().clone(),
