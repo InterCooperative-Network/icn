@@ -353,6 +353,14 @@ pub fn init_descriptions() {
         "icn_gossip_batch_compression_ratio",
         "Batch compression ratio (original/compressed)"
     );
+    describe_counter!(
+        "icn_gossip_batches_rejected_oversized_total",
+        "Total number of batches rejected for exceeding size limit"
+    );
+    describe_counter!(
+        "icn_gossip_batch_mutex_poisoned_total",
+        "Total number of mutex poisoning events in batch processing"
+    );
 
     // Scalability metrics (Phase 19)
     describe_counter!(
@@ -2249,6 +2257,17 @@ pub mod gossip {
     /// Record batch compression ratio (original/compressed)
     pub fn batch_compression_ratio_record(ratio: f64) {
         histogram!("icn_gossip_batch_compression_ratio").record(ratio);
+    }
+
+    /// Track rejected batches due to exceeding size limit
+    pub fn batches_rejected_oversized_inc() {
+        counter!("icn_gossip_batches_rejected_oversized_total").increment(1);
+    }
+
+    /// Track mutex poisoning events in batch processing
+    /// This indicates a serious bug - a thread panicked while holding a lock
+    pub fn batch_mutex_poisoned_inc() {
+        counter!("icn_gossip_batch_mutex_poisoned_total").increment(1);
     }
 }
 

@@ -60,9 +60,9 @@ mod subscriptions;
 pub use bloom::{BloomFilter, BloomResizeConfig};
 pub use error::{GossipError, Result};
 pub use gossip::{
-    start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor,
-    GossipHandle, PeerSamplingCallback, SendMessageCallback, StorageContentNotFoundCallback,
-    StorageProofCallback,
+    start_batch_flusher, start_digest_emitter, start_partition_checker, EntryNotificationCallback,
+    GossipActor, GossipHandle, PeerSamplingCallback, SendMessageCallback,
+    StorageContentNotFoundCallback, StorageProofCallback,
 };
 pub use partition::{
     Conflict, ConflictResolution, ConflictResolver, DataType, GapDirection, PartitionConfig,

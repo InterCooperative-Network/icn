@@ -17,8 +17,21 @@ use anyhow::Result;
 use icn_identity::Did;
 use tracing::{debug, warn};
 
+/// Maximum messages allowed in a single batch to prevent DoS attacks.
+/// A malicious peer could otherwise send unbounded batches.
+const MAX_BATCH_MESSAGES: usize = 100;
+
+/// Minimum trust score required to process messages (same as protocol.rs)
+const MIN_TRUST_FOR_MESSAGE: f64 = 0.1;
+
 impl GossipActor {
     /// Handle a batch of gossip messages
+    ///
+    /// # Security
+    ///
+    /// This handler performs the same trust validation as `handle_message_inner`:
+    /// - Rejects messages from senders with trust score below MIN_TRUST_FOR_MESSAGE
+    /// - Rejects batches with more than MAX_BATCH_MESSAGES to prevent DoS
     pub(crate) async fn handle_batch(
         &mut self,
         sender: &Did,
@@ -26,6 +39,60 @@ impl GossipActor {
         messages: Vec<GossipMessage>,
         _compressed: bool,
     ) -> Result<()> {
+        // CRITICAL: Validate batch size to prevent DoS attacks
+        if messages.len() > MAX_BATCH_MESSAGES {
+            warn!(
+                peer_did = %sender,
+                batch_id,
+                message_count = messages.len(),
+                max_allowed = MAX_BATCH_MESSAGES,
+                "Rejecting oversized batch"
+            );
+            icn_obs::metrics::gossip::batches_rejected_oversized_inc();
+            anyhow::bail!(
+                "Batch too large: {} messages exceeds limit of {}",
+                messages.len(),
+                MAX_BATCH_MESSAGES
+            );
+        }
+
+        // CRITICAL: Trust-gated message handling (same check as protocol.rs)
+        // Batches must not bypass the trust check that handle_message_inner performs
+        if let Some(ref trust_graph) = self.trust_graph {
+            if let Ok(tg) = trust_graph.try_read() {
+                match tg.compute_trust_score(sender) {
+                    Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
+                        warn!(
+                            peer_did = %sender,
+                            trust_score = score,
+                            min_required = MIN_TRUST_FOR_MESSAGE,
+                            batch_id,
+                            "Rejecting batch from low-trust sender"
+                        );
+                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                        anyhow::bail!(
+                            "Batch sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
+                        );
+                    }
+                    Ok(_) => {
+                        // Trust validated successfully
+                    }
+                    Err(e) => {
+                        // Unknown sender - reject by default
+                        debug!(
+                            peer_did = %sender,
+                            error = %e,
+                            batch_id,
+                            "Cannot compute trust score for batch sender"
+                        );
+                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                        anyhow::bail!("Cannot verify trust for batch sender {sender}: {e}");
+                    }
+                }
+            }
+            // If we can't acquire lock, skip trust check (avoid blocking)
+        }
+
         debug!(
             peer_did = %sender,
             batch_id,

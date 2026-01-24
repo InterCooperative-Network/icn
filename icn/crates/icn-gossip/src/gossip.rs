@@ -257,6 +257,10 @@ pub struct GossipActor {
     /// Uses Mutex for interior mutability to allow batching from &self methods
     pending_batches: std::sync::Mutex<HashMap<Option<Did>, Vec<GossipMessage>>>,
 
+    /// Accumulated batch sizes in bytes (recipient -> total serialized size)
+    /// Tracks actual serialized sizes instead of estimates for accurate batching
+    batch_sizes: std::sync::Mutex<HashMap<Option<Did>, usize>>,
+
     /// Last batch send time per recipient
     last_batch_time: std::sync::Mutex<HashMap<Option<Did>, Instant>>,
 
@@ -305,6 +309,7 @@ impl GossipActor {
             key_rotation_cache: crate::key_rotation::KeyRotationCache::new(), // Issue #469: Key rotation tracking
             batching_config: crate::types::BatchingConfig::default(),
             pending_batches: std::sync::Mutex::new(HashMap::new()),
+            batch_sizes: std::sync::Mutex::new(HashMap::new()),
             last_batch_time: std::sync::Mutex::new(HashMap::new()),
             next_batch_id: std::sync::Mutex::new(0),
         };
@@ -819,18 +824,41 @@ impl GossipActor {
             return;
         }
 
-        // Add to pending batch and check if this is the first message
-        let (batch_len, is_first_message) = {
+        // Calculate actual serialized size of the message
+        let message_size = icn_encoding::encode(&message)
+            .map(|v| v.len())
+            .unwrap_or(500); // Fallback to conservative estimate if serialization fails
+
+        // Add to pending batch and track size
+        let (batch_len, batch_bytes, is_first_message) = {
             let Ok(mut batches) = self.pending_batches.lock() else {
-                // Mutex poisoned - fall back to immediate send
-                warn!("Batch mutex poisoned, sending immediately");
+                // Mutex poisoned - fall back to immediate send and record metric
+                // This indicates a serious bug: a thread panicked while holding the lock
+                warn!("Batch mutex poisoned, sending immediately - this indicates a serious bug");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 self.send_message_immediate(recipient, message);
                 return;
             };
             let batch = batches.entry(recipient.clone()).or_default();
             let is_first = batch.is_empty();
             batch.push(message);
-            (batch.len(), is_first)
+            let batch_len = batch.len();
+
+            // Update accumulated size
+            let batch_bytes = match self.batch_sizes.lock() {
+                Ok(mut sizes) => {
+                    let size_entry = sizes.entry(recipient.clone()).or_insert(0);
+                    *size_entry += message_size;
+                    *size_entry
+                }
+                Err(_) => {
+                    warn!("Batch sizes mutex poisoned");
+                    icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
+                    batch_len * 500 // Fallback estimate
+                }
+            };
+
+            (batch_len, batch_bytes, is_first)
         };
 
         // Initialize batch timer when the first message is added
@@ -840,12 +868,6 @@ impl GossipActor {
                 time_guard.insert(recipient.clone(), Instant::now());
             }
         }
-
-        // Check if batch should be sent
-        // Conservative size estimate: 500 bytes per message average.
-        // This is intentionally conservative to prevent oversized batches.
-        // Most announce messages are ~200 bytes, but responses can be larger.
-        let batch_bytes = batch_len * 500;
 
         let time_exceeded = self
             .last_batch_time
@@ -871,9 +893,14 @@ impl GossipActor {
     pub fn flush_batch(&self, recipient: &Option<Did>) {
         let messages = {
             let Ok(mut batches) = self.pending_batches.lock() else {
-                warn!("Batch mutex poisoned, cannot flush");
+                warn!("Batch mutex poisoned, cannot flush - this indicates a serious bug");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
+            // Also clear the size tracking for this recipient
+            if let Ok(mut sizes) = self.batch_sizes.lock() {
+                sizes.remove(recipient);
+            }
             batches.remove(recipient)
         };
 
@@ -885,6 +912,8 @@ impl GossipActor {
             return;
         }
 
+        // Batch IDs use wrapping_add to handle u64 overflow gracefully.
+        // With 10 batches/second, it would take ~58 billion years to wrap.
         let batch_id = match self.next_batch_id.lock() {
             Ok(mut id) => {
                 let current = *id;
@@ -892,7 +921,8 @@ impl GossipActor {
                 current
             }
             Err(_) => {
-                warn!("Batch ID mutex poisoned, using 0");
+                warn!("Batch ID mutex poisoned, using 0 - this indicates a serious bug");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 0u64
             }
         };
@@ -923,6 +953,7 @@ impl GossipActor {
         let recipients: Vec<Option<Did>> = {
             let Ok(batches) = self.pending_batches.lock() else {
                 warn!("Batch mutex poisoned, cannot flush all");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
             batches.keys().cloned().collect()
@@ -930,6 +961,53 @@ impl GossipActor {
         for recipient in recipients {
             self.flush_batch(&recipient);
         }
+    }
+
+    /// Flush batches that have exceeded their max_delay time
+    ///
+    /// This is called by the background batch flusher to ensure messages
+    /// don't sit in batches indefinitely when no new messages arrive.
+    pub fn flush_expired_batches(&self) {
+        if !self.batching_config.enabled {
+            return;
+        }
+
+        let expired_recipients: Vec<Option<Did>> = {
+            let Ok(batches) = self.pending_batches.lock() else {
+                warn!("Batch mutex poisoned, cannot check expired batches");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
+                return;
+            };
+            let Ok(times) = self.last_batch_time.lock() else {
+                warn!("Batch time mutex poisoned, cannot check expired batches");
+                icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
+                return;
+            };
+
+            batches
+                .keys()
+                .filter(|recipient| {
+                    times
+                        .get(*recipient)
+                        .map(|t| t.elapsed() >= self.batching_config.max_delay)
+                        .unwrap_or(false)
+                })
+                .cloned()
+                .collect()
+        };
+
+        for recipient in expired_recipients {
+            debug!(
+                recipient = ?recipient,
+                "Flushing expired batch"
+            );
+            self.flush_batch(&recipient);
+        }
+    }
+
+    /// Get the batching configuration
+    pub fn batching_config(&self) -> &crate::types::BatchingConfig {
+        &self.batching_config
     }
 
     /// Send a message immediately without batching
@@ -1581,6 +1659,58 @@ pub fn start_digest_emitter(
                 }
                 _ = shutdown.recv() => {
                     info!("Digest emitter shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
+/// Start periodic batch flusher background task
+///
+/// This spawns a tokio task that periodically flushes batches that have
+/// exceeded their max_delay time. This ensures messages don't sit in batches
+/// indefinitely when no new messages arrive to trigger a flush.
+///
+/// # Parameters
+/// - `gossip_handle`: Shared handle to the gossip actor
+/// - `shutdown`: Receiver for graceful shutdown signal
+///
+/// # Returns
+/// JoinHandle for the background task
+pub fn start_batch_flusher(
+    gossip_handle: GossipHandle,
+    mut shutdown: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        // Check interval is half of max_delay to ensure timely flushing
+        let check_interval_ms = {
+            let gossip = gossip_handle.read().await;
+            let max_delay = gossip.batching_config().max_delay;
+            // Check at half the max_delay interval, with a minimum of 1ms
+            std::cmp::max(max_delay.as_millis() as u64 / 2, 1)
+        };
+
+        info!(
+            "Starting periodic batch flusher: check_interval={}ms",
+            check_interval_ms
+        );
+
+        loop {
+            let sleep_duration = tokio::time::Duration::from_millis(check_interval_ms);
+
+            // Wait for either timeout or shutdown
+            tokio::select! {
+                _ = tokio::time::sleep(sleep_duration) => {
+                    // Time to check for expired batches
+                    let gossip = gossip_handle.read().await;
+                    gossip.flush_expired_batches();
+                }
+                _ = shutdown.recv() => {
+                    // Flush any remaining batches on shutdown
+                    info!("Batch flusher shutting down, flushing remaining batches");
+                    let gossip = gossip_handle.read().await;
+                    gossip.flush_all_batches();
                     break;
                 }
             }

@@ -700,7 +700,8 @@ impl AdaptiveFanoutConfig {
 ///
 /// Batching reduces overhead from framing, serialization, and round-trips
 /// by accumulating multiple small messages before sending.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BatchingConfig {
     /// Maximum number of messages in a batch
     pub max_batch_size: usize,
