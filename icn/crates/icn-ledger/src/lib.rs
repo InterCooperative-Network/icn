@@ -109,8 +109,8 @@ pub use types::{
 
 // Use-based resource access (anti-rent-seeking)
 pub use use_access::{
-    AccessError, AccessModel, AntiSpeculationRules, DutyEventType, ResourceAccess,
-    StewardshipDuty, UsageEvent,
+    AccessError, AccessModel, AntiSpeculationRules, DutyEventType, ResourceAccess, StewardshipDuty,
+    UsageEvent,
 };
 
 // Labor shares and cooperative bonds (Razeto integration)

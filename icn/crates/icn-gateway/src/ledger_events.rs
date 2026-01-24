@@ -377,6 +377,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_bridge_forwards_resource_access_transferred() {
+        use std::time::Duration;
+
         let ledger_emitter = create_shared_emitter();
         let gateway_broadcaster = Arc::new(EventBroadcaster::new());
         let coop_id = "test-coop".to_string();
@@ -393,7 +395,8 @@ mod tests {
         );
         let _handle = bridge.start();
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        // Give the bridge time to start
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Emit resource access transferred event
         ledger_emitter.emit(LedgerEvent::ResourceAccessTransferred(
@@ -407,30 +410,30 @@ mod tests {
             },
         ));
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        // Use timeout with recv() for deterministic event waiting
+        let sequenced = tokio::time::timeout(Duration::from_millis(100), rx.recv())
+            .await
+            .expect("Timeout waiting for event")
+            .expect("Expected to receive event");
 
-        if let Ok(sequenced) = rx.try_recv() {
-            match sequenced.event {
-                GatewayEvent::ResourceAccessTransferred {
-                    resource_id,
-                    from_holder,
-                    to_holder,
-                    price,
-                    access_model,
-                    transferred_at,
-                    ..
-                } => {
-                    assert_eq!(resource_id, "resource123");
-                    assert_eq!(from_holder, "entity:icn:individual:alice");
-                    assert_eq!(to_holder, "entity:icn:individual:bob");
-                    assert_eq!(price, Some(100));
-                    assert_eq!(access_model, "Stewardship");
-                    assert_eq!(transferred_at, 1234567890);
-                }
-                _ => panic!("Expected ResourceAccessTransferred event"),
+        match sequenced.event {
+            GatewayEvent::ResourceAccessTransferred {
+                resource_id,
+                from_holder,
+                to_holder,
+                price,
+                access_model,
+                transferred_at,
+                ..
+            } => {
+                assert_eq!(resource_id, "resource123");
+                assert_eq!(from_holder, "entity:icn:individual:alice");
+                assert_eq!(to_holder, "entity:icn:individual:bob");
+                assert_eq!(price, Some(100));
+                assert_eq!(access_model, "Stewardship");
+                assert_eq!(transferred_at, 1234567890);
             }
-        } else {
-            panic!("Expected to receive ResourceAccessTransferred event");
+            _ => panic!("Expected ResourceAccessTransferred event"),
         }
     }
 }
