@@ -21,10 +21,11 @@
 //! ```
 
 use anyhow::{Context, Result};
+use rand::Rng;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tokio::time::{interval, Duration};
-use tracing::{debug, error, info};
+use tokio::time::{interval, Duration, MissedTickBehavior};
+use tracing::{debug, error, info, warn};
 
 use crate::runtime::ShutdownRx;
 
@@ -62,6 +63,30 @@ impl Default for ResourceEnforcerConfig {
             check_interval_seconds: default_check_interval(),
             batch_size: default_batch_size(),
             enabled: default_enabled(),
+        }
+    }
+}
+
+impl ResourceEnforcerConfig {
+    /// Maximum reasonable check interval (7 days).
+    /// Beyond this, idle resources may accumulate significantly before being detected.
+    const MAX_RECOMMENDED_INTERVAL_SECS: u64 = 7 * 24 * 3600;
+
+    /// Validate configuration and log warnings for questionable values.
+    ///
+    /// This does not fail - it logs warnings for operational awareness.
+    pub fn validate_and_warn(&self) {
+        if self.check_interval_seconds > Self::MAX_RECOMMENDED_INTERVAL_SECS {
+            warn!(
+                check_interval = self.check_interval_seconds,
+                max_recommended = Self::MAX_RECOMMENDED_INTERVAL_SECS,
+                "Resource enforcer check_interval_seconds exceeds 7 days; \
+                 idle resources may accumulate before detection"
+            );
+        }
+
+        if self.batch_size == 0 {
+            warn!("Resource enforcer batch_size is 0; using default of 100");
         }
     }
 }
@@ -213,13 +238,33 @@ impl ResourceAccessEnforcerActor {
                 return;
             }
 
+            // Validate config and log warnings
+            config.validate_and_warn();
+
             info!(
                 "ResourceAccessEnforcerActor started (check_interval={}s, batch_size={})",
                 config.check_interval_seconds, config.batch_size
             );
 
+            // Add startup jitter (0-10% of interval) to prevent thundering herd
+            // when multiple nodes start simultaneously
+            let jitter_secs = {
+                let max_jitter = config.check_interval_seconds / 10;
+                if max_jitter > 0 {
+                    rand::thread_rng().gen_range(0..max_jitter)
+                } else {
+                    0
+                }
+            };
+            if jitter_secs > 0 {
+                debug!("Applying startup jitter of {}s", jitter_secs);
+                tokio::time::sleep(Duration::from_secs(jitter_secs)).await;
+            }
+
             // Periodic enforcement check
             let mut check_interval = interval(Duration::from_secs(config.check_interval_seconds));
+            // Skip missed ticks rather than bursting to catch up
+            check_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
                 tokio::select! {
@@ -266,6 +311,15 @@ impl ResourceAccessEnforcerActor {
     /// This method batches updates to reduce lock contention. It first identifies
     /// all resources that need revocation during a read phase, then acquires the
     /// write lock once to perform all updates together.
+    ///
+    /// # Performance Note
+    ///
+    /// Currently, `list_all()` loads all resources into memory before processing.
+    /// The `batch_size` config only affects the iteration chunk size for CPU-bound
+    /// work, not memory usage. For deployments with 10K+ resources, consider:
+    /// - Adding pagination support to [`ResourceAccessStore::list_all`]
+    /// - Implementing cursor-based iteration
+    /// - Monitoring memory usage via metrics
     async fn perform_enforcement_check(&mut self) -> Result<EnforcementResult> {
         let current_time = icn_time::current_timestamp_secs();
         debug!("Starting enforcement check at timestamp {}", current_time);
@@ -287,8 +341,10 @@ impl ResourceAccessEnforcerActor {
             Vec::new();
 
         // Process in batches to identify revocations
+        // Note: We iterate by reference first, only cloning resources that need revocation.
+        // This avoids cloning every resource, which is important for large collections.
         for chunk in all_resources.chunks(self.config.batch_size) {
-            for (resource_id, mut access) in chunk.iter().cloned() {
+            for (resource_id, access) in chunk.iter() {
                 // Skip already revoked resources
                 if access.is_revoked() {
                     continue;
@@ -300,6 +356,9 @@ impl ResourceAccessEnforcerActor {
                     max_idle_seconds,
                 }) = access.validate_rules(current_time)
                 {
+                    // Clone only when revocation is needed
+                    let mut access_clone = access.clone();
+
                     // Revoke the access
                     let reason = format!(
                         "Automatically revoked: idle for {}s (max: {}s)",
@@ -308,21 +367,21 @@ impl ResourceAccessEnforcerActor {
 
                     info!(
                         "Revoking access for resource '{}' (holder: {}): {}",
-                        resource_id, access.holder, reason
+                        resource_id, access_clone.holder, reason
                     );
 
-                    access.revoke(reason.clone());
+                    access_clone.revoke(reason.clone());
 
                     // Prepare revocation event
                     let event = RevocationEvent {
                         resource_id: resource_id.clone(),
-                        holder: access.holder.clone(),
+                        holder: access_clone.holder.clone(),
                         reason,
                         timestamp: current_time,
                         idle_seconds,
                     };
 
-                    pending_revocations.push((resource_id, access, event));
+                    pending_revocations.push((resource_id.clone(), access_clone, event));
                 }
             }
         }
