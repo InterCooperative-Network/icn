@@ -67,8 +67,8 @@ pub(crate) fn validate_witness_signatures(
             .to_verifying_key()
             .context("Failed to extract verifying key from witness DID")?;
 
-        let signature = Signature::from_slice(&sig.signature)
-            .context("Invalid Ed25519 signature format")?;
+        let signature =
+            Signature::from_slice(&sig.signature).context("Invalid Ed25519 signature format")?;
 
         verifying_key
             .verify(entry_hash.as_bytes(), &signature)
