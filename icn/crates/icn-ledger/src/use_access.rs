@@ -686,8 +686,11 @@ pub trait ResourceAccessStore: Send + Sync {
 ///
 /// Keys are structured as:
 /// - Primary: `ledger:resource_access:<resource_id>:<holder>` -> ResourceAccess (JSON)
-/// - Index: `ledger:resource_access:idx:holder:<holder>:<resource_id>` -> "" (empty value, key-only index)
-/// - Index: `ledger:resource_access:idx:resource:<resource_id>:<holder>` -> "" (empty value, key-only index)
+/// - Index: `ledger:resource_access:idx:holder:<holder>:<resource_id>` -> primary key bytes
+/// - Index: `ledger:resource_access:idx:resource:<resource_id>:<holder>` -> primary key bytes
+///
+/// Index values contain the primary key, enabling single-lookup queries without
+/// the N+1 I/O pattern of key-only indexes.
 pub struct SledResourceAccessStore {
     store: std::sync::Arc<dyn icn_store::Store>,
 }
@@ -780,10 +783,13 @@ impl ResourceAccessStore for SledResourceAccessStore {
         // in an inconsistent state (primary record without indexes). Recovery requires
         // calling grant() again to overwrite the orphaned record.
         //
+        // Index values store the primary key to enable single-lookup queries
+        // (avoids N+1 I/O pattern in list_by_* methods).
+        //
         // 1. Write primary record
         self.store.put(&key, &value)?;
-        // 2. Write holder index; on failure, delete primary record
-        if let Err(err) = self.store.put(&holder_idx, b"") {
+        // 2. Write holder index with primary key as value; on failure, delete primary record
+        if let Err(err) = self.store.put(&holder_idx, &key) {
             // Best-effort rollback of primary record
             if let Err(rollback_err) = self.store.delete(&key) {
                 error!(
@@ -795,8 +801,8 @@ impl ResourceAccessStore for SledResourceAccessStore {
             }
             return Err(err);
         }
-        // 3. Write resource index; on failure, delete holder index and primary record
-        if let Err(err) = self.store.put(&resource_idx, b"") {
+        // 3. Write resource index with primary key as value; on failure, delete holder index and primary record
+        if let Err(err) = self.store.put(&resource_idx, &key) {
             // Best-effort rollback of previously written entries
             if let Err(rollback_err) = self.store.delete(&holder_idx) {
                 error!(
@@ -870,11 +876,22 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let index_entries = self.store.scan(&prefix)?;
 
         let mut results = Vec::new();
-        for (key, _) in index_entries {
-            // Extract resource_id by stripping the holder prefix from the key
-            let resource_id = Self::extract_resource_id_from_holder_key(&key, &prefix)?;
-            if let Some(access) = self.get(&resource_id, holder)? {
-                results.push(access);
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract resource_id from key and do second lookup
+                let resource_id = Self::extract_resource_id_from_holder_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(&resource_id, holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
             }
         }
 
@@ -886,11 +903,22 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let index_entries = self.store.scan(&prefix)?;
 
         let mut results = Vec::new();
-        for (key, _) in index_entries {
-            // Extract holder by stripping the resource prefix from the key
-            let holder = Self::extract_holder_from_resource_key(&key, &prefix)?;
-            if let Some(access) = self.get(resource_id, &holder)? {
-                results.push(access);
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract holder from key and do second lookup
+                let holder = Self::extract_holder_from_resource_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(resource_id, &holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
             }
         }
 
@@ -901,8 +929,13 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
 
         let mut expired = Vec::new();
-        for (_, value) in all_entries {
-            // Skip empty values (index entries have empty values)
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            // Index entries store primary keys as values, not JSON data
+            if key.windows(4).any(|w| w == b"idx:") {
+                continue;
+            }
+            // Also skip empty values for backward compatibility
             if value.is_empty() {
                 continue;
             }
@@ -919,8 +952,13 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
 
         let mut idle = Vec::new();
-        for (_, value) in all_entries {
-            // Skip empty values (index entries have empty values)
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            // Index entries store primary keys as values, not JSON data
+            if key.windows(4).any(|w| w == b"idx:") {
+                continue;
+            }
+            // Also skip empty values for backward compatibility
             if value.is_empty() {
                 continue;
             }
@@ -1947,6 +1985,70 @@ mod tests {
             let max_idle = 24 * 3600;
             let idle = access_store.find_idle(current_time, max_idle).unwrap();
             assert_eq!(idle.len(), 0);
+        }
+
+        #[test]
+        fn test_concurrent_grant_and_query() {
+            // Verify thread-safety of Arc<dyn Store> usage
+            // Spawns multiple threads calling grant() and list_by_holder() simultaneously
+            use std::thread;
+
+            let store = create_test_store();
+            let access_store = Arc::new(SledResourceAccessStore::new(store));
+            let holder = create_test_entity();
+
+            const NUM_THREADS: usize = 4;
+            const GRANTS_PER_THREAD: usize = 10;
+
+            let mut handles = Vec::new();
+
+            // Spawn writer threads
+            for t in 0..NUM_THREADS {
+                let access_store = Arc::clone(&access_store);
+                let holder = holder.clone();
+                handles.push(thread::spawn(move || {
+                    for i in 0..GRANTS_PER_THREAD {
+                        let resource_id = format!("tool-{}-{}", t, i);
+                        let access = ResourceAccess::new(
+                            resource_id,
+                            holder.clone(),
+                            AccessModel::UseAccess {
+                                duration_seconds: 7 * 24 * 3600,
+                                renewable: true,
+                                max_accumulated: 4,
+                            },
+                        );
+                        access_store.grant(access).unwrap();
+                    }
+                }));
+            }
+
+            // Spawn reader threads
+            for _ in 0..NUM_THREADS {
+                let access_store = Arc::clone(&access_store);
+                let holder = holder.clone();
+                handles.push(thread::spawn(move || {
+                    for _ in 0..GRANTS_PER_THREAD {
+                        // Just query, don't assert count since it's concurrent
+                        let _ = access_store.list_by_holder(&holder);
+                    }
+                }));
+            }
+
+            // Wait for all threads
+            for handle in handles {
+                handle.join().expect("Thread panicked");
+            }
+
+            // Verify final count
+            let final_count = access_store.list_by_holder(&holder).unwrap().len();
+            assert_eq!(
+                final_count,
+                NUM_THREADS * GRANTS_PER_THREAD,
+                "Expected {} grants, got {}",
+                NUM_THREADS * GRANTS_PER_THREAD,
+                final_count
+            );
         }
     }
 }
