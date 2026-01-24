@@ -152,6 +152,40 @@ impl EntityManager {
         anyhow::bail!("Entity manager not initialized")
     }
 
+    /// Update entity with optimistic locking
+    ///
+    /// Atomically updates the entity only if its current version matches `expected_version`.
+    /// Returns error if there's a version mismatch (concurrent modification detected).
+    ///
+    /// # Arguments
+    /// * `entity` - The entity to update (with modified fields)
+    /// * `expected_version` - The version we expect the entity to currently have
+    ///
+    /// # Returns
+    /// * `Ok(())` if update succeeded
+    /// * `Err` with EntityError::ConcurrentModification if version mismatch
+    pub async fn update_if_version(
+        &self,
+        entity: CooperativeEntity,
+        expected_version: u64,
+    ) -> Result<()> {
+        if let Some(ref handle) = self.actor_handle {
+            return handle
+                .update_if_version(entity, expected_version)
+                .await
+                .map_err(|e| anyhow::anyhow!("Entity update_if_version failed: {e}"));
+        }
+
+        if let Some(ref standalone) = self.standalone {
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
+            return Ok(registry.update_if_version(entity, expected_version)?);
+        }
+
+        anyhow::bail!("Entity manager not initialized")
+    }
+
     /// Remove an entity (only if no members)
     ///
     /// This method checks for members before deletion to prevent orphaned memberships.

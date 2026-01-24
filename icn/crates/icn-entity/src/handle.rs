@@ -64,6 +64,26 @@ impl EntityHandle {
         rx.await.map_err(|_| reply_failed())?
     }
 
+    /// Update entity with optimistic locking
+    ///
+    /// Atomically updates the entity only if its current version matches `expected_version`.
+    pub async fn update_if_version(
+        &self,
+        entity: CooperativeEntity,
+        expected_version: u64,
+    ) -> Result<()> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(EntityMessage::UpdateIfVersion {
+                entity,
+                expected_version,
+                reply,
+            })
+            .await
+            .map_err(|_| actor_disconnected())?;
+        rx.await.map_err(|_| reply_failed())?
+    }
+
     /// Delete an entity
     pub async fn delete(&self, id: &EntityId) -> Result<()> {
         let (reply, rx) = oneshot::channel();

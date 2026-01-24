@@ -455,6 +455,10 @@ pub struct CooperativeEntity {
     /// When the entity was last updated (Unix timestamp)
     pub updated_at: u64,
 
+    /// Version number for optimistic locking
+    /// Incremented on each update to detect concurrent modifications
+    pub version: u64,
+
     /// Optional description
     pub description: Option<String>,
 
@@ -476,6 +480,7 @@ impl CooperativeEntity {
             treasury_account: None,
             created_at: now,
             updated_at: now,
+            version: 0,
             description: None,
             metadata: HashMap::new(),
         }
@@ -494,6 +499,7 @@ impl CooperativeEntity {
             treasury_account: None,
             created_at: now,
             updated_at: now,
+            version: 0,
             description: None,
             metadata: HashMap::new(),
         })
@@ -512,6 +518,7 @@ impl CooperativeEntity {
             treasury_account: None,
             created_at: now,
             updated_at: now,
+            version: 0,
             description: None,
             metadata: HashMap::new(),
         })
@@ -534,6 +541,7 @@ impl CooperativeEntity {
             treasury_account: None,
             created_at: now,
             updated_at: now,
+            version: 0,
             description: None,
             metadata: HashMap::new(),
         })

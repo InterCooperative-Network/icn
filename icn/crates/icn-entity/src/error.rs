@@ -49,6 +49,13 @@ pub enum EntityError {
     #[error("Membership error: {0}")]
     MembershipError(String),
 
+    /// Concurrent modification detected
+    ///
+    /// The entity was modified by another operation since it was read.
+    /// This error occurs when optimistic locking detects a version mismatch.
+    #[error("Concurrent modification detected for entity: '{0}'. The entity was updated by another operation. Please retry the operation with the latest entity version.")]
+    ConcurrentModification(String),
+
     /// Registry error
     ///
     /// Error from the underlying storage layer.

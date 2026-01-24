@@ -1149,12 +1149,15 @@ pub async fn initiate_dissolution(
     // Verify caller has permission (Founders/BoardMembers only)
     require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
 
-    // Get entity
+    // Get entity and capture version for optimistic locking
     let mut entity = entity_mgr
         .get(&entity_id)
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Save expected version for optimistic locking
+    let expected_version = entity.version;
 
     // Verify entity is Active (can only dissolve active entities)
     match &entity.status {
@@ -1264,12 +1267,26 @@ pub async fn initiate_dissolution(
         "Initiating entity dissolution"
     );
 
-    // Update entity status to Dissolving
+    // Update entity status to Dissolving with optimistic locking
     entity.status = icn_entity::EntityStatus::Dissolving { started_at: now };
-    entity_mgr
-        .update(entity.clone())
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
+    
+    // Use update_if_version for atomic status transition
+    match entity_mgr.update_if_version(entity.clone(), expected_version).await {
+        Ok(()) => {
+            // Success - proceed with audit trail
+        }
+        Err(e) => {
+            // Check if this is a concurrent modification error
+            let error_str = e.to_string();
+            if error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification") {
+                return Err(GatewayError::Conflict(
+                    "Entity was modified by another operation. Please retry.".to_string(),
+                ));
+            }
+            // Other errors are internal
+            return Err(GatewayError::InternalError(format!("Failed to update entity: {e}")));
+        }
+    }
 
     // Record audit trail
     if let Err(e) = audit_mgr.record_audit(

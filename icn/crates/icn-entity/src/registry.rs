@@ -40,6 +40,30 @@ pub trait EntityRegistry: Send + Sync {
     /// Returns error if entity does not exist.
     fn update(&mut self, entity: CooperativeEntity) -> Result<()>;
 
+    /// Update entity with optimistic locking
+    ///
+    /// Atomically updates the entity only if its current version matches `expected_version`.
+    /// The version field is automatically incremented on successful update.
+    ///
+    /// # Arguments
+    /// * `entity` - The entity to update (with modified fields)
+    /// * `expected_version` - The version we expect the entity to currently have
+    ///
+    /// # Returns
+    /// * `Ok(())` if update succeeded
+    /// * `Err(EntityError::ConcurrentModification)` if version mismatch (entity was modified concurrently)
+    /// * `Err(EntityError::NotFound)` if entity doesn't exist
+    ///
+    /// # Example
+    /// ```ignore
+    /// let entity = registry.get(&entity_id)?.unwrap();
+    /// let expected_version = entity.version;
+    /// let mut updated = entity.clone();
+    /// updated.status = EntityStatus::Dissolving { started_at: now };
+    /// registry.update_if_version(updated, expected_version)?;
+    /// ```
+    fn update_if_version(&mut self, entity: CooperativeEntity, expected_version: u64) -> Result<()>;
+
     /// Delete an entity
     ///
     /// Returns error if entity has active members.
@@ -172,6 +196,30 @@ impl EntityRegistry for InMemoryRegistry {
         }
         // Auto-update the updated_at timestamp for audit trail accuracy
         entity.updated_at = icn_time::current_timestamp_secs();
+        // Increment version on update
+        entity.version += 1;
+        self.entities.insert(id, entity);
+        Ok(())
+    }
+
+    fn update_if_version(&mut self, mut entity: CooperativeEntity, expected_version: u64) -> Result<()> {
+        let id = entity.id.as_str().to_string();
+        
+        // Get current entity
+        let current = self
+            .entities
+            .get(&id)
+            .ok_or_else(|| EntityError::NotFound(id.clone()))?;
+
+        // Check version - detect concurrent modification
+        if current.version != expected_version {
+            return Err(EntityError::ConcurrentModification(id));
+        }
+
+        // Auto-update the updated_at timestamp for audit trail accuracy
+        entity.updated_at = icn_time::current_timestamp_secs();
+        // Increment version on successful update
+        entity.version = expected_version + 1;
         self.entities.insert(id, entity);
         Ok(())
     }

@@ -33,6 +33,12 @@ pub enum EntityMessage {
         entity: CooperativeEntity,
         reply: oneshot::Sender<Result<()>>,
     },
+    /// Update entity with optimistic locking
+    UpdateIfVersion {
+        entity: CooperativeEntity,
+        expected_version: u64,
+        reply: oneshot::Sender<Result<()>>,
+    },
     /// Delete an entity
     Delete {
         id: EntityId,
@@ -143,6 +149,14 @@ impl EntityActor {
                     let result = self.handle_update(entity).await;
                     let _ = reply.send(result);
                 }
+                EntityMessage::UpdateIfVersion {
+                    entity,
+                    expected_version,
+                    reply,
+                } => {
+                    let result = self.handle_update_if_version(entity, expected_version).await;
+                    let _ = reply.send(result);
+                }
                 EntityMessage::Delete { id, reply } => {
                     let result = self.handle_delete(id).await;
                     let _ = reply.send(result);
@@ -231,6 +245,30 @@ impl EntityActor {
         }
 
         debug!(entity_id = %entity_id, "Entity updated");
+        Ok(())
+    }
+
+    async fn handle_update_if_version(
+        &mut self,
+        entity: CooperativeEntity,
+        expected_version: u64,
+    ) -> Result<()> {
+        let entity_id = entity.id.clone();
+
+        // Update with version check (atomically)
+        self.registry.update_if_version(entity, expected_version)?;
+
+        // Re-fetch to get the canonical entity with correct updated_at and version
+        if let Some(updated_entity) = self.registry.get(&entity_id)? {
+            // Announce to network with correct timestamp and version
+            self.announce_entity_update(&updated_entity).await;
+        }
+
+        debug!(
+            entity_id = %entity_id,
+            expected_version = expected_version,
+            "Entity updated with version check"
+        );
         Ok(())
     }
 

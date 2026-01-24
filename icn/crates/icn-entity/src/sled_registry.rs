@@ -338,6 +338,8 @@ impl EntityRegistry for SledEntityRegistry {
 
         // Update the updated_at timestamp
         entity.updated_at = icn_time::current_timestamp_secs();
+        // Increment version
+        entity.version += 1;
 
         // Prepare for transaction
         let entity_id_str = entity.id.as_str().to_string();
@@ -371,6 +373,72 @@ impl EntityRegistry for SledEntityRegistry {
             .map_err(|e| handle_transaction_error(e, "entity update"))?;
 
         debug!(entity_id = %entity_id_display, "Entity updated");
+        Ok(())
+    }
+
+    fn update_if_version(&mut self, mut entity: CooperativeEntity, expected_version: u64) -> Result<()> {
+        let entity_key = Self::entity_key(&entity.id);
+
+        // Check if entity exists and get current entity
+        let old_entity = self
+            .get(&entity.id)?
+            .ok_or_else(|| EntityError::NotFound(entity.id.as_str().to_string()))?;
+
+        // Version check - detect concurrent modification
+        if old_entity.version != expected_version {
+            return Err(EntityError::ConcurrentModification(entity.id.as_str().to_string()));
+        }
+
+        // Update the updated_at timestamp
+        entity.updated_at = icn_time::current_timestamp_secs();
+        // Set new version (expected + 1)
+        entity.version = expected_version + 1;
+
+        // Prepare for transaction
+        let entity_id_str = entity.id.as_str().to_string();
+        let entity_id_display = entity.id.to_string();
+        let entity_value = Self::serialize_entity(&entity)?;
+        let type_changed = old_entity.entity_type != entity.entity_type;
+        let old_type_key = Self::type_index_key(old_entity.entity_type, &entity.id);
+        let new_type_key = Self::type_index_key(entity.entity_type, &entity.id);
+
+        // Use transaction for atomicity
+        self.db
+            .transaction(|tx| {
+                // Verify entity still exists and version still matches
+                // This is a double-check in case the entity was modified between the get and the transaction
+                if let Some(current_bytes) = tx.get(&entity_key)? {
+                    let current_entity = Self::deserialize_entity(&current_bytes)
+                        .map_err(|e| ConflictableTransactionError::Abort(e))?;
+                    if current_entity.version != expected_version {
+                        return Err(ConflictableTransactionError::Abort(
+                            EntityError::ConcurrentModification(entity_id_str.clone()),
+                        ));
+                    }
+                } else {
+                    return Err(ConflictableTransactionError::Abort(EntityError::NotFound(
+                        entity_id_str.clone(),
+                    )));
+                }
+
+                // If entity type changed, update the type index
+                if type_changed {
+                    tx.remove(old_type_key.as_slice())?;
+                    tx.insert(new_type_key.as_slice(), &[] as &[u8])?;
+                }
+
+                // Store updated entity
+                tx.insert(entity_key.as_slice(), entity_value.as_slice())?;
+
+                Ok(())
+            })
+            .map_err(|e| handle_transaction_error(e, "entity update_if_version"))?;
+
+        debug!(
+            entity_id = %entity_id_display,
+            expected_version = expected_version,
+            "Entity updated with version check"
+        );
         Ok(())
     }
 
