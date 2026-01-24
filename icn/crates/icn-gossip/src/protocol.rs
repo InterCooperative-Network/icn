@@ -7,14 +7,23 @@
 //!
 //! 1. Messages arrive via `handle_message()`
 //! 2. Sender trust is validated against minimum threshold
-//! 3. Messages are dispatched to type-specific handlers (in `handlers/` module)
+//! 3. Messages are dispatched to type-specific handlers via shared dispatch logic
 //!
 //! # Trust Gating
 //!
 //! All messages are validated against the sender's trust score before processing.
 //! Messages from low-trust senders are rejected with appropriate metrics tracking.
+//!
+//! # Dispatch Logic
+//!
+//! The dispatch logic is centralized in `handlers::dispatch` module to ensure
+//! single source of truth for message routing. This design:
+//! - Eliminates code duplication between single-message and batch handlers
+//! - Avoids async recursion issues in batch processing
+//! - Makes it easier to add new message types
 
 use crate::gossip::GossipActor;
+use crate::handlers::DispatchResult;
 use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
@@ -79,110 +88,22 @@ impl GossipActor {
             }
         }
 
-        // Dispatch to handler methods (extracted to handlers/ module)
-        match message {
-            GossipMessage::Announce {
-                hash,
-                author,
-                clock: _,
-                topic,
-            } => self.handle_announce(sender, hash, author, topic),
-
-            GossipMessage::Request { hash } => self.handle_request(sender, hash),
-
-            GossipMessage::Response { entry } => self.handle_response(sender, entry).await,
-
-            GossipMessage::RequestBloomFilter { topic } => {
-                self.handle_request_bloom_filter(sender, topic)
+        // Dispatch to handler methods using shared dispatch logic
+        match self.dispatch_message(sender, message) {
+            DispatchResult::Sync(result) => result,
+            DispatchResult::AsyncResponse(sender, entry) => {
+                self.handle_response(&sender, entry).await
             }
-
-            GossipMessage::SendBloomFilter { topic, filter } => {
-                self.handle_send_bloom_filter(sender, topic, filter)
-            }
-
-            GossipMessage::RequestMissing { hashes } => self.handle_request_missing(sender, hashes),
-
-            GossipMessage::Digest {
-                topic,
-                vector,
-                bloom,
-                hint_count,
-                nonce,
-            } => self.handle_digest(sender, topic, vector, bloom, hint_count, nonce),
-
-            GossipMessage::PullRequest {
-                topic,
-                want_ids,
-                max_bytes,
-                nonce,
-                cursor,
-            } => self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce, cursor),
-
-            GossipMessage::PullResponse {
+            DispatchResult::AsyncPullResponse {
+                sender,
                 topic,
                 entries,
                 truncated,
                 nonce,
                 next_cursor,
             } => {
-                self.handle_pull_response(sender, topic, entries, truncated, nonce, next_cursor)
+                self.handle_pull_response(&sender, topic, entries, truncated, nonce, next_cursor)
                     .await
-            }
-
-            GossipMessage::BlobAnnounce {
-                blob_hash,
-                peer_did,
-                size_bytes,
-            } => self.handle_blob_announce(sender, blob_hash, peer_did, size_bytes),
-
-            GossipMessage::ReplicaRequest {
-                content_hash,
-                requesting_peer,
-            } => self.handle_replica_request(sender, content_hash, requesting_peer),
-
-            GossipMessage::ReplicaOffer {
-                content_hash,
-                offering_peer,
-                health,
-            } => self.handle_replica_offer(sender, content_hash, offering_peer, health),
-
-            GossipMessage::ReplicaStatus {
-                content_hash,
-                replicas,
-            } => self.handle_replica_status(sender, content_hash, replicas),
-
-            GossipMessage::PartitionHealRequest {
-                requesting_peer,
-                vector_clock,
-                last_contact_ms,
-            } => self.handle_partition_heal_request(
-                sender,
-                requesting_peer,
-                vector_clock,
-                last_contact_ms,
-            ),
-
-            GossipMessage::PartitionHealResponse {
-                responding_peer,
-                vector_clock,
-                diverged_topics,
-                entries_behind,
-            } => self.handle_partition_heal_response(
-                sender,
-                responding_peer,
-                vector_clock,
-                diverged_topics,
-                entries_behind,
-            ),
-
-            GossipMessage::StorageChallengeMsg { challenge } => {
-                self.handle_storage_challenge(sender, challenge)
-            }
-
-            GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
-
-            GossipMessage::StorageContentNotFoundMsg { response } => {
-                self.handle_storage_content_not_found(sender, response)
             }
         }
     }
