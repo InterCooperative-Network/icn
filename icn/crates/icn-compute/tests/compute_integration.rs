@@ -628,3 +628,82 @@ async fn test_checkpoint_store_concurrent_access() {
     let final_checkpoint = result.expect("Should have checkpoint");
     assert_eq!(final_checkpoint.sequence, 10);
 }
+
+#[tokio::test]
+async fn test_resource_profile_refresh() {
+    use icn_compute::ResourceRefreshConfig;
+    use std::time::Duration;
+
+    // Create a compute actor with fast refresh interval (1 second for testing)
+    let trust_cb: icn_compute::TrustCallback = Arc::new(|_did: &str| 0.8);
+    let mut actor = icn_compute::ComputeActor::new("did:icn:test".to_string(), trust_cb);
+
+    // Set fast refresh for testing
+    actor.set_resource_refresh_config(ResourceRefreshConfig::with_interval(1));
+
+    // Track events
+    let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let events_clone = events.clone();
+    let event_cb: icn_compute::EventCallback = Arc::new(move |event| {
+        events_clone.lock().unwrap().push(event);
+    });
+    actor.set_event_callback(event_cb);
+
+    // Spawn the actor
+    let _handle = actor.spawn();
+
+    // Wait for at least 2 refresh cycles (2 seconds)
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // At this point, we should have at least one refresh
+    // (first refresh doesn't detect changes since there's no previous capacity)
+    // Note: Without an actual resource change, we won't get ResourcesChanged events
+    // This test primarily verifies that the refresh task runs without panicking
+
+    // Clean shutdown
+    drop(_handle);
+}
+
+#[tokio::test]
+async fn test_resource_change_detection() {
+    use icn_compute::{NodeCapacity, ResourceChangeType};
+
+    let capacity1 = NodeCapacity {
+        cpu_cores_total: 8.0,
+        cpu_cores_available: 4.0,
+        memory_mb_total: 16384,
+        memory_mb_available: 8192,
+        storage_mb_available: 100_000,
+        network_mbps: 1000.0,
+        gpu_devices: vec![],
+        updated_at: 1000,
+    };
+
+    // Test no change
+    let capacity2 = capacity1.clone();
+    let changes = capacity1.detect_changes(&capacity2, 0.1);
+    assert!(changes.is_empty());
+
+    // Test CPU change
+    let mut capacity2 = capacity1.clone();
+    capacity2.cpu_cores_available = 7.0; // Significant change
+    let changes = capacity1.detect_changes(&capacity2, 0.1);
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0], ResourceChangeType::Cpu);
+
+    // Test memory change
+    let mut capacity2 = capacity1.clone();
+    capacity2.memory_mb_available = 6000;
+    let changes = capacity1.detect_changes(&capacity2, 0.1);
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0], ResourceChangeType::Memory);
+
+    // Test multiple changes
+    let mut capacity2 = capacity1.clone();
+    capacity2.cpu_cores_available = 7.0;
+    capacity2.memory_mb_available = 6000;
+    let changes = capacity1.detect_changes(&capacity2, 0.1);
+    assert_eq!(changes.len(), 2);
+    assert!(changes.contains(&ResourceChangeType::Cpu));
+    assert!(changes.contains(&ResourceChangeType::Memory));
+}

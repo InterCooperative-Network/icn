@@ -91,6 +91,12 @@ pub struct ComputeActor {
     /// Rate limiter for federated announcements (per cooperative)
     /// Maps cooperative_id -> (last_announce_time, count_in_window)
     federated_announce_rate_limiter: Arc<Mutex<HashMap<String, (u64, u32)>>>,
+    /// Resource refresh configuration
+    resource_refresh_config: crate::scheduler::ResourceRefreshConfig,
+    /// Current cached resource profile
+    cached_capacity: Arc<Mutex<Option<crate::scheduler::NodeCapacity>>>,
+    /// Shutdown signal sender for graceful termination
+    shutdown_tx: tokio::sync::broadcast::Sender<()>,
 }
 
 impl ComputeActor {
@@ -123,6 +129,9 @@ impl ComputeActor {
             federation_registry: None, // Phase 21: Set via set_federation_registry()
             own_cooperative_id: None,  // Phase 21: Set via set_cooperative_id()
             federated_announce_rate_limiter: Arc::new(Mutex::new(HashMap::new())),
+            resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
+            cached_capacity: Arc::new(Mutex::new(None)),
+            shutdown_tx: tokio::sync::broadcast::channel(1).0,
         }
     }
 
@@ -283,6 +292,11 @@ impl ComputeActor {
         self.signing_key = key;
     }
 
+    /// Set resource refresh configuration
+    pub fn set_resource_refresh_config(&mut self, config: crate::scheduler::ResourceRefreshConfig) {
+        self.resource_refresh_config = config;
+    }
+
     /// Spawn the actor and return a handle
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
@@ -351,6 +365,100 @@ impl ComputeActor {
                                 error = %e,
                                 "Failed to cleanup expired quorum aggregators"
                             );
+                        }
+                    }
+                }
+            });
+        }
+
+        // Spawn resource refresh task with graceful shutdown
+        {
+            let own_did = self.own_did.clone();
+            let executor_registry_clone = Arc::clone(&self.executor_registry);
+            let cached_capacity_clone = Arc::clone(&self.cached_capacity);
+            let send_callback_clone = self.send_callback.clone();
+            let event_callback_clone = self.event_callback.clone();
+            let refresh_config = self.resource_refresh_config.clone();
+            let mut shutdown_rx = self.shutdown_tx.subscribe();
+
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+                    refresh_config.refresh_interval_secs,
+                ));
+
+                // Discard the immediate first tick so the first refresh happens
+                // after `refresh_interval_secs`, not immediately on actor start.
+                interval.tick().await;
+
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Sense current resources
+                            let new_capacity = crate::scheduler::NodeCapacity::sense_system_resources();
+
+                            // Record refresh metric
+                            icn_obs::metrics::compute::resource_refresh_inc();
+
+                            // Check for changes
+                            let mut cached = cached_capacity_clone.lock().await;
+                            let changes = if let Some(ref old_capacity) = *cached {
+                                new_capacity.detect_changes(old_capacity, refresh_config.change_threshold)
+                            } else {
+                                // First refresh - no previous capacity to compare
+                                vec![]
+                            };
+
+                            // Update cache
+                            *cached = Some(new_capacity.clone());
+                            drop(cached);
+
+                            // Record change metrics and emit events
+                            if !changes.is_empty() {
+                                tracing::info!(
+                                    changes = ?changes,
+                                    cpu_available = new_capacity.cpu_cores_available,
+                                    memory_available = new_capacity.memory_mb_available,
+                                    gpu_count = new_capacity.gpu_devices.len(),
+                                    "Resource profile changed significantly"
+                                );
+
+                                for change_type in &changes {
+                                    icn_obs::metrics::compute::resource_changes_inc(change_type.as_str());
+                                }
+
+                                // Emit event if callback is configured
+                                if let Some(ref event_cb) = event_callback_clone {
+                                    let event = crate::actor::ComputeEvent::ResourcesChanged {
+                                        executor: own_did.clone(),
+                                        capacity: new_capacity.clone(),
+                                        changes: changes.clone(),
+                                    };
+                                    event_cb(event);
+                                }
+
+                                // Announce capacity via gossip only when changes detected
+                                if let Some(ref send_cb) = send_callback_clone {
+                                    let msg = crate::types::ComputeMessage::NodeCapacityAnnounce {
+                                        executor: own_did.clone(),
+                                        capacity: new_capacity.clone(),
+                                    };
+                                    send_cb(msg);
+                                }
+                            }
+
+                            // Update executor registry with new capacity
+                            let mut registry = executor_registry_clone.lock().await;
+                            if let Some(info) = registry.get_mut(&own_did) {
+                                info.capacity = Some(new_capacity);
+                                tracing::debug!(
+                                    "Updated own executor capacity in registry"
+                                );
+                            }
+                            drop(registry);
+                        }
+                        _ = shutdown_rx.recv() => {
+                            tracing::info!("Resource refresh task received shutdown signal");
+                            break;
                         }
                     }
                 }

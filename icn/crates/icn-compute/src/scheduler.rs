@@ -315,6 +315,299 @@ pub struct GpuDevice {
     pub available: bool,
 }
 
+/// Configuration for periodic resource profile refresh
+#[derive(Debug, Clone)]
+pub struct ResourceRefreshConfig {
+    /// Interval between resource sensing in seconds
+    /// Default: 300 (5 minutes)
+    pub refresh_interval_secs: u64,
+
+    /// Threshold for detecting significant changes (0.0-1.0)
+    /// Changes below this threshold are ignored
+    /// Default: 0.1 (10% change)
+    pub change_threshold: f64,
+}
+
+impl Default for ResourceRefreshConfig {
+    fn default() -> Self {
+        Self {
+            refresh_interval_secs: 300, // 5 minutes
+            change_threshold: 0.1,      // 10% change
+        }
+    }
+}
+
+impl ResourceRefreshConfig {
+    /// Create a validated configuration with custom values.
+    ///
+    /// # Arguments
+    /// * `refresh_interval_secs` - Interval between refreshes (must be > 0)
+    /// * `change_threshold` - Threshold for detecting changes (must be in 0.0..=1.0)
+    ///
+    /// # Returns
+    /// `Ok(config)` if values are valid, `Err` with explanation otherwise.
+    pub fn new(refresh_interval_secs: u64, change_threshold: f64) -> Result<Self, &'static str> {
+        if refresh_interval_secs == 0 {
+            return Err("refresh_interval_secs must be > 0");
+        }
+        if !(0.0..=1.0).contains(&change_threshold) {
+            return Err("change_threshold must be in range [0.0, 1.0]");
+        }
+        Ok(Self {
+            refresh_interval_secs,
+            change_threshold,
+        })
+    }
+
+    /// Create config with custom refresh interval
+    ///
+    /// # Panics
+    /// Panics if interval_secs is 0 (use `new()` for fallible construction)
+    pub fn with_interval(interval_secs: u64) -> Self {
+        assert!(interval_secs > 0, "refresh_interval_secs must be > 0");
+        Self {
+            refresh_interval_secs: interval_secs,
+            ..Default::default()
+        }
+    }
+
+    /// Create config with custom change threshold
+    ///
+    /// # Panics
+    /// Panics if threshold is outside [0.0, 1.0] (use `new()` for fallible construction)
+    pub fn with_threshold(threshold: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&threshold),
+            "change_threshold must be in range [0.0, 1.0]"
+        );
+        Self {
+            change_threshold: threshold,
+            ..Default::default()
+        }
+    }
+}
+
+/// Type of resource change detected
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceChangeType {
+    /// CPU availability changed significantly
+    Cpu,
+    /// Memory availability changed significantly
+    Memory,
+    /// Storage availability changed significantly
+    Storage,
+    /// Network bandwidth changed significantly
+    Network,
+    /// GPU devices added or removed
+    Gpu,
+}
+
+impl ResourceChangeType {
+    /// Convert to string for metrics
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Memory => "memory",
+            Self::Storage => "storage",
+            Self::Network => "network",
+            Self::Gpu => "gpu",
+        }
+    }
+}
+
+impl NodeCapacity {
+    /// Sense current system resources and return a capacity snapshot.
+    ///
+    /// This function queries the operating system for real resource availability.
+    /// On Linux, it reads from /proc filesystem. On other platforms, it falls
+    /// back to reasonable defaults.
+    ///
+    /// # Implementation Status
+    ///
+    /// - **CPU**: Uses load average from /proc/loadavg to estimate available cores
+    /// - **Memory**: Reads MemTotal and MemAvailable from /proc/meminfo
+    /// - **Storage**: *Placeholder* - returns 100GB (TODO: use statvfs)
+    /// - **Network**: *Placeholder* - returns 1Gbps (TODO: measure bandwidth)
+    /// - **GPU**: *Placeholder* - returns empty list (TODO: parse nvidia-smi/ROCm)
+    pub fn sense_system_resources() -> Self {
+        let now = icn_time::current_timestamp_millis();
+
+        let cpu_total = num_cpus::get() as f64;
+        let cpu_available = Self::get_available_cpu_cores(cpu_total);
+
+        Self {
+            cpu_cores_total: cpu_total,
+            cpu_cores_available: cpu_available,
+            memory_mb_total: Self::get_total_memory_mb(),
+            memory_mb_available: Self::get_available_memory_mb(),
+            // TODO: Implement actual storage sensing via statvfs
+            storage_mb_available: 100_000, // Placeholder: 100GB
+            // TODO: Implement actual network bandwidth measurement
+            network_mbps: 1000.0, // Placeholder: 1Gbps
+            gpu_devices: Self::detect_gpus(),
+            updated_at: now,
+        }
+    }
+
+    /// Get available CPU cores based on system load.
+    ///
+    /// Uses the 1-minute load average from /proc/loadavg to estimate
+    /// how many cores are available for new work.
+    #[cfg(target_os = "linux")]
+    fn get_available_cpu_cores(total_cores: f64) -> f64 {
+        std::fs::read_to_string("/proc/loadavg")
+            .ok()
+            .and_then(|content| {
+                // /proc/loadavg format: "0.25 0.35 0.30 1/234 12345"
+                // First field is 1-minute load average
+                content
+                    .split_whitespace()
+                    .next()
+                    .and_then(|load| load.parse::<f64>().ok())
+            })
+            .map(|load_avg| {
+                // Available = total - load, clamped to [0, total]
+                (total_cores - load_avg).max(0.0).min(total_cores)
+            })
+            .unwrap_or(total_cores) // Fallback: assume all cores available
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_available_cpu_cores(total_cores: f64) -> f64 {
+        // Non-Linux: assume 70% of cores available as heuristic
+        total_cores * 0.7
+    }
+
+    /// Get total system memory in MB
+    #[cfg(target_os = "linux")]
+    fn get_total_memory_mb() -> u64 {
+        // Read from /proc/meminfo
+        std::fs::read_to_string("/proc/meminfo")
+            .ok()
+            .and_then(|content| {
+                content
+                    .lines()
+                    .find(|line| line.starts_with("MemTotal:"))
+                    .and_then(|line| {
+                        line.split_whitespace()
+                            .nth(1)
+                            .and_then(|kb| kb.parse::<u64>().ok())
+                            .map(|kb| kb / 1024) // Convert KB to MB
+                    })
+            })
+            .unwrap_or(8192) // Default 8GB if can't read
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_total_memory_mb() -> u64 {
+        8192 // Default 8GB for non-Linux systems
+    }
+
+    /// Get available system memory in MB
+    #[cfg(target_os = "linux")]
+    fn get_available_memory_mb() -> u64 {
+        // Read from /proc/meminfo
+        std::fs::read_to_string("/proc/meminfo")
+            .ok()
+            .and_then(|content| {
+                content
+                    .lines()
+                    .find(|line| line.starts_with("MemAvailable:"))
+                    .and_then(|line| {
+                        line.split_whitespace()
+                            .nth(1)
+                            .and_then(|kb| kb.parse::<u64>().ok())
+                            .map(|kb| kb / 1024) // Convert KB to MB
+                    })
+            })
+            .unwrap_or_else(|| Self::get_total_memory_mb() * 7 / 10) // Default 70% if can't read
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn get_available_memory_mb() -> u64 {
+        Self::get_total_memory_mb() * 7 / 10 // Default 70% available
+    }
+
+    /// Detect GPU devices
+    ///
+    /// Placeholder implementation. In a real system, this would:
+    /// - Run nvidia-smi for NVIDIA GPUs
+    /// - Query ROCm for AMD GPUs
+    /// - Parse output and build GpuDevice structs
+    fn detect_gpus() -> Vec<GpuDevice> {
+        // For now, return empty vec
+        // Future: Implement actual GPU detection
+        vec![]
+    }
+
+    /// Detect significant changes between two capacity snapshots
+    ///
+    /// Returns a list of resource types that changed significantly
+    pub fn detect_changes(&self, other: &NodeCapacity, threshold: f64) -> Vec<ResourceChangeType> {
+        let mut changes = Vec::new();
+
+        // Check CPU change (guard against division by zero)
+        let cpu_change = if self.cpu_cores_total > 0.0 {
+            (self.cpu_cores_available - other.cpu_cores_available).abs() / self.cpu_cores_total
+        } else {
+            0.0
+        };
+        if cpu_change >= threshold {
+            changes.push(ResourceChangeType::Cpu);
+        }
+
+        // Check memory change
+        let mem_change = if self.memory_mb_total > 0 {
+            (self.memory_mb_available as f64 - other.memory_mb_available as f64).abs()
+                / self.memory_mb_total as f64
+        } else {
+            0.0
+        };
+        if mem_change >= threshold {
+            changes.push(ResourceChangeType::Memory);
+        }
+
+        // Check storage change
+        // Use the larger value as baseline to ensure stable comparison
+        // (e.g., 100GB -> 50GB = 50% change, not 100%)
+        let storage_baseline = self.storage_mb_available.max(other.storage_mb_available);
+        let storage_change = if storage_baseline > 0 {
+            (self.storage_mb_available as f64 - other.storage_mb_available as f64).abs()
+                / storage_baseline as f64
+        } else {
+            0.0
+        };
+        if storage_change >= threshold {
+            changes.push(ResourceChangeType::Storage);
+        }
+
+        // Check network bandwidth change
+        let net_change = if self.network_mbps > 0.0 {
+            (self.network_mbps - other.network_mbps).abs() / self.network_mbps
+        } else {
+            0.0
+        };
+        if net_change >= threshold {
+            changes.push(ResourceChangeType::Network);
+        }
+
+        // Check GPU changes (devices added/removed)
+        if self.gpu_devices.len() != other.gpu_devices.len() {
+            changes.push(ResourceChangeType::Gpu);
+        } else {
+            // Check if availability changed for any GPU
+            for (gpu_self, gpu_other) in self.gpu_devices.iter().zip(other.gpu_devices.iter()) {
+                if gpu_self.available != gpu_other.available {
+                    changes.push(ResourceChangeType::Gpu);
+                    break;
+                }
+            }
+        }
+
+        changes
+    }
+}
+
 /// Locality hints for task placement.
 ///
 /// These guide the scheduler to prefer certain execution locations.
@@ -1110,5 +1403,175 @@ mod tests {
         let offer_copy = offer_valid.clone();
         assert_eq!(offer_valid, offer_copy);
         assert!(offer_valid.cmp(&offer_copy) == std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_resource_refresh_config() {
+        // Test default config
+        let config = ResourceRefreshConfig::default();
+        assert_eq!(config.refresh_interval_secs, 300); // 5 minutes
+        assert_eq!(config.change_threshold, 0.1); // 10%
+
+        // Test with custom interval
+        let config = ResourceRefreshConfig::with_interval(60);
+        assert_eq!(config.refresh_interval_secs, 60);
+        assert_eq!(config.change_threshold, 0.1);
+
+        // Test with custom threshold
+        let config = ResourceRefreshConfig::with_threshold(0.05);
+        assert_eq!(config.refresh_interval_secs, 300);
+        assert_eq!(config.change_threshold, 0.05);
+    }
+
+    #[test]
+    fn test_resource_change_type_as_str() {
+        assert_eq!(ResourceChangeType::Cpu.as_str(), "cpu");
+        assert_eq!(ResourceChangeType::Memory.as_str(), "memory");
+        assert_eq!(ResourceChangeType::Storage.as_str(), "storage");
+        assert_eq!(ResourceChangeType::Network.as_str(), "network");
+        assert_eq!(ResourceChangeType::Gpu.as_str(), "gpu");
+    }
+
+    #[test]
+    fn test_detect_changes_no_change() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let capacity2 = capacity1.clone();
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_detect_changes_cpu() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let mut capacity2 = capacity1.clone();
+        capacity2.cpu_cores_available = 7.0; // 3.0 / 8.0 = 37.5% change
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0], ResourceChangeType::Cpu);
+    }
+
+    #[test]
+    fn test_detect_changes_memory() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let mut capacity2 = capacity1.clone();
+        capacity2.memory_mb_available = 6000; // 2192 / 16384 = 13.4% change
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0], ResourceChangeType::Memory);
+    }
+
+    #[test]
+    fn test_detect_changes_gpu_added() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let mut capacity2 = capacity1.clone();
+        capacity2.gpu_devices.push(GpuDevice {
+            device_id: "0".to_string(),
+            memory_gb: 16,
+            compute_capability: "sm_80".to_string(),
+            device_name: "NVIDIA A100".to_string(),
+            available: true,
+        });
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0], ResourceChangeType::Gpu);
+    }
+
+    #[test]
+    fn test_detect_changes_multiple() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let mut capacity2 = capacity1.clone();
+        capacity2.cpu_cores_available = 7.0; // CPU changed
+        capacity2.memory_mb_available = 6000; // Memory changed
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert_eq!(changes.len(), 2);
+        assert!(changes.contains(&ResourceChangeType::Cpu));
+        assert!(changes.contains(&ResourceChangeType::Memory));
+    }
+
+    #[test]
+    fn test_detect_changes_below_threshold() {
+        let capacity1 = NodeCapacity {
+            cpu_cores_total: 8.0,
+            cpu_cores_available: 4.0,
+            memory_mb_total: 16384,
+            memory_mb_available: 8192,
+            storage_mb_available: 100_000,
+            network_mbps: 1000.0,
+            gpu_devices: vec![],
+            updated_at: 1000,
+        };
+
+        let mut capacity2 = capacity1.clone();
+        capacity2.cpu_cores_available = 4.5; // 0.5 / 8.0 = 6.25% change (below 10% threshold)
+
+        let changes = capacity1.detect_changes(&capacity2, 0.1);
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn test_sense_system_resources() {
+        // Just verify it doesn't panic and returns reasonable values
+        let capacity = NodeCapacity::sense_system_resources();
+
+        assert!(capacity.cpu_cores_total > 0.0);
+        assert!(capacity.cpu_cores_available > 0.0);
+        assert!(capacity.memory_mb_total > 0);
+        assert!(capacity.memory_mb_available > 0);
+        assert!(capacity.updated_at > 0);
     }
 }

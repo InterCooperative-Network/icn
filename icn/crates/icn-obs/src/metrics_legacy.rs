@@ -3694,6 +3694,19 @@ pub mod compute {
     pub fn quorum_active_verifications_set(count: usize) {
         gauge!("icn_compute_quorum_active_verifications").set(count as f64);
     }
+
+    // === Resource Refresh Metrics ===
+
+    /// Record a resource profile refresh
+    pub fn resource_refresh_inc() {
+        counter!("icn_compute_resource_refresh_total").increment(1);
+    }
+
+    /// Record a significant resource change
+    pub fn resource_changes_inc(change_type: &str) {
+        counter!("icn_compute_resource_changes_total", "type" => change_type.to_string())
+            .increment(1);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

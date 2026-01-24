@@ -98,6 +98,12 @@ pub enum ComputeEvent {
         fuel_used: u64,
         duration_ms: u64,
     },
+    /// Resource capacity changed significantly
+    ResourcesChanged {
+        executor: String,
+        capacity: NodeCapacity,
+        changes: Vec<crate::scheduler::ResourceChangeType>,
+    },
 }
 
 /// Callback for broadcasting compute events (e.g., to WebSocket clients)

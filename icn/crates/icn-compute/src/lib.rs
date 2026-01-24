@@ -84,7 +84,7 @@ pub use result_quorum::{
 pub use scheduler::{
     DefaultPlacementPolicy, FederatedPlacementConstraints, FederationPolicy, GpuDevice, GpuSpec,
     LocalityContext, LocalityHint, NodeCapacity, NodeState, PlacementOffer, PlacementPolicy,
-    PlacementRequest, ResourceProfile,
+    PlacementRequest, ResourceChangeType, ResourceProfile, ResourceRefreshConfig,
 };
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
