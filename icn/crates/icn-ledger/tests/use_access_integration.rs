@@ -386,22 +386,23 @@ fn test_stewardship_handoff_procedure_complete_flow() {
     let current_time = access.granted_at + 1000;
 
     // Complete handoff steps
+    // Note: Use delimiter format (colon) so segment matching recognizes the step
     access
         .record_usage(
             current_time,
-            "Document maintenance schedule completed".to_string(),
+            "Document maintenance schedule: completed".to_string(),
         )
         .unwrap();
     access
         .record_usage(
             current_time + 100,
-            "Train incoming steward - completed training session".to_string(),
+            "Train incoming steward: completed training session".to_string(),
         )
         .unwrap();
     access
         .record_usage(
             current_time + 200,
-            "Transfer access keys - keys securely transferred".to_string(),
+            "Transfer access keys: keys securely transferred".to_string(),
         )
         .unwrap();
 

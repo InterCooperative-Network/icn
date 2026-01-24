@@ -1049,13 +1049,26 @@ impl ResourceAccessStore for SledResourceAccessStore {
         current_time: u64,
     ) -> Result<(EntityId, ResourceAccess)> {
         // Get existing access
-        let mut access = self
-            .get(resource_id)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?
-            .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
+        let mut access = match self.get(resource_id) {
+            Ok(Some(a)) => a,
+            Ok(None) => {
+                icn_obs::metrics::ledger::resource_access_transfer_not_found_inc();
+                return Err(AccessError::Revoked(format!(
+                    "Resource {} not found",
+                    resource_id
+                )));
+            }
+            Err(e) => {
+                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
+                return Err(AccessError::StorageError(e.to_string()));
+            }
+        };
 
         // Validate all transfer preconditions using shared helper
-        access.validate_transfer_preconditions(price)?;
+        if let Err(e) = access.validate_transfer_preconditions(price) {
+            icn_obs::metrics::ledger::resource_access_transfer_validation_failed_inc();
+            return Err(e);
+        }
 
         // Store old holder for event emission and index cleanup
         let old_holder = access.holder.clone();
@@ -1065,23 +1078,36 @@ impl ResourceAccessStore for SledResourceAccessStore {
         let mut old_holder_resources: Vec<String> = self
             .store
             .get(&old_holder_key)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?
+            .map_err(|e| {
+                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
+                AccessError::StorageError(e.to_string())
+            })?
             .map(|b| deserialize_holder_index(&b, &format!("transfer:{}", old_holder)))
             .unwrap_or_default();
         old_holder_resources.retain(|r| r != resource_id);
-        let old_holder_bytes = serde_json::to_vec(&old_holder_resources)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+        let old_holder_bytes = serde_json::to_vec(&old_holder_resources).map_err(|e| {
+            icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
+            AccessError::StorageError(e.to_string())
+        })?;
         self.store
             .put(&old_holder_key, &old_holder_bytes)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+            .map_err(|e| {
+                icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
+                AccessError::StorageError(e.to_string())
+            })?;
 
         // Update holder and record transfer timestamp for audit trail
         access.holder = new_holder;
         access.last_transferred_at = Some(current_time);
 
         // Persist the updated access (this also adds to new holder's index)
-        self.put(&access)
-            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+        self.put(&access).map_err(|e| {
+            icn_obs::metrics::ledger::resource_access_transfer_storage_error_inc();
+            AccessError::StorageError(e.to_string())
+        })?;
+
+        // Record successful transfer metric
+        icn_obs::metrics::ledger::resource_access_transfer_inc();
 
         Ok((old_holder, access))
     }
