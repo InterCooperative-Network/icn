@@ -41,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use thiserror::Error;
+use tracing::error;
 
 /// Errors related to resource access
 #[derive(Debug, Clone, Error, PartialEq, Eq, Serialize, Deserialize)]
@@ -667,21 +668,48 @@ impl ResourceAccess {
 // ResourceAccessStore - Persistent storage for resource access records
 // =============================================================================
 
-/// Key prefix for resource access records
-const RESOURCE_ACCESS_PREFIX: &str = "resource_access:";
+/// Key prefix for primary resource access records
+const ACCESS_PREFIX: &str = "resource_access:data:";
+
+/// Key prefix for holder index entries (maps holder -> list of resource_ids)
+const HOLDER_INDEX_PREFIX: &str = "resource_access:holder_index:";
 
 /// Trait for storing and managing resource access records
+///
+/// # Index Retention Policy
+///
+/// Index entries (holder -> resource mappings) are intentionally retained even when
+/// access is revoked. This design choice enables:
+///
+/// 1. **Audit trails**: Historical queries can reconstruct who held access to what resources
+/// 2. **Dispute resolution**: Revocation reasons and timestamps remain queryable
+/// 3. **Analytics**: Usage patterns and access history inform governance decisions
+///
+/// Callers should filter by `revoked` status when listing active access. The `list_by_holder`
+/// method returns all records (including revoked) to support audit use cases.
+///
+/// To permanently remove a record and its indexes, use `remove()` instead of revocation.
 pub trait ResourceAccessStore: Send + Sync {
     /// Get resource access by resource_id
     fn get(&self, resource_id: &str) -> anyhow::Result<Option<ResourceAccess>>;
 
     /// Store or update resource access
+    ///
+    /// Creates or updates the primary record and maintains holder index consistency.
+    /// If the holder index update fails, a best-effort rollback of the primary record
+    /// is attempted. Rollback failures are logged but do not change the returned error.
     fn put(&self, access: &ResourceAccess) -> anyhow::Result<()>;
 
-    /// Remove resource access (e.g., when fully revoked)
+    /// Remove resource access and clean up all associated indexes
+    ///
+    /// This permanently deletes the record. For audit-preserving removal, use
+    /// `ResourceAccess::revoke()` followed by `put()` instead.
     fn remove(&self, resource_id: &str) -> anyhow::Result<()>;
 
     /// List all resource access records for a given holder
+    ///
+    /// Returns all records including revoked ones to support audit queries.
+    /// Filter by `!access.revoked` for active access only.
     fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>>;
 
     /// Transfer resource access to a new holder
@@ -780,11 +808,11 @@ impl SledResourceAccessStore {
     }
 
     fn access_key(resource_id: &str) -> Vec<u8> {
-        format!("{RESOURCE_ACCESS_PREFIX}{}", resource_id).into_bytes()
+        format!("{ACCESS_PREFIX}{}", resource_id).into_bytes()
     }
 
     fn holder_index_key(holder: &EntityId) -> Vec<u8> {
-        format!("{}holder_index:{}", RESOURCE_ACCESS_PREFIX, holder).into_bytes()
+        format!("{HOLDER_INDEX_PREFIX}{}", holder).into_bytes()
     }
 }
 
@@ -816,7 +844,20 @@ impl ResourceAccessStore for SledResourceAccessStore {
         if !holder_resources.contains(&access.resource_id) {
             holder_resources.push(access.resource_id.clone());
             let holder_bytes = serde_json::to_vec(&holder_resources)?;
-            self.store.put(&holder_key, &holder_bytes)?;
+            if let Err(index_err) = self.store.put(&holder_key, &holder_bytes) {
+                // Best-effort rollback: try to delete the primary record
+                // to maintain consistency between primary and index
+                if let Err(rollback_err) = self.store.delete(&key) {
+                    error!(
+                        resource_id = %access.resource_id,
+                        index_error = %index_err,
+                        rollback_error = %rollback_err,
+                        "Failed to rollback primary record after holder index update failed. \
+                         Database may be in inconsistent state."
+                    );
+                }
+                return Err(index_err);
+            }
         }
 
         Ok(())
