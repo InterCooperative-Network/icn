@@ -213,6 +213,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, error, info, instrument, warn};
 
+// Re-export ForkStats from fork_ops module
+pub use crate::ledger_impl::fork_ops::ForkStats;
+
 /// Type alias for validation hook callback
 pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>;
 
@@ -226,15 +229,6 @@ pub(crate) const JOURNAL_PREFIX: &str = "ledger:journal:";
 /// Format: ledger:journal_ts:{timestamp:020}:{hash}
 /// The timestamp is zero-padded to 20 digits for proper lexicographic ordering
 pub(crate) const JOURNAL_TS_PREFIX: &str = "ledger:journal_ts:";
-
-/// Statistics about forks in the ledger
-#[derive(Debug, Clone)]
-pub struct ForkStats {
-    /// Total number of detected forks
-    pub total_forks: usize,
-    /// Parent hashes that have forks
-    pub parents_with_forks: Vec<ContentHash>,
-}
 
 /// Key prefix for cached balances in storage
 pub(crate) const BALANCE_PREFIX: &str = "ledger:balance:";
@@ -290,22 +284,23 @@ pub struct Ledger {
     gossip: Option<GossipHandle>,
 
     /// Quarantine store for entries that violate invariants
-    quarantine: QuarantineStore,
+    pub(crate) quarantine: QuarantineStore,
 
     /// Last merge decision (for reporting)
     last_merge: Option<MergeDecision>,
 
     /// Fork detector for detecting conflicting entries (Phase 18 Week 5)
-    fork_detector: ForkDetector,
+    pub(crate) fork_detector: ForkDetector,
 
     /// Fork resolver for resolving detected forks (Phase 18 Week 5)
-    fork_resolver: ForkResolver,
+    pub(crate) fork_resolver: ForkResolver,
 
     /// Freeze manager for emergency member freezes (Issue #25)
     freeze_manager: FreezeManager,
 
     /// Byzantine fault detector (Phase 18)
-    misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
+    pub(crate) misbehavior_detector:
+        Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Trust graph for entry validation (wrapped in RwLock for live updates)
     trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
@@ -2298,16 +2293,7 @@ impl Ledger {
 
     /// Rebuild the fork detection index from stored entries
     fn rebuild_fork_index(&mut self) -> Result<()> {
-        let entries = self.get_all_entries()?;
-        let entry_count = entries.len();
-
-        for entry in entries {
-            self.fork_detector.index_entry(&entry);
-        }
-
-        info!(entry_count = entry_count, "Rebuilt fork detection index");
-
-        Ok(())
+        crate::ledger_impl::fork_ops::rebuild_fork_index(self)
     }
 
     /// Ensure timestamp index exists for efficient pagination
@@ -2315,54 +2301,17 @@ impl Ledger {
     /// This migrates existing ledgers that were created before the timestamp
     /// index was introduced. Only runs if the index is empty but entries exist.
     fn ensure_timestamp_index(&self) -> Result<()> {
-        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
-        let ts_count = self.store.scan_count(ts_prefix)?;
-
-        // If timestamp index already has entries, no migration needed
-        if ts_count > 0 {
-            return Ok(());
-        }
-
-        // Check if we have journal entries that need indexing
-        let journal_prefix = JOURNAL_PREFIX.as_bytes();
-        let pairs = self.store.scan(journal_prefix)?;
-
-        if pairs.is_empty() {
-            return Ok(());
-        }
-
-        info!(
-            entry_count = pairs.len(),
-            "Migrating ledger: building timestamp index"
-        );
-
-        for (key, value) in pairs {
-            // Extract hash from key (after prefix)
-            let key_str = String::from_utf8_lossy(&key);
-            let hash_hex = key_str.trim_start_matches(JOURNAL_PREFIX);
-
-            // Deserialize entry to get timestamp
-            let entry: JournalEntry = serde_json::from_slice(&value)?;
-
-            // Write to timestamp index
-            let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash_hex);
-            if let Ok(hash_bytes) = hex::decode(hash_hex) {
-                self.store.put(ts_key.as_bytes(), &hash_bytes)?;
-            }
-        }
-
-        info!("Timestamp index migration complete");
-        Ok(())
+        crate::ledger_impl::fork_ops::ensure_timestamp_index(self)
     }
 
     /// Detect any forks in the ledger
     pub fn detect_forks(&self) -> Vec<(ContentHash, Vec<ContentHash>)> {
-        self.fork_detector.detect_forks()
+        crate::ledger_impl::fork_ops::detect_forks(self)
     }
 
     /// Check if a specific parent has a fork
     pub fn has_fork(&self, parent: &ContentHash) -> bool {
-        self.fork_detector.has_fork(parent)
+        crate::ledger_impl::fork_ops::has_fork(self, parent)
     }
 
     /// Detect and resolve all forks in the ledger
@@ -2371,217 +2320,12 @@ impl Ledger {
     /// Entries that should be discarded are quarantined.
     #[instrument(skip(self))]
     pub fn detect_and_resolve_forks(&mut self) -> Result<Vec<(Fork, ForkResolution)>> {
-        let forks = self.fork_detector.detect_forks();
-
-        if forks.is_empty() {
-            debug!("No forks detected in ledger");
-            return Ok(vec![]);
-        }
-
-        info!(
-            fork_count = forks.len(),
-            "Detected forks in ledger, attempting resolution"
-        );
-
-        let mut resolutions = Vec::new();
-
-        for (parent, children) in forks {
-            // Get the actual entries for comparison
-            let mut entries = Vec::new();
-            for child_hash in &children {
-                if let Some(entry) = self.get_entry(child_hash)? {
-                    entries.push(entry);
-                }
-            }
-
-            // Handle N-way forks using tournament-style resolution
-            // Compare entries pairwise: winner of round 1 vs entry 3, winner vs entry 4, etc.
-            if entries.len() >= 2 {
-                let is_nway = entries.len() > 2;
-                let entry_count = entries.len();
-
-                // Track winning entry index and all losers
-                let mut winner_idx = 0;
-                let mut losers: Vec<usize> = Vec::new();
-                let mut requires_manual = false;
-                let mut manual_reason = String::new();
-
-                // Tournament: compare current winner against each subsequent entry
-                for challenger_idx in 1..entries.len() {
-                    let fork = Fork {
-                        common_parents: vec![parent.clone()],
-                        entry1: entries[winner_idx].clone(),
-                        entry2: entries[challenger_idx].clone(),
-                        detected_at: SystemTime::now(),
-                    };
-
-                    match self.fork_resolver.resolve_fork(&fork) {
-                        Ok(resolution) => {
-                            match &resolution {
-                                ForkResolution::KeepFirst => {
-                                    // Current winner stays, challenger loses
-                                    losers.push(challenger_idx);
-                                    debug!(
-                                        round = challenger_idx,
-                                        winner = winner_idx,
-                                        "Tournament round: keeping current winner"
-                                    );
-                                }
-                                ForkResolution::KeepSecond => {
-                                    // Challenger wins, previous winner loses
-                                    losers.push(winner_idx);
-                                    winner_idx = challenger_idx;
-                                    debug!(
-                                        round = challenger_idx,
-                                        new_winner = winner_idx,
-                                        "Tournament round: challenger wins"
-                                    );
-                                }
-                                ForkResolution::RequiresManual { reason } => {
-                                    requires_manual = true;
-                                    manual_reason = reason.clone();
-                                    warn!(
-                                        parent = %parent.to_hex(),
-                                        round = challenger_idx,
-                                        reason = reason,
-                                        "Fork requires manual resolution, stopping tournament"
-                                    );
-                                    break;
-                                }
-                            }
-
-                            // Store the last resolution for reporting
-                            if challenger_idx == entries.len() - 1 && !requires_manual {
-                                resolutions.push((fork, resolution));
-                            }
-                        }
-                        Err(e) => {
-                            warn!(
-                                parent = %parent.to_hex(),
-                                round = challenger_idx,
-                                error = %e,
-                                "Failed to resolve fork round"
-                            );
-                        }
-                    }
-                }
-
-                // Handle manual resolution requirement
-                if requires_manual {
-                    icn_obs::metrics::ledger_forks::manual_resolution_required_inc(&manual_reason);
-                    continue;
-                }
-
-                // Quarantine all losing entries
-                for loser_idx in &losers {
-                    let loser_entry = &entries[*loser_idx];
-                    if let Some(hash) = &loser_entry.id {
-                        self.quarantine_forked_entry(
-                            loser_entry,
-                            if is_nway {
-                                "Lost N-way fork resolution"
-                            } else {
-                                "Lost fork resolution"
-                            },
-                        )?;
-                        debug!(
-                            quarantined = %hash.to_hex(),
-                            entry_index = loser_idx,
-                            "Quarantined losing fork entry"
-                        );
-                    }
-                }
-
-                // Record metrics
-                icn_obs::metrics::ledger_forks::resolved_inc("hybrid");
-                if is_nway {
-                    icn_obs::metrics::ledger_forks::nway_fork_resolved_inc(entry_count);
-                    info!(
-                        parent = %parent.to_hex(),
-                        entry_count = entry_count,
-                        losers_quarantined = losers.len(),
-                        winner_idx = winner_idx,
-                        "Resolved N-way fork via tournament"
-                    );
-                } else {
-                    info!(
-                        parent = %parent.to_hex(),
-                        "Resolved 2-way fork"
-                    );
-                }
-            }
-        }
-
-        Ok(resolutions)
-    }
-
-    /// Quarantine an entry that lost fork resolution
-    fn quarantine_forked_entry(&mut self, entry: &JournalEntry, reason: &str) -> Result<()> {
-        let hash = entry.id.as_ref().context("Entry missing hash")?;
-
-        // Remove from main store
-        let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
-        self.store.delete(key.as_bytes())?;
-
-        // Remove from timestamp index
-        let ts_key = format!(
-            "{}{:020}:{}",
-            JOURNAL_TS_PREFIX,
-            entry.timestamp,
-            hash.to_hex()
-        );
-        self.store.delete(ts_key.as_bytes())?;
-
-        // Add to quarantine
-        let item = QuarantineItem::new(
-            hash.clone(),
-            QuarantineReason::ForkConflict(reason.to_string()),
-            entry.author.clone(),
-        );
-        self.quarantine.add(entry.clone(), item)?;
-
-        // Record Byzantine violation for conflicting ledger entries (Phase 18)
-        if let Some(ref detector) = self.misbehavior_detector {
-            // Find the conflicting entry hash from the first parent
-            let conflicting_hash = entry
-                .parents
-                .first()
-                .cloned()
-                .unwrap_or_else(|| hash.clone());
-
-            let violation = icn_security::Violation::ConflictingLedgerEntries {
-                entry1: hash.as_bytes().try_into().unwrap_or([0u8; 32]),
-                entry2: conflicting_hash.as_bytes().try_into().unwrap_or([0u8; 32]),
-            };
-
-            // SAFETY: Use block_in_place to report violation from sync context.
-            // This may be called from tokio runtime; block_in_place moves other tasks off this thread.
-            let detector_clone = detector.clone();
-            let author = entry.author.clone();
-            tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    detector_clone
-                        .write()
-                        .await
-                        .record_violation(&author, violation, vec![]);
-                })
-            });
-        }
-
-        // Recompute balances (expensive but necessary for correctness)
-        self.recompute_balances()?;
-
-        Ok(())
+        crate::ledger_impl::fork_ops::detect_and_resolve_forks(self)
     }
 
     /// Get fork resolution statistics
     pub fn get_fork_stats(&self) -> ForkStats {
-        let forks = self.fork_detector.detect_forks();
-        ForkStats {
-            total_forks: forks.len(),
-            parents_with_forks: forks.iter().map(|(p, _)| p.clone()).collect(),
-        }
+        crate::ledger_impl::fork_ops::get_fork_stats(self)
     }
 
     /// Get account balance for a specific currency
