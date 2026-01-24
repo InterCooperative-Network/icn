@@ -336,6 +336,24 @@ pub fn init_descriptions() {
         "Latency of gossip message processing in seconds"
     );
 
+    // Message batching metrics
+    describe_counter!(
+        "icn_gossip_batches_sent_total",
+        "Total number of message batches sent"
+    );
+    describe_counter!(
+        "icn_gossip_batches_received_total",
+        "Total number of message batches received"
+    );
+    describe_histogram!(
+        "icn_gossip_batch_size",
+        "Number of messages in a batch"
+    );
+    describe_histogram!(
+        "icn_gossip_batch_compression_ratio",
+        "Batch compression ratio (original/compressed)"
+    );
+
     // Scalability metrics (Phase 19)
     describe_counter!(
         "icn_scalability_vector_clocks_compressed_total",
@@ -2210,6 +2228,27 @@ pub mod gossip {
     /// Issue #181: Record gossip message processing latency
     pub fn message_latency_record(latency_secs: f64) {
         histogram!("icn_gossip_message_latency_seconds").record(latency_secs);
+    }
+
+    /// Message batching metrics
+    /// Track number of batches sent
+    pub fn batches_sent_inc() {
+        counter!("icn_gossip_batches_sent_total").increment(1);
+    }
+
+    /// Track number of batches received
+    pub fn batches_received_inc() {
+        counter!("icn_gossip_batches_received_total").increment(1);
+    }
+
+    /// Record batch size (number of messages in batch)
+    pub fn batch_size_record(size: usize) {
+        histogram!("icn_gossip_batch_size").record(size as f64);
+    }
+
+    /// Record batch compression ratio (original/compressed)
+    pub fn batch_compression_ratio_record(ratio: f64) {
+        histogram!("icn_gossip_batch_compression_ratio").record(ratio);
     }
 }
 

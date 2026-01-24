@@ -13,6 +13,17 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 
+/// Compress batch data with zstd
+fn compress_batch(data: &[u8]) -> Result<Vec<u8>> {
+    zstd::encode_all(data, 3).context("Failed to compress batch")
+}
+
+/// Decompress batch data with zstd
+fn decompress_batch(data: &[u8]) -> Result<Vec<u8>> {
+    zstd::decode_all(data).context("Failed to decompress batch")
+}
+
+
 /// Callback for sending gossip messages to peers
 /// Parameters: (recipient_did, message)
 /// If recipient_did is None, broadcast to all peers
@@ -231,6 +242,19 @@ pub struct GossipActor {
     /// Key rotation cache for tracking rotated DIDs during grace period (Issue #469)
     /// Used to accept messages signed with old keys during the transition period
     key_rotation_cache: crate::key_rotation::KeyRotationCache,
+
+    /// Message batching configuration
+    batching_config: crate::types::BatchingConfig,
+
+    /// Pending outgoing messages (recipient -> messages)
+    /// Uses Mutex for interior mutability to allow batching from &self methods
+    pending_batches: std::sync::Mutex<HashMap<Option<Did>, Vec<GossipMessage>>>,
+
+    /// Last batch send time per recipient
+    last_batch_time: std::sync::Mutex<HashMap<Option<Did>, Instant>>,
+
+    /// Counter for batch IDs
+    next_batch_id: std::sync::Mutex<u64>,
 }
 
 impl GossipActor {
@@ -272,6 +296,10 @@ impl GossipActor {
             adaptive_fanout_config: crate::types::AdaptiveFanoutConfig::default(), // M2 #484: Adaptive fanout
             topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy::default(), // Issue #473: Strict defaults
             key_rotation_cache: crate::key_rotation::KeyRotationCache::new(), // Issue #469: Key rotation tracking
+            batching_config: crate::types::BatchingConfig::default(),
+            pending_batches: std::sync::Mutex::new(HashMap::new()),
+            last_batch_time: std::sync::Mutex::new(HashMap::new()),
+            next_batch_id: std::sync::Mutex::new(0),
         };
 
         // Create default topics with appropriate scopes
@@ -771,13 +799,105 @@ impl GossipActor {
         peers.into_iter().collect()
     }
 
-    /// Send a message to a peer (if callback is set)
-    pub(crate) fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
+    /// Set the batching configuration
+    pub fn set_batching_config(&mut self, config: crate::types::BatchingConfig) {
+        self.batching_config = config;
+    }
+
+    /// Enqueue a message for batching, or send immediately if batching is disabled
+    pub(crate) fn send_message_batched(&self, recipient: Option<Did>, message: GossipMessage) {
+        if !self.batching_config.enabled {
+            // Batching disabled - send immediately
+            self.send_message_immediate(recipient, message);
+            return;
+        }
+
+        // Add to pending batch
+        let batch_len = {
+            let mut batches = self.pending_batches.lock().unwrap();
+            let batch = batches.entry(recipient.clone()).or_default();
+            batch.push(message);
+            batch.len()
+        };
+
+        // Check if batch should be sent
+        let batch_bytes = batch_len * 500; // Rough estimate
+        
+        let time_exceeded = self.last_batch_time
+            .lock()
+            .unwrap()
+            .get(&recipient)
+            .map(|t| t.elapsed() >= self.batching_config.max_delay)
+            .unwrap_or(false);
+
+        let should_send = batch_len >= self.batching_config.max_batch_size
+            || batch_bytes >= self.batching_config.max_batch_bytes
+            || time_exceeded;
+
+        if should_send {
+            self.flush_batch(&recipient);
+        }
+    }
+
+    /// Flush pending batch for a recipient
+    pub fn flush_batch(&self, recipient: &Option<Did>) {
+        let messages = self.pending_batches.lock().unwrap().remove(recipient);
+        
+        if let Some(messages) = messages {
+            if messages.is_empty() {
+                return;
+            }
+
+            let batch_id = {
+                let mut id = self.next_batch_id.lock().unwrap();
+                let current = *id;
+                *id = id.wrapping_add(1);
+                current
+            };
+
+            // For now, we don't compress at this layer - compression happens at the 
+            // network/protocol layer when the entire Batch message is serialized
+            let compressed = false;
+
+            // Record metrics
+            icn_obs::metrics::gossip::batch_size_record(messages.len());
+            icn_obs::metrics::gossip::batches_sent_inc();
+
+            let batch_msg = GossipMessage::Batch {
+                batch_id,
+                messages,
+                compressed,
+            };
+
+            self.send_message_immediate(recipient.clone(), batch_msg);
+            self.last_batch_time
+                .lock()
+                .unwrap()
+                .insert(recipient.clone(), Instant::now());
+        }
+    }
+
+    /// Flush all pending batches
+    pub fn flush_all_batches(&self) {
+        let recipients: Vec<Option<Did>> = self.pending_batches.lock().unwrap().keys().cloned().collect();
+        for recipient in recipients {
+            self.flush_batch(&recipient);
+        }
+    }
+
+    /// Send a message immediately without batching
+    fn send_message_immediate(&self, recipient: Option<Did>, message: GossipMessage) {
         if let Some(callback) = &self.send_callback {
             callback(recipient, message);
         } else {
             debug!("Cannot send message - no send callback set");
         }
+    }
+
+    /// Send a message to a peer (if callback is set)
+    /// This now uses batching when enabled
+    pub(crate) fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
+        self.send_message_batched(recipient, message);
     }
 
     /// Send a message with scope-aware peer selection

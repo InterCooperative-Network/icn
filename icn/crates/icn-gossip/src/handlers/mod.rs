@@ -10,7 +10,9 @@
 //! - `replica`: ReplicaRequest, ReplicaOffer, ReplicaStatus (Phase 17)
 //! - `partition`: PartitionHealRequest, PartitionHealResponse (Phase 18)
 //! - `storage_challenge`: StorageChallengeMsg, StorageProofMsg (proof-of-storage)
+//! - `batch`: Batch message handling (performance optimization)
 
+mod batch;
 mod bloom;
 mod dispatch;
 mod partition;

@@ -372,6 +372,19 @@ pub enum GossipMessage {
         /// The content-not-found response
         response: StorageContentNotFound,
     },
+
+    /// Batch of gossip messages for improved network efficiency
+    ///
+    /// Multiple messages can be batched together and optionally compressed
+    /// to reduce network overhead (framing, serialization, round-trips).
+    Batch {
+        /// Batch identifier (for tracking and debugging)
+        batch_id: u64,
+        /// Batched messages
+        messages: Vec<GossipMessage>,
+        /// Whether the message data is compressed with zstd
+        compressed: bool,
+    },
 }
 
 impl GossipMessage {
@@ -396,6 +409,7 @@ impl GossipMessage {
             GossipMessage::StorageChallengeMsg { .. } => "StorageChallengeMsg",
             GossipMessage::StorageProofMsg { .. } => "StorageProofMsg",
             GossipMessage::StorageContentNotFoundMsg { .. } => "StorageContentNotFoundMsg",
+            GossipMessage::Batch { .. } => "Batch",
         }
     }
 }
@@ -679,6 +693,74 @@ impl AdaptiveFanoutConfig {
 
         // Clamp to bounds
         adjusted.clamp(self.min_fanout, self.max_fanout)
+    }
+}
+
+/// Message batching configuration for optimizing network efficiency
+///
+/// Batching reduces overhead from framing, serialization, and round-trips
+/// by accumulating multiple small messages before sending.
+#[derive(Debug, Clone)]
+pub struct BatchingConfig {
+    /// Maximum number of messages in a batch
+    pub max_batch_size: usize,
+
+    /// Maximum time to wait before sending a batch (even if not full)
+    pub max_delay: Duration,
+
+    /// Minimum size in bytes before compression is applied
+    pub compression_threshold: usize,
+
+    /// Whether batching is enabled
+    pub enabled: bool,
+
+    /// Maximum total size of a batch in bytes (uncompressed)
+    pub max_batch_bytes: usize,
+}
+
+impl Default for BatchingConfig {
+    fn default() -> Self {
+        Self {
+            max_batch_size: 10,
+            max_delay: Duration::from_millis(10),
+            compression_threshold: COMPRESSION_THRESHOLD,
+            enabled: true,
+            max_batch_bytes: 256 * 1024, // 256KB
+        }
+    }
+}
+
+impl BatchingConfig {
+    /// Create a new batching configuration
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Disable batching (send messages immediately)
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
+    }
+
+    /// Create a configuration optimized for low latency
+    pub fn low_latency() -> Self {
+        Self {
+            max_batch_size: 5,
+            max_delay: Duration::from_millis(5),
+            ..Default::default()
+        }
+    }
+
+    /// Create a configuration optimized for high throughput
+    pub fn high_throughput() -> Self {
+        Self {
+            max_batch_size: 50,
+            max_delay: Duration::from_millis(50),
+            max_batch_bytes: 1024 * 1024, // 1MB
+            ..Default::default()
+        }
     }
 }
 

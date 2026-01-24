@@ -107,6 +107,13 @@ pub enum DispatchResult {
         nonce: u64,
         next_cursor: Option<crate::types::SyncCursor>,
     },
+    /// Handler needs async execution - contains batch data
+    AsyncBatch {
+        sender: Did,
+        batch_id: u64,
+        messages: Vec<GossipMessage>,
+        compressed: bool,
+    },
 }
 
 impl GossipActor {
@@ -270,6 +277,20 @@ impl GossipActor {
 
             GossipMessage::StorageContentNotFoundMsg { response } => {
                 DispatchResult::Sync(self.handle_storage_content_not_found(sender, response))
+            }
+
+            GossipMessage::Batch {
+                batch_id,
+                messages,
+                compressed,
+            } => {
+                // Async handler - return data for caller to await
+                DispatchResult::AsyncBatch {
+                    sender: sender.clone(),
+                    batch_id,
+                    messages,
+                    compressed,
+                }
             }
         }
     }
