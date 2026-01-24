@@ -236,6 +236,11 @@ impl UsageEvent {
         }
     }
 
+    /// Alias for `with_duty_type` for convenience
+    pub fn with_type(timestamp: u64, description: String, duty_type: DutyEventType) -> Self {
+        Self::with_duty_type(timestamp, description, duty_type)
+    }
+
     // === Convenience constructors for common duty types ===
 
     /// Create a maintenance event
@@ -811,6 +816,337 @@ impl ResourceAccess {
         } else {
             current_time.saturating_sub(self.granted_at)
         }
+    }
+}
+
+use tracing::error;
+
+/// Trait for persistent storage of resource access records
+///
+/// This trait abstracts over the storage backend, allowing different implementations
+/// (e.g., sled, in-memory for testing, or distributed storage for federation).
+pub trait ResourceAccessStore: Send + Sync {
+    /// Grant access to a resource
+    fn grant(&self, access: ResourceAccess) -> anyhow::Result<()>;
+
+    /// Revoke access to a resource
+    fn revoke(&self, resource_id: &str, holder: &EntityId, reason: String) -> anyhow::Result<()>;
+
+    /// Get access record for a specific resource and holder
+    fn get(&self, resource_id: &str, holder: &EntityId) -> anyhow::Result<Option<ResourceAccess>>;
+
+    /// List all access records for a specific holder
+    fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>>;
+
+    /// List all access records for a specific resource
+    fn list_by_resource(&self, resource_id: &str) -> anyhow::Result<Vec<ResourceAccess>>;
+
+    /// Find expired access records at the given timestamp
+    fn find_expired(&self, current_time: u64) -> anyhow::Result<Vec<ResourceAccess>>;
+
+    /// Find idle access records (not used recently)
+    fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>>;
+}
+
+/// Sled-backed resource access store
+///
+/// Keys are structured as:
+/// - Primary: `ledger:resource_access:<resource_id>:<holder>` -> ResourceAccess (JSON)
+/// - Index: `ledger:resource_access:idx:holder:<holder>:<resource_id>` -> primary key bytes
+/// - Index: `ledger:resource_access:idx:resource:<resource_id>:<holder>` -> primary key bytes
+///
+/// Index values contain the primary key, enabling single-lookup queries without
+/// the N+1 I/O pattern of key-only indexes.
+pub struct SledResourceAccessStore {
+    store: std::sync::Arc<dyn icn_store::Store>,
+}
+
+impl SledResourceAccessStore {
+    /// Create a new resource access store using the given storage backend
+    pub fn new(store: std::sync::Arc<dyn icn_store::Store>) -> Self {
+        Self { store }
+    }
+
+    /// Key prefix for all resource access records
+    const ACCESS_PREFIX: &'static [u8] = b"ledger:resource_access:";
+
+    /// Primary key for access record: ledger:resource_access:<resource_id>:<holder>
+    fn access_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
+        format!("ledger:resource_access:{}:{}", resource_id, holder).into_bytes()
+    }
+
+    /// Index key for holder lookup: ledger:resource_access:idx:holder:<holder>:<resource_id>
+    fn holder_index_key(holder: &EntityId, resource_id: &str) -> Vec<u8> {
+        format!(
+            "ledger:resource_access:idx:holder:{}:{}",
+            holder, resource_id
+        )
+        .into_bytes()
+    }
+
+    /// Index key for resource lookup: ledger:resource_access:idx:resource:<resource_id>:<holder>
+    fn resource_index_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
+        format!(
+            "ledger:resource_access:idx:resource:{}:{}",
+            resource_id, holder
+        )
+        .into_bytes()
+    }
+
+    /// Prefix for holder index scan
+    fn holder_prefix(holder: &EntityId) -> Vec<u8> {
+        format!("ledger:resource_access:idx:holder:{}:", holder).into_bytes()
+    }
+
+    /// Prefix for resource index scan
+    fn resource_prefix(resource_id: &str) -> Vec<u8> {
+        format!("ledger:resource_access:idx:resource:{}:", resource_id).into_bytes()
+    }
+
+    /// Extract resource_id from a holder index key by stripping the holder prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:holder:<holder>:<resource_id>`
+    /// Given the prefix `ledger:resource_access:idx:holder:<holder>:`, we extract the resource_id
+    /// which is everything after that prefix.
+    fn extract_resource_id_from_holder_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<String> {
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain resource_id after prefix");
+        }
+        let resource_id_bytes = &key[prefix.len()..];
+        let resource_id = std::str::from_utf8(resource_id_bytes)?;
+        Ok(resource_id.to_string())
+    }
+
+    /// Extract holder EntityId from a resource index key by stripping the resource prefix.
+    ///
+    /// Key format: `ledger:resource_access:idx:resource:<resource_id>:<holder>`
+    /// Given the prefix `ledger:resource_access:idx:resource:<resource_id>:`, we extract the holder
+    /// which is everything after that prefix.
+    fn extract_holder_from_resource_key(key: &[u8], prefix: &[u8]) -> anyhow::Result<EntityId> {
+        use std::str::FromStr;
+
+        if key.len() <= prefix.len() {
+            anyhow::bail!("Key too short to contain holder after prefix");
+        }
+        let holder_bytes = &key[prefix.len()..];
+        let holder_str = std::str::from_utf8(holder_bytes)?;
+        EntityId::from_str(holder_str)
+            .map_err(|e| anyhow::anyhow!("Failed to parse EntityId: {}", e))
+    }
+}
+
+impl ResourceAccessStore for SledResourceAccessStore {
+    fn grant(&self, access: ResourceAccess) -> anyhow::Result<()> {
+        let key = Self::access_key(&access.resource_id, &access.holder);
+        let holder_idx = Self::holder_index_key(&access.holder, &access.resource_id);
+        let resource_idx = Self::resource_index_key(&access.resource_id, &access.holder);
+
+        // Serialize access record
+        let value = serde_json::to_vec(&access)?;
+
+        // Store primary record and indexes with best-effort rollback on failure.
+        // Note: These writes are not atomic. If a rollback fails, the store may be left
+        // in an inconsistent state (primary record without indexes). Recovery requires
+        // calling grant() again to overwrite the orphaned record.
+        //
+        // Index values store the primary key to enable single-lookup queries
+        // (avoids N+1 I/O pattern in list_by_* methods).
+        //
+        // 1. Write primary record
+        self.store.put(&key, &value)?;
+        // 2. Write holder index with primary key as value; on failure, delete primary record
+        if let Err(err) = self.store.put(&holder_idx, &key) {
+            // Best-effort rollback of primary record
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after holder index write failed"
+                );
+            }
+            return Err(err);
+        }
+        // 3. Write resource index with primary key as value; on failure, delete holder index and primary record
+        if let Err(err) = self.store.put(&resource_idx, &key) {
+            // Best-effort rollback of previously written entries
+            if let Err(rollback_err) = self.store.delete(&holder_idx) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback holder index after resource index write failed"
+                );
+            }
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after resource index write failed"
+                );
+            }
+            return Err(err);
+        }
+
+        Ok(())
+    }
+
+    /// Revoke access to a resource
+    ///
+    /// This marks the access record as revoked but intentionally retains the
+    /// index entries for audit trail purposes. The revoked record remains
+    /// discoverable via `list_by_holder` and `list_by_resource` queries,
+    /// allowing cooperatives to track historical access patterns.
+    ///
+    /// Callers should filter results by `access.is_revoked()` if they only
+    /// want active access records. The `find_expired` and `find_idle` methods
+    /// already filter out revoked records.
+    fn revoke(&self, resource_id: &str, holder: &EntityId, reason: String) -> anyhow::Result<()> {
+        let key = Self::access_key(resource_id, holder);
+
+        // Load existing access
+        if let Some(bytes) = self.store.get(&key)? {
+            let mut access: ResourceAccess = serde_json::from_slice(&bytes)?;
+
+            // Revoke it (index entries are intentionally retained for audit trail)
+            access.revoke(reason);
+
+            // Save updated record
+            let value = serde_json::to_vec(&access)?;
+            self.store.put(&key, &value)?;
+
+            Ok(())
+        } else {
+            anyhow::bail!(
+                "Access not found for resource {} and holder {}",
+                resource_id,
+                holder
+            );
+        }
+    }
+
+    fn get(&self, resource_id: &str, holder: &EntityId) -> anyhow::Result<Option<ResourceAccess>> {
+        let key = Self::access_key(resource_id, holder);
+
+        if let Some(bytes) = self.store.get(&key)? {
+            let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+            Ok(Some(access))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>> {
+        let prefix = Self::holder_prefix(holder);
+        let index_entries = self.store.scan(&prefix)?;
+
+        let mut results = Vec::new();
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract resource_id from key and do second lookup
+                let resource_id = Self::extract_resource_id_from_holder_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(&resource_id, holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    fn list_by_resource(&self, resource_id: &str) -> anyhow::Result<Vec<ResourceAccess>> {
+        let prefix = Self::resource_prefix(resource_id);
+        let index_entries = self.store.scan(&prefix)?;
+
+        let mut results = Vec::new();
+        for (index_key, primary_key) in index_entries {
+            // Index value contains the primary key; use it directly to fetch data.
+            // Fall back to legacy behavior (extract from index key) for empty values
+            // to maintain backward compatibility during migration.
+            if primary_key.is_empty() {
+                // Legacy empty index value: extract holder from key and do second lookup
+                let holder = Self::extract_holder_from_resource_key(&index_key, &prefix)?;
+                if let Some(access) = self.get(resource_id, &holder)? {
+                    results.push(access);
+                }
+            } else {
+                // Optimized path: fetch data using the primary key stored in the index value
+                if let Some(bytes) = self.store.get(&primary_key)? {
+                    let access: ResourceAccess = serde_json::from_slice(&bytes)?;
+                    results.push(access);
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    fn find_expired(&self, current_time: u64) -> anyhow::Result<Vec<ResourceAccess>> {
+        let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
+
+        let mut expired = Vec::new();
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            // Index entries store primary keys as values, not JSON data
+            let key_str = String::from_utf8_lossy(&key);
+            if key_str.contains(":idx:") {
+                continue;
+            }
+
+            let access: ResourceAccess = serde_json::from_slice(&value)?;
+
+            // Skip revoked records (already handled)
+            if access.is_revoked() {
+                continue;
+            }
+
+            if access.is_expired(current_time) {
+                expired.push(access);
+            }
+        }
+
+        Ok(expired)
+    }
+
+    fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>> {
+        let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
+
+        let mut idle = Vec::new();
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            let key_str = String::from_utf8_lossy(&key);
+            if key_str.contains(":idx:") {
+                continue;
+            }
+
+            let access: ResourceAccess = serde_json::from_slice(&value)?;
+
+            // Skip revoked records (already handled)
+            if access.is_revoked() {
+                continue;
+            }
+
+            // Skip expired records (handled by find_expired)
+            if access.is_expired(current_time) {
+                continue;
+            }
+
+            if access.is_idle(current_time, max_idle) {
+                idle.push(access);
+            }
+        }
+
+        Ok(idle)
     }
 }
 
@@ -1798,7 +2134,7 @@ mod tests {
         access.usage_log.push_back(UsageEvent::with_type(
             maintenance_time,
             "Recent maintenance".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Report 2 (3 days ago) - most recent
@@ -1843,21 +2179,21 @@ mod tests {
         access.usage_log.push_back(UsageEvent::with_type(
             current_time - (2 * 24 * 3600), // 2 days ago
             "Recent cleaning".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Event 2: Old event with EARLIER timestamp - inserted second (out of order)
         access.usage_log.push_back(UsageEvent::with_type(
             current_time - (30 * 24 * 3600), // 30 days ago
             "Old event".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Event 3: Another old event
         access.usage_log.push_back(UsageEvent::with_type(
             current_time - (20 * 24 * 3600), // 20 days ago
             "Another old event".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // With .filter(), all events are checked regardless of order,
@@ -1894,7 +2230,7 @@ mod tests {
         access.usage_log.push_back(UsageEvent::with_type(
             50,
             "Early maintenance".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // cutoff_time = 100.saturating_sub(1_000_000) = 0
