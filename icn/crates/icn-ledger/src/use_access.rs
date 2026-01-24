@@ -71,6 +71,15 @@ pub enum AccessError {
     /// Transfer for profit not allowed
     #[error("Cannot transfer access for profit")]
     ProfitTransferNotAllowed,
+
+    /// Invalid timestamp provided (time travel attempt)
+    #[error("Invalid timestamp {provided}: must be >= {minimum} (granted_at)")]
+    InvalidTimestamp {
+        /// The timestamp provided
+        provided: u64,
+        /// The minimum valid timestamp
+        minimum: u64,
+    },
 }
 
 /// Result type for access operations
@@ -252,11 +261,13 @@ impl ResourceAccess {
     }
 
     /// Calculate expiration timestamp based on access model
+    ///
+    /// Uses saturating_add to prevent overflow on very long durations.
     fn calculate_expiration(model: &AccessModel, granted_at: u64) -> Option<u64> {
         match model {
             AccessModel::UseAccess {
                 duration_seconds, ..
-            } => Some(granted_at + duration_seconds),
+            } => Some(granted_at.saturating_add(*duration_seconds)),
             AccessModel::Stewardship { .. } => None, // Stewardship is ongoing
         }
     }
@@ -276,7 +287,21 @@ impl ResourceAccess {
     }
 
     /// Attempt to renew access
+    ///
+    /// # Arguments
+    /// * `current_time` - The current timestamp (must be >= granted_at)
+    ///
+    /// # Errors
+    /// Returns `AccessError::InvalidTimestamp` if current_time is before granted_at
     pub fn renew(&mut self, current_time: u64) -> Result<()> {
+        // Validate time is not in the past (before access was granted)
+        if current_time < self.granted_at {
+            return Err(AccessError::InvalidTimestamp {
+                provided: current_time,
+                minimum: self.granted_at,
+            });
+        }
+
         match &self.model {
             AccessModel::UseAccess {
                 duration_seconds,
@@ -781,5 +806,137 @@ mod tests {
 
         // Oldest entries should be removed (first entries should be gone)
         assert!(!access.usage_log[0].description.contains("Usage 0"));
+    }
+
+    #[test]
+    fn test_stewardship_community_benefit_provided_before_deadline() {
+        let entity = create_test_entity();
+        let granted_at = 1000;
+        let deadline = granted_at + 30 * 24 * 3600; // 30 days
+
+        let mut access = ResourceAccess::new(
+            "community-center".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::CommunityBenefit {
+                    description: "Host workshop".to_string(),
+                    due_by: deadline,
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+        access.granted_at = granted_at;
+
+        // Provide benefit before deadline
+        let benefit_time = granted_at + 20 * 24 * 3600;
+        access
+            .record_usage(benefit_time, "Host workshop for community".to_string())
+            .unwrap();
+
+        // Check after deadline - should pass because benefit was provided
+        let check_time = deadline + 3600;
+        assert!(access.check_duties(check_time).is_ok());
+    }
+
+    #[test]
+    fn test_stewardship_community_benefit_not_provided_by_deadline() {
+        let entity = create_test_entity();
+        let granted_at = 1000;
+        let deadline = granted_at + 30 * 24 * 3600; // 30 days
+
+        let access = ResourceAccess::new(
+            "community-center".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::CommunityBenefit {
+                    description: "Host workshop".to_string(),
+                    due_by: deadline,
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Check at deadline without providing benefit - should fail
+        let result = access.check_duties(deadline);
+        assert!(
+            matches!(result, Err(AccessError::DutyUnfulfilled(msg)) if msg.contains("Host workshop"))
+        );
+    }
+
+    #[test]
+    fn test_stewardship_community_benefit_before_deadline_no_check() {
+        let entity = create_test_entity();
+        let granted_at = 1000;
+        let deadline = granted_at + 30 * 24 * 3600; // 30 days
+
+        let access = ResourceAccess::new(
+            "community-center".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::CommunityBenefit {
+                    description: "Host workshop".to_string(),
+                    due_by: deadline,
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Check before deadline without providing benefit - should still pass
+        // (duty only enforced at/after deadline)
+        let check_time = deadline - 3600;
+        assert!(access.check_duties(check_time).is_ok());
+    }
+
+    #[test]
+    fn test_stewardship_community_benefit_case_insensitive() {
+        let entity = create_test_entity();
+        let granted_at = 1000;
+        let deadline = granted_at + 30 * 24 * 3600;
+
+        let mut access = ResourceAccess::new(
+            "community-center".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::CommunityBenefit {
+                    description: "Host Workshop".to_string(), // Mixed case
+                    due_by: deadline,
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+        access.granted_at = granted_at;
+
+        // Record with different case
+        let benefit_time = granted_at + 20 * 24 * 3600;
+        access
+            .record_usage(benefit_time, "HOST WORKSHOP session completed".to_string())
+            .unwrap();
+
+        // Should pass due to case-insensitive matching
+        let check_time = deadline + 3600;
+        assert!(access.check_duties(check_time).is_ok());
+    }
+
+    #[test]
+    fn test_renewal_time_travel_rejected() {
+        let entity = create_test_entity();
+        let mut access = ResourceAccess::new(
+            "tool-001".to_string(),
+            entity,
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 5,
+            },
+        );
+
+        // Try to renew with time before grant - should fail
+        let past_time = access.granted_at - 1000;
+        let result = access.renew(past_time);
+        assert!(matches!(
+            result,
+            Err(AccessError::InvalidTimestamp { provided, minimum })
+            if provided == past_time && minimum == access.granted_at
+        ));
     }
 }
