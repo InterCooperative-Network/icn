@@ -298,6 +298,11 @@ pub struct ResourceAccess {
 
     /// Timestamp of last stewardship review (for review_period enforcement)
     pub last_review: Option<u64>,
+
+    /// Timestamp of last transfer (for audit trail)
+    /// Set when access is transferred to a new holder via ResourceAccessStore::transfer()
+    #[serde(default)]
+    pub last_transferred_at: Option<u64>,
 }
 
 impl ResourceAccess {
@@ -321,6 +326,7 @@ impl ResourceAccess {
             revoked: false,
             revocation_reason: None,
             last_review: None,
+            last_transferred_at: None,
         }
     }
 
@@ -788,6 +794,17 @@ fn deserialize_holder_index(bytes: &[u8], context: &str) -> Vec<String> {
 ///
 /// - [`SledResourceAccessStore`]: Production-ready Sled-backed implementation
 ///
+/// # Implementation Requirements
+///
+/// **Implementers MUST maintain the holder index** to ensure `list_by_holder()` works correctly:
+///
+/// - `put()`: Add resource_id to the new holder's index; if holder changed, remove from old holder's index
+/// - `remove()`: Remove resource_id from the holder's index
+/// - `transfer()`: Remove from old holder's index, add to new holder's index
+///
+/// The provided default `transfer()` relies on `put()` to maintain indexes. If your implementation
+/// uses a different indexing strategy, you MUST override `transfer()` to maintain consistency.
+///
 /// # Index Retention Policy
 ///
 /// Index entries (holder -> resource mappings) are intentionally retained even when
@@ -844,6 +861,14 @@ pub trait ResourceAccessStore: Send + Sync {
     ///
     /// Returns all records including revoked ones to support audit queries.
     /// Filter by `!access.revoked` for active access only.
+    ///
+    /// # Performance Note
+    ///
+    /// The default implementation uses an N+1 query pattern: one query to get
+    /// the holder's resource ID list, then one query per resource to fetch details.
+    /// This is acceptable for typical workloads (< 50 resources per holder) but
+    /// may need optimization for holders with many resources. Consider monitoring
+    /// via metrics and implementing batch loading if needed.
     fn list_by_holder(&self, holder: &EntityId) -> anyhow::Result<Vec<ResourceAccess>>;
 
     /// Transfer resource access to a new holder
@@ -862,7 +887,7 @@ pub trait ResourceAccessStore: Send + Sync {
     /// * `resource_id` - The resource to transfer
     /// * `new_holder` - Entity receiving access
     /// * `price` - Optional transfer price (for validation)
-    /// * `_current_time` - Reserved for future audit/timestamp features
+    /// * `current_time` - Transfer timestamp for audit trail
     ///
     /// # Returns
     /// A tuple of (old_holder, updated ResourceAccess with new holder)
@@ -871,7 +896,7 @@ pub trait ResourceAccessStore: Send + Sync {
         resource_id: &str,
         new_holder: EntityId,
         price: Option<i64>,
-        _current_time: u64,
+        current_time: u64,
     ) -> Result<(EntityId, ResourceAccess)> {
         // Get existing access
         let mut access = self
@@ -885,8 +910,9 @@ pub trait ResourceAccessStore: Send + Sync {
         // Store old holder for event emission
         let old_holder = access.holder.clone();
 
-        // Update holder
+        // Update holder and record transfer timestamp for audit trail
         access.holder = new_holder;
+        access.last_transferred_at = Some(current_time);
 
         // Persist the updated access
         self.put(&access)
@@ -1000,12 +1026,27 @@ impl ResourceAccessStore for SledResourceAccessStore {
         Ok(accesses)
     }
 
+    /// Transfer resource access to a new holder with index maintenance.
+    ///
+    /// # Transaction Boundary Warning
+    ///
+    /// This operation performs three sequential writes that are NOT atomic:
+    /// 1. Remove resource from old holder's index
+    /// 2. Update the resource access record (holder + timestamp)
+    /// 3. Add resource to new holder's index (via `put()`)
+    ///
+    /// If step 3 fails after step 1 succeeds, the resource will be temporarily
+    /// orphaned (not in either holder's index). The resource data remains intact
+    /// and can be recovered by calling `put()` again. For applications requiring
+    /// stronger consistency, consider wrapping this in application-level retry logic.
+    ///
+    /// A future enhancement could use sled's transactional API for true atomicity.
     fn transfer(
         &self,
         resource_id: &str,
         new_holder: EntityId,
         price: Option<i64>,
-        _current_time: u64,
+        current_time: u64,
     ) -> Result<(EntityId, ResourceAccess)> {
         // Get existing access
         let mut access = self
@@ -1034,8 +1075,9 @@ impl ResourceAccessStore for SledResourceAccessStore {
             .put(&old_holder_key, &old_holder_bytes)
             .map_err(|e| AccessError::StorageError(e.to_string()))?;
 
-        // Update holder
+        // Update holder and record transfer timestamp for audit trail
         access.holder = new_holder;
+        access.last_transferred_at = Some(current_time);
 
         // Persist the updated access (this also adds to new holder's index)
         self.put(&access)
