@@ -597,13 +597,13 @@ async fn test_multiple_resource_access_transfers() {
         .expect("Should subscribe");
 
     // Broadcast multiple transfers
-    let transfers = vec![
+    let transfers = [
         ("resource-1", "alice", "bob", Some(100), "UseAccess"),
         ("resource-2", "bob", "charlie", None, "Stewardship"),
         ("resource-3", "charlie", "alice", Some(250), "UseAccess"),
     ];
 
-    for (resource_id, from, to, price, access_model) in transfers.iter() {
+    for (resource_id, from, to, price, access_model) in &transfers {
         let event = GatewayEvent::ResourceAccessTransferred {
             coop_id: "resource-coop".to_string(),
             resource_id: resource_id.to_string(),
