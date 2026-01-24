@@ -39,6 +39,7 @@ use icn_entity::EntityId;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use thiserror::Error;
+use tracing::error;
 
 /// Errors related to resource access
 #[derive(Debug, Clone, Error, PartialEq, Eq, Serialize, Deserialize)]
@@ -774,26 +775,61 @@ impl ResourceAccessStore for SledResourceAccessStore {
         // Serialize access record
         let value = serde_json::to_vec(&access)?;
 
-        // Store primary record and indexes with best-effort rollback on failure
+        // Store primary record and indexes with best-effort rollback on failure.
+        // Note: These writes are not atomic. If a rollback fails, the store may be left
+        // in an inconsistent state (primary record without indexes). Recovery requires
+        // calling grant() again to overwrite the orphaned record.
+        //
         // 1. Write primary record
         self.store.put(&key, &value)?;
         // 2. Write holder index; on failure, delete primary record
         if let Err(err) = self.store.put(&holder_idx, b"") {
-            // Best-effort rollback of primary record; ignore rollback error
-            let _ = self.store.delete(&key);
+            // Best-effort rollback of primary record
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after holder index write failed"
+                );
+            }
             return Err(err);
         }
         // 3. Write resource index; on failure, delete holder index and primary record
         if let Err(err) = self.store.put(&resource_idx, b"") {
-            // Best-effort rollback of previously written entries; ignore rollback errors
-            let _ = self.store.delete(&holder_idx);
-            let _ = self.store.delete(&key);
+            // Best-effort rollback of previously written entries
+            if let Err(rollback_err) = self.store.delete(&holder_idx) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback holder index after resource index write failed"
+                );
+            }
+            if let Err(rollback_err) = self.store.delete(&key) {
+                error!(
+                    resource_id = access.resource_id,
+                    holder = %access.holder,
+                    error = %rollback_err,
+                    "Failed to rollback primary record after resource index write failed"
+                );
+            }
             return Err(err);
         }
 
         Ok(())
     }
 
+    /// Revoke access to a resource
+    ///
+    /// This marks the access record as revoked but intentionally retains the
+    /// index entries for audit trail purposes. The revoked record remains
+    /// discoverable via `list_by_holder` and `list_by_resource` queries,
+    /// allowing cooperatives to track historical access patterns.
+    ///
+    /// Callers should filter results by `access.is_revoked()` if they only
+    /// want active access records. The `find_expired` and `find_idle` methods
+    /// already filter out revoked records.
     fn revoke(&self, resource_id: &str, holder: &EntityId, reason: String) -> anyhow::Result<()> {
         let key = Self::access_key(resource_id, holder);
 
@@ -801,7 +837,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
         if let Some(bytes) = self.store.get(&key)? {
             let mut access: ResourceAccess = serde_json::from_slice(&bytes)?;
 
-            // Revoke it
+            // Revoke it (index entries are intentionally retained for audit trail)
             access.revoke(reason);
 
             // Save updated record
