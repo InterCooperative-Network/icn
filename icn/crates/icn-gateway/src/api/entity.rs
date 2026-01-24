@@ -35,6 +35,7 @@ use tracing::{info, warn};
 use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
+use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use crate::pagination::{ListPagination, ListQuery, ListResponse};
 
@@ -75,6 +76,32 @@ pub struct AddMembershipRequest {
     pub role: String,
     /// Initial shares (for weighted voting)
     pub shares: Option<u64>,
+}
+
+/// Request to initiate entity dissolution
+#[derive(Debug, Deserialize)]
+pub struct InitiateDissolutionRequest {
+    /// Governance proposal ID that approved the dissolution
+    pub proposal_id: String,
+    /// Reason for dissolution
+    pub reason: String,
+    /// Optional waiting period in seconds (defaults to 30 days)
+    pub waiting_period_seconds: Option<u64>,
+}
+
+/// Response for dissolution initiation
+#[derive(Debug, Serialize)]
+pub struct DissolutionResponse {
+    /// Entity ID being dissolved
+    pub entity_id: String,
+    /// Current dissolution status
+    pub status: String,
+    /// When dissolution was initiated (Unix timestamp)
+    pub initiated_at: u64,
+    /// Expected completion date (Unix timestamp)
+    pub completion_date: u64,
+    /// Governance proposal ID
+    pub proposal_id: String,
 }
 
 /// Entity summary response
@@ -978,7 +1005,7 @@ pub async fn remove_membership(
     }
 
     // Verify entity exists
-    let _entity = entity_mgr
+    let entity = entity_mgr
         .get(&entity_id)
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
@@ -993,7 +1020,8 @@ pub async fn remove_membership(
     // Find the membership being removed
     let membership_to_remove = members.iter().find(|m| m.member_id == member_id);
 
-    // Prevent removing the last founder
+    // Prevent removing the last founder (unless entity is dissolving)
+    // When an entity is in Dissolving status, founders can be removed to complete dissolution
     if let Some(membership) = membership_to_remove {
         if matches!(membership.role, MembershipRole::Founder) {
             let founder_count = members
@@ -1001,9 +1029,13 @@ pub async fn remove_membership(
                 .filter(|m| matches!(m.role, MembershipRole::Founder))
                 .count();
 
-            if founder_count <= 1 {
+            let is_dissolving =
+                matches!(entity.status, icn_entity::EntityStatus::Dissolving { .. });
+
+            if founder_count <= 1 && !is_dissolving {
                 return Err(GatewayError::BadRequest(
-                    "Cannot remove the last founder. Transfer founder role to another member first."
+                    "Cannot remove the last founder. Transfer founder role to another member first, \
+                     or initiate dissolution to remove all members."
                         .to_string(),
                 ));
             }
@@ -1066,6 +1098,510 @@ pub async fn remove_membership(
             "Failed to record audit: {e}"
         )));
     }
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// ============================================================================
+// Dissolution Workflow
+// ============================================================================
+
+/// POST /entities/:id/dissolution - Initiate entity dissolution
+///
+/// Initiates an entity dissolution with a waiting period, requiring
+/// an approved governance proposal.
+///
+/// Requires:
+/// - Valid governance proposal ID that has been Accepted
+/// - Founder or BoardMember role
+/// - Entity must be Active
+///
+/// The dissolution process:
+/// 1. Validates the governance proposal exists and is Accepted
+/// 2. Sets entity status to Dissolving with waiting period
+/// 3. Records audit trail with initiator info
+/// 4. After waiting period expires, call complete_dissolution to finalize
+#[post("/{id}/dissolution")]
+pub async fn initiate_dissolution(
+    req: HttpRequest,
+    entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    governance_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<String>,
+    body: web::Json<InitiateDissolutionRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "entity:write")?;
+
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
+    let entity_id_str = path.into_inner();
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    // Verify caller has permission (Founders/BoardMembers only)
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
+
+    // Get entity
+    let mut entity = entity_mgr
+        .get(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Verify entity is Active (can only dissolve active entities)
+    match &entity.status {
+        icn_entity::EntityStatus::Active => {}
+        icn_entity::EntityStatus::Dissolving { .. } => {
+            return Err(GatewayError::BadRequest(
+                "Entity is already in Dissolving status. Cancel existing dissolution first."
+                    .to_string(),
+            ));
+        }
+        other => {
+            return Err(GatewayError::BadRequest(format!(
+                "Cannot dissolve entity with status: {:?}. Entity must be Active.",
+                other
+            )));
+        }
+    }
+
+    // Validate governance proposal exists and is Accepted
+    let proposal_id = icn_governance::ProposalId::new(body.proposal_id.clone());
+
+    let proposal = governance_mgr
+        .get_proposal(&proposal_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to fetch proposal: {e}")))?
+        .ok_or_else(|| {
+            GatewayError::NotFound(format!(
+                "Governance proposal not found: {}",
+                body.proposal_id
+            ))
+        })?;
+
+    // Verify proposal is in Accepted state
+    if !matches!(
+        proposal.state,
+        icn_governance::ProposalState::Accepted { .. }
+    ) {
+        return Err(GatewayError::BadRequest(format!(
+            "Governance proposal is not approved. Current state: {:?}",
+            proposal.state
+        )));
+    }
+
+    // Verify proposal domain matches entity's governance domain
+    // This prevents cross-domain proposal abuse (using a proposal from Domain A
+    // to dissolve an entity in Domain B)
+    if let Some(ref entity_domain) = entity.governance_domain_id {
+        if proposal.domain_id.0 != *entity_domain {
+            return Err(GatewayError::BadRequest(format!(
+                "Proposal domain '{}' does not match entity governance domain '{}'",
+                proposal.domain_id.0, entity_domain
+            )));
+        }
+    } else {
+        // Entity has no governance domain - require it for dissolution
+        return Err(GatewayError::BadRequest(
+            "Entity has no governance domain configured. Set a governance domain before \
+             initiating dissolution, or ensure the dissolution proposal is scoped to the \
+             entity's domain."
+                .to_string(),
+        ));
+    }
+
+    // Record metric for dissolution initiation
+    gateway_metrics::entity_dissolution_initiated_inc();
+
+    // Waiting period configuration
+    // Default: 30 days (2,592,000 seconds)
+    // Minimum: 1 second to prevent immediate (0-second) dissolution that could bypass
+    // governance intent. A 0-second waiting period would allow completion_date == now,
+    // enabling immediate completion without any waiting.
+    const DEFAULT_WAITING_PERIOD: u64 = 30 * 24 * 60 * 60;
+    const MIN_WAITING_PERIOD: u64 = 1; // 1 second minimum
+
+    let waiting_period = body
+        .waiting_period_seconds
+        .unwrap_or(DEFAULT_WAITING_PERIOD);
+
+    // Enforce minimum waiting period to prevent immediate dissolution
+    if waiting_period < MIN_WAITING_PERIOD {
+        return Err(GatewayError::BadRequest(format!(
+            "Waiting period {} seconds is below minimum of {} second(s). \
+             A waiting period is required to allow stakeholders time to respond.",
+            waiting_period, MIN_WAITING_PERIOD
+        )));
+    }
+
+    // Calculate completion date with overflow protection
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| GatewayError::InternalError("System time before UNIX epoch".to_string()))?
+        .as_secs();
+
+    let completion_date = now.checked_add(waiting_period).ok_or_else(|| {
+        GatewayError::BadRequest(format!(
+            "Waiting period {} seconds would cause timestamp overflow",
+            waiting_period
+        ))
+    })?;
+
+    info!(
+        entity_id = %entity_id,
+        proposal_id = %body.proposal_id,
+        initiator = %caller_id,
+        waiting_period_seconds = waiting_period,
+        completion_date = completion_date,
+        "Initiating entity dissolution"
+    );
+
+    // Update entity status to Dissolving
+    entity.status = icn_entity::EntityStatus::Dissolving { started_at: now };
+    entity_mgr
+        .update(entity.clone())
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
+
+    // Record audit trail
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::DissolutionInitiated {
+            proposal_id: body.proposal_id.clone(),
+            completion_date,
+            reason: body.reason.clone(),
+        },
+        &caller_id,
+        Some(body.proposal_id.clone()),
+        Some(body.reason.clone()),
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record dissolution initiation audit - attempting rollback"
+        );
+        // Rollback: restore entity to Active status
+        entity.status = icn_entity::EntityStatus::Active;
+        if let Err(rollback_err) = entity_mgr.update(entity).await {
+            gateway_metrics::entity_audit_rollback_failure_inc("initiate_dissolution");
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %rollback_err,
+                "Failed to rollback entity status after audit failure"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}."
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
+
+    let response = DissolutionResponse {
+        entity_id: entity_id.to_string(),
+        status: "dissolving".to_string(),
+        initiated_at: now,
+        completion_date,
+        proposal_id: body.proposal_id.clone(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// POST /entities/:id/dissolution/complete - Complete entity dissolution
+///
+/// Finalizes dissolution after waiting period has elapsed.
+/// Requires:
+/// - Entity must be in Dissolving status
+/// - Waiting period must have elapsed
+/// - Founder or BoardMember role (or dissolution initiator if no members remain)
+/// - Entity must have no members
+///
+/// This endpoint performs the actual deletion after the waiting period.
+#[post("/{id}/dissolution/complete")]
+pub async fn complete_dissolution(
+    req: HttpRequest,
+    entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "entity:write")?;
+
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
+    let entity_id_str = path.into_inner();
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    // Get entity
+    let entity = entity_mgr
+        .get(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Verify entity is in Dissolving status
+    let _started_at = match &entity.status {
+        icn_entity::EntityStatus::Dissolving { started_at } => *started_at,
+        _ => {
+            return Err(GatewayError::BadRequest(format!(
+                "Entity is not in Dissolving status. Current status: {:?}",
+                entity.status
+            )))
+        }
+    };
+
+    // Fetch audit trail ONCE and extract all needed values (optimized query)
+    let audit_trail = audit_mgr
+        .get_audit_trail(&entity_id, 100, 0)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get audit trail: {e}")))?;
+
+    // Extract proposal_id, completion_date, and initiator from dissolution initiation record
+    let (proposal_id, completion_date, initiator_id) = audit_trail
+        .records
+        .iter()
+        .find_map(|record| {
+            if let EntityOperation::DissolutionInitiated {
+                proposal_id,
+                completion_date,
+                ..
+            } = &record.operation
+            {
+                Some((
+                    proposal_id.clone(),
+                    *completion_date,
+                    record.performed_by.clone(),
+                ))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            GatewayError::InternalError(
+                "Dissolution initiated but no audit record found".to_string(),
+            )
+        })?;
+
+    // Check member count - affects authorization requirements
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
+
+    // Authorization check:
+    // - If entity still has members, require Founder/BoardMember role
+    // - If entity has no members, verify caller was the dissolution initiator
+    //   (prevents unauthorized parties from completing orphaned dissolutions)
+    if !members.is_empty() {
+        require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
+    } else {
+        // Memberless entity: verify caller was the dissolution initiator
+        if caller_id != initiator_id {
+            return Err(GatewayError::Forbidden(format!(
+                "Only the dissolution initiator ({}) can complete dissolution when no members remain",
+                initiator_id
+            )));
+        }
+    }
+
+    // Verify waiting period has elapsed
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| GatewayError::InternalError("System time before UNIX epoch".to_string()))?
+        .as_secs();
+
+    if now < completion_date {
+        let remaining = completion_date - now;
+        return Err(GatewayError::BadRequest(format!(
+            "Waiting period has not elapsed. {} seconds remaining.",
+            remaining
+        )));
+    }
+
+    // Verify entity has no members (enforcement of clean dissolution)
+    if !members.is_empty() {
+        return Err(GatewayError::BadRequest(format!(
+            "Cannot complete dissolution: entity still has {} members. Remove all members before completing dissolution.",
+            members.len()
+        )));
+    }
+
+    info!(
+        entity_id = %entity_id,
+        proposal_id = %proposal_id,
+        initiator = %initiator_id,
+        completed_by = %caller_id,
+        "Completing entity dissolution"
+    );
+
+    // CRITICAL: Record audit trail BEFORE deleting entity for atomicity
+    // If audit fails, we can still rollback (entity still exists)
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::DissolutionCompleted {
+            proposal_id: proposal_id.clone(),
+        },
+        &caller_id,
+        Some(proposal_id.clone()),
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record dissolution completion audit"
+        );
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record dissolution audit: {e}"
+        )));
+    }
+
+    // Race condition protection: Re-verify entity is still Dissolving before final delete
+    // This prevents TOCTOU issues between status check and delete
+    let entity_recheck = entity_mgr
+        .get(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to re-verify entity: {e}")))?
+        .ok_or_else(|| {
+            GatewayError::NotFound(format!(
+                "Entity was deleted by another request: {entity_id}"
+            ))
+        })?;
+
+    if !matches!(
+        entity_recheck.status,
+        icn_entity::EntityStatus::Dissolving { .. }
+    ) {
+        return Err(GatewayError::Conflict(
+            "Entity status changed during completion. Please retry.".to_string(),
+        ));
+    }
+
+    // Delete the entity
+    entity_mgr
+        .remove(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to delete entity: {e}")))?;
+
+    // Record dissolution completion metric
+    gateway_metrics::entity_dissolution_completed_inc();
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// DELETE /entities/:id/dissolution - Cancel entity dissolution
+///
+/// Cancels an in-progress dissolution before the waiting period expires.
+/// Requires:
+/// - Entity must be in Dissolving status
+/// - Founder or BoardMember role
+///
+/// This restores the entity to Active status.
+#[delete("/{id}/dissolution")]
+pub async fn cancel_dissolution(
+    req: HttpRequest,
+    entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "entity:write")?;
+
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
+    let entity_id_str = path.into_inner();
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    // Verify caller has permission
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
+
+    // Get entity
+    let mut entity = entity_mgr
+        .get(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Verify entity is in Dissolving status
+    if !matches!(entity.status, icn_entity::EntityStatus::Dissolving { .. }) {
+        return Err(GatewayError::BadRequest(format!(
+            "Entity is not in Dissolving status. Current status: {:?}",
+            entity.status
+        )));
+    }
+
+    info!(
+        entity_id = %entity_id,
+        "Cancelling entity dissolution"
+    );
+
+    // Restore entity to Active status
+    let old_status = entity.status.clone();
+    entity.status = icn_entity::EntityStatus::Active;
+    entity_mgr
+        .update(entity.clone())
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
+
+    // Record audit trail
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::DissolutionCancelled {
+            reason: "Cancelled by authorized member".to_string(),
+        },
+        &caller_id,
+        None,
+        Some("Dissolution cancelled".to_string()),
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record dissolution cancellation audit - attempting rollback"
+        );
+        // Rollback: restore entity to Dissolving status
+        entity.status = old_status;
+        if let Err(rollback_err) = entity_mgr.update(entity).await {
+            gateway_metrics::entity_audit_rollback_failure_inc("cancel_dissolution");
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %rollback_err,
+                "Failed to rollback entity status after audit failure"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}."
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
+
+    // Record dissolution cancelled metric
+    gateway_metrics::entity_dissolution_cancelled_inc();
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1335,6 +1871,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(list_members)
         .service(add_membership)
         .service(remove_membership)
+        .service(initiate_dissolution)
+        .service(complete_dissolution)
+        .service(cancel_dissolution)
         .service(get_entity_audit);
 }
 
