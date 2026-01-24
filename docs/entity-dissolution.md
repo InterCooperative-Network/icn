@@ -255,7 +255,10 @@ Common errors:
 
 ### 404 Not Found
 - Entity does not exist
-- Proposal ID not found in audit trail
+
+### 500 Internal Server Error
+- Dissolution audit trail is missing expected records (e.g., `DissolutionInitiated` event or `completion_date`)
+- System time error (system clock before UNIX epoch)
 
 ## Rollback and Compensation
 

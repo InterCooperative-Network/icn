@@ -1004,7 +1004,7 @@ pub async fn remove_membership(
     }
 
     // Verify entity exists
-    let _entity = entity_mgr
+    let entity = entity_mgr
         .get(&entity_id)
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
@@ -1019,7 +1019,8 @@ pub async fn remove_membership(
     // Find the membership being removed
     let membership_to_remove = members.iter().find(|m| m.member_id == member_id);
 
-    // Prevent removing the last founder
+    // Prevent removing the last founder (unless entity is dissolving)
+    // When an entity is in Dissolving status, founders can be removed to complete dissolution
     if let Some(membership) = membership_to_remove {
         if matches!(membership.role, MembershipRole::Founder) {
             let founder_count = members
@@ -1027,9 +1028,13 @@ pub async fn remove_membership(
                 .filter(|m| matches!(m.role, MembershipRole::Founder))
                 .count();
 
-            if founder_count <= 1 {
+            let is_dissolving =
+                matches!(entity.status, icn_entity::EntityStatus::Dissolving { .. });
+
+            if founder_count <= 1 && !is_dissolving {
                 return Err(GatewayError::BadRequest(
-                    "Cannot remove the last founder. Transfer founder role to another member first."
+                    "Cannot remove the last founder. Transfer founder role to another member first, \
+                     or initiate dissolution to remove all members."
                         .to_string(),
                 ));
             }
@@ -1102,14 +1107,21 @@ pub async fn remove_membership(
 
 /// POST /entities/:id/dissolution - Initiate entity dissolution
 ///
-/// Initiates a governance-approved dissolution with a waiting period.
+/// Initiates an entity dissolution with a waiting period, recording
+/// the associated governance proposal ID for audit purposes.
+///
+/// **Note**: The caller provides a proposal_id which is recorded for audit
+/// purposes, but governance proposal validation (checking that the proposal
+/// exists and is in Accepted status) is NOT currently implemented. Future
+/// enhancement should inject `GovernanceManager` to validate proposals.
+///
 /// Requires:
-/// - Governance proposal ID (must be Accepted)
+/// - Proposal ID (recorded for audit trail)
 /// - Founder or BoardMember role
 /// - Entity must be Active
 ///
 /// The dissolution process:
-/// 1. Validates governance proposal is approved
+/// 1. Records the governance proposal ID in the audit trail
 /// 2. Sets entity status to Dissolving with waiting period
 /// 3. Records audit trail
 /// 4. After waiting period expires, call complete_dissolution to finalize
@@ -1157,12 +1169,14 @@ pub async fn initiate_dissolution(
 
     // Default waiting period: 30 days (2,592,000 seconds)
     const DEFAULT_WAITING_PERIOD: u64 = 30 * 24 * 60 * 60;
-    let waiting_period = body.waiting_period_seconds.unwrap_or(DEFAULT_WAITING_PERIOD);
+    let waiting_period = body
+        .waiting_period_seconds
+        .unwrap_or(DEFAULT_WAITING_PERIOD);
 
     // Calculate completion date
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .map_err(|_| GatewayError::InternalError("System time before UNIX epoch".to_string()))?
         .as_secs();
     let completion_date = now + waiting_period;
 
@@ -1260,9 +1274,6 @@ pub async fn complete_dissolution(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
-    // Verify caller has permission (Founders/BoardMembers only)
-    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
-
     // Get entity
     let entity = entity_mgr
         .get(&entity_id)
@@ -1270,15 +1281,27 @@ pub async fn complete_dissolution(
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
+    // Check member count - affects authorization requirements
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
+
+    // Authorization check:
+    // - If entity still has members, require Founder/BoardMember role
+    // - If entity has no members (all removed during dissolution), allow completion
+    //   by anyone with entity:write scope (since there's no one left to authorize)
+    if !members.is_empty() {
+        require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
+    }
+
     // Verify entity is in Dissolving status
     let (_started_at, proposal_id) = match &entity.status {
         icn_entity::EntityStatus::Dissolving { started_at } => {
             // Find the dissolution initiation audit record to get proposal_id
-            let audit_trail = audit_mgr
-                .get_audit_trail(&entity_id, 100, 0)
-                .map_err(|e| {
-                    GatewayError::InternalError(format!("Failed to get audit trail: {e}"))
-                })?;
+            let audit_trail = audit_mgr.get_audit_trail(&entity_id, 100, 0).map_err(|e| {
+                GatewayError::InternalError(format!("Failed to get audit trail: {e}"))
+            })?;
 
             let proposal_id = audit_trail
                 .records
@@ -1311,7 +1334,7 @@ pub async fn complete_dissolution(
     // Verify waiting period has elapsed
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .map_err(|_| GatewayError::InternalError("System time before UNIX epoch".to_string()))?
         .as_secs();
 
     // Get the completion date from audit record
@@ -1345,11 +1368,7 @@ pub async fn complete_dissolution(
     }
 
     // Verify entity has no members (enforcement of clean dissolution)
-    let members = entity_mgr
-        .get_members(&entity_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
-
+    // Note: `members` was already fetched earlier for authorization check
     if !members.is_empty() {
         return Err(GatewayError::BadRequest(format!(
             "Cannot complete dissolution: entity still has {} members. Remove all members before completing dissolution.",
