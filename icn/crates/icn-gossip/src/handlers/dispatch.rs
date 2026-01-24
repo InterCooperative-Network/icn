@@ -5,6 +5,28 @@
 //! variants to their appropriate handler methods while avoiding async
 //! recursion issues.
 //!
+//! # Current Message Types
+//!
+//! The dispatch handles 18 GossipMessage variants:
+//! - Push protocol: Announce, Request, Response
+//! - Bloom filter sync: RequestBloomFilter, SendBloomFilter
+//! - Pull protocol: Digest, PullRequest, PullResponse, RequestMissing
+//! - Data locality: BlobAnnounce
+//! - Replication: ReplicaRequest, ReplicaOffer, ReplicaStatus
+//! - Partition healing: PartitionHealRequest, PartitionHealResponse
+//! - Storage proofs: StorageChallengeMsg, StorageProofMsg, StorageContentNotFoundMsg
+//!
+//! Note: The Batch variant (added by PR #829) is NOT dispatched here because
+//! batch handlers call dispatch_message() internally for each contained message.
+//!
+//! # Adding New Message Types
+//!
+//! When adding a new GossipMessage variant:
+//! 1. Add the variant to GossipMessage enum in types.rs
+//! 2. Add the handler method in the appropriate handlers/ submodule
+//! 3. Add the dispatch case in dispatch_message() below
+//! 4. If the handler is async, add a new DispatchResult variant
+//!
 //! # Design
 //!
 //! The dispatch method is non-async and returns an enum indicating whether
@@ -149,9 +171,9 @@ impl GossipActor {
                 bloom,
                 hint_count,
                 nonce,
-            } => DispatchResult::Sync(self.handle_digest(
-                sender, topic, vector, bloom, hint_count, nonce,
-            )),
+            } => DispatchResult::Sync(
+                self.handle_digest(sender, topic, vector, bloom, hint_count, nonce),
+            ),
 
             GossipMessage::PullRequest {
                 topic,
@@ -159,9 +181,9 @@ impl GossipActor {
                 max_bytes,
                 nonce,
                 cursor,
-            } => DispatchResult::Sync(self.handle_pull_request(
-                sender, topic, want_ids, max_bytes, nonce, cursor,
-            )),
+            } => DispatchResult::Sync(
+                self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce, cursor),
+            ),
 
             GossipMessage::PullResponse {
                 topic,
@@ -185,9 +207,9 @@ impl GossipActor {
                 blob_hash,
                 peer_did,
                 size_bytes,
-            } => DispatchResult::Sync(self.handle_blob_announce(
-                sender, blob_hash, peer_did, size_bytes,
-            )),
+            } => DispatchResult::Sync(
+                self.handle_blob_announce(sender, blob_hash, peer_did, size_bytes),
+            ),
 
             GossipMessage::ReplicaRequest {
                 content_hash,
@@ -275,7 +297,7 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let data = vec![1, 2, 3];
         let hash = blake3::hash(&data).into();
-        
+
         GossipEntry {
             hash,
             author: keypair.did().clone(),
