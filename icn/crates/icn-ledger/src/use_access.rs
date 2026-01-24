@@ -80,6 +80,21 @@ pub enum AccessError {
         /// The minimum valid timestamp
         minimum: u64,
     },
+
+    /// Access has been revoked
+    #[error("Access has been revoked: {0}")]
+    Revoked(String),
+
+    /// Stewardship review overdue
+    #[error("Stewardship review overdue: last review at {last_review}, current time {current_time}, period {review_period}s")]
+    ReviewOverdue {
+        /// Timestamp of last review
+        last_review: u64,
+        /// Current timestamp
+        current_time: u64,
+        /// Required review period
+        review_period: u64,
+    },
 }
 
 /// Result type for access operations
@@ -206,7 +221,11 @@ impl AntiSpeculationRules {
 }
 
 /// Resource access tracking
+///
+/// Fields are public for inspection but modifications should go through
+/// the provided methods to ensure invariants are maintained.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ResourceAccess {
     /// Unique identifier for the resource
     pub resource_id: String,
@@ -231,6 +250,15 @@ pub struct ResourceAccess {
 
     /// Number of times renewed (for accumulation tracking)
     pub renewal_count: u32,
+
+    /// Whether access has been revoked (e.g., due to failed duty checks)
+    pub revoked: bool,
+
+    /// Reason for revocation (if revoked)
+    pub revocation_reason: Option<String>,
+
+    /// Timestamp of last stewardship review (for review_period enforcement)
+    pub last_review: Option<u64>,
 }
 
 impl ResourceAccess {
@@ -251,6 +279,9 @@ impl ResourceAccess {
             usage_log: VecDeque::new(),
             rules: AntiSpeculationRules::standard(),
             renewal_count: 0,
+            revoked: false,
+            revocation_reason: None,
+            last_review: None,
         }
     }
 
@@ -290,6 +321,16 @@ impl ResourceAccess {
     ///
     /// # Arguments
     /// * `current_time` - The current timestamp (must be >= granted_at)
+    ///
+    /// # Renewal Behavior
+    ///
+    /// Renewal extends from the later of (current expiration, current time).
+    /// This means:
+    /// - If renewed before expiration: time is "banked" (extends from expiration)
+    /// - If renewed after expiration: extends from current time
+    ///
+    /// This is intentional to reward proactive renewal while preventing
+    /// accumulation beyond `max_accumulated` renewals.
     ///
     /// # Errors
     /// Returns `AccessError::InvalidTimestamp` if current_time is before granted_at
@@ -335,7 +376,16 @@ impl ResourceAccess {
 
     /// Record a usage event
     pub fn record_usage(&mut self, timestamp: u64, description: String) -> Result<()> {
-        // Validate access is still valid
+        // Check if access has been revoked
+        if self.revoked {
+            return Err(AccessError::Revoked(
+                self.revocation_reason
+                    .clone()
+                    .unwrap_or_else(|| "Access revoked".to_string()),
+            ));
+        }
+
+        // Validate access is still valid (for UseAccess expiration)
         if self.is_expired(timestamp) {
             return Err(AccessError::Expired(self.expires_at.unwrap_or(0)));
         }
@@ -349,6 +399,19 @@ impl ResourceAccess {
         }
 
         Ok(())
+    }
+
+    /// Revoke access with a reason
+    ///
+    /// Once revoked, usage cannot be recorded and the access is effectively terminated.
+    pub fn revoke(&mut self, reason: String) {
+        self.revoked = true;
+        self.revocation_reason = Some(reason);
+    }
+
+    /// Check if access is revoked
+    pub fn is_revoked(&self) -> bool {
+        self.revoked
     }
 
     /// Check if resource is idle (no recent usage)
@@ -457,6 +520,51 @@ impl ResourceAccess {
                 Ok(())
             }
             AccessModel::UseAccess { .. } => Ok(()), // No duties for use access
+        }
+    }
+
+    /// Check if a stewardship review is overdue
+    ///
+    /// Returns an error if the time since last review exceeds the review period.
+    /// For non-Stewardship access models, always returns Ok.
+    pub fn check_review_period(&self, current_time: u64) -> Result<()> {
+        match &self.model {
+            AccessModel::Stewardship {
+                review_period_seconds,
+                ..
+            } => {
+                let last_review = self.last_review.unwrap_or(self.granted_at);
+                let time_since_review = current_time.saturating_sub(last_review);
+
+                if time_since_review > *review_period_seconds {
+                    return Err(AccessError::ReviewOverdue {
+                        last_review,
+                        current_time,
+                        review_period: *review_period_seconds,
+                    });
+                }
+                Ok(())
+            }
+            AccessModel::UseAccess { .. } => Ok(()),
+        }
+    }
+
+    /// Record that a stewardship review has been completed
+    pub fn record_review(&mut self, timestamp: u64) {
+        self.last_review = Some(timestamp);
+    }
+
+    /// Check if a review is needed (non-error version for queries)
+    pub fn needs_review(&self, current_time: u64) -> bool {
+        match &self.model {
+            AccessModel::Stewardship {
+                review_period_seconds,
+                ..
+            } => {
+                let last_review = self.last_review.unwrap_or(self.granted_at);
+                current_time.saturating_sub(last_review) > *review_period_seconds
+            }
+            AccessModel::UseAccess { .. } => false,
         }
     }
 
@@ -938,5 +1046,84 @@ mod tests {
             Err(AccessError::InvalidTimestamp { provided, minimum })
             if provided == past_time && minimum == access.granted_at
         ));
+    }
+
+    #[test]
+    fn test_revocation_prevents_usage() {
+        let entity = create_test_entity();
+        let mut access = ResourceAccess::new(
+            "tool-001".to_string(),
+            entity,
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        assert!(!access.is_revoked());
+
+        // Revoke access
+        access.revoke("Failed duty check".to_string());
+        assert!(access.is_revoked());
+
+        // Try to record usage - should fail
+        let result = access.record_usage(access.granted_at + 100, "Usage attempt".to_string());
+        assert!(matches!(result, Err(AccessError::Revoked(msg)) if msg.contains("Failed duty check")));
+    }
+
+    #[test]
+    fn test_stewardship_review_period() {
+        let entity = create_test_entity();
+        let granted_at = 1000;
+        let review_period = 90 * 24 * 3600; // 90 days
+
+        let mut access = ResourceAccess::new(
+            "community-garden".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![],
+                review_period_seconds: review_period,
+            },
+        );
+        access.granted_at = granted_at;
+
+        // Within review period - should be OK
+        let check_time = granted_at + 80 * 24 * 3600; // 80 days
+        assert!(access.check_review_period(check_time).is_ok());
+        assert!(!access.needs_review(check_time));
+
+        // After review period - should fail
+        let overdue_time = granted_at + 91 * 24 * 3600; // 91 days
+        let result = access.check_review_period(overdue_time);
+        assert!(matches!(result, Err(AccessError::ReviewOverdue { .. })));
+        assert!(access.needs_review(overdue_time));
+
+        // Record a review
+        access.record_review(overdue_time);
+        assert!(!access.needs_review(overdue_time));
+        assert!(access.check_review_period(overdue_time).is_ok());
+
+        // Overdue again after another review period
+        let later_time = overdue_time + 91 * 24 * 3600;
+        assert!(access.needs_review(later_time));
+    }
+
+    #[test]
+    fn test_use_access_no_review_period() {
+        let entity = create_test_entity();
+        let access = ResourceAccess::new(
+            "tool-001".to_string(),
+            entity,
+            AccessModel::UseAccess {
+                duration_seconds: 30 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        // UseAccess never needs review
+        assert!(!access.needs_review(access.granted_at + 365 * 24 * 3600));
+        assert!(access.check_review_period(access.granted_at + 365 * 24 * 3600).is_ok());
     }
 }
