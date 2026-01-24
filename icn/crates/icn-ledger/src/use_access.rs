@@ -481,9 +481,10 @@ impl ResourceAccess {
     /// It first tries structured event types (O(1) matching), then falls
     /// back to keyword matching for backward compatibility.
     ///
-    /// Performance: Uses time-based filtering to skip scanning events
-    /// outside the relevant time windows, improving performance when
-    /// the usage log contains many old events.
+    /// Performance: Uses time-based early termination with `.take_while()` to stop
+    /// scanning once events older than the relevant time window are encountered.
+    /// Since events are logged chronologically and we iterate in reverse, this
+    /// provides O(k) complexity where k is the number of recent events.
     pub fn check_duties(&self, current_time: u64) -> Result<()> {
         match &self.model {
             AccessModel::Stewardship { duties, .. } => {
@@ -495,13 +496,13 @@ impl ResourceAccess {
                         } => {
                             // Find last maintenance event
                             // Priority: structured event type > keyword matching
-                            // Optimization: Skip events outside the relevant time window
+                            // Optimization: Stop scanning once we reach events older than the window
                             let cutoff_time = current_time.saturating_sub(*frequency_seconds);
                             let last_maintenance = self
                                 .usage_log
                                 .iter()
                                 .rev()
-                                .filter(|e| e.timestamp >= cutoff_time) // Only consider recent events
+                                .take_while(|e| e.timestamp >= cutoff_time) // Stop at older events
                                 .find(|e| {
                                     // First check structured event type (O(1))
                                     if let Some(event_type) = &e.event_type {
@@ -532,13 +533,13 @@ impl ResourceAccess {
                         } => {
                             // Count reports in the period
                             // Reports are any usage event with Report type or any event (for backward compat)
-                            // Optimization: Filter to only scan events within the time period
+                            // Optimization: Stop scanning once we reach events older than the period
                             let period_start = current_time.saturating_sub(*period_seconds);
                             let report_count = self
                                 .usage_log
                                 .iter()
                                 .rev()
-                                .filter(|e| e.timestamp >= period_start) // Skip events outside the period
+                                .take_while(|e| e.timestamp >= period_start) // Stop at older events
                                 .filter(|e| {
                                     // Count structured Report events or any event for backward compat
                                     if let Some(event_type) = &e.event_type {
@@ -1381,19 +1382,30 @@ mod tests {
         let base_time = 1000u64;
         access.granted_at = base_time;
 
-        // Add 500 old usage events (more than 90 days old)
+        // Add 500 older usage events (well before the current review period)
         for i in 0..500 {
             let old_time = base_time + (i * 3600); // 1 hour apart
-            access.usage_log.push_back(UsageEvent::new(
-                old_time,
-                format!("Old event {}", i),
-            ));
+            access
+                .usage_log
+                .push_back(UsageEvent::new(old_time, format!("Old event {}", i)));
         }
 
         // Current time is 100 days after grant
         let current_time = base_time + (100 * 24 * 3600);
 
-        // Add recent maintenance event (5 days ago)
+        // Add recent events in CHRONOLOGICAL order (oldest first)
+        // This matches real-world usage where record_usage() appends events sequentially
+        // The take_while() optimization relies on events being in timestamp order
+
+        // Report 1 (10 days ago) - oldest of the recent events
+        let report_time_1 = current_time - (10 * 24 * 3600);
+        access.usage_log.push_back(UsageEvent::with_type(
+            report_time_1,
+            "Report 1".to_string(),
+            DutyEventType::Report,
+        ));
+
+        // Maintenance event (5 days ago)
         let maintenance_time = current_time - (5 * 24 * 3600);
         access.usage_log.push_back(UsageEvent::with_type(
             maintenance_time,
@@ -1401,27 +1413,18 @@ mod tests {
             DutyEventType::Maintenance,
         ));
 
-        // Add recent report events (within last 30 days)
-        let report_time_1 = current_time - (10 * 24 * 3600);
-        let report_time_2 = current_time - (5 * 24 * 3600);
-        access.usage_log.push_back(UsageEvent::with_type(
-            report_time_1,
-            "Report 1".to_string(),
-            DutyEventType::Report,
-        ));
+        // Report 2 (3 days ago) - most recent
+        let report_time_2 = current_time - (3 * 24 * 3600);
         access.usage_log.push_back(UsageEvent::with_type(
             report_time_2,
             "Report 2".to_string(),
             DutyEventType::Report,
         ));
 
-        // Check duties should pass - the optimization allows it to skip
-        // scanning all 500+ old events and only process recent ones
+        // Check duties should pass - the optimization allows early termination
+        // once we encounter events older than the relevant time windows
         let result = access.check_duties(current_time);
-        if let Err(e) = &result {
-            eprintln!("check_duties failed: {}", e);
-        }
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "check_duties failed: {:?}", result);
 
         // Verify that maintenance is still considered current
         assert!(!access.is_idle(current_time, 7 * 24 * 3600));
