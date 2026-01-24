@@ -1722,6 +1722,10 @@ mod tests {
         let mut gossip1 = GossipActor::new(did1.clone(), Arc::new(mock_trust_lookup));
         let mut gossip2 = GossipActor::new(did2.clone(), Arc::new(mock_trust_lookup));
 
+        // Disable batching for this test to check message types directly
+        gossip1.set_batching_config(crate::types::BatchingConfig::disabled());
+        gossip2.set_batching_config(crate::types::BatchingConfig::disabled());
+
         // Track messages sent by gossip2 via callback
         let sent_messages = Arc::new(std::sync::Mutex::new(Vec::new()));
         let sent_messages_clone = sent_messages.clone();
@@ -1749,6 +1753,9 @@ mod tests {
         };
 
         gossip2.handle_message(&did1, announce).await.unwrap();
+
+        // Flush any pending batches from the handle
+        gossip2.flush_all_batches();
 
         // Gossip2 should have sent a Request message
         {
@@ -1798,6 +1805,9 @@ mod tests {
 
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
+        // Disable batching for this test
+        gossip.set_batching_config(crate::types::BatchingConfig::disabled());
+
         // Publish some entries
         let hash1 = gossip
             .publish("global:identity", b"Entry 1".to_vec())
@@ -1826,6 +1836,9 @@ mod tests {
         };
 
         gossip.handle_message(&did, request_missing).await.unwrap();
+
+        // Flush any pending batches
+        gossip.flush_all_batches();
 
         // Should have sent 2 Response messages
         let messages = sent_messages.lock().unwrap();
@@ -2918,6 +2931,10 @@ mod tests {
         let trust_lookup2: TrustLookup = Arc::new(|_did| None);
         let mut gossip2 = GossipActor::new(did2.clone(), trust_lookup2);
 
+        // Disable batching for this test
+        gossip1.set_batching_config(crate::types::BatchingConfig::disabled());
+        gossip2.set_batching_config(crate::types::BatchingConfig::disabled());
+
         // Set up stores for both actors
         let store1 = Arc::new(SledStore::temporary()?) as Arc<dyn icn_store::Store>;
         let store2 = Arc::new(SledStore::temporary()?) as Arc<dyn icn_store::Store>;
@@ -2973,6 +2990,9 @@ mod tests {
 
         // Handle the request
         gossip1.handle_message(&did2, request).await?;
+
+        // Flush any pending batches
+        gossip1.flush_all_batches();
 
         // Verify gossip1 responded with ReplicaOffer
         {
