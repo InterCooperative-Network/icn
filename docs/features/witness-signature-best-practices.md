@@ -86,13 +86,15 @@ AccessModel::Stewardship {
     ],
 }
 
-// Record handoff completion with witnesses
-let handoff_event = UsageEvent::handoff(timestamp, "Tractor handoff completed - all steps verified")
+// Record handoff completion with witnesses (step_index=3 for final step in 4-step procedure)
+let handoff_event = UsageEvent::handoff_step(timestamp, "Tractor handoff completed - all steps verified", 3)
     .with_witness("did:icn:equipment_coordinator".to_string())
     .with_witness("did:icn:farm_steward".to_string());
 
-access.record_usage_event(handoff_event)?;
-access.validate_duty_completion(&handoff_event, 2)?; // Require 2 witnesses
+access.record_usage_event(handoff_event.clone())?;
+if !access.validate_duty_completion(&handoff_event, 2) { // Require 2 witnesses
+    return Err(AccessError::InsufficientWitnesses);
+}
 ```
 
 ### Trust-Critical Operations
@@ -272,7 +274,7 @@ let witnessed = WitnessedEntry {
     policy_applied: WitnessPolicy::Counterparty,
 };
 
-ledger.append_witnessed(witnessed)?;
+ledger.append_witnessed_entry(witnessed).await?;
 ```
 
 ### Quorum-Based Witness Policy
@@ -301,10 +303,10 @@ let config = WitnessConfig {
 ledger.set_witness_config(config);
 
 // Record equipment transfer with witness signatures
+// Note: JournalEntryBuilder supports debit, credit, contract_ref, add_delta, add_parent
 let entry = JournalEntryBuilder::new(coop_did.clone())
     .debit(coop_did.clone(), "equipment_hours".to_string(), 800)
     .credit(member_did.clone(), "equipment_hours".to_string(), 800)
-    .memo("Tractor transfer to member for seasonal use".to_string())
     .build()?;
 
 let entry_hash = entry.id.clone().unwrap();
@@ -333,7 +335,7 @@ let witnessed = WitnessedEntry {
     },
 };
 
-ledger.append_witnessed(witnessed)?;
+ledger.append_witnessed_entry(witnessed).await?;
 ```
 
 ### HandoffProcedure with Witness Verification
@@ -346,10 +348,10 @@ use icn_ledger::use_access::{
 };
 
 // Define stewardship access with handoff procedure
+// ResourceAccess::new(resource_id, holder, model) - timestamp is set automatically
 let access = ResourceAccess::new(
     resource_id.clone(),
     member_did.clone(),
-    icn_time::current_timestamp_secs(),
     AccessModel::Stewardship {
         steward: member_did.clone(),
         review_period_seconds: 2_592_000, // 30 days
@@ -371,9 +373,11 @@ let access = ResourceAccess::new(
 );
 
 // When relinquishing stewardship, complete handoff with witnesses
-let handoff_event = UsageEvent::handoff(
+// step_index=3 for final step in a 4-step handoff procedure (0-indexed)
+let handoff_event = UsageEvent::handoff_step(
     icn_time::current_timestamp_secs(),
-    "Completed all handoff steps: state documented, maintenance up to date, physical inspection passed, keys transferred"
+    "Completed all handoff steps: state documented, maintenance up to date, physical inspection passed, keys transferred",
+    3, // Final step index
 )
 .with_witness("did:icn:outgoing_steward".to_string())
 .with_witness("did:icn:incoming_steward".to_string())
@@ -556,16 +560,17 @@ pub fn update_handoff_witnesses(
 **Behavior**:
 ```rust
 // Witness signatures are validated with strict timestamp checks
-pub fn validate_witness_signatures(witnessed: &WitnessedEntry) -> Result<()> {
+// Note: Actual signature includes ledger reference for config access
+pub fn validate_witness_signatures(ledger: &Ledger, witnessed: &WitnessedEntry) -> Result<()> {
     let current_time = icn_time::try_current_timestamp_secs()?;
     const MAX_CLOCK_SKEW_SECS: u64 = 5; // Strict 5-second tolerance
-    
+
     for sig in &witnessed.witness_signatures {
         // Reject future timestamps (even with small skew tolerance)
         if sig.signed_at > current_time + MAX_CLOCK_SKEW_SECS {
             return Err(LedgerError::FutureWitnessSignature);
         }
-        
+
         // Reject expired signatures based on collection_timeout_secs
         if let Some(config) = &ledger.witness_config {
             let age = current_time.saturating_sub(sig.signed_at);
