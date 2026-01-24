@@ -136,12 +136,81 @@ fn bench_gossip_entry_compression(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_message_batching(c: &mut Criterion) {
+    let mut group = c.benchmark_group("message_batching");
+
+    // Benchmark different batch sizes
+    for batch_size in [1, 5, 10, 50].iter().copied() {
+        group.bench_with_input(
+            BenchmarkId::new("serialize_batch", batch_size),
+            &batch_size,
+            |b, &batch_size| {
+                let author = Did::from_anchor_id(&[1u8; 32]);
+                let messages: Vec<icn_gossip::GossipMessage> = (0..batch_size)
+                    .map(|i| icn_gossip::GossipMessage::Announce {
+                        hash: blake3::hash(&[i as u8; 32]).into(),
+                        author: author.clone(),
+                        clock: VectorClock::new(),
+                        topic: "test:benchmark".to_string(),
+                    })
+                    .collect();
+
+                b.iter(|| {
+                    icn_encoding::encode(black_box(&messages)).unwrap()
+                });
+            },
+        );
+    }
+
+    // Benchmark serialization overhead: batch vs individual
+    for batch_size in [5, 10, 50].iter().copied() {
+        let author = Did::from_anchor_id(&[1u8; 32]);
+        let messages: Vec<icn_gossip::GossipMessage> = (0..batch_size)
+            .map(|i| icn_gossip::GossipMessage::Announce {
+                hash: blake3::hash(&[i as u8; 32]).into(),
+                author: author.clone(),
+                clock: VectorClock::new(),
+                topic: "test:benchmark".to_string(),
+            })
+            .collect();
+
+        // Individual serialization
+        group.bench_function(
+            BenchmarkId::new("individual", batch_size),
+            |b| {
+                b.iter(|| {
+                    let mut total_size = 0;
+                    for msg in &messages {
+                        let encoded = icn_encoding::encode(black_box(msg)).unwrap();
+                        total_size += encoded.len();
+                    }
+                    total_size
+                });
+            },
+        );
+
+        // Batch serialization
+        group.bench_function(
+            BenchmarkId::new("batched", batch_size),
+            |b| {
+                b.iter(|| {
+                    let encoded = icn_encoding::encode(black_box(&messages)).unwrap();
+                    encoded.len()
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_vector_clock_merge,
     bench_content_hash,
     bench_gossip_entry_serialization,
-    bench_gossip_entry_compression
+    bench_gossip_entry_compression,
+    bench_message_batching
 );
 
 criterion_main!(benches);
