@@ -37,8 +37,12 @@ use tracing::debug;
 /// # Trust Validation
 ///
 /// When `min_witness_trust` is set, witnesses must have the minimum trust score
-/// with all parties involved in the transaction (author and counterparties).
-/// This prevents collusion with unknown/untrusted entities.
+/// with the trust graph owner (typically the ledger owner or cooperative).
+/// 
+/// **Current Limitation**: Trust is computed from the trust graph owner's perspective,
+/// not from each transaction party's perspective. This means all parties share the
+/// same trust requirements. For future enhancement, per-party trust validation could
+/// be implemented by querying trust from each party's perspective.
 ///
 /// Trust scores are computed using the combined score from all three trust
 /// dimensions (social, economic, technical). If the trust graph is not available,
@@ -56,8 +60,6 @@ pub(crate) async fn validate_witness_signatures(
     witnessed: &crate::types::WitnessedEntry,
 ) -> Result<()> {
     use ed25519_dalek::{Signature, Verifier};
-    use icn_identity::Did;
-    use std::collections::HashSet;
 
     let entry_hash = witnessed
         .entry
@@ -141,20 +143,24 @@ pub(crate) async fn validate_witness_signatures(
     Ok(())
 }
 
-/// Validate that a witness has sufficient trust score with all transaction parties
+/// Validate that a witness has sufficient trust score with the trust graph owner
+///
+/// **Current Implementation**: Trust is computed from the trust graph owner's perspective.
+/// This is a simplification - ideally trust should be computed from each transaction
+/// party's perspective individually. This is left as a future enhancement (TODO).
 ///
 /// # Arguments
 /// * `ledger` - The ledger instance
 /// * `witness` - The DID of the witness to validate
-/// * `parties` - All parties involved in the transaction
+/// * `parties` - All parties involved in the transaction (for future per-party validation)
 /// * `min_trust` - Minimum required trust score
 ///
 /// # Errors
-/// Returns error if witness has insufficient trust with any party
+/// Returns error if witness has insufficient trust with the trust graph owner
 async fn validate_witness_trust_score(
     ledger: &Ledger,
     witness: &Did,
-    parties: &HashSet<Did>,
+    _parties: &HashSet<Did>,  // Reserved for future per-party validation
     min_trust: f64,
 ) -> Result<()> {
     // If no trust graph is available, skip trust validation with a warning
@@ -169,46 +175,29 @@ async fn validate_witness_trust_score(
         }
     };
 
-    // Check trust score from each party's perspective
-    for party in parties {
-        // Skip self-validation (a party doesn't need to trust themselves)
-        if party == witness {
-            continue;
-        }
+    // Compute trust score from trust graph owner's perspective
+    // TODO: For future enhancement, compute trust from each party's perspective
+    // by creating per-party trust lookups or using party-specific trust graphs
+    let trust_score = {
+        let graph = trust_graph.read().await;
+        graph.compute_trust_score(witness).unwrap_or(0.0)
+    };
 
-        // Compute trust score from party's perspective to witness
-        // We need to temporarily set the trust graph's own_did to the party
-        // Since we can't modify the trust graph here, we'll need to compute
-        // the trust score by checking if the party has an edge to the witness
-        let trust_score = {
-            let graph = trust_graph.read().await;
-            
-            // Compute trust score from party to witness
-            // Note: This uses the current trust graph's own_did perspective
-            // For now, we'll check if the witness appears in the trust graph
-            // and has a reasonable score. Full implementation would require
-            // per-party trust lookups.
-            graph.compute_trust_score(witness).unwrap_or(0.0)
-        };
-
-        if trust_score < min_trust {
-            anyhow::bail!(
-                "Witness {} has insufficient trust score {:.3} with party {} (minimum: {:.3})",
-                witness,
-                trust_score,
-                party,
-                min_trust
-            );
-        }
-
-        debug!(
-            witness = %witness,
-            party = %party,
-            trust_score = trust_score,
-            min_trust = min_trust,
-            "Witness trust score validated"
+    if trust_score < min_trust {
+        anyhow::bail!(
+            "Witness {} has insufficient trust score {:.3} (minimum: {:.3})",
+            witness,
+            trust_score,
+            min_trust
         );
     }
+
+    debug!(
+        witness = %witness,
+        trust_score = trust_score,
+        min_trust = min_trust,
+        "Witness trust score validated"
+    );
 
     Ok(())
 }

@@ -36,13 +36,6 @@ fn create_ledger_with_trust_for_owner(owner_did: icn_identity::Did) -> (Ledger, 
     (ledger, temp_dir, trust_graph_arc)
 }
 
-/// Create a test ledger with trust graph (deprecated - use create_ledger_with_trust_for_owner)
-fn create_ledger_with_trust() -> (Ledger, TempDir, Arc<RwLock<TrustGraph>>) {
-    let owner_kp = KeyPair::generate().unwrap();
-    let owner_did = owner_kp.did().clone();
-    create_ledger_with_trust_for_owner(owner_did)
-}
-
 #[tokio::test]
 async fn test_witness_trust_validation_sufficient_trust() {
     // Create keypairs for alice and bob
