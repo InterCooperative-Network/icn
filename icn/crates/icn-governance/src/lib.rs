@@ -115,7 +115,7 @@ pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, Gover
 pub use proposal::{
     DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome, FederationProposal,
     FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload,
-    ProposalState, TreasuryApprovalType, TreasuryProposalOperation,
+    ProposalState, ResourceAccessAction, TreasuryApprovalType, TreasuryProposalOperation,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
 pub use sdis::{

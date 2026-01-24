@@ -75,6 +75,7 @@ pub mod quarantine;
 pub mod sync;
 pub mod treasury;
 pub mod types;
+pub mod use_access;
 
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
 pub use dispute::DisputeManager;
@@ -104,6 +105,11 @@ pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,
     WitnessConfig, WitnessPolicy, WitnessSignature, WitnessedEntry,
+};
+
+// Use-based resource access (anti-rent-seeking)
+pub use use_access::{
+    AccessError, AccessModel, AntiSpeculationRules, ResourceAccess, StewardshipDuty, UsageEvent,
 };
 
 // Labor shares and cooperative bonds (Razeto integration)
