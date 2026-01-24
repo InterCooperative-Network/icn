@@ -211,7 +211,8 @@ pub(crate) fn count_entry_signers(ledger: &Ledger, entry: &JournalEntry) -> usiz
 ///
 /// # Returns
 /// Total transaction value as u64
-pub(crate) fn calculate_entry_value(_ledger: &Ledger, entry: &JournalEntry) -> u64 {
+#[allow(unused_variables)]
+pub(crate) fn calculate_entry_value(ledger: &Ledger, entry: &JournalEntry) -> u64 {
     entry
         .accounts
         .iter()
