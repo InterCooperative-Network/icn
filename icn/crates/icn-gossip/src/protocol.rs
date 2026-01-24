@@ -82,8 +82,21 @@ impl GossipActor {
                     }
                 }
             } else {
-                // If we can't acquire lock, skip trust check (avoid blocking)
+                // SECURITY: Fail-safe behavior - reject message when trust cannot be verified.
+                // This prevents timing attacks where an attacker floods the system to create
+                // lock contention and then sends malicious messages during the contention window.
+                //
+                // Operators: If this metric increases, investigate trust graph lock contention.
+                // Consider increasing trust graph capacity or reducing message rate.
                 icn_obs::metrics::gossip::trust_check_lock_skipped_inc();
+                warn!(
+                    peer_did = %sender,
+                    message_type = message.variant_name(),
+                    "Trust graph lock contention - rejecting message (fail-safe)"
+                );
+                anyhow::bail!(
+                    "Cannot verify trust for {sender}: trust graph lock contention. Message rejected."
+                );
             }
         }
 

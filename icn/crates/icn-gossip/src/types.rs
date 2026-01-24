@@ -700,13 +700,31 @@ impl AdaptiveFanoutConfig {
 ///
 /// Batching reduces overhead from framing, serialization, and round-trips
 /// by accumulating multiple small messages before sending.
+///
+/// # Latency Characteristics
+///
+/// The background flusher checks for expired batches every `max_delay / 2` milliseconds.
+/// This means a single message could wait up to `max_delay + (max_delay / 2)` before
+/// being flushed in the worst case (message arrives just after a check completes).
+///
+/// **Worst-case flush latency by preset:**
+/// - `default()`: 10ms + 5ms = 15ms
+/// - `low_latency()`: 5ms + 2.5ms = 7.5ms
+/// - `high_throughput()`: 50ms + 25ms = 75ms
+/// - `disabled()`: 0ms (immediate)
+///
+/// For latency-critical applications, use [`BatchingConfig::low_latency()`] or
+/// [`BatchingConfig::disabled()`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BatchingConfig {
     /// Maximum number of messages in a batch
     pub max_batch_size: usize,
 
-    /// Maximum time to wait before sending a batch (even if not full)
+    /// Maximum time to wait before sending a batch (even if not full).
+    ///
+    /// The background flusher runs at `max_delay / 2` intervals, so actual
+    /// worst-case latency is `max_delay * 1.5`. See struct-level docs for details.
     pub max_delay: Duration,
 
     /// Minimum size in bytes before compression is applied
