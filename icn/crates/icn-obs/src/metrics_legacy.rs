@@ -765,6 +765,24 @@ pub fn init_descriptions() {
         "Whether actor is currently active (1=active, 0=inactive)"
     );
 
+    // Resource access enforcer metrics
+    describe_counter!(
+        "icn_resource_enforcer_checks_total",
+        "Total number of enforcement checks performed"
+    );
+    describe_counter!(
+        "icn_resource_enforcer_resources_checked_total",
+        "Total number of resource access entries checked"
+    );
+    describe_counter!(
+        "icn_resource_enforcer_revocations_total",
+        "Total number of resources revoked due to idle timeout"
+    );
+    describe_counter!(
+        "icn_resource_access_revoked_total",
+        "Individual resource revocation events"
+    );
+
     // Core infrastructure metrics (dead-letter queue)
     describe_counter!(
         "icn_core_dead_letter_enqueued_total",
