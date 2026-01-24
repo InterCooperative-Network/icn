@@ -259,6 +259,17 @@ pub enum GatewayEvent {
         reason: String,
     },
 
+    /// Resource access was transferred to a new holder
+    ResourceAccessTransferred {
+        coop_id: String,
+        resource_id: String,
+        from_holder: String,
+        to_holder: String,
+        price: Option<i64>,
+        access_model: String,
+        transferred_at: u64,
+    },
+
     // === Control Events ===
     /// Server is shutting down gracefully
     ///

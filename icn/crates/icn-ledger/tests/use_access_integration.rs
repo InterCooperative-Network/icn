@@ -277,7 +277,7 @@ fn test_proposal_payload_type_name() {
 // Integration tests for ResourceAccessStore
 mod store_integration {
     use super::*;
-    use icn_ledger::{ResourceAccessStore, SledResourceAccessStore};
+    use icn_ledger::use_access::{ResourceAccessStore, SledResourceAccessStore};
     use icn_store::SledStore;
     use std::sync::Arc;
 
