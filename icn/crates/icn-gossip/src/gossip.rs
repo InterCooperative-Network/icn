@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Compress batch data with zstd
 ///
@@ -834,7 +834,7 @@ impl GossipActor {
             let Ok(mut batches) = self.pending_batches.lock() else {
                 // Mutex poisoned - fall back to immediate send and record metric
                 // This indicates a serious bug: a thread panicked while holding the lock
-                warn!("Batch mutex poisoned, sending immediately - this indicates a serious bug");
+                error!("Batch mutex poisoned, sending immediately - this indicates a serious bug");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 self.send_message_immediate(recipient, message);
                 return;
@@ -852,7 +852,7 @@ impl GossipActor {
                     *size_entry
                 }
                 Err(_) => {
-                    warn!("Batch sizes mutex poisoned");
+                    error!("Batch sizes mutex poisoned");
                     icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                     batch_len * 500 // Fallback estimate
                 }
@@ -893,7 +893,7 @@ impl GossipActor {
     pub fn flush_batch(&self, recipient: &Option<Did>) {
         let messages = {
             let Ok(mut batches) = self.pending_batches.lock() else {
-                warn!("Batch mutex poisoned, cannot flush - this indicates a serious bug");
+                error!("Batch mutex poisoned, cannot flush - this indicates a serious bug");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
@@ -921,7 +921,7 @@ impl GossipActor {
                 current
             }
             Err(_) => {
-                warn!("Batch ID mutex poisoned, using 0 - this indicates a serious bug");
+                error!("Batch ID mutex poisoned, using 0 - this indicates a serious bug");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 0u64
             }
@@ -952,7 +952,7 @@ impl GossipActor {
     pub fn flush_all_batches(&self) {
         let recipients: Vec<Option<Did>> = {
             let Ok(batches) = self.pending_batches.lock() else {
-                warn!("Batch mutex poisoned, cannot flush all");
+                error!("Batch mutex poisoned, cannot flush all");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
@@ -974,12 +974,12 @@ impl GossipActor {
 
         let expired_recipients: Vec<Option<Did>> = {
             let Ok(batches) = self.pending_batches.lock() else {
-                warn!("Batch mutex poisoned, cannot check expired batches");
+                error!("Batch mutex poisoned, cannot check expired batches");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
             let Ok(times) = self.last_batch_time.lock() else {
-                warn!("Batch time mutex poisoned, cannot check expired batches");
+                error!("Batch time mutex poisoned, cannot check expired batches");
                 icn_obs::metrics::gossip::batch_mutex_poisoned_inc();
                 return;
             };
