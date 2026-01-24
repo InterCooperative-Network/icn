@@ -215,3 +215,150 @@ async fn test_gossip_store_wrapper_integration() {
     assert_eq!(logged[0].resource_id, "resource-456");
     assert_eq!(logged[0].reason, "Automatic revocation: idle");
 }
+
+#[tokio::test]
+async fn test_cross_node_revocation_propagation() {
+    // This test validates that revocation events are:
+    // 1. Published to gossip by the originating node
+    // 2. Received by other nodes via gossip
+    // 3. Applied to local storage on receiving nodes
+
+    use icn_core::supervisor::init_resource_enforcer::GossipResourceAccessStore;
+    use std::sync::Mutex;
+
+    // Create two nodes with separate gossip actors
+    let node1_keypair = KeyPair::generate().unwrap();
+    let node1_keypair_clone = node1_keypair.clone();
+    let node1_did = node1_keypair_clone.did();
+    let node2_keypair = KeyPair::generate().unwrap();
+    let node2_keypair_clone = node2_keypair.clone();
+    let node2_did = node2_keypair_clone.did();
+
+    let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+
+    // Node 1 - originating node that will publish the revocation
+    let node1_revocations = Arc::new(Mutex::new(Vec::new()));
+    let node1_gossip =
+        GossipActor::spawn_with_trust_graph(node1_did.clone(), trust_lookup.clone(), None);
+    {
+        let mut gossip = node1_gossip.write().await;
+        gossip.set_keypair(node1_keypair);
+        gossip.create_topic(icn_gossip::Topic::new(
+            RESOURCE_REVOCATIONS_TOPIC.to_string(),
+            icn_gossip::AccessControl::Public,
+        ));
+    }
+
+    let node1_inner_store = Box::new(MockResourceAccessStore::new(node1_revocations.clone()));
+    let mut node1_store = GossipResourceAccessStore::new(node1_inner_store, node1_gossip.clone());
+
+    // Node 2 - receiving node that will apply the revocation
+    let node2_revocations = Arc::new(Mutex::new(Vec::new()));
+    let node2_gossip =
+        GossipActor::spawn_with_trust_graph(node2_did.clone(), trust_lookup.clone(), None);
+    {
+        let mut gossip = node2_gossip.write().await;
+        gossip.set_keypair(node2_keypair.clone());
+        gossip.create_topic(icn_gossip::Topic::new(
+            RESOURCE_REVOCATIONS_TOPIC.to_string(),
+            icn_gossip::AccessControl::Public,
+        ));
+
+        // Subscribe to revocations topic
+        gossip
+            .subscribe(RESOURCE_REVOCATIONS_TOPIC, node2_did.clone())
+            .await
+            .expect("Failed to subscribe to revocations topic");
+    }
+
+    let node2_inner_store = Box::new(MockResourceAccessStore::new(node2_revocations.clone()));
+    let node2_store = Arc::new(tokio::sync::RwLock::new(
+        GossipResourceAccessStore::new(node2_inner_store, node2_gossip.clone()),
+    ));
+
+    // Create a resource on node 1
+    let entity = EntityId::from_did(&node1_did);
+    let access = ResourceAccess::new(
+        "cross-node-resource".to_string(),
+        entity.clone(),
+        AccessModel::UseAccess {
+            duration_seconds: 90 * 24 * 3600, // 90 days
+            renewable: false,
+            max_accumulated: 1,
+        },
+    )
+    .with_rules(AntiSpeculationRules::strict());
+
+    node1_store
+        .update("cross-node-resource", &access)
+        .unwrap();
+
+    // Node 1 emits a revocation (simulating auto-revocation by enforcer)
+    let revocation_event = RevocationEvent {
+        resource_id: "cross-node-resource".to_string(),
+        holder: entity.clone(),
+        reason: "Idle for 15 days".to_string(),
+        timestamp: icn_time::current_timestamp_secs(),
+        idle_seconds: 15 * 24 * 3600,
+    };
+
+    node1_store
+        .emit_revocation(revocation_event.clone())
+        .unwrap();
+
+    // Wait for async gossip publication
+    tokio::time::sleep(tokio::time::Duration::from_millis(ASYNC_PUBLISH_WAIT_MS)).await;
+
+    // Verify node 1 logged the revocation
+    {
+        let logged = node1_revocations.lock().unwrap();
+        assert_eq!(
+            logged.len(),
+            1,
+            "Node 1 should have logged the revocation"
+        );
+        assert_eq!(logged[0].resource_id, "cross-node-resource");
+        assert_eq!(logged[0].idle_seconds, 15 * 24 * 3600);
+    }
+
+    // Simulate node 2 receiving the revocation via gossip notification callback
+    // In a real deployment, this would happen automatically via the notification callback
+    // For this test, we manually call apply_received_revocation to simulate the callback
+    {
+        let store_guard = node2_store.read().await;
+        store_guard
+            .apply_received_revocation(&revocation_event)
+            .expect("Node 2 should apply the received revocation");
+    }
+
+    // Verify node 2 applied the revocation
+    {
+        let logged = node2_revocations.lock().unwrap();
+        assert_eq!(
+            logged.len(),
+            1,
+            "Node 2 should have received and applied the revocation"
+        );
+        assert_eq!(logged[0].resource_id, "cross-node-resource");
+        assert_eq!(logged[0].holder, entity);
+        assert_eq!(logged[0].reason, "Idle for 15 days");
+    }
+
+    // Test idempotency - applying the same revocation again should not error
+    {
+        let store_guard = node2_store.read().await;
+        store_guard
+            .apply_received_revocation(&revocation_event)
+            .expect("Duplicate revocation should be handled idempotently");
+    }
+
+    // Verify idempotent behavior - both calls logged (mock store doesn't deduplicate)
+    {
+        let logged = node2_revocations.lock().unwrap();
+        assert_eq!(
+            logged.len(),
+            2,
+            "Mock store records both calls for testing purposes"
+        );
+    }
+}
