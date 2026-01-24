@@ -896,7 +896,10 @@ impl GossipActor {
 
     /// Send a message to a peer (if callback is set)
     /// This now uses batching when enabled
-    pub(crate) fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
+    ///
+    /// Note: Public for testing purposes, but internal use should prefer
+    /// protocol-level methods like `publish()` or handler methods
+    pub fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
         self.send_message_batched(recipient, message);
     }
 
