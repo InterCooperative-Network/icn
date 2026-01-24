@@ -42,7 +42,7 @@ pub use policy::{Capability, CapabilityQuota, DefaultPolicySource, PolicySource,
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use resource_enforcer_actor::{
     EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
-    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent,
+    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
 };
 pub use runtime::Runtime;
 pub use storage_challenge::{ChallengeScheduler, ChallengeSchedulerHandle};
