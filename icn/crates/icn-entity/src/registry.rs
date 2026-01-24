@@ -62,7 +62,8 @@ pub trait EntityRegistry: Send + Sync {
     /// updated.status = EntityStatus::Dissolving { started_at: now };
     /// registry.update_if_version(updated, expected_version)?;
     /// ```
-    fn update_if_version(&mut self, entity: CooperativeEntity, expected_version: u64) -> Result<()>;
+    fn update_if_version(&mut self, entity: CooperativeEntity, expected_version: u64)
+        -> Result<()>;
 
     /// Delete an entity
     ///
@@ -194,17 +195,21 @@ impl EntityRegistry for InMemoryRegistry {
         if !self.entities.contains_key(&id) {
             return Err(EntityError::NotFound(id));
         }
-        // Auto-update the updated_at timestamp for audit trail accuracy
+        // Auto-update the updated_at timestamp for audit trail accuracy.
+        // Note: the regular update() does not modify the version field;
+        // versioned/optimistic updates should use update_if_version().
         entity.updated_at = icn_time::current_timestamp_secs();
-        // Increment version on update
-        entity.version += 1;
         self.entities.insert(id, entity);
         Ok(())
     }
 
-    fn update_if_version(&mut self, mut entity: CooperativeEntity, expected_version: u64) -> Result<()> {
+    fn update_if_version(
+        &mut self,
+        mut entity: CooperativeEntity,
+        expected_version: u64,
+    ) -> Result<()> {
         let id = entity.id.as_str().to_string();
-        
+
         // Get current entity
         let current = self
             .entities

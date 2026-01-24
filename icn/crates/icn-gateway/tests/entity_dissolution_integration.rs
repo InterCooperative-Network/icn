@@ -893,7 +893,7 @@ async fn test_concurrent_dissolution_initiation_detected() {
 
     // This test verifies that optimistic locking prevents race conditions
     // by simulating a scenario where the entity is modified between read and write
-    
+
     let entity_mgr = Arc::new(EntityManager::new());
     let alice = test_identity();
 
@@ -916,11 +916,16 @@ async fn test_concurrent_dissolution_initiation_detected() {
     let entity_v0 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
     assert_eq!(entity_v0.version, 0, "Initial version should be 0");
 
-    // Simulate concurrent modification: another process updates the entity
-    // This increments the version from 0 to 1
+    // Simulate concurrent modification: another process updates the entity using
+    // optimistic locking. This increments the version from 0 to 1.
+    // (Regular update() does not increment version - only update_if_version does)
     let mut entity_modified = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    let expected_version = entity_modified.version;
     entity_modified.description = Some("Modified by concurrent process".to_string());
-    entity_mgr.update(entity_modified).await.unwrap();
+    entity_mgr
+        .update_if_version(entity_modified, expected_version)
+        .await
+        .unwrap();
 
     // Verify version was incremented
     let entity_v1 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
@@ -937,13 +942,14 @@ async fn test_concurrent_dissolution_initiation_detected() {
 
     // Attempt to update with stale version
     let result = entity_mgr.update_if_version(entity_stale, 0).await;
-    
+
     // Should fail due to version mismatch
     assert!(result.is_err(), "Update with stale version should fail");
 
     let error_str = result.unwrap_err().to_string();
     assert!(
-        error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification"),
+        error_str.contains("Concurrent modification")
+            || error_str.contains("ConcurrentModification"),
         "Error should indicate concurrent modification, got: {error_str}"
     );
 
@@ -1010,7 +1016,10 @@ async fn test_dissolution_initiation_succeeds_with_correct_version() {
     // Verify entity status changed to Dissolving
     let entity_after = entity_mgr.get(&entity_id).await.unwrap().unwrap();
     assert!(
-        matches!(entity_after.status, icn_entity::EntityStatus::Dissolving { .. }),
+        matches!(
+            entity_after.status,
+            icn_entity::EntityStatus::Dissolving { .. }
+        ),
         "Entity should be in Dissolving status"
     );
 
@@ -1038,7 +1047,7 @@ async fn test_optimistic_locking_prevents_double_initiation() {
 
     // This test simulates two concurrent requests attempting to initiate dissolution
     // The second request should be rejected due to version mismatch
-    
+
     let entity_mgr = Arc::new(EntityManager::new());
     let alice = test_identity();
 
@@ -1065,7 +1074,10 @@ async fn test_optimistic_locking_prevents_double_initiation() {
     let mut entity2 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
     let version2 = entity2.version;
 
-    assert_eq!(version1, version2, "Both requests should see same initial version");
+    assert_eq!(
+        version1, version2,
+        "Both requests should see same initial version"
+    );
 
     // First request updates status
     entity1.status = icn_entity::EntityStatus::Dissolving {
@@ -1094,7 +1106,8 @@ async fn test_optimistic_locking_prevents_double_initiation() {
     // Verify error is about concurrent modification
     let error_str = result2.unwrap_err().to_string();
     assert!(
-        error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification"),
+        error_str.contains("Concurrent modification")
+            || error_str.contains("ConcurrentModification"),
         "Error should indicate concurrent modification, got: {error_str}"
     );
 
@@ -1105,7 +1118,10 @@ async fn test_optimistic_locking_prevents_double_initiation() {
         "Version should be 1 after single successful update"
     );
     assert!(
-        matches!(final_entity.status, icn_entity::EntityStatus::Dissolving { .. }),
+        matches!(
+            final_entity.status,
+            icn_entity::EntityStatus::Dissolving { .. }
+        ),
         "Entity should be in Dissolving status"
     );
 }

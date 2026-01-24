@@ -336,10 +336,10 @@ impl EntityRegistry for SledEntityRegistry {
             .get(&entity.id)?
             .ok_or_else(|| EntityError::NotFound(entity.id.as_str().to_string()))?;
 
-        // Update the updated_at timestamp
+        // Update the updated_at timestamp.
+        // Note: the regular update() does not modify the version field;
+        // versioned/optimistic updates should use update_if_version().
         entity.updated_at = icn_time::current_timestamp_secs();
-        // Increment version
-        entity.version += 1;
 
         // Prepare for transaction
         let entity_id_str = entity.id.as_str().to_string();
@@ -376,7 +376,11 @@ impl EntityRegistry for SledEntityRegistry {
         Ok(())
     }
 
-    fn update_if_version(&mut self, mut entity: CooperativeEntity, expected_version: u64) -> Result<()> {
+    fn update_if_version(
+        &mut self,
+        mut entity: CooperativeEntity,
+        expected_version: u64,
+    ) -> Result<()> {
         let entity_key = Self::entity_key(&entity.id);
 
         // Check if entity exists and get current entity
@@ -386,7 +390,9 @@ impl EntityRegistry for SledEntityRegistry {
 
         // Version check - detect concurrent modification
         if old_entity.version != expected_version {
-            return Err(EntityError::ConcurrentModification(entity.id.as_str().to_string()));
+            return Err(EntityError::ConcurrentModification(
+                entity.id.as_str().to_string(),
+            ));
         }
 
         // Update the updated_at timestamp
@@ -409,7 +415,7 @@ impl EntityRegistry for SledEntityRegistry {
                 // This is a double-check in case the entity was modified between the get and the transaction
                 if let Some(current_bytes) = tx.get(&entity_key)? {
                     let current_entity = Self::deserialize_entity(&current_bytes)
-                        .map_err(|e| ConflictableTransactionError::Abort(e))?;
+                        .map_err(ConflictableTransactionError::Abort)?;
                     if current_entity.version != expected_version {
                         return Err(ConflictableTransactionError::Abort(
                             EntityError::ConcurrentModification(entity_id_str.clone()),

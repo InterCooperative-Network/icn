@@ -154,7 +154,9 @@ impl EntityActor {
                     expected_version,
                     reply,
                 } => {
-                    let result = self.handle_update_if_version(entity, expected_version).await;
+                    let result = self
+                        .handle_update_if_version(entity, expected_version)
+                        .await;
                     let _ = reply.send(result);
                 }
                 EntityMessage::Delete { id, reply } => {

@@ -457,6 +457,7 @@ pub struct CooperativeEntity {
 
     /// Version number for optimistic locking
     /// Incremented on each update to detect concurrent modifications
+    #[serde(default)]
     pub version: u64,
 
     /// Optional description

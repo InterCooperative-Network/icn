@@ -1269,22 +1269,29 @@ pub async fn initiate_dissolution(
 
     // Update entity status to Dissolving with optimistic locking
     entity.status = icn_entity::EntityStatus::Dissolving { started_at: now };
-    
+
     // Use update_if_version for atomic status transition
-    match entity_mgr.update_if_version(entity.clone(), expected_version).await {
+    match entity_mgr
+        .update_if_version(entity.clone(), expected_version)
+        .await
+    {
         Ok(()) => {
             // Success - proceed with audit trail
         }
         Err(e) => {
             // Check if this is a concurrent modification error
             let error_str = e.to_string();
-            if error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification") {
+            if error_str.contains("Concurrent modification")
+                || error_str.contains("ConcurrentModification")
+            {
                 return Err(GatewayError::Conflict(
                     "Entity was modified by another operation. Please retry.".to_string(),
                 ));
             }
             // Other errors are internal
-            return Err(GatewayError::InternalError(format!("Failed to update entity: {e}")));
+            return Err(GatewayError::InternalError(format!(
+                "Failed to update entity: {e}"
+            )));
         }
     }
 
@@ -1306,8 +1313,33 @@ pub async fn initiate_dissolution(
             "Failed to record dissolution initiation audit - attempting rollback"
         );
         // Rollback: restore entity to Active status
-        entity.status = icn_entity::EntityStatus::Active;
-        if let Err(rollback_err) = entity_mgr.update(entity).await {
+        // Fetch current entity to get correct version after update_if_version succeeded
+        let mut rollback_entity = match entity_mgr.get(&entity_id).await {
+            Ok(Some(ent)) => ent,
+            Ok(None) => {
+                gateway_metrics::entity_audit_rollback_failure_inc("initiate_dissolution");
+                tracing::error!(
+                    entity_id = %entity_id,
+                    "Entity disappeared during rollback - cannot restore status"
+                );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to record audit: {e}. CRITICAL: Entity not found during rollback."
+                )));
+            }
+            Err(fetch_err) => {
+                gateway_metrics::entity_audit_rollback_failure_inc("initiate_dissolution");
+                tracing::error!(
+                    entity_id = %entity_id,
+                    error = %fetch_err,
+                    "Failed to fetch entity for rollback"
+                );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to record audit: {e}. CRITICAL: Cannot fetch entity for rollback: {fetch_err}."
+                )));
+            }
+        };
+        rollback_entity.status = icn_entity::EntityStatus::Active;
+        if let Err(rollback_err) = entity_mgr.update(rollback_entity).await {
             gateway_metrics::entity_audit_rollback_failure_inc("initiate_dissolution");
             tracing::error!(
                 entity_id = %entity_id,
