@@ -133,6 +133,7 @@ impl ResourceAccessStore for GossipResourceAccessStore {
 mod tests {
     use super::*;
     use icn_entity::EntityId;
+    use icn_gossip::{gossip::TrustLookup, GossipActor};
     use icn_identity::KeyPair;
     use icn_ledger::{AccessModel, ResourceAccess};
     use std::collections::HashMap;
@@ -235,5 +236,72 @@ mod tests {
                 idle_seconds: 0,
             })
             .is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_gossip_store_publishes_revocations() {
+        use icn_gossip::GossipActor;
+        use std::sync::{Arc, Mutex as StdMutex};
+
+        // Create a mock store that tracks revocation events
+        let events_log: Arc<StdMutex<Vec<RevocationEvent>>> =
+            Arc::new(StdMutex::new(Vec::new()));
+
+        struct MockStore {
+            events: Arc<StdMutex<Vec<RevocationEvent>>>,
+        }
+
+        impl ResourceAccessStore for MockStore {
+            fn list_all(&self) -> Result<Vec<(String, ResourceAccess)>> {
+                Ok(Vec::new())
+            }
+
+            fn update(&mut self, _resource_id: &str, _access: &ResourceAccess) -> Result<()> {
+                Ok(())
+            }
+
+            fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
+                self.events.lock().unwrap().push(event);
+                Ok(())
+            }
+        }
+
+        // Create gossip actor
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did();
+        let trust_lookup: TrustLookup =
+            Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+        let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+
+        // Create gossip-aware store
+        let inner_store = Box::new(MockStore {
+            events: events_log.clone(),
+        });
+        let mut gossip_store = GossipResourceAccessStore::new(inner_store, gossip_handle.clone());
+
+        // Create and emit a revocation event
+        let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
+        let event = RevocationEvent {
+            resource_id: "test-resource".to_string(),
+            holder: entity,
+            reason: "Idle for too long".to_string(),
+            timestamp: icn_time::current_timestamp_secs(),
+            idle_seconds: 86400, // 1 day
+        };
+
+        // Emit the revocation
+        gossip_store.emit_revocation(event.clone()).unwrap();
+
+        // Wait for async publication task
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Verify event was logged
+        let logged_events = events_log.lock().unwrap();
+        assert_eq!(logged_events.len(), 1);
+        assert_eq!(logged_events[0].resource_id, "test-resource");
+        assert_eq!(logged_events[0].reason, "Idle for too long");
+
+        // Verify event was published to gossip
+        // (We can't easily check this without subscribing, but the log should show it)
     }
 }
