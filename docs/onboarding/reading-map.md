@@ -60,3 +60,23 @@ This map links each module to the highest-signal files and docs.
 - `CONTRIBUTING.md`
 - `docs/ci/CI_ALL_GREEN_REPORT.md`
 - `docs/testing/`
+
+## Module 11: Federation (Advanced)
+- `icn/crates/icn-federation/`
+- `docs/ARCHITECTURE.md` (Federation section)
+
+## Module 12: Observability and metrics
+- `icn/crates/icn-obs/`
+- `monitoring/`
+- `docs/production-hardening.md`
+
+## Module 13: Security and privacy
+- `icn/crates/icn-security/`
+- `icn/crates/icn-privacy/`
+- `icn/crates/icn-net/src/envelope.rs`
+- `docs/production-hardening.md`
+
+## Module 14: Governance and CCL deep dive
+- `icn/crates/icn-governance/`
+- `icn/crates/icn-ccl/`
+- `docs/governance-primitives.md`
