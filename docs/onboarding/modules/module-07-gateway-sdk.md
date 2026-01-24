@@ -133,6 +133,48 @@ let trust_manager = if let Some(handle) = self.trust_graph_handle {
 ICN uses DID-based authentication via challenge-response. This proves identity without
 transmitting private keys.
 
+### Auth Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant AuthService
+    participant Store
+
+    rect rgb(240, 240, 255)
+        Note over Client,Store: Challenge Phase
+        Client->>Gateway: POST /v1/auth/challenge<br/>{did: "did:icn:..."}
+        Gateway->>Gateway: Rate limit check (IP)
+        Gateway->>AuthService: create_challenge(did)
+        AuthService->>Store: Store nonce (5min TTL)
+        AuthService-->>Gateway: {nonce, expires_in}
+        Gateway-->>Client: 200 OK {nonce, expires_in}
+    end
+
+    Note over Client: Sign nonce with<br/>Ed25519 private key
+
+    rect rgb(240, 255, 240)
+        Note over Client,Store: Verify Phase
+        Client->>Gateway: POST /v1/auth/verify<br/>{did, signature, coop_id, scopes}
+        Gateway->>AuthService: verify_challenge(did, sig, ...)
+        AuthService->>Store: Get stored nonce
+        AuthService->>AuthService: Verify Ed25519 signature
+        AuthService->>AuthService: Validate scopes
+        AuthService->>AuthService: Generate JWT
+        AuthService-->>Gateway: {token, expires_in}
+        Gateway-->>Client: 200 OK {token, expires_in}
+    end
+
+    rect rgb(255, 240, 240)
+        Note over Client,Store: Authenticated Request
+        Client->>Gateway: GET /v1/ledger/balance<br/>Authorization: Bearer <jwt>
+        Gateway->>Gateway: Validate JWT
+        Gateway->>Gateway: Check scopes
+        Gateway-->>Client: 200 OK {balance: 100}
+    end
+```
+
 ### Step 1: Challenge Request
 
 The client requests a challenge for their DID:

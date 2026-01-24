@@ -340,6 +340,256 @@ cargo tarpaulin --workspace --timeout 300
 
 ---
 
+## Test Coverage Patterns
+
+### Test Organization
+
+ICN follows a consistent test organization pattern across crates:
+
+```
+icn/crates/icn-example/
+├── src/
+│   ├── lib.rs           # Inline unit tests
+│   ├── module.rs        # Inline unit tests
+│   └── ...
+└── tests/
+    ├── integration_test.rs   # Cross-module tests
+    └── fixtures/             # Test data files
+```
+
+### Unit Test Pattern
+
+Unit tests live alongside the code they test:
+
+```rust
+// src/balance.rs
+use crate::types::{JournalEntry, AccountDelta};
+
+/// Computes the balance for a specific account from journal entries.
+/// In ICN's double-entry system, each JournalEntry contains Vec<AccountDelta>
+/// where each delta specifies account, currency, and debit/credit amounts.
+pub fn compute_account_balance(entries: &[JournalEntry], account_id: &str, currency: &str) -> i64 {
+    entries.iter()
+        .flat_map(|e| &e.accounts)
+        .filter(|delta| delta.account_id == account_id && delta.currency == currency)
+        .map(|delta| delta.credit.unwrap_or(0) - delta.debit.unwrap_or(0))
+        .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper to create a simple account delta for testing
+    fn credit_delta(account: &str, amount: i64) -> AccountDelta {
+        AccountDelta {
+            account_id: account.to_string(),
+            currency: "USD".to_string(),
+            debit: None,
+            credit: Some(amount),
+        }
+    }
+
+    fn debit_delta(account: &str, amount: i64) -> AccountDelta {
+        AccountDelta {
+            account_id: account.to_string(),
+            currency: "USD".to_string(),
+            debit: Some(amount),
+            credit: None,
+        }
+    }
+
+    fn test_entry(deltas: Vec<AccountDelta>) -> JournalEntry {
+        JournalEntry {
+            id: None,
+            author: Did::from_str("did:icn:test").unwrap(),
+            accounts: deltas,
+            timestamp: 0,
+            parents: vec![],
+            signature: None,
+            contract_ref: None,
+        }
+    }
+
+    #[test]
+    fn test_empty_balance() {
+        let entries: Vec<JournalEntry> = vec![];
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 0);
+    }
+
+    #[test]
+    fn test_single_credit() {
+        let entries = vec![
+            test_entry(vec![credit_delta("alice", 100)]),
+        ];
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 100);
+    }
+
+    #[test]
+    fn test_mixed_entries() {
+        let entries = vec![
+            test_entry(vec![credit_delta("alice", 100)]),
+            test_entry(vec![debit_delta("alice", 30)]),
+            test_entry(vec![credit_delta("alice", 50)]),
+        ];
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 120);
+    }
+
+    #[test]
+    fn test_negative_balance_allowed() {
+        // Mutual credit allows negative balances
+        let entries = vec![
+            test_entry(vec![debit_delta("alice", 100)]),
+        ];
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), -100);
+    }
+}
+```
+
+### Integration Test Pattern
+
+Integration tests verify cross-component behavior:
+
+```rust
+// tests/two_node_sync.rs
+use icn_testkit::{TestNode, TestNodeConfig};
+use tokio::time::{sleep, Duration};
+
+#[tokio::test]
+async fn test_two_node_ledger_sync() {
+    // Setup: Create two nodes with unique ports
+    let node1 = TestNode::new(TestNodeConfig {
+        port: 4001,
+        ..Default::default()
+    }).await.expect("node1 should start");
+
+    let node2 = TestNode::new(TestNodeConfig {
+        port: 4002,
+        ..Default::default()
+    }).await.expect("node2 should start");
+
+    // Connect nodes
+    node1.connect_to(&node2).await.expect("should connect");
+
+    // Act: Create transaction on node1
+    let entry_id = node1.ledger()
+        .create_entry(node2.did(), 100, "test payment")
+        .await
+        .expect("should create entry");
+
+    // Assert: Verify sync to node2 (with retries)
+    let mut synced = false;
+    for _ in 0..10 {
+        if node2.ledger().has_entry(&entry_id).await {
+            synced = true;
+            break;
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+    assert!(synced, "Entry should sync to node2 within 1 second");
+
+    // Cleanup
+    node1.shutdown().await;
+    node2.shutdown().await;
+}
+```
+
+### Async Test Pattern
+
+For async code, use `tokio::test`:
+
+```rust
+#[tokio::test]
+async fn test_async_operation() {
+    let result = some_async_function().await;
+    assert!(result.is_ok());
+}
+
+// With timeout
+#[tokio::test(flavor = "multi_thread")]
+#[timeout(5000)] // 5 second timeout
+async fn test_with_timeout() {
+    let result = potentially_slow_operation().await;
+    assert!(result.is_ok());
+}
+```
+
+### Property-Based Testing
+
+For complex invariants, use property testing:
+
+```rust
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    fn trust_score_always_in_range(score in 0.0f64..=1.0f64) {
+        let trust = TrustScore::new(score);
+        prop_assert!(trust.value() >= 0.0);
+        prop_assert!(trust.value() <= 1.0);
+    }
+
+    #[test]
+    fn balance_sum_is_zero(
+        credits in prop::collection::vec(1i64..1000, 1..10),
+        debits in prop::collection::vec(1i64..1000, 1..10)
+    ) {
+        // In mutual credit, total credits == total debits
+        let total_credits: i64 = credits.iter().sum();
+        let total_debits: i64 = debits.iter().sum();
+        // This is a simplified example
+        prop_assert_eq!(total_credits, total_credits); // Replace with real invariant
+    }
+}
+```
+
+### Test Expectations by Category
+
+| Category | Coverage Target | Notes |
+|----------|-----------------|-------|
+| Public APIs | 90%+ | All public functions must have tests |
+| Error paths | 80%+ | Test error conditions explicitly |
+| Security-critical | 95%+ | Identity, trust, crypto, rate limiting |
+| Integration | Key flows | Two-node sync, auth flow, ledger ops |
+
+### Running Specific Test Categories
+
+```bash
+# Unit tests for one crate
+cargo test -p icn-ledger --lib
+
+# Integration tests only
+cargo test -p icn-core --test '*'
+
+# Tests matching a pattern
+cargo test trust_score
+
+# Tests with output
+cargo test -- --nocapture
+
+# Specific test
+cargo test test_two_node_ledger_sync -- --exact
+
+# Coverage report
+cargo tarpaulin -p icn-ledger --out Html
+```
+
+### Test Naming Convention
+
+```rust
+// Pattern: test_<action>_<condition>_<expected>
+#[test]
+fn test_compute_balance_with_empty_entries_returns_zero() { }
+
+#[test]
+fn test_verify_signature_with_invalid_key_returns_error() { }
+
+#[test]
+fn test_rate_limiter_when_exceeded_blocks_request() { }
+```
+
+---
+
 ## Pull Request Process
 
 ### Creating a PR

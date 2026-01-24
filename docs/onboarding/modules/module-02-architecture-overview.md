@@ -606,6 +606,8 @@ impl Supervisor {
 | Security | `icn-security` | Rate limiting, access control |
 | Runtime | `icn-core` | Supervisor, actor lifecycle |
 | API | `icn-gateway` | REST/WebSocket, JWT auth |
+| API Types | `icn-api` | Shared service layer, API definitions |
+| Encoding | `icn-encoding` | Postcard serialization, wire format |
 | Metrics | `icn-obs` | Prometheus, tracing, logging |
 | Governance | `icn-governance` | Proposals, voting, policy |
 | Federation | `icn-federation` | Inter-coop agreements |
