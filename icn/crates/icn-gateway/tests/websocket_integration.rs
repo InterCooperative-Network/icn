@@ -531,3 +531,151 @@ async fn test_global_sequence_uniqueness() {
     let unique: std::collections::HashSet<_> = seqs.iter().collect();
     assert_eq!(unique.len(), 3, "All sequences should be unique");
 }
+
+/// Test that ResourceAccessTransferred events are properly broadcast to subscribers
+#[tokio::test]
+async fn test_resource_access_transferred_event_delivery() {
+    let broadcaster = EventBroadcaster::new();
+    
+    // Subscribe to events
+    let mut rx = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Should subscribe successfully");
+    
+    // Broadcast a ResourceAccessTransferred event
+    let event = GatewayEvent::ResourceAccessTransferred {
+        coop_id: "test-coop".to_string(),
+        resource_id: "resource-123".to_string(),
+        from_holder: "entity:icn:individual:alice".to_string(),
+        to_holder: "entity:icn:individual:bob".to_string(),
+        price: Some(500),
+        access_model: "Stewardship".to_string(),
+        transferred_at: 1234567890,
+    };
+    
+    broadcaster.broadcast("test-coop", event).await;
+    
+    // Receive the event
+    let received = rx.recv().await;
+    assert!(received.is_some(), "Should receive the event");
+    
+    let sequenced = received.unwrap();
+    assert!(sequenced.seq > 0, "Should have a sequence number");
+    
+    // Verify event contents
+    match sequenced.event {
+        GatewayEvent::ResourceAccessTransferred {
+            coop_id,
+            resource_id,
+            from_holder,
+            to_holder,
+            price,
+            access_model,
+            transferred_at,
+        } => {
+            assert_eq!(coop_id, "test-coop");
+            assert_eq!(resource_id, "resource-123");
+            assert_eq!(from_holder, "entity:icn:individual:alice");
+            assert_eq!(to_holder, "entity:icn:individual:bob");
+            assert_eq!(price, Some(500));
+            assert_eq!(access_model, "Stewardship");
+            assert_eq!(transferred_at, 1234567890);
+        }
+        _ => panic!("Expected ResourceAccessTransferred event"),
+    }
+}
+
+/// Test multiple ResourceAccessTransferred events in sequence
+#[tokio::test]
+async fn test_multiple_resource_access_transfers() {
+    let broadcaster = EventBroadcaster::new();
+    
+    let mut rx = broadcaster
+        .subscribe("resource-coop")
+        .await
+        .expect("Should subscribe");
+    
+    // Broadcast multiple transfers
+    let transfers = vec![
+        ("resource-1", "alice", "bob", Some(100), "UseAccess"),
+        ("resource-2", "bob", "charlie", None, "Stewardship"),
+        ("resource-3", "charlie", "alice", Some(250), "UseAccess"),
+    ];
+    
+    for (resource_id, from, to, price, access_model) in transfers.iter() {
+        let event = GatewayEvent::ResourceAccessTransferred {
+            coop_id: "resource-coop".to_string(),
+            resource_id: resource_id.to_string(),
+            from_holder: format!("entity:icn:individual:{}", from),
+            to_holder: format!("entity:icn:individual:{}", to),
+            price: *price,
+            access_model: access_model.to_string(),
+            transferred_at: 1234567890,
+        };
+        broadcaster.broadcast("resource-coop", event).await;
+    }
+    
+    // Verify all events are received in order
+    for (expected_resource, expected_from, expected_to, expected_price, expected_model) in transfers.iter() {
+        let received = rx.recv().await.expect("Should receive event");
+        
+        match received.event {
+            GatewayEvent::ResourceAccessTransferred {
+                resource_id,
+                from_holder,
+                to_holder,
+                price,
+                access_model,
+                ..
+            } => {
+                assert_eq!(resource_id, *expected_resource);
+                assert_eq!(from_holder, format!("entity:icn:individual:{}", expected_from));
+                assert_eq!(to_holder, format!("entity:icn:individual:{}", expected_to));
+                assert_eq!(price, *expected_price);
+                assert_eq!(access_model, *expected_model);
+            }
+            _ => panic!("Expected ResourceAccessTransferred event"),
+        }
+    }
+}
+
+/// Test ResourceAccessTransferred event is included in backfill
+#[tokio::test]
+async fn test_resource_access_transferred_backfill() {
+    let broadcaster = EventBroadcaster::new();
+    
+    // Broadcast some events before subscribing
+    for i in 0..5 {
+        let event = GatewayEvent::ResourceAccessTransferred {
+            coop_id: "backfill-coop".to_string(),
+            resource_id: format!("resource-{}", i),
+            from_holder: format!("entity:icn:individual:holder{}", i),
+            to_holder: format!("entity:icn:individual:holder{}", i + 1),
+            price: Some(i as i64 * 100),
+            access_model: "Stewardship".to_string(),
+            transferred_at: 1234567890 + i,
+        };
+        broadcaster.broadcast("backfill-coop", event).await;
+    }
+    
+    // Get backfill
+    let backfill = broadcaster.get_backfill("backfill-coop", 0).await;
+    assert_eq!(backfill.len(), 5, "Should have 5 events in backfill");
+    
+    // Verify first and last events
+    match &backfill[0].event {
+        GatewayEvent::ResourceAccessTransferred { resource_id, .. } => {
+            assert_eq!(resource_id, "resource-0");
+        }
+        _ => panic!("Expected ResourceAccessTransferred event"),
+    }
+    
+    match &backfill[4].event {
+        GatewayEvent::ResourceAccessTransferred { resource_id, price, .. } => {
+            assert_eq!(resource_id, "resource-4");
+            assert_eq!(*price, Some(400));
+        }
+        _ => panic!("Expected ResourceAccessTransferred event"),
+    }
+}

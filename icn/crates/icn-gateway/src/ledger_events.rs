@@ -241,23 +241,22 @@ impl LedgerEventBridge {
             }
 
             LedgerEvent::ResourceAccessTransferred(rat) => {
-                // TODO(resource-access-websocket): Add WebSocket forwarding for resource access transfers
-                //
-                // Implementation steps:
-                // 1. Add GatewayEvent::ResourceAccessTransferred variant to events.rs
-                // 2. Determine coop_id from resource or use default
-                // 3. Broadcast to relevant WebSocket subscribers
-                //
-                // This will enable real-time notifications for:
-                // - Resource stewardship changes
-                // - Access handoffs between community members
-                // - Audit trail visibility in cooperative dashboards
-                debug!(
-                    resource_id = %rat.resource_id,
-                    from = %rat.from_holder,
-                    to = %rat.to_holder,
-                    "ResourceAccessTransferred event (not yet forwarded to WebSocket)"
-                );
+                // Use default coop_id since resource events are ledger-wide
+                // In the future, could extract coop_id from resource metadata
+                let coop_id = self.default_coop_id.clone();
+                let gateway_event = GatewayEvent::ResourceAccessTransferred {
+                    coop_id: coop_id.clone(),
+                    resource_id: rat.resource_id,
+                    from_holder: rat.from_holder,
+                    to_holder: rat.to_holder,
+                    price: rat.price,
+                    access_model: rat.access_model,
+                    transferred_at: rat.transferred_at,
+                };
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
+                debug!("Forwarded ResourceAccessTransferred event");
             }
         }
     }
@@ -373,6 +372,65 @@ mod tests {
                 }
                 _ => panic!("Expected BalanceChanged event"),
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_bridge_forwards_resource_access_transferred() {
+        let ledger_emitter = create_shared_emitter();
+        let gateway_broadcaster = Arc::new(EventBroadcaster::new());
+        let coop_id = "test-coop".to_string();
+
+        let mut rx = gateway_broadcaster
+            .subscribe(&coop_id)
+            .await
+            .expect("Should subscribe");
+
+        let bridge = LedgerEventBridge::new(
+            ledger_emitter.clone(),
+            gateway_broadcaster.clone(),
+            coop_id.clone(),
+        );
+        let _handle = bridge.start();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Emit resource access transferred event
+        ledger_emitter.emit(LedgerEvent::ResourceAccessTransferred(
+            icn_ledger::ResourceAccessTransferred {
+                resource_id: "resource123".to_string(),
+                from_holder: "entity:icn:individual:alice".to_string(),
+                to_holder: "entity:icn:individual:bob".to_string(),
+                price: Some(100),
+                access_model: "Stewardship".to_string(),
+                transferred_at: 1234567890,
+            },
+        ));
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        if let Ok(sequenced) = rx.try_recv() {
+            match sequenced.event {
+                GatewayEvent::ResourceAccessTransferred {
+                    resource_id,
+                    from_holder,
+                    to_holder,
+                    price,
+                    access_model,
+                    transferred_at,
+                    ..
+                } => {
+                    assert_eq!(resource_id, "resource123");
+                    assert_eq!(from_holder, "entity:icn:individual:alice");
+                    assert_eq!(to_holder, "entity:icn:individual:bob");
+                    assert_eq!(price, Some(100));
+                    assert_eq!(access_model, "Stewardship");
+                    assert_eq!(transferred_at, 1234567890);
+                }
+                _ => panic!("Expected ResourceAccessTransferred event"),
+            }
+        } else {
+            panic!("Expected to receive ResourceAccessTransferred event");
         }
     }
 }
