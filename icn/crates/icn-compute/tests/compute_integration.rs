@@ -707,4 +707,3 @@ async fn test_resource_change_detection() {
     assert!(changes.contains(&ResourceChangeType::Cpu));
     assert!(changes.contains(&ResourceChangeType::Memory));
 }
-

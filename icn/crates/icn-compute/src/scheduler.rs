@@ -478,9 +478,12 @@ impl NodeCapacity {
     pub fn detect_changes(&self, other: &NodeCapacity, threshold: f64) -> Vec<ResourceChangeType> {
         let mut changes = Vec::new();
 
-        // Check CPU change
-        let cpu_change = (self.cpu_cores_available - other.cpu_cores_available).abs()
-            / self.cpu_cores_total;
+        // Check CPU change (guard against division by zero)
+        let cpu_change = if self.cpu_cores_total > 0.0 {
+            (self.cpu_cores_available - other.cpu_cores_available).abs() / self.cpu_cores_total
+        } else {
+            0.0
+        };
         if cpu_change >= threshold {
             changes.push(ResourceChangeType::Cpu);
         }
@@ -496,7 +499,7 @@ impl NodeCapacity {
             changes.push(ResourceChangeType::Memory);
         }
 
-        // Check storage change
+        // Check storage change (uses available as baseline since no total field exists)
         let storage_change = if self.storage_mb_available > 0 {
             (self.storage_mb_available as f64 - other.storage_mb_available as f64).abs()
                 / self.storage_mb_available as f64
@@ -505,6 +508,16 @@ impl NodeCapacity {
         };
         if storage_change >= threshold {
             changes.push(ResourceChangeType::Storage);
+        }
+
+        // Check network bandwidth change
+        let net_change = if self.network_mbps > 0.0 {
+            (self.network_mbps - other.network_mbps).abs() / self.network_mbps
+        } else {
+            0.0
+        };
+        if net_change >= threshold {
+            changes.push(ResourceChangeType::Network);
         }
 
         // Check GPU changes (devices added/removed)
@@ -1491,4 +1504,3 @@ mod tests {
         assert!(capacity.updated_at > 0);
     }
 }
-

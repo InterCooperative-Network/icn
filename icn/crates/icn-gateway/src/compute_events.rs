@@ -67,6 +67,8 @@ pub async fn forward_compute_event(broadcaster: &EventBroadcaster, event: Comput
                 )
                 .await;
         }
+        // Resource changes are internal monitoring events, not broadcast to clients
+        ComputeEvent::ResourcesChanged { .. } => {}
     }
 }
 

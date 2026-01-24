@@ -382,6 +382,10 @@ impl ComputeActor {
                     refresh_config.refresh_interval_secs,
                 ));
 
+                // Discard the immediate first tick so the first refresh happens
+                // after `refresh_interval_secs`, not immediately on actor start.
+                interval.tick().await;
+
                 loop {
                     interval.tick().await;
 

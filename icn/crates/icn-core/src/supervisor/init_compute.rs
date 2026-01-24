@@ -250,6 +250,8 @@ pub fn create_event_callback(
                 );
                 icn_obs::metrics::compute::tasks_completed_inc(outcome);
             }
+            // Resource changes are internal monitoring events, already logged
+            icn_compute::ComputeEvent::ResourcesChanged { .. } => {}
         }
 
         // Forward to EventBroadcaster for WebSocket delivery
