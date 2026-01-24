@@ -39,6 +39,10 @@ pub struct SupervisorConfig {
     /// Storage maintenance configuration (compaction, cleanup)
     #[serde(default)]
     pub storage_maintenance: MaintenanceConfig,
+
+    /// Resource access enforcer configuration (idle revocation)
+    #[serde(default)]
+    pub resource_enforcer: crate::resource_enforcer_actor::ResourceEnforcerConfig,
 }
 
 /// Configuration for actor restart with exponential backoff.
@@ -136,6 +140,7 @@ impl Default for SupervisorConfig {
             clock_sync_interval_secs: default_clock_sync_interval_secs(),
             restart_policy: RestartPolicyConfig::default(),
             storage_maintenance: MaintenanceConfig::default(),
+            resource_enforcer: crate::resource_enforcer_actor::ResourceEnforcerConfig::default(),
         }
     }
 }

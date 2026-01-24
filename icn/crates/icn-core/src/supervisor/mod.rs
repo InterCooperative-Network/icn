@@ -26,6 +26,7 @@ pub mod init_governance;
 pub mod init_ledger;
 pub mod init_network;
 pub mod init_notifications;
+pub mod init_resource_enforcer;
 pub mod init_rpc;
 pub mod init_send_callback;
 pub mod init_snapshot;

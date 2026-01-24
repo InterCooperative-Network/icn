@@ -1032,4 +1032,43 @@ fn spawn_background_tasks(
         "Connection candidate announcement task spawned (interval: {} seconds)",
         config.network.nat_dial.candidate_announce_interval_secs
     );
+
+    // Resource access enforcer
+    if config.supervisor.resource_enforcer.enabled {
+        // TODO: Replace `NullResourceAccessStore` with a real persistent backend.
+        //
+        // Integration plan:
+        // 1. Storage backend:
+        //    - Use the sled-backed SledResourceAccessStore from `icn-ledger` as the
+        //      concrete implementation for `ResourceAccessStore`.
+        // 2. Persistence layout:
+        //    - Resource access entries are persisted in the ledger store using the
+        //      `ledger:resource_access:` key prefix (see icn-ledger/src/use_access.rs).
+        // 3. Revocation events:
+        //    - When access is revoked, emit revocation events via:
+        //        * a dedicated gossip topic for cluster-wide propagation, and/or
+        //        * the existing notification/observer system for local subscribers.
+        //      Wire through `spawn_resource_enforcer` so revocations are observable.
+        let store = Arc::new(RwLock::new(
+            super::init_resource_enforcer::NullResourceAccessStore,
+        ));
+        // The resource enforcer actor is fully autonomous and only needs the shutdown
+        // signal via the broadcast channel. We intentionally discard the handle for now;
+        // future work may expose it via the Gateway API for manual checks or statistics
+        // queries if needed.
+        if let Ok(_enforcer_handle) = super::init_resource_enforcer::spawn_resource_enforcer(
+            &config.supervisor.resource_enforcer,
+            store,
+            shutdown_tx,
+        ) {
+            info!(
+                "Resource access enforcer task spawned (interval: {} seconds)",
+                config.supervisor.resource_enforcer.check_interval_seconds
+            );
+        } else {
+            warn!("Failed to spawn resource access enforcer");
+        }
+    } else {
+        info!("Resource access enforcer disabled by configuration");
+    }
 }
