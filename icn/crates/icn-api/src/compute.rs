@@ -289,7 +289,12 @@ impl TaskPriorityParam {
     }
 }
 
-/// Resource profile parameter
+/// Resource profile parameter for specifying task resource requirements.
+///
+/// All fields are optional. An empty profile (all fields `None`) is valid and
+/// indicates that the daemon should use its default resource allocation.
+/// This is intentional to support simple tasks that don't need specific
+/// resource constraints.
 #[derive(Debug, Clone)]
 pub struct ResourceProfileParam {
     pub cpu_cores: Option<f64>,
@@ -570,5 +575,95 @@ mod tests {
 
         profile.memory_mb = Some(2_000_000);
         assert!(profile.validate().is_err());
+    }
+
+    #[test]
+    fn test_empty_resource_profile_is_valid() {
+        // An empty resource profile (all None) is valid - daemon uses defaults
+        let profile = ResourceProfileParam {
+            cpu_cores: None,
+            memory_mb: None,
+            storage_mb: None,
+            network_mbps: None,
+            duration_estimate_secs: None,
+        };
+        assert!(
+            profile.validate().is_ok(),
+            "Empty resource profile should be valid (uses daemon defaults)"
+        );
+    }
+
+    #[test]
+    fn test_fuel_limit_boundary_values() {
+        let mut params = SubmitTaskParams {
+            task_id: "task-1".to_string(),
+            code: Some("{}".to_string()),
+            wasm_bytes: None,
+            code_type: CodeTypeParam::Ccl,
+            inputs: serde_json::Value::Null,
+            fuel_limit: MIN_FUEL_LIMIT,
+            priority: TaskPriorityParam::Normal,
+            deadline_ms: None,
+            payment_rate: None,
+            payment_currency: None,
+            coop_id: None,
+            resource_profile: None,
+        };
+
+        // Exactly MIN_FUEL_LIMIT should pass
+        assert!(
+            params.validate().is_ok(),
+            "MIN_FUEL_LIMIT ({}) should be valid",
+            MIN_FUEL_LIMIT
+        );
+
+        // Exactly MAX_FUEL_LIMIT should pass
+        params.fuel_limit = MAX_FUEL_LIMIT;
+        assert!(
+            params.validate().is_ok(),
+            "MAX_FUEL_LIMIT ({}) should be valid",
+            MAX_FUEL_LIMIT
+        );
+
+        // One below MIN should fail
+        params.fuel_limit = MIN_FUEL_LIMIT - 1;
+        assert!(
+            params.validate().is_err(),
+            "MIN_FUEL_LIMIT - 1 should be invalid"
+        );
+
+        // One above MAX should fail
+        params.fuel_limit = MAX_FUEL_LIMIT + 1;
+        assert!(
+            params.validate().is_err(),
+            "MAX_FUEL_LIMIT + 1 should be invalid"
+        );
+    }
+
+    #[test]
+    fn test_unicode_task_id() {
+        // Unicode characters in task IDs are currently allowed
+        // (length validation uses String::len() which counts bytes)
+        let params = SubmitTaskParams {
+            task_id: "task-日本語-🚀".to_string(),
+            code: Some("{}".to_string()),
+            wasm_bytes: None,
+            code_type: CodeTypeParam::Ccl,
+            inputs: serde_json::Value::Null,
+            fuel_limit: 10_000,
+            priority: TaskPriorityParam::Normal,
+            deadline_ms: None,
+            payment_rate: None,
+            payment_currency: None,
+            coop_id: None,
+            resource_profile: None,
+        };
+
+        // Currently passes - document this behavior
+        // Phase 3 security hardening may add stricter format validation
+        assert!(
+            params.validate().is_ok(),
+            "Unicode task IDs are currently allowed"
+        );
     }
 }
