@@ -887,8 +887,12 @@ impl ResourceAccess {
         };
 
         // Determine minimum witness count
+        // Use saturating conversion to handle systems where u32 might exceed usize::MAX
         let min_witnesses = min_witness_signatures
-            .map(|n| n as usize)
+            .map(|n| {
+                // On systems where u32 > usize::MAX (e.g., 16-bit), use usize::MAX
+                usize::try_from(n).unwrap_or(usize::MAX)
+            })
             .unwrap_or(required_witnesses.len());
 
         // Check each step has been completed with sufficient witnesses
