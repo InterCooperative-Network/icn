@@ -9,12 +9,61 @@
 //!
 //! The dispatch method is non-async and returns an enum indicating whether
 //! the handler is synchronous (already executed) or asynchronous (returns
-//! a future to be awaited by the caller). This design allows:
+//! handler parameters for the caller to await). This design allows:
 //!
 //! - Single source of truth for message routing
 //! - Use in both single-message and batch contexts
 //! - Avoidance of async recursion in batch handlers
 //! - Clear separation of dispatch logic from handling logic
+//!
+//! # Usage in Protocol Handler
+//!
+//! The main protocol handler uses dispatch to route messages:
+//!
+//! ```rust,ignore
+//! match self.dispatch_message(sender, message) {
+//!     DispatchResult::Sync(result) => result?,
+//!     DispatchResult::AsyncResponse(sender, entry) => {
+//!         self.handle_response(&sender, entry).await?
+//!     }
+//!     DispatchResult::AsyncPullResponse { sender, topic, entries, ... } => {
+//!         self.handle_pull_response(&sender, topic, entries, ...).await?
+//!     }
+//! }
+//! ```
+//!
+//! # Future: Batch Handler Example
+//!
+//! When message batching is implemented (Issue #330, PR #829), the dispatch
+//! method can be used to handle multiple messages efficiently:
+//!
+//! ```rust,ignore
+//! async fn handle_batch(&mut self, sender: &Did, messages: Vec<GossipMessage>) -> Result<()> {
+//!     let mut async_responses = Vec::new();
+//!     let mut async_pull_responses = Vec::new();
+//!     
+//!     // Phase 1: Dispatch all messages (no async recursion)
+//!     for message in messages {
+//!         match self.dispatch_message(sender, message) {
+//!             DispatchResult::Sync(result) => result?, // Handle sync immediately
+//!             DispatchResult::AsyncResponse(s, e) => async_responses.push((s, e)),
+//!             DispatchResult::AsyncPullResponse { sender, topic, entries, ... } => {
+//!                 async_pull_responses.push((sender, topic, entries, ...))
+//!             }
+//!         }
+//!     }
+//!     
+//!     // Phase 2: Process async handlers sequentially or in parallel
+//!     for (sender, entry) in async_responses {
+//!         self.handle_response(&sender, entry).await?;
+//!     }
+//!     for (sender, topic, entries, truncated, nonce, cursor) in async_pull_responses {
+//!         self.handle_pull_response(&sender, topic, entries, truncated, nonce, cursor).await?;
+//!     }
+//!     
+//!     Ok(())
+//! }
+//! ```
 
 use crate::gossip::GossipActor;
 use crate::types::{GossipEntry, GossipMessage};
