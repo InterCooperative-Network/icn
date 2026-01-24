@@ -503,6 +503,15 @@ mod tests {
             events.push(event);
             Ok(())
         }
+
+        fn apply_received_revocation(&self, event: &RevocationEvent) -> Result<()> {
+            let mut events = self
+                .events
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Failed to lock events: {}", e))?;
+            events.push(event.clone());
+            Ok(())
+        }
     }
 
     #[test]
