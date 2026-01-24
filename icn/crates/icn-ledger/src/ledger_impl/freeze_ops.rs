@@ -38,6 +38,18 @@ use crate::ledger::Ledger;
 use icn_identity::Did;
 use tracing::info;
 
+/// Get the current Unix timestamp in seconds.
+///
+/// Returns 0 if the system clock is before the Unix epoch (should never happen
+/// in practice, but handles the error case gracefully).
+#[inline]
+fn current_timestamp_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 /// Freeze a member account
 ///
 /// This is an emergency action that blocks all ledger transactions involving
@@ -60,18 +72,21 @@ pub(crate) fn freeze_member(
         duration = ?duration_seconds,
         "Freezing member account"
     );
-    ledger
-        .freeze_manager
-        .freeze(did.clone(), reason.clone(), duration_seconds);
 
-    // Emit freeze event
+    // Emit freeze event first (uses references/clones), then freeze manager (consumes owned values).
+    // This ordering avoids cloning `did` since emit takes &Did but freeze takes Did.
     if let Some(ref emitter) = ledger.event_emitter {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        emitter.emit_member_frozen(&did, reason, None, None, duration_seconds, now);
+        emitter.emit_member_frozen(
+            &did,
+            reason.clone(),
+            None,
+            None,
+            duration_seconds,
+            current_timestamp_secs(),
+        );
     }
+
+    ledger.freeze_manager.freeze(did, reason, duration_seconds);
 }
 
 /// Freeze a member with full metadata (for governance integration)
@@ -100,29 +115,27 @@ pub(crate) fn freeze_member_with_metadata(
         proposal = ?proposal_id,
         "Freezing member account via governance"
     );
-    ledger.freeze_manager.freeze_with_metadata(
-        did.clone(),
-        reason.clone(),
-        duration_seconds,
-        proposal_id.clone(),
-        frozen_by.clone(),
-    );
 
-    // Emit freeze event
+    // Emit freeze event first (uses references/clones), then freeze manager (consumes owned values).
+    // This ordering avoids cloning `did` and `frozen_by` since emit takes references.
     if let Some(ref emitter) = ledger.event_emitter {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
         emitter.emit_member_frozen(
             &did,
-            reason,
+            reason.clone(),
             frozen_by.as_ref(),
-            proposal_id,
+            proposal_id.clone(),
             duration_seconds,
-            now,
+            current_timestamp_secs(),
         );
     }
+
+    ledger.freeze_manager.freeze_with_metadata(
+        did,
+        reason,
+        duration_seconds,
+        proposal_id,
+        frozen_by,
+    );
 }
 
 /// Unfreeze a member account
@@ -152,11 +165,7 @@ pub(crate) fn unfreeze_member(
     // Emit unfreeze event if member was unfrozen
     if result.is_some() {
         if let Some(ref emitter) = ledger.event_emitter {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            emitter.emit_member_unfrozen(did, reason, None, None, now);
+            emitter.emit_member_unfrozen(did, reason, None, None, current_timestamp_secs());
         }
     }
 
@@ -199,11 +208,13 @@ pub(crate) fn unfreeze_member_with_metadata(
     // Emit unfreeze event if member was unfrozen
     if result.is_some() {
         if let Some(ref emitter) = ledger.event_emitter {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            emitter.emit_member_unfrozen(did, reason, unfrozen_by.as_ref(), proposal_id, now);
+            emitter.emit_member_unfrozen(
+                did,
+                reason,
+                unfrozen_by.as_ref(),
+                proposal_id,
+                current_timestamp_secs(),
+            );
         }
     }
 
