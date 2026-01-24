@@ -492,7 +492,7 @@ async fn test_background_flusher_flushes_single_message() {
 
     // Configure batching with short delay
     let config = BatchingConfig {
-        max_batch_size: 100, // Large so size doesn't trigger flush
+        max_batch_size: 100,                  // Large so size doesn't trigger flush
         max_delay: Duration::from_millis(20), // Short delay for test
         ..BatchingConfig::default()
     };
