@@ -225,10 +225,16 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Action for resource access proposal
+///
+/// The model is embedded in the Grant variant to ensure at compile-time
+/// that all grant proposals include an access model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceAccessAction {
-    /// Grant access to a resource
-    Grant,
+    /// Grant access to a resource with the specified access model
+    Grant {
+        /// The access model defining duration, renewability, and duties
+        model: icn_ledger::AccessModel,
+    },
     /// Revoke access from a resource
     Revoke,
 }
@@ -638,15 +644,16 @@ pub enum ProposalPayload {
     /// Enforces anti-speculation rules:
     /// - Use it or lose it (idle revocation)
     /// - No profit transfer (can't sell access for profit)
+    ///
+    /// Note: The access model is embedded in the `action` field for `Grant` actions,
+    /// ensuring type-safe proposals (can't create a Grant without a model).
     ResourceAccess {
-        /// Grant or revoke access
+        /// Grant (with model) or revoke access
         action: ResourceAccessAction,
         /// Resource identifier
         resource_id: String,
         /// Entity receiving/losing access
         holder: icn_entity::EntityId,
-        /// Access model (required for Grant)
-        model: Option<icn_ledger::AccessModel>,
         /// Reason for grant/revocation
         reason: String,
     },

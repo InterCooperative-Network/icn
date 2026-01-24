@@ -24,14 +24,15 @@ fn test_resource_access_proposal_creation() {
         "Grant Tool Access".to_string(),
         "Grant Alice access to the community workshop tools".to_string(),
         ProposalPayload::ResourceAccess {
-            action: ResourceAccessAction::Grant,
+            action: ResourceAccessAction::Grant {
+                model: AccessModel::UseAccess {
+                    duration_seconds: 7 * 24 * 3600, // 1 week
+                    renewable: true,
+                    max_accumulated: 4,
+                },
+            },
             resource_id: "workshop-tools-001".to_string(),
             holder: holder.clone(),
-            model: Some(AccessModel::UseAccess {
-                duration_seconds: 7 * 24 * 3600, // 1 week
-                renewable: true,
-                max_accumulated: 4,
-            }),
             reason: "Active member needs tools for community project".to_string(),
         },
     );
@@ -63,7 +64,6 @@ fn test_resource_access_revocation_proposal() {
             action: ResourceAccessAction::Revoke,
             resource_id: "workshop-tools-001".to_string(),
             holder: holder.clone(),
-            model: None, // No model needed for revocation
             reason: "Repeated violations of tool usage policy".to_string(),
         },
     );
@@ -91,26 +91,27 @@ fn test_stewardship_access_proposal() {
         "Grant Garden Stewardship".to_string(),
         "Appoint steward for community garden".to_string(),
         ProposalPayload::ResourceAccess {
-            action: ResourceAccessAction::Grant,
+            action: ResourceAccessAction::Grant {
+                model: AccessModel::Stewardship {
+                    duties: vec![
+                        StewardshipDuty::Maintenance {
+                            description: "Water plants and maintain beds".to_string(),
+                            frequency_seconds: 7 * 24 * 3600, // Weekly
+                        },
+                        StewardshipDuty::UsageReporting {
+                            min_reports: 4,
+                            period_seconds: 30 * 24 * 3600, // Monthly
+                        },
+                        StewardshipDuty::CommunityBenefit {
+                            description: "Host monthly gardening workshops".to_string(),
+                            due_by: icn_time::current_timestamp_secs() + 90 * 24 * 3600, // 90 days
+                        },
+                    ],
+                    review_period_seconds: 90 * 24 * 3600, // Quarterly review
+                },
+            },
             resource_id: "community-garden-001".to_string(),
             holder: holder.clone(),
-            model: Some(AccessModel::Stewardship {
-                duties: vec![
-                    StewardshipDuty::Maintenance {
-                        description: "Water plants and maintain beds".to_string(),
-                        frequency_seconds: 7 * 24 * 3600, // Weekly
-                    },
-                    StewardshipDuty::UsageReporting {
-                        min_reports: 4,
-                        period_seconds: 30 * 24 * 3600, // Monthly
-                    },
-                    StewardshipDuty::CommunityBenefit {
-                        description: "Host monthly gardening workshops".to_string(),
-                        due_by: icn_time::current_timestamp_secs() + 90 * 24 * 3600, // 90 days
-                    },
-                ],
-                review_period_seconds: 90 * 24 * 3600, // Quarterly review
-            }),
             reason: "Experienced gardener with community engagement".to_string(),
         },
     );
@@ -227,14 +228,15 @@ fn test_governance_thresholds_for_resource_access() {
 
     // Resource access should use normal thresholds
     let payload = ProposalPayload::ResourceAccess {
-        action: ResourceAccessAction::Grant,
+        action: ResourceAccessAction::Grant {
+            model: AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        },
         resource_id: "tool-001".to_string(),
         holder: entity.clone(),
-        model: Some(AccessModel::UseAccess {
-            duration_seconds: 7 * 24 * 3600,
-            renewable: true,
-            max_accumulated: 4,
-        }),
         reason: "Community project".to_string(),
     };
 
@@ -256,14 +258,15 @@ fn test_proposal_payload_type_name() {
     let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
 
     let payload = ProposalPayload::ResourceAccess {
-        action: ResourceAccessAction::Grant,
+        action: ResourceAccessAction::Grant {
+            model: AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        },
         resource_id: "tool-001".to_string(),
         holder: entity.clone(),
-        model: Some(AccessModel::UseAccess {
-            duration_seconds: 7 * 24 * 3600,
-            renewable: true,
-            max_accumulated: 4,
-        }),
         reason: "Community project".to_string(),
     };
 

@@ -1130,4 +1130,49 @@ mod tests {
             .check_review_period(access.granted_at + 365 * 24 * 3600)
             .is_ok());
     }
+
+    #[test]
+    fn test_stewardship_handoff_procedure() {
+        // HandoffProcedure defines steps that must be completed when
+        // transferring stewardship. This test documents the expected structure.
+        let entity = create_test_entity();
+        let handoff_steps = vec![
+            "Document all ongoing maintenance tasks".to_string(),
+            "Meet with incoming steward for orientation".to_string(),
+            "Transfer access credentials securely".to_string(),
+            "Notify community of transition".to_string(),
+        ];
+
+        let access = ResourceAccess::new(
+            "community-space".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: handoff_steps.clone(),
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Verify the handoff steps are stored in the access model
+        if let AccessModel::Stewardship { duties, .. } = &access.model {
+            let handoff_duty = duties
+                .iter()
+                .find(|d| matches!(d, StewardshipDuty::HandoffProcedure { .. }));
+            assert!(handoff_duty.is_some());
+
+            if let Some(StewardshipDuty::HandoffProcedure { steps }) = handoff_duty {
+                assert_eq!(steps.len(), 4);
+                assert!(steps[0].contains("Document"));
+                assert!(steps[3].contains("community"));
+            }
+        } else {
+            panic!("Expected Stewardship model");
+        }
+
+        // HandoffProcedure is not checked in check_duties() - it's validated
+        // at transfer time (when ResourceAccessStore.transfer() is called).
+        // This allows the regular duty checks to pass while handoff is pending.
+        assert!(access.check_duties(access.granted_at + 1000).is_ok());
+    }
 }

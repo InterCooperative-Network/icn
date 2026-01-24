@@ -427,17 +427,9 @@ impl GovernanceEventHandler {
                 action,
                 resource_id,
                 holder,
-                model,
                 reason,
             } => {
-                self.handle_resource_access(
-                    proposal_id,
-                    action,
-                    resource_id,
-                    holder,
-                    model,
-                    reason,
-                );
+                self.handle_resource_access(proposal_id, action, resource_id, holder, reason);
             }
         }
     }
@@ -452,24 +444,16 @@ impl GovernanceEventHandler {
         action: icn_governance::ResourceAccessAction,
         resource_id: String,
         holder: icn_entity::EntityId,
-        model: Option<icn_ledger::AccessModel>,
         reason: String,
     ) {
         match action {
-            icn_governance::ResourceAccessAction::Grant => {
-                if let Some(access_model) = model {
-                    info!(
-                        "🔑 Resource access {} granted: {} to {} ({:?}) - {}",
-                        proposal_id.0, resource_id, holder, access_model, reason
-                    );
-                    // TODO: Integrate with ResourceAccessStore when implemented
-                    // The actual storage and enforcement will be added in follow-up PRs
-                } else {
-                    warn!(
-                        "⚠️ Resource access {} grant missing access model for {} to {}",
-                        proposal_id.0, resource_id, holder
-                    );
-                }
+            icn_governance::ResourceAccessAction::Grant { model } => {
+                info!(
+                    "🔑 Resource access {} granted: {} to {} ({:?}) - {}",
+                    proposal_id.0, resource_id, holder, model, reason
+                );
+                // TODO: Integrate with ResourceAccessStore when implemented
+                // The actual storage and enforcement will be added in follow-up PRs
             }
             icn_governance::ResourceAccessAction::Revoke => {
                 info!(
