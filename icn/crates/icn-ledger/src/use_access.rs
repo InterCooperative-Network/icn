@@ -153,6 +153,12 @@ pub enum StewardshipDuty {
     HandoffProcedure {
         /// Steps required for proper handoff
         steps: Vec<String>,
+        /// Optional witnesses who must attest to step completion
+        /// When None, no witness validation is performed (backward compatible)
+        witnesses: Option<Vec<String>>,
+        /// Minimum number of witness signatures required per step
+        /// Defaults to all witnesses if not specified
+        min_witness_signatures: Option<u32>,
     },
 }
 
@@ -799,6 +805,76 @@ impl ResourceAccess {
         Ok(())
     }
 
+    /// Validate handoff procedure completion with witness verification
+    ///
+    /// Checks that all required handoff steps have been completed with sufficient
+    /// witness attestations when witness requirements are configured.
+    ///
+    /// # Arguments
+    /// * `current_time` - Current timestamp for validation
+    ///
+    /// # Returns
+    /// * `Ok(())` if:
+    ///   - No handoff procedure is defined
+    ///   - Handoff procedure has no witness requirements
+    ///   - All handoff steps completed with sufficient witnesses
+    /// * `Err(AccessError::DutyUnfulfilled)` if handoff steps are incomplete or lack witnesses
+    pub fn validate_handoff_completion(&self) -> Result<()> {
+        // Only validate if this is a Stewardship model with HandoffProcedure
+        let AccessModel::Stewardship { duties, .. } = &self.model else {
+            return Ok(()); // No handoff required for non-stewardship
+        };
+
+        // Find HandoffProcedure duty
+        let handoff_duty = duties
+            .iter()
+            .find(|d| matches!(d, StewardshipDuty::HandoffProcedure { .. }));
+
+        let Some(StewardshipDuty::HandoffProcedure {
+            steps,
+            witnesses: witness_requirement,
+            min_witness_signatures,
+        }) = handoff_duty
+        else {
+            return Ok(()); // No handoff procedure defined
+        };
+
+        // If no witness requirement, fall back to existing behavior (OK)
+        let Some(required_witnesses) = witness_requirement else {
+            return Ok(());
+        };
+
+        // Determine minimum witness count
+        let min_witnesses = min_witness_signatures
+            .map(|n| n as usize)
+            .unwrap_or(required_witnesses.len());
+
+        // Check each step has been completed with sufficient witnesses
+        for (step_index, step_desc) in steps.iter().enumerate() {
+            let step_completed = self.usage_log.iter().any(|event| {
+                // Check if this is a handoff step event for this step index
+                let is_correct_step = matches!(
+                    event.duty_type,
+                    Some(DutyEventType::HandoffStep { step_index: idx }) if idx == step_index
+                );
+
+                // Check if it has sufficient witnesses
+                let has_witnesses = event.has_sufficient_witnesses(min_witnesses);
+
+                is_correct_step && has_witnesses
+            });
+
+            if !step_completed {
+                return Err(AccessError::DutyUnfulfilled(format!(
+                    "Handoff step {} not completed with {} witnesses: {}",
+                    step_index, min_witnesses, step_desc
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get time until expiration (if applicable)
     pub fn time_until_expiration(&self, current_time: u64) -> Option<u64> {
         self.expires_at.map(|exp| exp.saturating_sub(current_time))
@@ -1367,6 +1443,8 @@ mod tests {
             AccessModel::Stewardship {
                 duties: vec![StewardshipDuty::HandoffProcedure {
                     steps: handoff_steps.clone(),
+                    witnesses: None,
+                    min_witness_signatures: None,
                 }],
                 review_period_seconds: 90 * 24 * 3600,
             },
@@ -1379,7 +1457,7 @@ mod tests {
                 .find(|d| matches!(d, StewardshipDuty::HandoffProcedure { .. }));
             assert!(handoff_duty.is_some());
 
-            if let Some(StewardshipDuty::HandoffProcedure { steps }) = handoff_duty {
+            if let Some(StewardshipDuty::HandoffProcedure { steps, .. }) = handoff_duty {
                 assert_eq!(steps.len(), 4);
                 assert!(steps[0].contains("Document"));
                 assert!(steps[3].contains("community"));
@@ -1787,7 +1865,7 @@ mod tests {
 
         // Report 1 (10 days ago) - oldest of the recent events
         let report_time_1 = current_time - (10 * 24 * 3600);
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             report_time_1,
             "Report 1".to_string(),
             DutyEventType::Report,
@@ -1795,15 +1873,15 @@ mod tests {
 
         // Maintenance event (5 days ago)
         let maintenance_time = current_time - (5 * 24 * 3600);
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             maintenance_time,
             "Recent maintenance".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Report 2 (3 days ago) - most recent
         let report_time_2 = current_time - (3 * 24 * 3600);
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             report_time_2,
             "Report 2".to_string(),
             DutyEventType::Report,
@@ -1840,24 +1918,24 @@ mod tests {
 
         // Insert events OUT OF ORDER to simulate clock skew:
         // Event 1: Recent maintenance (within window) - inserted first
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             current_time - (2 * 24 * 3600), // 2 days ago
             "Recent cleaning".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Event 2: Old event with EARLIER timestamp - inserted second (out of order)
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             current_time - (30 * 24 * 3600), // 30 days ago
             "Old event".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // Event 3: Another old event
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             current_time - (20 * 24 * 3600), // 20 days ago
             "Another old event".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // With .filter(), all events are checked regardless of order,
@@ -1891,10 +1969,10 @@ mod tests {
         access.granted_at = 0;
 
         // Add maintenance event at time 50
-        access.usage_log.push_back(UsageEvent::with_type(
+        access.usage_log.push_back(UsageEvent::with_duty_type(
             50,
             "Early maintenance".to_string(),
-            DutyEventType::Maintenance,
+            DutyEventType::Maintenance { duty_id: None },
         ));
 
         // cutoff_time = 100.saturating_sub(1_000_000) = 0
@@ -1905,5 +1983,210 @@ mod tests {
             "check_duties should work with saturating cutoff: {:?}",
             result
         );
+    }
+
+    #[test]
+    fn test_handoff_with_witness_requirements() {
+        // Test HandoffProcedure with witness requirements
+        let entity = create_test_entity();
+        let witness1 = "did:icn:witness1".to_string();
+        let witness2 = "did:icn:witness2".to_string();
+        let handoff_steps = vec![
+            "Document all ongoing tasks".to_string(),
+            "Transfer credentials".to_string(),
+        ];
+
+        let mut access = ResourceAccess::new(
+            "high-value-resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: handoff_steps.clone(),
+                    witnesses: Some(vec![witness1.clone(), witness2.clone()]),
+                    min_witness_signatures: Some(2),
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Without any handoff steps completed, validation should fail
+        let result = access.validate_handoff_completion();
+        assert!(result.is_err());
+        assert!(matches!(result, Err(AccessError::DutyUnfulfilled(_))));
+
+        // Complete first step with one witness - should fail (need 2)
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Documented tasks", 0)
+                .with_witness(witness1.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_err());
+
+        // Complete first step with two witnesses - should still fail (second step incomplete)
+        access.usage_log.pop_back();
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Documented tasks", 0)
+                .with_witness(witness1.clone())
+                .with_witness(witness2.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_err());
+
+        // Complete second step with two witnesses - should pass
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 200, "Transferred credentials", 1)
+                .with_witness(witness1.clone())
+                .with_witness(witness2.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_ok(), "Should pass with all steps completed: {:?}", result);
+    }
+
+    #[test]
+    fn test_handoff_without_witness_requirements() {
+        // Test backward compatibility - HandoffProcedure without witness requirements
+        let entity = create_test_entity();
+        let handoff_steps = vec![
+            "Document tasks".to_string(),
+            "Transfer credentials".to_string(),
+        ];
+
+        let access = ResourceAccess::new(
+            "community-tool".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: handoff_steps.clone(),
+                    witnesses: None, // No witness requirement
+                    min_witness_signatures: None,
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Should pass without any steps recorded (backward compatible)
+        let result = access.validate_handoff_completion();
+        assert!(result.is_ok(), "Should pass without witness requirements: {:?}", result);
+    }
+
+    #[test]
+    fn test_handoff_min_witnesses_default() {
+        // Test that min_witness_signatures defaults to all witnesses if not specified
+        let entity = create_test_entity();
+        let witness1 = "did:icn:witness1".to_string();
+        let witness2 = "did:icn:witness2".to_string();
+        let witness3 = "did:icn:witness3".to_string();
+
+        let mut access = ResourceAccess::new(
+            "resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Step 1".to_string()],
+                    witnesses: Some(vec![witness1.clone(), witness2.clone(), witness3.clone()]),
+                    min_witness_signatures: None, // Should default to 3 (all witnesses)
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // With only 2 witnesses - should fail
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Step 1", 0)
+                .with_witness(witness1.clone())
+                .with_witness(witness2.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_err(), "Should fail with only 2 of 3 required witnesses");
+
+        // With all 3 witnesses - should pass
+        access.usage_log.pop_back();
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Step 1", 0)
+                .with_witness(witness1.clone())
+                .with_witness(witness2.clone())
+                .with_witness(witness3.clone()),
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_ok(), "Should pass with all 3 witnesses");
+    }
+
+    #[test]
+    fn test_handoff_validation_with_min_subset() {
+        // Test that min_witness_signatures can be less than total witnesses
+        let entity = create_test_entity();
+        let witness1 = "did:icn:witness1".to_string();
+        let witness2 = "did:icn:witness2".to_string();
+        let witness3 = "did:icn:witness3".to_string();
+
+        let mut access = ResourceAccess::new(
+            "resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Step 1".to_string()],
+                    witnesses: Some(vec![witness1.clone(), witness2.clone(), witness3.clone()]),
+                    min_witness_signatures: Some(2), // Only need 2 of 3
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // With 2 witnesses (any 2) - should pass
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Step 1", 0)
+                .with_witness(witness1.clone())
+                .with_witness(witness3.clone()), // witness2 not included
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_ok(), "Should pass with 2 of 3 required witnesses");
+    }
+
+    #[test]
+    fn test_handoff_non_stewardship_access() {
+        // Test that non-stewardship access doesn't require handoff validation
+        let entity = create_test_entity();
+        let access = ResourceAccess::new(
+            "tool".to_string(),
+            entity,
+            AccessModel::UseAccess {
+                duration_seconds: 7 * 24 * 3600,
+                renewable: true,
+                max_accumulated: 4,
+            },
+        );
+
+        // Should always pass for UseAccess
+        let result = access.validate_handoff_completion();
+        assert!(result.is_ok(), "Non-stewardship access should not require handoff");
+    }
+
+    #[test]
+    fn test_handoff_duplicate_witnesses_not_counted() {
+        // Test that duplicate witnesses are not counted (gaming prevention)
+        let entity = create_test_entity();
+        let witness1 = "did:icn:witness1".to_string();
+
+        let mut access = ResourceAccess::new(
+            "resource".to_string(),
+            entity,
+            AccessModel::Stewardship {
+                duties: vec![StewardshipDuty::HandoffProcedure {
+                    steps: vec!["Step 1".to_string()],
+                    witnesses: Some(vec![witness1.clone()]),
+                    min_witness_signatures: Some(2), // Need 2 unique witnesses
+                }],
+                review_period_seconds: 90 * 24 * 3600,
+            },
+        );
+
+        // Add same witness twice - should fail (only counts as 1)
+        access.usage_log.push_back(
+            UsageEvent::handoff_step(access.granted_at + 100, "Step 1", 0)
+                .with_witness(witness1.clone())
+                .with_witness(witness1.clone()), // Duplicate
+        );
+        let result = access.validate_handoff_completion();
+        assert!(result.is_err(), "Duplicate witnesses should not be counted");
     }
 }
