@@ -8,6 +8,48 @@
 //! - **UseAccess**: Time-limited, renewable access rights with accumulation limits
 //! - **Stewardship**: Access tied to duties and responsibilities
 //! - **Anti-Speculation**: Rules preventing rent-seeking and profit from access transfers
+//! - **Witness Signatures**: Optional cryptographic attestation for handoff procedures
+//!
+//! # Witness Signatures for Handoff Procedures
+//!
+//! For high-value resources, `HandoffProcedure` supports optional witness requirements:
+//!
+//! ```rust,ignore
+//! use icn_ledger::use_access::{AccessModel, ResourceAccess, StewardshipDuty, UsageEvent};
+//! use icn_entity::EntityId;
+//!
+//! // Create stewardship with witness-verified handoff
+//! let witness1 = "did:icn:witness1".to_string();
+//! let witness2 = "did:icn:witness2".to_string();
+//!
+//! let access = ResourceAccess::new(
+//!     "high-value-equipment".to_string(),
+//!     EntityId::individual_from_did(steward_did.clone()),
+//!     AccessModel::Stewardship {
+//!         duties: vec![StewardshipDuty::HandoffProcedure {
+//!             steps: vec![
+//!                 "Document current state".to_string(),
+//!                 "Transfer credentials".to_string(),
+//!             ],
+//!             witnesses: Some(vec![witness1.clone(), witness2.clone()]),
+//!             min_witness_signatures: Some(2),  // Require both witnesses
+//!         }],
+//!         review_period_seconds: 90 * 24 * 3600,
+//!     },
+//! );
+//!
+//! // Complete handoff step with witness attestation
+//! let step_event = UsageEvent::handoff_step(timestamp, "Documented state", 0)
+//!     .with_witness(witness1.clone())
+//!     .with_witness(witness2.clone());
+//! access.record_usage_event(step_event)?;
+//!
+//! // Validate handoff completion before transfer
+//! access.validate_handoff_completion()?;
+//! ```
+//!
+//! **Backward Compatibility**: When `witnesses` is `None`, no witness validation is performed,
+//! maintaining existing behavior for community-context resources.
 //!
 //! # Example
 //!
@@ -2039,7 +2081,11 @@ mod tests {
                 .with_witness(witness2.clone()),
         );
         let result = access.validate_handoff_completion();
-        assert!(result.is_ok(), "Should pass with all steps completed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Should pass with all steps completed: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -2066,7 +2112,11 @@ mod tests {
 
         // Should pass without any steps recorded (backward compatible)
         let result = access.validate_handoff_completion();
-        assert!(result.is_ok(), "Should pass without witness requirements: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Should pass without witness requirements: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -2097,7 +2147,10 @@ mod tests {
                 .with_witness(witness2.clone()),
         );
         let result = access.validate_handoff_completion();
-        assert!(result.is_err(), "Should fail with only 2 of 3 required witnesses");
+        assert!(
+            result.is_err(),
+            "Should fail with only 2 of 3 required witnesses"
+        );
 
         // With all 3 witnesses - should pass
         access.usage_log.pop_back();
@@ -2158,7 +2211,10 @@ mod tests {
 
         // Should always pass for UseAccess
         let result = access.validate_handoff_completion();
-        assert!(result.is_ok(), "Non-stewardship access should not require handoff");
+        assert!(
+            result.is_ok(),
+            "Non-stewardship access should not require handoff"
+        );
     }
 
     #[test]
