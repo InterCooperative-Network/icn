@@ -757,3 +757,132 @@ async fn test_dissolving_entity_allows_removing_multiple_founders() {
     let members = entity_mgr.get_members(&entity_id).await.unwrap();
     assert_eq!(members.len(), 0, "Should have no members left");
 }
+
+#[actix_web::test]
+async fn test_dissolution_rejects_zero_waiting_period() {
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
+    let alice = test_identity();
+
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("zero-wait-test", "Zero Wait Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let membership =
+        Membership::active(alice_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(membership).await.unwrap();
+
+    // Pre-populate a proposal for this test
+    _governance_mgr.insert_test_proposal(create_test_proposal("proposal-zero-wait"));
+
+    // Try to initiate dissolution with zero waiting period - should fail
+    let req_body = json!({
+        "proposal_id": "proposal-zero-wait",
+        "reason": "Test zero waiting period",
+        "waiting_period_seconds": 0
+    });
+
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let req = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&req_body)
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+
+    let body_bytes = test::read_body(resp).await;
+    let body_str = String::from_utf8_lossy(&body_bytes);
+    assert!(
+        body_str.contains("minimum") || body_str.contains("below"),
+        "Error should mention minimum waiting period, got: {body_str}"
+    );
+
+    // Verify entity is still Active (not Dissolving)
+    let entity = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert!(matches!(entity.status, icn_entity::EntityStatus::Active));
+}
+
+#[actix_web::test]
+async fn test_dissolution_rejects_concurrent_initiation() {
+    let (app, entity_mgr, _audit_mgr, _governance_mgr) = create_test_app().await;
+    let alice = test_identity();
+
+    // Create an active entity with governance domain
+    let mut entity = CooperativeEntity::cooperative("concurrent-test", "Concurrent Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let membership =
+        Membership::active(alice_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(membership).await.unwrap();
+
+    // Pre-populate proposals for this test
+    _governance_mgr.insert_test_proposal(create_test_proposal("proposal-concurrent-1"));
+    _governance_mgr.insert_test_proposal(create_test_proposal("proposal-concurrent-2"));
+
+    // First initiation should succeed
+    let req_body1 = json!({
+        "proposal_id": "proposal-concurrent-1",
+        "reason": "First dissolution attempt",
+        "waiting_period_seconds": 3600
+    });
+
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let req1 = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&req_body1)
+        .to_request();
+    req1.extensions_mut().insert(claims.clone());
+
+    let resp1 = test::call_service(&app, req1).await;
+    assert!(
+        resp1.status().is_success(),
+        "First dissolution should succeed"
+    );
+
+    // Verify entity is now Dissolving
+    let entity = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert!(matches!(
+        entity.status,
+        icn_entity::EntityStatus::Dissolving { .. }
+    ));
+
+    // Second initiation should fail - entity already dissolving
+    let req_body2 = json!({
+        "proposal_id": "proposal-concurrent-2",
+        "reason": "Second dissolution attempt",
+        "waiting_period_seconds": 3600
+    });
+
+    let req2 = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&req_body2)
+        .to_request();
+    req2.extensions_mut().insert(claims.clone());
+
+    let resp2 = test::call_service(&app, req2).await;
+    assert_eq!(resp2.status(), 400);
+
+    let body_bytes = test::read_body(resp2).await;
+    let body_str = String::from_utf8_lossy(&body_bytes);
+    assert!(
+        body_str.contains("Cannot dissolve") || body_str.contains("status"),
+        "Error should mention invalid status, got: {body_str}"
+    );
+}

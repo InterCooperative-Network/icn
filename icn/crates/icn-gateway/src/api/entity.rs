@@ -1211,7 +1211,9 @@ pub async fn initiate_dissolution(
     } else {
         // Entity has no governance domain - require it for dissolution
         return Err(GatewayError::BadRequest(
-            "Entity has no governance domain configured. Cannot validate proposal scope."
+            "Entity has no governance domain configured. Set a governance domain before \
+             initiating dissolution, or ensure the dissolution proposal is scoped to the \
+             entity's domain."
                 .to_string(),
         ));
     }
