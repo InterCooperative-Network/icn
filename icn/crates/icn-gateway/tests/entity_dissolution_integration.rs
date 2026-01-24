@@ -886,3 +886,226 @@ async fn test_dissolution_rejects_concurrent_initiation() {
         "Error should mention invalid status, got: {body_str}"
     );
 }
+
+#[actix_web::test]
+async fn test_concurrent_dissolution_initiation_detected() {
+    init_logging();
+
+    // This test verifies that optimistic locking prevents race conditions
+    // by simulating a scenario where the entity is modified between read and write
+    
+    let entity_mgr = Arc::new(EntityManager::new());
+    let alice = test_identity();
+
+    // Create and register entity
+    let mut entity = CooperativeEntity::cooperative("concurrent-test", "Concurrent Test")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity.clone()).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let membership = Membership::active(alice_id, entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(membership).await.unwrap();
+
+    // Read entity and capture version (simulating first request's read)
+    let entity_v0 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert_eq!(entity_v0.version, 0, "Initial version should be 0");
+
+    // Simulate concurrent modification: another process updates the entity
+    // This increments the version from 0 to 1
+    let mut entity_modified = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    entity_modified.description = Some("Modified by concurrent process".to_string());
+    entity_mgr.update(entity_modified).await.unwrap();
+
+    // Verify version was incremented
+    let entity_v1 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert_eq!(entity_v1.version, 1, "Version should be 1 after update");
+
+    // Now try to update with stale version (0) - should fail
+    let mut entity_stale = entity_v0.clone(); // This has version 0
+    entity_stale.status = icn_entity::EntityStatus::Dissolving {
+        started_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    // Attempt to update with stale version
+    let result = entity_mgr.update_if_version(entity_stale, 0).await;
+    
+    // Should fail due to version mismatch
+    assert!(result.is_err(), "Update with stale version should fail");
+
+    let error_str = result.unwrap_err().to_string();
+    assert!(
+        error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification"),
+        "Error should indicate concurrent modification, got: {error_str}"
+    );
+
+    // Verify entity is still Active (status update did not proceed)
+    let final_entity = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert!(
+        matches!(final_entity.status, icn_entity::EntityStatus::Active),
+        "Entity should still be Active after failed update"
+    );
+    assert_eq!(final_entity.version, 1, "Version should still be 1");
+}
+
+#[actix_web::test]
+async fn test_dissolution_initiation_succeeds_with_correct_version() {
+    init_logging();
+
+    let (app, entity_mgr, audit_mgr, _governance_mgr) = create_test_app().await;
+    let alice = test_identity();
+
+    // Create a test entity
+    let mut entity = CooperativeEntity::cooperative("version-test", "Version Test Coop")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let membership =
+        Membership::active(alice_id.clone(), entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(membership).await.unwrap();
+
+    // Verify initial version is 0
+    let entity_before = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert_eq!(entity_before.version, 0, "Initial version should be 0");
+
+    // Initiate dissolution (no concurrent modifications)
+    let req_body = json!({
+        "proposal_id": "proposal-123",
+        "reason": "Test version-tracked dissolution",
+        "waiting_period_seconds": 10
+    });
+
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let req = test::TestRequest::post()
+        .uri(&format!("/entities/{}/dissolution", entity_id))
+        .set_json(&req_body)
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp = test::call_service(&app, req).await;
+    let status = resp.status();
+    let body_bytes = test::read_body(resp).await;
+    let body_str = String::from_utf8_lossy(&body_bytes);
+
+    assert!(
+        status.is_success(),
+        "Expected success, got {status:?} with body: {body_str}"
+    );
+
+    // Verify entity status changed to Dissolving
+    let entity_after = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert!(
+        matches!(entity_after.status, icn_entity::EntityStatus::Dissolving { .. }),
+        "Entity should be in Dissolving status"
+    );
+
+    // Verify version was incremented
+    assert_eq!(
+        entity_after.version, 1,
+        "Version should be incremented to 1 after update"
+    );
+
+    // Verify audit record was created
+    let audit_trail = audit_mgr.get_audit_trail(&entity_id, 10, 0).unwrap();
+    let dissolution_record = audit_trail
+        .records
+        .iter()
+        .find(|r| matches!(r.operation, EntityOperation::DissolutionInitiated { .. }));
+    assert!(
+        dissolution_record.is_some(),
+        "Audit trail should contain dissolution initiation record"
+    );
+}
+
+#[actix_web::test]
+async fn test_optimistic_locking_prevents_double_initiation() {
+    init_logging();
+
+    // This test simulates two concurrent requests attempting to initiate dissolution
+    // The second request should be rejected due to version mismatch
+    
+    let entity_mgr = Arc::new(EntityManager::new());
+    let alice = test_identity();
+
+    // Create and register entity
+    let mut entity = CooperativeEntity::cooperative("double-init-test", "Double Init Test")
+        .unwrap()
+        .with_governance_domain("test-domain");
+    entity.status = icn_entity::EntityStatus::Active;
+    let entity_id = entity.id.clone();
+    entity_mgr.register(entity.clone()).await.unwrap();
+
+    // Add alice as founder
+    let alice_id = EntityId::from_did(alice.did());
+    let alice_entity = CooperativeEntity::individual(alice.did(), alice_id.to_string());
+    entity_mgr.register(alice_entity).await.unwrap();
+    let membership = Membership::active(alice_id, entity_id.clone(), MembershipRole::Founder);
+    entity_mgr.add_membership(membership).await.unwrap();
+
+    // Get entity and capture version (simulating first request)
+    let mut entity1 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    let version1 = entity1.version;
+
+    // Get entity again (simulating second concurrent request)
+    let mut entity2 = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    let version2 = entity2.version;
+
+    assert_eq!(version1, version2, "Both requests should see same initial version");
+
+    // First request updates status
+    entity1.status = icn_entity::EntityStatus::Dissolving {
+        started_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    // First update succeeds
+    let result1 = entity_mgr.update_if_version(entity1, version1).await;
+    assert!(result1.is_ok(), "First update should succeed");
+
+    // Second request tries to update with stale version
+    entity2.status = icn_entity::EntityStatus::Dissolving {
+        started_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    // Second update should fail due to version mismatch
+    let result2 = entity_mgr.update_if_version(entity2, version2).await;
+    assert!(result2.is_err(), "Second update should fail");
+
+    // Verify error is about concurrent modification
+    let error_str = result2.unwrap_err().to_string();
+    assert!(
+        error_str.contains("Concurrent modification") || error_str.contains("ConcurrentModification"),
+        "Error should indicate concurrent modification, got: {error_str}"
+    );
+
+    // Verify final entity state
+    let final_entity = entity_mgr.get(&entity_id).await.unwrap().unwrap();
+    assert_eq!(
+        final_entity.version, 1,
+        "Version should be 1 after single successful update"
+    );
+    assert!(
+        matches!(final_entity.status, icn_entity::EntityStatus::Dissolving { .. }),
+        "Entity should be in Dissolving status"
+    );
+}
