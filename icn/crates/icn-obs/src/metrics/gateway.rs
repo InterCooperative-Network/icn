@@ -405,6 +405,23 @@ pub fn entity_audit_corruption_inc() {
     counter!("icn_gateway_entity_audit_corruption_total").increment(1);
 }
 
+// Entity dissolution metrics
+
+/// Increment entity dissolution initiated counter
+pub fn entity_dissolution_initiated_inc() {
+    counter!("icn_gateway_entity_dissolution_initiated_total").increment(1);
+}
+
+/// Increment entity dissolution completed counter
+pub fn entity_dissolution_completed_inc() {
+    counter!("icn_gateway_entity_dissolution_completed_total").increment(1);
+}
+
+/// Increment entity dissolution cancelled counter
+pub fn entity_dissolution_cancelled_inc() {
+    counter!("icn_gateway_entity_dissolution_cancelled_total").increment(1);
+}
+
 // Oracle metrics
 
 /// Increment oracle rate queries counter
