@@ -241,10 +241,10 @@ impl LedgerEventBridge {
             }
 
             LedgerEvent::ResourceAccessTransferred(rat) => {
-                // Use default coop_id since resource events are ledger-wide
-                // In the future, could extract coop_id from resource metadata
+                // Extract coop_id from resource metadata, fall back to default if not present
+                let coop_id = rat.coop_id.unwrap_or_else(|| self.default_coop_id.clone());
                 let gateway_event = GatewayEvent::ResourceAccessTransferred {
-                    coop_id: self.default_coop_id.clone(),
+                    coop_id: coop_id.clone(),
                     resource_id: rat.resource_id,
                     from_holder: rat.from_holder,
                     to_holder: rat.to_holder,
@@ -253,7 +253,7 @@ impl LedgerEventBridge {
                     transferred_at: rat.transferred_at,
                 };
                 self.gateway_broadcaster
-                    .broadcast(&self.default_coop_id, gateway_event)
+                    .broadcast(&coop_id, gateway_event)
                     .await;
                 debug!("Forwarded ResourceAccessTransferred event");
             }
@@ -406,6 +406,7 @@ mod tests {
                 price: Some(100),
                 access_model: "Stewardship".to_string(),
                 transferred_at: 1234567890,
+                coop_id: None, // Will use default coop_id
             },
         ));
 
@@ -430,6 +431,72 @@ mod tests {
                 assert_eq!(to_holder, "entity:icn:individual:bob");
                 assert_eq!(price, Some(100));
                 assert_eq!(access_model, "Stewardship");
+                assert_eq!(transferred_at, 1234567890);
+            }
+            _ => panic!("Expected ResourceAccessTransferred event"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_bridge_forwards_resource_access_with_coop_id() {
+        use std::time::Duration;
+
+        let ledger_emitter = create_shared_emitter();
+        let gateway_broadcaster = Arc::new(EventBroadcaster::new());
+        let default_coop = "default-coop".to_string();
+        let resource_coop = "resource-coop".to_string();
+
+        // Subscribe to the resource's cooperative channel
+        let mut rx = gateway_broadcaster
+            .subscribe(&resource_coop)
+            .await
+            .expect("Should subscribe");
+
+        let bridge = LedgerEventBridge::new(
+            ledger_emitter.clone(),
+            gateway_broadcaster.clone(),
+            default_coop.clone(),
+        );
+        let _handle = bridge.start();
+
+        // Give the bridge time to start
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        // Emit resource access transferred event with specific coop_id
+        ledger_emitter.emit(LedgerEvent::ResourceAccessTransferred(
+            icn_ledger::ResourceAccessTransferred {
+                resource_id: "multi-coop-resource".to_string(),
+                from_holder: "entity:icn:individual:alice".to_string(),
+                to_holder: "entity:icn:cooperative:resource-coop".to_string(),
+                price: Some(50),
+                access_model: "UseAccess".to_string(),
+                transferred_at: 1234567890,
+                coop_id: Some(resource_coop.clone()),
+            },
+        ));
+
+        // Use timeout with recv() for deterministic event waiting
+        let sequenced = tokio::time::timeout(Duration::from_millis(100), rx.recv())
+            .await
+            .expect("Timeout waiting for event")
+            .expect("Expected to receive event");
+
+        match sequenced.event {
+            GatewayEvent::ResourceAccessTransferred {
+                coop_id,
+                resource_id,
+                from_holder,
+                to_holder,
+                price,
+                access_model,
+                transferred_at,
+            } => {
+                assert_eq!(coop_id, resource_coop);
+                assert_eq!(resource_id, "multi-coop-resource");
+                assert_eq!(from_holder, "entity:icn:individual:alice");
+                assert_eq!(to_holder, "entity:icn:cooperative:resource-coop");
+                assert_eq!(price, Some(50));
+                assert_eq!(access_model, "UseAccess");
                 assert_eq!(transferred_at, 1234567890);
             }
             _ => panic!("Expected ResourceAccessTransferred event"),

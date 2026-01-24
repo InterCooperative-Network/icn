@@ -400,6 +400,9 @@ pub struct ResourceAccess {
 
     /// Timestamp of last stewardship review (for review_period enforcement)
     pub last_review: Option<u64>,
+
+    /// Cooperative ID that owns/manages this resource (None for backward compatibility)
+    pub coop_id: Option<String>,
 }
 
 impl ResourceAccess {
@@ -423,12 +426,19 @@ impl ResourceAccess {
             revoked: false,
             revocation_reason: None,
             last_review: None,
+            coop_id: None,
         }
     }
 
     /// Create with custom anti-speculation rules
     pub fn with_rules(mut self, rules: AntiSpeculationRules) -> Self {
         self.rules = rules;
+        self
+    }
+
+    /// Set the cooperative ID for this resource
+    pub fn with_coop_id(mut self, coop_id: impl Into<String>) -> Self {
+        self.coop_id = Some(coop_id.into());
         self
     }
 

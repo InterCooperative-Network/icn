@@ -295,6 +295,9 @@ pub struct ResourceAccessTransferred {
 
     /// Unix timestamp when transferred
     pub transferred_at: u64,
+
+    /// Cooperative ID that owns/manages this resource (None for backward compatibility)
+    pub coop_id: Option<String>,
 }
 
 /// Event emitter for broadcasting ledger events
@@ -532,6 +535,7 @@ impl LedgerEventEmitter {
         price: Option<i64>,
         access_model: String,
         transferred_at: u64,
+        coop_id: Option<String>,
     ) -> usize {
         self.emit(LedgerEvent::ResourceAccessTransferred(
             ResourceAccessTransferred {
@@ -541,6 +545,7 @@ impl LedgerEventEmitter {
                 price,
                 access_model,
                 transferred_at,
+                coop_id,
             },
         ))
     }
