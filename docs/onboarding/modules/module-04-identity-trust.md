@@ -253,6 +253,106 @@ pub enum RotationReason {
 4. Old key enters grace period
 5. After grace period, old key is invalid
 
+### 8. Hardware-Backed Keys (TPM/HSM)
+
+For production deployments, ICN supports **hardware security modules** that protect
+private keys from software extraction:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    KEY BACKEND ARCHITECTURE                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Application Code                                              │
+│         │                                                       │
+│         ▼                                                       │
+│   ┌─────────────────┐                                          │
+│   │   DidSigner     │  Trait abstraction for signing           │
+│   │   interface     │                                          │
+│   └────────┬────────┘                                          │
+│            │                                                    │
+│     ┌──────┴──────┬────────────────┐                           │
+│     ▼             ▼                ▼                           │
+│  ┌───────┐   ┌─────────┐     ┌──────────┐                      │
+│  │Soft   │   │  TPM    │     │  PKCS#11 │                      │
+│  │ware  │   │  2.0    │     │   (HSM)  │                      │
+│  └───────┘   └─────────┘     └──────────┘                      │
+│  In-memory   Hardware        Hardware                          │
+│  keys        sealed keys     external module                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**DidKey enum for honest semantics:**
+```rust
+pub enum DidKey {
+    /// Key is stored in software (extractable)
+    Software(SoftwareKeyPair),
+    /// Key is protected by hardware (non-extractable)
+    Hardware(HardwareKeyHandle),
+}
+
+impl DidKey {
+    /// Returns true if key material can be exported
+    pub fn is_extractable(&self) -> bool {
+        matches!(self, DidKey::Software(_))
+    }
+}
+```
+
+**TPM 2.0 Features:**
+- **Key sealing**: Keys encrypted to TPM state, bound to boot configuration
+- **PCR policies**: Keys only usable when system is in expected state
+- **Non-exportable**: Private key never leaves the TPM chip
+- **Attestation**: Prove key is hardware-protected to remote parties
+
+```rust
+pub struct TpmBackend {
+    context: tss_esapi::Context,
+    primary_handle: KeyHandle,
+}
+
+impl DidSigner for TpmBackend {
+    fn sign(&self, data: &[u8]) -> Result<Signature> {
+        // Sign operation happens inside TPM
+        // Private key never exposed to software
+        let signature = self.context.sign(
+            self.primary_handle,
+            data,
+            SignatureScheme::Ed25519,
+        )?;
+        Ok(Signature::from_tpm(signature))
+    }
+}
+```
+
+**Configuration:**
+```toml
+# config.toml
+[keystore]
+# Options: "software", "tpm", "pkcs11"
+backend = "tpm"
+
+[keystore.tpm]
+# TPM device path (Linux)
+device = "/dev/tpmrm0"
+# Optional: PCR policy for key usage
+pcr_policy = [0, 7]
+```
+
+**Use cases for hardware keys:**
+| Scenario | Recommendation |
+|----------|----------------|
+| Development | Software backend (easier debugging) |
+| Test nodes | Software backend |
+| Production servers | TPM 2.0 (built-in, no extra cost) |
+| High-security nodes | External HSM (PKCS#11) |
+
+**Limitations:**
+- TPM operations are slower than software (~100ms vs ~1ms per signature)
+- Key rotation requires re-enrollment with the TPM
+- Remote attestation requires additional infrastructure
+
 ---
 
 ## The Trust Graph
