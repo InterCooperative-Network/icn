@@ -22,9 +22,6 @@
 //! ```
 
 use anyhow::{Context, Result};
-
-/// Gossip topic for resource access revocation events
-pub const RESOURCE_REVOCATIONS_TOPIC: &str = "resource:revocations";
 use rand::Rng;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
@@ -32,6 +29,9 @@ use tokio::time::{interval, Duration, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::runtime::ShutdownRx;
+
+/// Gossip topic for resource access revocation events
+pub const RESOURCE_REVOCATIONS_TOPIC: &str = "resource:revocations";
 
 /// Configuration for resource access enforcement
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

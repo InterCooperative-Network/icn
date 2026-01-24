@@ -774,7 +774,7 @@ pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
             // 1. Update local cache/store with the revocation
             // 2. Propagate to any local components that need to know
             // 3. Emit metrics for monitoring
-            
+
             // For now, just log and update metrics
             metrics::counter!("icn_resource_revocations_received_total").increment(1);
         }

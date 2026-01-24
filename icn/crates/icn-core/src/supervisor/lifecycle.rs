@@ -1046,9 +1046,16 @@ async fn spawn_background_tasks(
         );
         let store = Arc::new(RwLock::new(gossip_store));
 
-        // Subscribe to revocations topic to receive cluster-wide notifications
+        // Create and subscribe to revocations topic for cluster-wide notifications
         {
             let mut gossip = gossip_handle.write().await;
+
+            // Create the topic (required before subscribing)
+            gossip.create_topic(icn_gossip::Topic::new(
+                crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC.to_string(),
+                icn_gossip::AccessControl::Public,
+            ));
+
             if let Err(e) = gossip
                 .subscribe(
                     crate::resource_enforcer_actor::RESOURCE_REVOCATIONS_TOPIC,

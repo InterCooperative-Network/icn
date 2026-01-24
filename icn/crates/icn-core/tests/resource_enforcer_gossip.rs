@@ -3,6 +3,9 @@
 //! Validates that revocation events are properly published to and received from
 //! the gossip network, enabling cluster-wide notification of access revocations.
 
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use icn_core::resource_enforcer_actor::{
     ResourceAccessStore, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
 };
@@ -27,6 +30,7 @@ impl MockResourceAccessStore {
         }
     }
 
+    #[allow(dead_code)]
     fn add_resource(&self, id: String, access: ResourceAccess) {
         self.resources.lock().unwrap().insert(id, access);
     }
@@ -62,20 +66,13 @@ async fn test_revocation_event_gossip_publication() {
     let node2_keypair = KeyPair::generate().unwrap();
     let node2_did = node2_keypair.did();
 
-    let trust_lookup: TrustLookup =
-        Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+    let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
 
-    let node1_gossip = GossipActor::spawn_with_trust_graph(
-        node1_did.clone(),
-        trust_lookup.clone(),
-        None,
-    );
+    let node1_gossip =
+        GossipActor::spawn_with_trust_graph(node1_did.clone(), trust_lookup.clone(), None);
 
-    let node2_gossip = GossipActor::spawn_with_trust_graph(
-        node2_did.clone(),
-        trust_lookup.clone(),
-        None,
-    );
+    let node2_gossip =
+        GossipActor::spawn_with_trust_graph(node2_did.clone(), trust_lookup.clone(), None);
 
     // Create the revocation topic on both nodes
     {
@@ -120,7 +117,7 @@ async fn test_revocation_event_gossip_publication() {
     }
 
     // Create a revocation event
-    let entity = EntityId::from_did(&node1_did);
+    let entity = EntityId::from_did(node1_did);
     let event = RevocationEvent {
         resource_id: "test-resource-123".to_string(),
         holder: entity,
@@ -160,8 +157,7 @@ async fn test_gossip_store_wrapper_integration() {
     let keypair = KeyPair::generate().unwrap();
     let keypair_clone = keypair.clone();
     let did = keypair_clone.did();
-    let trust_lookup: TrustLookup =
-        Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+    let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
     let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
 
     // Set keypair for signing
@@ -175,7 +171,7 @@ async fn test_gossip_store_wrapper_integration() {
     let mut gossip_store = GossipResourceAccessStore::new(inner_store, gossip_handle.clone());
 
     // Create a resource and track it
-    let entity = EntityId::from_did(&did);
+    let entity = EntityId::from_did(did);
     let access = ResourceAccess::new(
         "resource-456".to_string(),
         entity.clone(),

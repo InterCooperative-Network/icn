@@ -104,11 +104,14 @@ impl ResourceAccessStore for GossipResourceAccessStore {
         let event_clone = event.clone();
 
         // Spawn async task to publish to gossip (don't block the enforcer)
+        // Note: Revocation gossip publication is best-effort. If gossip is unavailable,
+        // the event may not reach other cluster nodes until the next enforcement cycle.
         tokio::spawn(async move {
             let serialized = match serde_json::to_vec(&event_clone) {
                 Ok(data) => data,
                 Err(e) => {
                     warn!("Failed to serialize revocation event: {}", e);
+                    metrics::counter!("icn_resource_revocation_gossip_failures_total", "reason" => "serialization").increment(1);
                     return;
                 }
             };
@@ -116,12 +119,14 @@ impl ResourceAccessStore for GossipResourceAccessStore {
             let mut gossip = gossip_handle.write().await;
             if let Err(e) = gossip.publish(RESOURCE_REVOCATIONS_TOPIC, serialized).await {
                 warn!("Failed to publish revocation to gossip: {}", e);
+                metrics::counter!("icn_resource_revocation_gossip_failures_total", "reason" => "publish").increment(1);
             } else {
                 info!(
                     resource_id = %event_clone.resource_id,
                     holder = %event_clone.holder,
                     "Published revocation event to gossip"
                 );
+                metrics::counter!("icn_resource_revocation_gossip_published_total").increment(1);
             }
         });
 
@@ -133,7 +138,7 @@ impl ResourceAccessStore for GossipResourceAccessStore {
 mod tests {
     use super::*;
     use icn_entity::EntityId;
-    use icn_gossip::{gossip::TrustLookup, GossipActor};
+    use icn_gossip::gossip::TrustLookup;
     use icn_identity::KeyPair;
     use icn_ledger::{AccessModel, ResourceAccess};
     use std::collections::HashMap;
@@ -244,8 +249,7 @@ mod tests {
         use std::sync::{Arc, Mutex as StdMutex};
 
         // Create a mock store that tracks revocation events
-        let events_log: Arc<StdMutex<Vec<RevocationEvent>>> =
-            Arc::new(StdMutex::new(Vec::new()));
+        let events_log: Arc<StdMutex<Vec<RevocationEvent>>> = Arc::new(StdMutex::new(Vec::new()));
 
         struct MockStore {
             events: Arc<StdMutex<Vec<RevocationEvent>>>,
@@ -269,9 +273,18 @@ mod tests {
         // Create gossip actor
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did();
-        let trust_lookup: TrustLookup =
-            Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+        let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
         let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+
+        // Set keypair for signing and create the revocation topic
+        {
+            let mut gossip = gossip_handle.write().await;
+            gossip.set_keypair(keypair);
+            gossip.create_topic(icn_gossip::Topic::new(
+                RESOURCE_REVOCATIONS_TOPIC.to_string(),
+                icn_gossip::AccessControl::Public,
+            ));
+        }
 
         // Create gossip-aware store
         let inner_store = Box::new(MockStore {
