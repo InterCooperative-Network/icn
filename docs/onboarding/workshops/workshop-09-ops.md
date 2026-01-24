@@ -132,22 +132,33 @@ docker-compose logs -f
 ## Part 4: Health Endpoint
 
 ### Steps
-1. Check the health endpoint:
+1. Check the basic health endpoint:
    ```bash
    curl -s http://localhost:8080/health | jq
    ```
 
-2. Expected response:
+2. Basic health response:
+   ```json
+   {
+     "status": "ok",
+     "version": "0.1.0"
+   }
+   ```
+
+3. For detailed component checks, use `/health/detailed`:
+   ```bash
+   curl -s http://localhost:8080/health/detailed | jq
+   ```
+
+4. Detailed health response:
    ```json
    {
      "status": "healthy",
      "version": "0.1.0",
-     "uptime_seconds": 123,
-     "components": {
-       "network": "healthy",
-       "gossip": "healthy",
-       "ledger": "healthy",
-       "trust": "healthy"
+     "checks": {
+       "cooperative_manager": {"status": "ok", "details": "..."},
+       "notification_queue": {"status": "ok", "details": "..."},
+       "system": {"status": "ok", "details": "..."}
      }
    }
    ```
@@ -159,13 +170,13 @@ grep -r "health" icn/crates/icn-gateway/src/ --include="*.rs" | head -10
 ```
 
 ### Questions to answer
-1. What components are checked?
-2. What makes a component "unhealthy"?
+1. What components are checked in `/health/detailed`?
+2. What's the difference between `/health` and `/health/detailed`?
 3. How often should health be polled?
 
 ### Checkpoint
-- [ ] Health endpoint returns 200
-- [ ] All components show healthy
+- [ ] Basic health endpoint returns 200
+- [ ] Detailed health shows component status
 
 ## Part 5: Prometheus Metrics
 

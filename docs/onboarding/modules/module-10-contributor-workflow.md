@@ -363,9 +363,16 @@ Unit tests live alongside the code they test:
 
 ```rust
 // src/balance.rs
-pub fn compute_balance(entries: &[LedgerEntry]) -> i64 {
+use crate::types::{JournalEntry, AccountDelta};
+
+/// Computes the balance for a specific account from journal entries.
+/// In ICN's double-entry system, each JournalEntry contains Vec<AccountDelta>
+/// where each delta specifies account, currency, and debit/credit amounts.
+pub fn compute_account_balance(entries: &[JournalEntry], account_id: &str, currency: &str) -> i64 {
     entries.iter()
-        .map(|e| e.credit_amount - e.debit_amount)
+        .flat_map(|e| &e.accounts)
+        .filter(|delta| delta.account_id == account_id && delta.currency == currency)
+        .map(|delta| delta.credit.unwrap_or(0) - delta.debit.unwrap_or(0))
         .sum()
 }
 
@@ -373,36 +380,68 @@ pub fn compute_balance(entries: &[LedgerEntry]) -> i64 {
 mod tests {
     use super::*;
 
+    // Helper to create a simple account delta for testing
+    fn credit_delta(account: &str, amount: i64) -> AccountDelta {
+        AccountDelta {
+            account_id: account.to_string(),
+            currency: "USD".to_string(),
+            debit: None,
+            credit: Some(amount),
+        }
+    }
+
+    fn debit_delta(account: &str, amount: i64) -> AccountDelta {
+        AccountDelta {
+            account_id: account.to_string(),
+            currency: "USD".to_string(),
+            debit: Some(amount),
+            credit: None,
+        }
+    }
+
+    fn test_entry(deltas: Vec<AccountDelta>) -> JournalEntry {
+        JournalEntry {
+            id: None,
+            author: Did::from_str("did:icn:test").unwrap(),
+            accounts: deltas,
+            timestamp: 0,
+            parents: vec![],
+            signature: None,
+            contract_ref: None,
+        }
+    }
+
     #[test]
     fn test_empty_balance() {
-        let entries = vec![];
-        assert_eq!(compute_balance(&entries), 0);
+        let entries: Vec<JournalEntry> = vec![];
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 0);
     }
 
     #[test]
     fn test_single_credit() {
         let entries = vec![
-            LedgerEntry::new_credit(100),
+            test_entry(vec![credit_delta("alice", 100)]),
         ];
-        assert_eq!(compute_balance(&entries), 100);
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 100);
     }
 
     #[test]
     fn test_mixed_entries() {
         let entries = vec![
-            LedgerEntry::new_credit(100),
-            LedgerEntry::new_debit(30),
-            LedgerEntry::new_credit(50),
+            test_entry(vec![credit_delta("alice", 100)]),
+            test_entry(vec![debit_delta("alice", 30)]),
+            test_entry(vec![credit_delta("alice", 50)]),
         ];
-        assert_eq!(compute_balance(&entries), 120);
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), 120);
     }
 
     #[test]
     fn test_negative_balance_allowed() {
+        // Mutual credit allows negative balances
         let entries = vec![
-            LedgerEntry::new_debit(100),
+            test_entry(vec![debit_delta("alice", 100)]),
         ];
-        assert_eq!(compute_balance(&entries), -100);
+        assert_eq!(compute_account_balance(&entries, "alice", "USD"), -100);
     }
 }
 ```

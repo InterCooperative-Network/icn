@@ -83,24 +83,41 @@ self.wire_gossip_to_ledger().await?;
 2. How does the handle pattern prevent shared mutable state?
 3. What happens when a handle's sender is dropped?
 
-### Expected pattern
-```rust
-pub struct GossipHandle {
-    tx: mpsc::Sender<GossipCommand>,
-}
+### Actual pattern
 
-impl GossipHandle {
-    pub async fn subscribe(&self, topic: Topic) -> Result<()> {
-        let (reply_tx, reply_rx) = oneshot::channel();
-        self.tx.send(GossipCommand::Subscribe { topic, reply: reply_tx }).await?;
-        reply_rx.await?
-    }
-}
-```
+**Note**: ICN uses two patterns for actor handles:
+
+1. **Message-passing handles** (e.g., `NetworkActor`):
+   ```rust
+   pub struct NetworkHandle {
+       tx: mpsc::Sender<NetworkCommand>,
+   }
+
+   impl NetworkHandle {
+       pub async fn send_message(&self, msg: NetworkMessage) -> Result<()> {
+           let (reply_tx, reply_rx) = oneshot::channel();
+           self.tx.send(NetworkCommand::Send { msg, reply: reply_tx }).await?;
+           reply_rx.await?
+       }
+   }
+   ```
+
+2. **Shared-state handles** (e.g., `GossipActor`):
+   ```rust
+   // From icn/crates/icn-gossip/src/gossip.rs
+   pub type GossipHandle = Arc<RwLock<GossipActor>>;
+
+   // Usage requires acquiring lock:
+   let mut gossip = gossip_handle.write().await;
+   gossip.subscribe(topic, subscriber_did).await?;
+   ```
+
+The gossip actor uses the shared-state pattern with `Arc<RwLock<>>` rather than
+message passing. Different actors use different patterns based on their needs.
 
 ### Checkpoint
-- [ ] You can explain the handle pattern
-- [ ] You understand how request-reply works over channels
+- [ ] You understand both handle patterns (message-passing and shared-state)
+- [ ] You know which pattern GossipActor uses
 
 ## Part 4: Shutdown Coordination
 

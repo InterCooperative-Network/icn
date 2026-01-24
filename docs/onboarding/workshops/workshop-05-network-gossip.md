@@ -214,27 +214,46 @@ impl VectorClock {
 3. Understand how test nodes are set up
 
 ### Test pattern
+
+From `icn/crates/icn-testkit/src/node.rs` - the actual TestNode API:
+
 ```rust
 #[tokio::test]
-async fn test_two_node_gossip() {
-    let node1 = TestNode::new(4001).await;
-    let node2 = TestNode::new(4002).await;
+async fn test_two_node_gossip() -> anyhow::Result<()> {
+    use icn_gossip::AccessControl;
+
+    let node1 = TestNode::new(4001).await?;
+    let node2 = TestNode::new(4002).await?;
 
     // Connect nodes
-    node1.connect_to(&node2).await;
+    node1.connect(&node2).await?;
 
-    // Subscribe to topic
-    node1.subscribe("test:topic").await;
-    node2.subscribe("test:topic").await;
+    // Create topic on both nodes
+    node1.create_topic("test:topic", AccessControl::Public).await?;
+    node2.create_topic("test:topic", AccessControl::Public).await?;
+
+    // Subscribe using each node's DID
+    let did1 = node1.did();
+    let did2 = node2.did();
+    node1.subscribe("test:topic", &did1).await?;
+    node2.subscribe("test:topic", &did2).await?;
 
     // Publish and verify propagation
-    node1.publish("test:topic", b"hello").await;
+    let hash = node1.publish("test:topic", b"hello").await?;
 
     // Wait for gossip propagation
-    let received = node2.wait_for_message("test:topic", Duration::from_secs(5)).await;
-    assert_eq!(received, b"hello");
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert!(node2.has_entry("test:topic", &hash).await?);
+
+    Ok(())
 }
 ```
+
+**Key differences from pseudocode**:
+- `connect(&node2)` not `connect_to(&node2)`
+- `subscribe()` requires the subscriber DID
+- `publish()` returns a hash, not the message
+- Use `has_entry()` to verify propagation
 
 ### Questions to answer
 1. How are unique ports assigned to test nodes?

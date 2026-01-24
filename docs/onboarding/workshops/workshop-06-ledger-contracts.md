@@ -19,19 +19,31 @@ how CCL contracts execute with capabilities.
 2. Find the `LedgerEntry` struct definition
 3. Identify all fields and their purposes
 
-### Expected structure
+### Actual structure
+
+The actual code uses `JournalEntry` (in `icn/crates/icn-ledger/src/types.rs`):
+
 ```rust
-pub struct LedgerEntry {
-    pub id: EntryId,           // Unique hash-based identifier
-    pub debit: Did,            // Account debited (money leaves)
-    pub credit: Did,           // Account credited (money arrives)
-    pub amount: i64,           // Units transferred
-    pub memo: Option<String>,  // Human-readable description
-    pub timestamp: u64,        // When created
-    pub parents: Vec<EntryId>, // Merkle-DAG references
-    pub signature: Signature,  // Creator's signature
+pub struct JournalEntry {
+    pub id: Option<ContentHash>,      // Hash-based identifier (computed)
+    pub author: Did,                   // Who created this entry
+    pub accounts: Vec<AccountDelta>,   // Multi-currency double-entry (debits/credits)
+    pub timestamp: u64,                // When created
+    pub parents: Vec<ContentHash>,     // Merkle-DAG references
+    pub signature: Option<Signature>,  // Creator's signature
+    pub contract_ref: Option<String>,  // Related CCL contract
+}
+
+pub struct AccountDelta {
+    pub account_id: String,     // Account identifier
+    pub currency: String,       // Currency code
+    pub debit: Option<i64>,     // Amount debited (leaves account)
+    pub credit: Option<i64>,    // Amount credited (enters account)
 }
 ```
+
+Key difference: Instead of a single debit/credit pair, entries use `Vec<AccountDelta>`
+to support multi-currency, generalized double-entry bookkeeping.
 
 ### Questions to answer
 1. Why are there two accounts (debit and credit) per entry?
@@ -74,16 +86,26 @@ pub struct LedgerEntry {
 3. How does the DAG enable parallel transactions?
 
 ### Code to find
+
+In `icn/crates/icn-ledger/src/entry.rs`, find the hash computation:
+
 ```rust
-impl LedgerEntry {
-    pub fn compute_id(&self) -> EntryId {
-        // Hash of entry content (excluding signature)
-        let mut hasher = Blake2b::new();
-        hasher.update(&self.debit.to_bytes());
-        hasher.update(&self.credit.to_bytes());
-        hasher.update(&self.amount.to_le_bytes());
-        // ... hash parents too
-        EntryId::from(hasher.finalize())
+impl JournalEntry {
+    pub fn compute_hash(&self) -> ContentHash {
+        // Hash of entry content (excluding signature and id)
+        let mut hasher = Blake2b256::new();
+        hasher.update(self.author.as_bytes());
+        // Hash each account delta
+        for delta in &self.accounts {
+            hasher.update(delta.account_id.as_bytes());
+            hasher.update(delta.currency.as_bytes());
+            // ... hash amounts
+        }
+        // Hash parents for DAG integrity
+        for parent in &self.parents {
+            hasher.update(parent.as_bytes());
+        }
+        ContentHash::from(hasher.finalize())
     }
 }
 ```
@@ -99,19 +121,25 @@ impl LedgerEntry {
 2. Understand how balances are derived from entries
 3. Identify caching or optimization strategies
 
-### Balance computation
+### Balance computation (simplified concept)
+
+The basic formula for a single currency:
 ```
-Balance(Alice) = Σ credits_to_Alice - Σ debits_from_Alice
+Balance(Account, Currency) = Σ credits_to_Account - Σ debits_from_Account
 ```
 
-Example:
+**Conceptual example** (simplified - actual entries use `AccountDelta`):
 ```
-Entry 1: Bob → Alice: 100   (Alice +100)
-Entry 2: Alice → Carol: 30  (Alice -30)
-Entry 3: Dan → Alice: 50    (Alice +50)
+Entry 1: Bob → Alice: 100 USD   (Alice's USD balance +100)
+Entry 2: Alice → Carol: 30 USD  (Alice's USD balance -30)
+Entry 3: Dan → Alice: 50 USD    (Alice's USD balance +50)
 ---
-Balance(Alice) = 100 - 30 + 50 = 120
+Balance(Alice, USD) = 100 - 30 + 50 = 120
 ```
+
+**Important**: The actual ledger is multi-currency. Each `JournalEntry` contains
+`Vec<AccountDelta>` where each delta specifies the currency. Balances are computed
+per-account and per-currency.
 
 ### Questions to answer
 1. How does the ledger handle concurrent balance queries?
@@ -147,26 +175,36 @@ grep -r "balance\|Balance" icn/crates/icn-ledger/src/ --include="*.rs" | head -2
 2. What happens if validation fails?
 3. How are credit limits enforced?
 
-### Code pattern
+### Code pattern (conceptual)
+
+The actual validation in `icn/crates/icn-ledger/src/ledger.rs` uses `JournalEntry`:
+
 ```rust
-fn validate_entry(&self, entry: &LedgerEntry) -> Result<(), LedgerError> {
-    // Verify signature
-    entry.debit.verify(&entry.signature, &entry.content_hash())?;
-
-    // Check amount
-    if entry.amount <= 0 {
-        return Err(LedgerError::InvalidAmount);
+fn validate_entry(&self, entry: &JournalEntry) -> Result<()> {
+    // 1. Verify signature from author
+    if let Some(sig) = &entry.signature {
+        entry.author.verify(sig, &entry.compute_hash().as_bytes())?;
     }
 
-    // Check balance
-    let balance = self.get_balance(&entry.debit)?;
-    if balance < entry.amount {
-        return Err(LedgerError::InsufficientBalance);
+    // 2. Check all account deltas have valid amounts
+    for delta in &entry.accounts {
+        if let Some(debit) = delta.debit {
+            if debit <= 0 { return Err(LedgerError::InvalidAmount); }
+        }
+        if let Some(credit) = delta.credit {
+            if credit <= 0 { return Err(LedgerError::InvalidAmount); }
+        }
     }
+
+    // 3. Check author has sufficient balance (per currency)
+    // ... currency-specific balance checks
 
     Ok(())
 }
 ```
+
+**Note**: This is simplified. The actual validation includes trust checks,
+witness requirements for high-value transactions, and more.
 
 ### Checkpoint
 - [ ] You can list all validation checks
@@ -227,19 +265,24 @@ Ledger.apply_entry()
 3. Explore `Rule`, `Condition`, and `Effect` types
 
 ### Contract structure
+
+From `icn/crates/icn-ccl/src/ast.rs`:
+
 ```rust
 pub struct Contract {
     pub name: String,
-    pub version: Version,       // Semantic version
-    pub parties: Vec<Did>,      // Who can participate
-    pub rules: Vec<Rule>,       // Conditional logic
-    pub state: ContractState,   // Mutable state
+    pub participants: Vec<Did>,      // Who can participate
+    pub currency: Option<String>,    // Optional currency code
+    pub rules: Vec<Rule>,            // Conditional logic
+    pub state_vars: Vec<StateVar>,   // Mutable state variables
+    pub triggers: Vec<Trigger>,      // Event triggers
 }
 
 pub struct Rule {
     pub name: String,
-    pub conditions: Vec<Expr>,  // When to trigger
-    pub effects: Vec<Stmt>,     // What happens
+    pub params: Vec<Param>,     // Rule parameters
+    pub requires: Vec<Expr>,    // Preconditions
+    pub body: Vec<Stmt>,        // Rule body (what happens)
 }
 ```
 
@@ -349,12 +392,18 @@ export ICN_PASSPHRASE="workshop"
 # Start daemon with debug logging
 RUST_LOG=icn_ledger=debug ./target/debug/icnd --data-dir "$ICN_DATA" &
 
-# Create a test transaction (syntax may vary)
-./target/debug/icnctl --data-dir "$ICN_DATA" ledger transfer \
-  --to did:icn:somerecipient \
-  --amount 10 \
-  --memo "test transfer"
+# Note: Transactions are created via the Gateway API or SDK, not icnctl.
+# Use icnctl to inspect ledger state after transactions:
+./target/debug/icnctl --data-dir "$ICN_DATA" ledger head
+./target/debug/icnctl --data-dir "$ICN_DATA" ledger history
+./target/debug/icnctl --data-dir "$ICN_DATA" ledger balance <account-id>
 ```
+
+### Available icnctl ledger commands
+- `ledger head` - Show most recent ledger entry
+- `ledger balance <account>` - Show balance for an account
+- `ledger history` - Show recent ledger history
+- `ledger quarantine` - Quarantine management
 
 ### Expected log output
 - "Creating ledger entry"
@@ -363,8 +412,8 @@ RUST_LOG=icn_ledger=debug ./target/debug/icnd --data-dir "$ICN_DATA" &
 - "Announcing to gossip"
 
 ### Checkpoint
-- [ ] You created a transaction successfully
-- [ ] You traced it through the logs
+- [ ] You started the daemon with debug logging
+- [ ] You understand how to inspect ledger state
 
 ## Summary
 
