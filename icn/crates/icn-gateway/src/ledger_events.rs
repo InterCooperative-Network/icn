@@ -239,6 +239,17 @@ impl LedgerEventBridge {
                     .await;
                 debug!("Forwarded CrossCurrencyTransfer event");
             }
+
+            LedgerEvent::ResourceAccessTransferred(rat) => {
+                // Resource access transfers are logged but not yet forwarded to WebSocket
+                // In the future, we could add a ResourceAccessTransferred gateway event
+                debug!(
+                    resource_id = %rat.resource_id,
+                    from = %rat.from_holder,
+                    to = %rat.to_holder,
+                    "ResourceAccessTransferred event (not forwarded)"
+                );
+            }
         }
     }
 }

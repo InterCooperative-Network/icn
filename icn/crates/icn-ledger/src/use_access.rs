@@ -97,6 +97,10 @@ pub enum AccessError {
         /// Required review period
         review_period: u64,
     },
+
+    /// Storage backend error
+    #[error("Storage error: {0}")]
+    StorageError(String),
 }
 
 /// Result type for access operations
@@ -706,7 +710,7 @@ pub trait ResourceAccessStore: Send + Sync {
         // Get existing access
         let mut access = self
             .get(resource_id)
-            .map_err(|e| AccessError::Revoked(format!("Storage error: {}", e)))?
+            .map_err(|e| AccessError::StorageError(e.to_string()))?
             .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
 
         // Validate access is not revoked
@@ -725,18 +729,19 @@ pub trait ResourceAccessStore: Send + Sync {
         // For Stewardship, validate HandoffProcedure steps are completed
         if let AccessModel::Stewardship { duties, .. } = &access.model {
             // Check if HandoffProcedure duty exists
-            let handoff_duty = duties
-                .iter()
-                .find_map(|d| match d {
-                    StewardshipDuty::HandoffProcedure { steps } => Some(steps),
-                    _ => None,
-                });
+            let handoff_duty = duties.iter().find_map(|d| match d {
+                StewardshipDuty::HandoffProcedure { steps } => Some(steps),
+                _ => None,
+            });
 
             if let Some(required_steps) = handoff_duty {
                 // Verify all handoff steps are recorded in usage_log
                 for step in required_steps {
                     let step_completed = access.usage_log.iter().any(|event| {
-                        event.description.to_lowercase().contains(&step.to_lowercase())
+                        event
+                            .description
+                            .to_lowercase()
+                            .contains(&step.to_lowercase())
                     });
 
                     if !step_completed {
@@ -757,7 +762,7 @@ pub trait ResourceAccessStore: Send + Sync {
 
         // Persist the updated access
         self.put(&access)
-            .map_err(|e| AccessError::Revoked(format!("Storage error: {}", e)))?;
+            .map_err(|e| AccessError::StorageError(e.to_string()))?;
 
         Ok((old_holder, access))
     }
@@ -852,6 +857,96 @@ impl ResourceAccessStore for SledResourceAccessStore {
             }
         }
         Ok(accesses)
+    }
+
+    fn transfer(
+        &self,
+        resource_id: &str,
+        new_holder: EntityId,
+        price: Option<i64>,
+        current_time: u64,
+    ) -> Result<(EntityId, ResourceAccess)> {
+        // Get existing access
+        let mut access = self
+            .get(resource_id)
+            .map_err(|e| AccessError::StorageError(e.to_string()))?
+            .ok_or_else(|| AccessError::Revoked(format!("Resource {} not found", resource_id)))?;
+
+        // Validate access is not revoked
+        if access.revoked {
+            return Err(AccessError::Revoked(
+                access
+                    .revocation_reason
+                    .clone()
+                    .unwrap_or_else(|| "Access revoked".to_string()),
+            ));
+        }
+
+        // Validate transfer price (no-profit rule)
+        access.validate_transfer(price)?;
+
+        // For Stewardship, validate HandoffProcedure steps are completed
+        if let AccessModel::Stewardship { duties, .. } = &access.model {
+            // Check if HandoffProcedure duty exists
+            let handoff_duty = duties.iter().find_map(|d| match d {
+                StewardshipDuty::HandoffProcedure { steps } => Some(steps),
+                _ => None,
+            });
+
+            if let Some(required_steps) = handoff_duty {
+                // Verify all handoff steps are recorded in usage_log
+                // Use exact matching to prevent false positives from partial matches
+                for step in required_steps {
+                    let step_lower = step.to_lowercase();
+                    let step_completed = access.usage_log.iter().any(|event| {
+                        event
+                            .description
+                            .to_lowercase()
+                            .split(&[',', ';', '.', '-'][..])
+                            .any(|segment| segment.trim() == step_lower)
+                            || event.description.to_lowercase() == step_lower
+                    });
+
+                    if !step_completed {
+                        return Err(AccessError::DutyUnfulfilled(format!(
+                            "Handoff step not completed: {}",
+                            step
+                        )));
+                    }
+                }
+            }
+        }
+
+        // Store old holder for event emission and index cleanup
+        let old_holder = access.holder.clone();
+
+        // Remove resource from old holder's index
+        let old_holder_key = Self::holder_index_key(&old_holder);
+        let mut old_holder_resources: Vec<String> = self
+            .store
+            .get(&old_holder_key)
+            .map_err(|e| AccessError::StorageError(e.to_string()))?
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        old_holder_resources.retain(|r| r != resource_id);
+        let old_holder_bytes = serde_json::to_vec(&old_holder_resources)
+            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+        self.store
+            .put(&old_holder_key, &old_holder_bytes)
+            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+
+        // Update holder
+        access.holder = new_holder;
+
+        // Record the transfer time for tracking purposes
+        // (current_time can be used by callers for audit/logging if needed)
+        let _ = current_time;
+
+        // Persist the updated access (this also adds to new holder's index)
+        self.put(&access)
+            .map_err(|e| AccessError::StorageError(e.to_string()))?;
+
+        Ok((old_holder, access))
     }
 }
 
@@ -1603,6 +1698,11 @@ mod tests {
 
         access_store.put(&access).unwrap();
 
+        // Verify initial holder index
+        let alice_resources = access_store.list_by_holder(&alice).unwrap();
+        assert_eq!(alice_resources.len(), 1);
+        assert_eq!(alice_resources[0].resource_id, "tool-001");
+
         // Free transfer should succeed
         let current_time = access.granted_at + 3600;
         let (old_holder, updated_access) = access_store
@@ -1616,6 +1716,22 @@ mod tests {
         // Verify it's persisted
         let retrieved = access_store.get("tool-001").unwrap().unwrap();
         assert_eq!(retrieved.holder, bob);
+
+        // Verify holder index cleanup: resource removed from old holder's index
+        let alice_resources_after = access_store.list_by_holder(&alice).unwrap();
+        assert!(
+            alice_resources_after.is_empty(),
+            "Resource should be removed from old holder's index"
+        );
+
+        // Verify holder index: resource added to new holder's index
+        let bob_resources = access_store.list_by_holder(&bob).unwrap();
+        assert_eq!(
+            bob_resources.len(),
+            1,
+            "Resource should be in new holder's index"
+        );
+        assert_eq!(bob_resources[0].resource_id, "tool-001");
     }
 
     #[test]
@@ -1705,11 +1821,29 @@ mod tests {
 
         // Now transfer should succeed
         let (old_holder, updated_access) = access_store
-            .transfer("community-garden", bob.clone(), None, access.granted_at + 1000)
+            .transfer(
+                "community-garden",
+                bob.clone(),
+                None,
+                access.granted_at + 1000,
+            )
             .unwrap();
 
         assert_eq!(old_holder, alice);
         assert_eq!(updated_access.holder, bob);
+
+        // Verify holder index cleanup after stewardship transfer
+        let alice_resources = access_store.list_by_holder(&alice).unwrap();
+        assert!(
+            alice_resources.is_empty(),
+            "Resource should be removed from old holder's index"
+        );
+        let bob_resources = access_store.list_by_holder(&bob).unwrap();
+        assert_eq!(
+            bob_resources.len(),
+            1,
+            "Resource should be in new holder's index"
+        );
     }
 
     #[test]
