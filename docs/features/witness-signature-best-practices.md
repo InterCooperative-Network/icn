@@ -20,6 +20,27 @@ Witness signatures are Ed25519 cryptographic signatures from trusted community m
 - **WitnessConfig**: Ledger-wide witness configuration with value thresholds and timeouts
 - **UsageEvent Witnesses**: Witness attestation for resource usage and handoff events
 
+### Two Types of Witness Signatures
+
+ICN provides **two distinct witness systems** for different use cases:
+
+| **System** | **Purpose** | **API** | **Use Case** |
+|------------|-------------|---------|--------------|
+| **Ledger Entry Witnesses** | Co-sign financial transactions | `WitnessedEntry`, `WitnessSignature` | Mutual credit transfers, resource exchanges |
+| **Resource Access Witnesses** | Attest to stewardship events | `UsageEvent::with_witness()` | HandoffProcedure completion, duty fulfillment |
+
+**Ledger Entry Witnesses** (documented in [Configuration Examples](#configuration-examples)):
+- Cryptographic signatures stored in `WitnessedEntry.witness_signatures`
+- Validated against `WitnessPolicy` (Counterparty, Quorum, AllParties)
+- Used for financial accountability and fork resolution
+
+**Resource Access Witnesses** (documented in [HandoffProcedure with Witness Verification](#handoffprocedure-with-witness-verification)):
+- Added via `UsageEvent::with_witness(did)` builder method
+- Validated via `ResourceAccess::validate_duty_completion(&event, min_witnesses)`
+- Used for stewardship transfer attestation and duty completion verification
+
+Most examples in this guide apply to both systems, but the API differs. Sections are labeled to indicate which system they apply to.
+
 ---
 
 ## When to Use Witness Signatures
@@ -666,11 +687,18 @@ pub fn select_qualified_witnesses(
 }
 ```
 
+**⚠️ Current Limitation**: Without trust-graph integration (Issue #832), witness selection relies on **manual vetting**. This creates risks:
+- No automated verification that witnesses meet trust thresholds
+- Witness pools may include members whose trust has degraded
+- Potential for colluding witnesses if pool selection isn't carefully managed
+
 **Best Practices**:
 - Manually vet witnesses before adding to witness pools
 - Require witnesses to have established trust relationships
 - Periodically review and rotate witness pools
 - Monitor for compromised witness keys (key rotation procedures)
+- Document witness selection criteria in cooperative bylaws
+- Implement periodic witness pool audits (quarterly recommended)
 
 ### Avoiding Single Points of Failure
 
@@ -799,12 +827,14 @@ pub fn select_qualified_witnesses(
 
 **Status**: Planned enhancement (Issue #832)
 
+> **⚠️ Note**: All code examples in this section represent **planned APIs** that are **not yet implemented**. These examples illustrate the intended design direction for trust-graph integration. Do not attempt to use these APIs in current ICN versions.
+
 ### Automatic Trust Validation
 
 Future versions will integrate witness selection with ICN's trust graph:
 
 ```rust
-// Planned API
+// ⚠️ PLANNED API (not yet implemented) - Issue #832
 pub struct TrustWeightedWitnessPolicy {
     min_trust_score: f64,
     required_witnesses: usize,
@@ -835,7 +865,8 @@ impl TrustWeightedWitnessPolicy {
 ### Reputation-Based Witness Quality
 
 ```rust
-// Planned: Witness reputation tracking
+// ⚠️ PLANNED API (not yet implemented) - Issue #832
+// Witness reputation tracking
 pub struct WitnessReputation {
     did: Did,
     attestations_signed: u64,
@@ -850,7 +881,8 @@ pub struct WitnessReputation {
 ### Dynamic Witness Pool Management
 
 ```rust
-// Planned: Automatically maintain witness pools based on trust graph
+// ⚠️ PLANNED API (not yet implemented) - Issue #832
+// Automatically maintain witness pools based on trust graph
 pub fn update_witness_pool_from_trust(
     trust_graph: &TrustGraph,
     resource_type: &str,
