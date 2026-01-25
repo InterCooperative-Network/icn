@@ -137,7 +137,10 @@ impl GossipActor {
                 batch_id,
                 messages,
                 compressed,
-            } => self.handle_batch(&sender, batch_id, messages, compressed).await,
+            } => {
+                self.handle_batch(&sender, batch_id, messages, compressed)
+                    .await
+            }
         }
     }
 }
