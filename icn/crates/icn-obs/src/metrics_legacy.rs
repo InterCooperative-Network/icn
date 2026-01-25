@@ -2237,6 +2237,47 @@ pub mod gossip {
     pub fn message_latency_record(latency_secs: f64) {
         histogram!("icn_gossip_message_latency_seconds").record(latency_secs);
     }
+
+    // Resource revocation notification metrics (PR #845)
+
+    /// Track resource revocations received via gossip
+    pub fn resource_revocations_received_inc() {
+        counter!("icn_resource_revocations_received_total").increment(1);
+    }
+
+    /// Track resource revocations successfully applied to local storage
+    pub fn resource_revocations_applied_inc() {
+        counter!("icn_resource_revocations_applied_total").increment(1);
+    }
+
+    /// Track idempotent revocations (already revoked or non-existent)
+    pub fn resource_revocations_idempotent_inc() {
+        counter!("icn_resource_revocations_idempotent_total").increment(1);
+    }
+
+    /// Track failed revocation applications
+    pub fn resource_revocations_failed_inc() {
+        counter!("icn_resource_revocations_failed_total").increment(1);
+    }
+
+    /// Track resource revocations published to gossip
+    pub fn revocation_gossip_published_inc() {
+        counter!("icn_resource_revocation_gossip_published_total").increment(1);
+    }
+
+    /// Track resource revocation gossip publication failures
+    pub fn revocation_gossip_failures_inc(reason: &str) {
+        counter!(
+            "icn_resource_revocation_gossip_failures_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Track trust check lock skip events (fail-safe behavior)
+    pub fn trust_check_lock_skipped_inc() {
+        counter!("icn_gossip_trust_check_lock_skipped_total").increment(1);
+    }
 }
 
 /// Scalability metrics (Phase 19)

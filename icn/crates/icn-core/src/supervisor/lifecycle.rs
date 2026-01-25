@@ -326,8 +326,9 @@ async fn spawn_actors_with_identity(
         Arc::new(RwLock::new(None));
     let contract_registry_holder: Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>> =
         Arc::new(RwLock::new(None));
-    let resource_access_store_holder: Arc<RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>> =
-        Arc::new(RwLock::new(None));
+    let resource_access_store_holder: Arc<
+        RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>,
+    > = Arc::new(RwLock::new(None));
 
     // Initialize federation services if enabled
     let federation_services = super::init_federation::init_federation_services(

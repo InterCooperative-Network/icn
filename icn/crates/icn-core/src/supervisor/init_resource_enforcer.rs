@@ -89,23 +89,14 @@ impl SledResourceAccessStoreAdapter {
 
 impl ResourceAccessStore for SledResourceAccessStoreAdapter {
     fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>> {
-        // KNOWN LIMITATION: The icn-ledger trait doesn't have a list_all method.
-        // This means the resource enforcer cannot enumerate persisted resources
-        // for idle revocation enforcement checks when using this adapter.
-        //
-        // Impact: Resources stored via icn-ledger will NOT be automatically
-        // revoked when idle. Only resources stored via direct ResourceAccessStore
-        // implementations with proper list_all support will be enforced.
-        //
-        // Tracked in: Issue #850 (feat(ledger): Add list_all to ResourceAccessStore trait)
-        //
-        // Workarounds:
-        // 1. Use in-memory store for development/testing (has full list_all support)
-        // 2. Add list_all to icn-ledger's ResourceAccessStore trait
-        // 3. Access store.scan() directly if available
-        //
-        // For now, return empty to maintain compatibility.
-        Ok(Vec::new())
+        // Delegate to the icn-ledger trait's list_all method
+        let all_access = LedgerResourceAccessStore::list_all(&self.inner)?;
+
+        // Convert to (resource_id, ResourceAccess) pairs as expected by icn-core
+        Ok(all_access
+            .into_iter()
+            .map(|access| (access.resource_id.clone(), access))
+            .collect())
     }
 
     fn update(&mut self, resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()> {
@@ -214,7 +205,7 @@ impl ResourceAccessStore for GossipResourceAccessStore {
                 Ok(data) => data,
                 Err(e) => {
                     warn!("Failed to serialize revocation event: {}", e);
-                    metrics::counter!("icn_resource_revocation_gossip_failures_total", "reason" => "serialization").increment(1);
+                    icn_obs::metrics::gossip::revocation_gossip_failures_inc("serialization");
                     return;
                 }
             };
@@ -222,14 +213,14 @@ impl ResourceAccessStore for GossipResourceAccessStore {
             let mut gossip = gossip_handle.write().await;
             if let Err(e) = gossip.publish(RESOURCE_REVOCATIONS_TOPIC, serialized).await {
                 warn!("Failed to publish revocation to gossip: {}", e);
-                metrics::counter!("icn_resource_revocation_gossip_failures_total", "reason" => "publish").increment(1);
+                icn_obs::metrics::gossip::revocation_gossip_failures_inc("publish");
             } else {
                 info!(
                     resource_id = %event_for_gossip.resource_id,
                     holder = %event_for_gossip.holder,
                     "Published revocation event to gossip"
                 );
-                metrics::counter!("icn_resource_revocation_gossip_published_total").increment(1);
+                icn_obs::metrics::gossip::revocation_gossip_published_inc();
             }
         });
 

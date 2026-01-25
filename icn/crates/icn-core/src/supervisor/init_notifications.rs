@@ -767,7 +767,9 @@ pub async fn handle_entity_update(entry_data: Vec<u8>, entity_handle: EntityHand
 /// Handle resource revocation events from cluster
 pub async fn handle_resource_revocation(
     entry_data: Vec<u8>,
-    store_handle: Option<&Arc<tokio::sync::RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>,
+    store_handle: Option<
+        &Arc<tokio::sync::RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>,
+    >,
 ) {
     match serde_json::from_slice::<crate::resource_enforcer_actor::RevocationEvent>(&entry_data) {
         Ok(event) => {
@@ -782,7 +784,7 @@ pub async fn handle_resource_revocation(
             // Update local storage with the revocation if store is available
             if let Some(store) = store_handle {
                 let store_guard = store.read().await;
-                
+
                 match store_guard.apply_received_revocation(&event) {
                     Ok(()) => {
                         info!(
@@ -790,22 +792,26 @@ pub async fn handle_resource_revocation(
                             holder = %event.holder,
                             "Successfully applied revocation to local storage"
                         );
-                        metrics::counter!("icn_resource_revocations_applied_total").increment(1);
+                        icn_obs::metrics::gossip::resource_revocations_applied_inc();
                     }
                     Err(e) => {
                         // If the resource access doesn't exist, it may have already been revoked
                         // or never existed on this node. This is expected in distributed systems.
                         //
                         // Note: This string matching is fragile but necessary since icn-ledger
-                        // doesn't expose typed errors. When icn-ledger adds structured errors,
-                        // this should be updated to match on error types instead.
-                        if e.to_string().contains("Access not found") {
+                        // doesn't expose typed errors. When icn-ledger adds structured errors
+                        // (tracked in Issue #849), this should be updated to match on error
+                        // types instead of string contents.
+                        if e.to_string().contains("Access not found")
+                            || e.to_string().contains("not found")
+                            || e.to_string().contains("does not exist")
+                        {
                             debug!(
                                 resource_id = %event.resource_id,
                                 holder = %event.holder,
                                 "Revocation received for non-existent access (already revoked or not present)"
                             );
-                            metrics::counter!("icn_resource_revocations_idempotent_total").increment(1);
+                            icn_obs::metrics::gossip::resource_revocations_idempotent_inc();
                         } else {
                             warn!(
                                 resource_id = %event.resource_id,
@@ -813,7 +819,7 @@ pub async fn handle_resource_revocation(
                                 error = %e,
                                 "Failed to apply revocation to local storage"
                             );
-                            metrics::counter!("icn_resource_revocations_failed_total").increment(1);
+                            icn_obs::metrics::gossip::resource_revocations_failed_inc();
                         }
                     }
                 }
@@ -822,7 +828,7 @@ pub async fn handle_resource_revocation(
             }
 
             // Update metrics for received revocations
-            metrics::counter!("icn_resource_revocations_received_total").increment(1);
+            icn_obs::metrics::gossip::resource_revocations_received_inc();
         }
         Err(e) => {
             warn!("Failed to deserialize revocation event: {}", e);

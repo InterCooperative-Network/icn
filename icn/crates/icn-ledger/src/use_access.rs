@@ -992,6 +992,18 @@ pub trait ResourceAccessStore: Send + Sync {
 
     /// Find idle access records (not used recently)
     fn find_idle(&self, current_time: u64, max_idle: u64) -> anyhow::Result<Vec<ResourceAccess>>;
+
+    /// List all access records
+    ///
+    /// Returns all resource access records, including revoked and expired ones.
+    /// This is primarily used by the resource enforcer for periodic enforcement checks.
+    ///
+    /// # Performance
+    ///
+    /// This method loads all records into memory. For deployments with many
+    /// resource access records (10K+), consider using pagination or the more
+    /// targeted methods like `find_idle()` or `find_expired()`.
+    fn list_all(&self) -> anyhow::Result<Vec<ResourceAccess>>;
 }
 
 /// Sled-backed resource access store
@@ -1293,6 +1305,24 @@ impl ResourceAccessStore for SledResourceAccessStore {
         }
 
         Ok(idle)
+    }
+
+    fn list_all(&self) -> anyhow::Result<Vec<ResourceAccess>> {
+        let all_entries = self.store.scan(Self::ACCESS_PREFIX)?;
+
+        let mut result = Vec::new();
+        for (key, value) in all_entries {
+            // Skip index entries (they contain "idx:" in the key path)
+            let key_str = String::from_utf8_lossy(&key);
+            if key_str.contains(":idx:") {
+                continue;
+            }
+
+            let access: ResourceAccess = serde_json::from_slice(&value)?;
+            result.push(access);
+        }
+
+        Ok(result)
     }
 }
 
