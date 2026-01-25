@@ -1282,9 +1282,9 @@ pub async fn initiate_dissolution(
         }
         Err(e) => {
             // Check if this is a concurrent modification error using type-safe matching
-            if e.downcast_ref::<EntityError>()
-                .is_some_and(|entity_err| matches!(entity_err, EntityError::ConcurrentModification(_)))
-            {
+            if e.downcast_ref::<EntityError>().is_some_and(|entity_err| {
+                matches!(entity_err, EntityError::ConcurrentModification(_))
+            }) {
                 return Err(GatewayError::Conflict(
                     "Entity was modified by another operation. Please retry.".to_string(),
                 ));
