@@ -428,6 +428,99 @@ fn test_batch_byte_threshold_triggers_send() {
     }
 }
 
+/// Test that batch triggers on EITHER count OR byte threshold (OR logic)
+///
+/// This test verifies that the batching logic correctly flushes when
+/// either threshold is reached, not requiring both conditions to be true.
+#[test]
+fn test_batch_triggers_on_either_threshold() {
+    let kp = KeyPair::generate().unwrap();
+    let mut gossip = GossipActor::new(kp.did().clone(), trust_lookup_all());
+    gossip.set_keypair(kp.clone());
+
+    // Configure with both count and byte thresholds
+    // We'll test that hitting EITHER one triggers a flush
+    let config = BatchingConfig {
+        max_batch_size: 3,       // Low count threshold
+        max_batch_bytes: 10_000, // High byte threshold (won't be hit first)
+        max_delay: Duration::from_secs(10),
+        ..BatchingConfig::default()
+    };
+    gossip.set_batching_config(config);
+
+    let sent_messages = Arc::new(Mutex::new(Vec::new()));
+    let sent_clone = sent_messages.clone();
+
+    gossip.set_send_callback(Arc::new(move |_recipient, message| {
+        sent_clone.lock().unwrap().push(message);
+    }));
+
+    // Send exactly 3 messages to hit count threshold (not byte threshold)
+    // Each Announce message is ~130 bytes, so 3 messages = ~390 bytes < 10,000
+    for i in 0..3 {
+        let msg = GossipMessage::Announce {
+            hash: [i as u8; 32],
+            author: kp.did().clone(),
+            clock: icn_gossip::VectorClock::new(),
+            topic: "test".to_string(),
+        };
+        gossip.send_message(Some(kp.did().clone()), msg);
+    }
+
+    // Count threshold should have triggered flush
+    let sent = sent_messages.lock().unwrap();
+    assert_eq!(sent.len(), 1, "Count threshold should trigger flush");
+    drop(sent);
+
+    // Now test the other direction: byte threshold triggers before count
+    let mut gossip2 = GossipActor::new(kp.did().clone(), trust_lookup_all());
+    gossip2.set_keypair(kp.clone());
+
+    let config2 = BatchingConfig {
+        max_batch_size: 100,  // High count threshold (won't be hit first)
+        max_batch_bytes: 200, // Low byte threshold
+        max_delay: Duration::from_secs(10),
+        ..BatchingConfig::default()
+    };
+    gossip2.set_batching_config(config2);
+
+    let sent_messages2 = Arc::new(Mutex::new(Vec::new()));
+    let sent_clone2 = sent_messages2.clone();
+
+    gossip2.set_send_callback(Arc::new(move |_recipient, message| {
+        sent_clone2.lock().unwrap().push(message);
+    }));
+
+    // Send messages until byte threshold triggers (before count threshold of 100)
+    // Each Announce is ~130 bytes, so 2 messages = ~260 bytes > 200 byte threshold
+    for i in 0..3 {
+        let msg = GossipMessage::Announce {
+            hash: [i as u8; 32],
+            author: kp.did().clone(),
+            clock: icn_gossip::VectorClock::new(),
+            topic: "test".to_string(),
+        };
+        gossip2.send_message(Some(kp.did().clone()), msg);
+    }
+
+    // Byte threshold should have triggered flush before count threshold
+    let sent2 = sent_messages2.lock().unwrap();
+    assert!(
+        !sent2.is_empty(),
+        "Byte threshold should trigger flush before count threshold"
+    );
+
+    // Verify the batch has fewer than 100 messages (proving count wasn't the trigger)
+    for msg in sent2.iter() {
+        if let GossipMessage::Batch { messages, .. } = msg {
+            assert!(
+                messages.len() < 100,
+                "Batch should have triggered on bytes, not count"
+            );
+        }
+    }
+}
+
 #[tokio::test]
 async fn test_oversized_batch_rejected() {
     let kp1 = KeyPair::generate().unwrap();

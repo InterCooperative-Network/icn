@@ -121,21 +121,23 @@ gossip_actor.flush_all_batches();
 
 Monitor batching performance via Prometheus metrics:
 
-### Batch Count Metrics
-```
-icn_gossip_batches_sent_total          # Total batches sent
-icn_gossip_batches_received_total      # Total batches received
-```
+### Metrics Reference
 
-### Batch Size Metrics
-```
-icn_gossip_batch_size                  # Histogram of messages per batch
-```
+| Metric | Type | Description |
+|--------|------|-------------|
+| `icn_gossip_batches_sent_total` | Counter | Total number of message batches sent |
+| `icn_gossip_batches_received_total` | Counter | Total number of message batches received |
+| `icn_gossip_batch_size` | Histogram | Number of messages per batch |
+| `icn_gossip_batch_compression_ratio` | Histogram | Compression ratio (original/compressed size) |
+| `icn_gossip_batches_rejected_oversized_total` | Counter | DoS protection: batches exceeding size limits |
+| `icn_gossip_batch_mutex_poisoned_total` | Counter | Critical: thread panics during batch processing |
+| `icn_gossip_trust_check_lock_skipped_total` | Counter | Trust graph lock contention events |
 
-### Compression Metrics
-```
-icn_gossip_batch_compression_ratio     # Histogram of compression ratios
-```
+### Alerting Recommendations
+
+- **`icn_gossip_batch_mutex_poisoned_total > 0`**: Investigate thread panics immediately. This indicates a critical bug in batch processing.
+- **`icn_gossip_trust_check_lock_skipped_total` increasing**: Trust graph lock contention. Consider increasing trust graph capacity or reducing message rate.
+- **`icn_gossip_batches_rejected_oversized_total` increasing**: Potential DoS attempts or misconfigured peers. Review peer trust levels and rate limits.
 
 ## Best Practices
 
