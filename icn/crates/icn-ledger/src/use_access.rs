@@ -2726,4 +2726,36 @@ mod tests {
             );
         }
     }
+
+    /// Test that validates the exact error string format for "Access not found" errors.
+    ///
+    /// IMPORTANT: This test exists because `icn-core/src/supervisor/init_notifications.rs`
+    /// relies on string matching to detect idempotent revocation operations. If this test
+    /// fails, you MUST also update the string matching in `init_notifications.rs` to match
+    /// the new error format.
+    ///
+    /// See Issue #849 for tracking typed errors that will replace this fragile string matching.
+    #[test]
+    fn test_revoke_not_found_error_format() {
+        let store = std::sync::Arc::new(icn_store::SledStore::temporary().unwrap());
+        let access_store = SledResourceAccessStore::new(store);
+
+        let nonexistent_holder = create_test_entity();
+
+        // Try to revoke access that doesn't exist
+        let result = access_store.revoke("nonexistent-resource", &nonexistent_holder, "test".to_string());
+
+        assert!(result.is_err(), "Revoke should fail for non-existent access");
+
+        let error_string = result.unwrap_err().to_string();
+
+        // CRITICAL: If you change this assertion, you MUST also update the string matching
+        // in icn-core/src/supervisor/init_notifications.rs handle_resource_revocation()
+        assert!(
+            error_string.contains("Access not found"),
+            "Error string must contain 'Access not found' for idempotency detection in gossip handler. \
+             Got: '{}'. If you're changing this error format, update init_notifications.rs too!",
+            error_string
+        );
+    }
 }

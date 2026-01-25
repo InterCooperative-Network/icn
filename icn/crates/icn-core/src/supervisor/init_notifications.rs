@@ -773,6 +773,9 @@ pub async fn handle_resource_revocation(
 ) {
     match serde_json::from_slice::<crate::resource_enforcer_actor::RevocationEvent>(&entry_data) {
         Ok(event) => {
+            // Record receipt metric first, before processing
+            icn_obs::metrics::gossip::resource_revocations_received_inc();
+
             info!(
                 resource_id = %event.resource_id,
                 holder = %event.holder,
@@ -826,9 +829,6 @@ pub async fn handle_resource_revocation(
             } else {
                 debug!("Resource access store not available, skipping local revocation");
             }
-
-            // Update metrics for received revocations
-            icn_obs::metrics::gossip::resource_revocations_received_inc();
         }
         Err(e) => {
             warn!("Failed to deserialize revocation event: {}", e);

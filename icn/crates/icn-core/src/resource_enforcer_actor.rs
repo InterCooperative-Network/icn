@@ -31,6 +31,54 @@ use tracing::{debug, error, info, warn};
 use crate::runtime::ShutdownRx;
 
 /// Gossip topic for resource access revocation events
+///
+/// # Trust Model
+///
+/// This topic uses `AccessControl::PublicSigned` which means:
+///
+/// 1. **Publishing**: Any authenticated node can publish revocation events.
+///    Revocations originate from the local `ResourceAccessEnforcerActor` which
+///    detects idle resources during periodic enforcement checks.
+///
+/// 2. **Message Verification**: All messages are cryptographically signed by the
+///    publishing node's DID. Receivers verify signatures before processing.
+///    Invalid or tampered messages are rejected.
+///
+/// 3. **Trust Gating**: Nodes can configure trust-based filtering to only accept
+///    revocations from nodes above a minimum trust threshold. This prevents
+///    untrusted nodes from forcing revocations across the cluster.
+///
+/// 4. **Idempotency**: Revocation application is idempotent. Receiving a duplicate
+///    revocation (e.g., due to gossip re-broadcast) is handled gracefully without
+///    error. This is detected via "Access not found" errors during application.
+///
+/// # Security Considerations
+///
+/// - **Malicious Revocations**: A compromised or malicious node could attempt to
+///   revoke resources it doesn't own. Receivers should validate that revocations
+///   come from nodes with authority over the resource (e.g., the resource owner's
+///   cooperative or a trusted federation member). This validation is currently
+///   best-effort; see Issue #XXX for stricter authorization checks.
+///
+/// - **Denial of Service**: Rate limiting on gossip message processing prevents
+///   flooding attacks. The trust-gated rate limits apply per trust class.
+///
+/// - **Replay Protection**: Gossip entries include timestamps and vector clocks
+///   to prevent replay of old revocation events.
+///
+/// # Topic Configuration
+///
+/// When creating this topic, use:
+/// ```ignore
+/// gossip.create_topic(Topic {
+///     name: RESOURCE_REVOCATIONS_TOPIC.to_string(),
+///     acl: AccessControl::PublicSigned,
+///     scope: Scope::Global,
+///     min_trust_threshold: Some(0.3), // Only accept from Known+ trust
+///     retention: Duration::from_secs(7 * 24 * 3600), // 7 days
+///     max_entries: 10_000,
+/// });
+/// ```
 pub const RESOURCE_REVOCATIONS_TOPIC: &str = "resource:revocations";
 
 /// Configuration for resource access enforcement

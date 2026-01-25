@@ -19,6 +19,14 @@ use super::actors::{
     CoreActorHandles, EventSubscriptionHandles, GatewayActorHandles, ShutdownHandles,
 };
 
+/// Type alias for the resource access store holder
+///
+/// This is used to share a late-initialized resource access store between the
+/// supervisor lifecycle and the gossip notification handler. The outer Option
+/// allows for deferred initialization after the ledger is set up.
+pub type ResourceAccessStoreHolder =
+    Arc<RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>>;
+
 /// Run the supervisor lifecycle
 ///
 /// This is the main entry point for supervisor operation. It:
@@ -326,9 +334,7 @@ async fn spawn_actors_with_identity(
         Arc::new(RwLock::new(None));
     let contract_registry_holder: Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>> =
         Arc::new(RwLock::new(None));
-    let resource_access_store_holder: Arc<
-        RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>,
-    > = Arc::new(RwLock::new(None));
+    let resource_access_store_holder: ResourceAccessStoreHolder = Arc::new(RwLock::new(None));
 
     // Initialize federation services if enabled
     let federation_services = super::init_federation::init_federation_services(
@@ -789,9 +795,7 @@ async fn configure_gossip_actor(
     node_profile_handle: &Arc<RwLock<crate::node::NodeProfile>>,
     federation_handler: &Option<Arc<icn_federation::FederationGossipHandler>>,
     contract_registry_holder: &Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>,
-    resource_access_store_holder: &Arc<
-        RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>,
-    >,
+    resource_access_store_holder: &ResourceAccessStoreHolder,
     entity_handle: &icn_entity::EntityHandle,
     config: &Config,
     shutdown_tx: &ShutdownTx,
@@ -958,9 +962,7 @@ async fn spawn_background_tasks(
     did: &icn_identity::Did,
     protocol_parameter_store: Arc<dyn icn_governance::ProtocolParameterStore>,
     ledger_store: Arc<icn_store::SledStore>,
-    resource_access_store_holder: &Arc<
-        RwLock<Option<Arc<RwLock<dyn crate::resource_enforcer_actor::ResourceAccessStore>>>>,
-    >,
+    resource_access_store_holder: &ResourceAccessStoreHolder,
     shutdown_tx: &ShutdownTx,
     _background_tasks: &mut JoinSet<()>,
 ) {

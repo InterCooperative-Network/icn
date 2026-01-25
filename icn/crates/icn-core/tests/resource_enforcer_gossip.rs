@@ -283,7 +283,7 @@ async fn test_revocation_storage_application_and_idempotency() {
     )));
 
     // Create a resource on node 1
-    let entity = EntityId::from_did(&node1_did);
+    let entity = EntityId::from_did(node1_did);
     let access = ResourceAccess::new(
         "cross-node-resource".to_string(),
         entity.clone(),
