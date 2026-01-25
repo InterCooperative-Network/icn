@@ -2743,9 +2743,16 @@ mod tests {
         let nonexistent_holder = create_test_entity();
 
         // Try to revoke access that doesn't exist
-        let result = access_store.revoke("nonexistent-resource", &nonexistent_holder, "test".to_string());
+        let result = access_store.revoke(
+            "nonexistent-resource",
+            &nonexistent_holder,
+            "test".to_string(),
+        );
 
-        assert!(result.is_err(), "Revoke should fail for non-existent access");
+        assert!(
+            result.is_err(),
+            "Revoke should fail for non-existent access"
+        );
 
         let error_string = result.unwrap_err().to_string();
 
