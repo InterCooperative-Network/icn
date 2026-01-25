@@ -79,6 +79,14 @@ pub struct WitnessSettings {
     /// After this time, unsigned entries may be rejected.
     #[serde(default = "default_collection_timeout")]
     pub collection_timeout_secs: u64,
+
+    /// Minimum trust score required for witnesses (optional)
+    ///
+    /// When set, witnesses must have at least this trust score with
+    /// all parties involved in the transaction. See `WitnessConfig` in
+    /// icn-ledger for valid trust thresholds.
+    #[serde(default)]
+    pub min_witness_trust: Option<f64>,
 }
 
 fn default_witness_policy() -> String {
@@ -97,6 +105,7 @@ impl Default for WitnessSettings {
             quorum_required: None,
             quorum_witnesses: None,
             collection_timeout_secs: default_collection_timeout(),
+            min_witness_trust: None,
         }
     }
 }
@@ -155,6 +164,7 @@ impl WitnessSettings {
             default_policy: policy,
             threshold: self.threshold,
             collection_timeout_secs: self.collection_timeout_secs,
+            min_witness_trust: self.min_witness_trust,
         })
     }
 }

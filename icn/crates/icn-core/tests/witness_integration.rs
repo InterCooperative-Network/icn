@@ -77,6 +77,7 @@ async fn test_entry_rejected_without_required_witnesses() -> Result<()> {
         default_policy: WitnessPolicy::Counterparty,
         threshold: None,
         collection_timeout_secs: 300,
+        min_witness_trust: None,
     };
     let (ledger, _temp) = create_witnessed_ledger(config)?;
 
@@ -114,6 +115,7 @@ async fn test_entry_accepted_with_required_witnesses() -> Result<()> {
         default_policy: WitnessPolicy::Counterparty,
         threshold: None,
         collection_timeout_secs: 300,
+        min_witness_trust: None,
     };
     let (mut ledger, _temp) = create_witnessed_ledger(config)?;
 
@@ -165,6 +167,7 @@ async fn test_quorum_policy_enforcement() -> Result<()> {
         },
         threshold: None,
         collection_timeout_secs: 300,
+        min_witness_trust: None,
     };
     let (mut ledger, _temp) = create_witnessed_ledger(config.clone())?;
 
@@ -219,6 +222,7 @@ async fn test_all_parties_policy_enforcement() -> Result<()> {
         default_policy: WitnessPolicy::AllParties,
         threshold: None,
         collection_timeout_secs: 300,
+        min_witness_trust: None,
     };
     let (mut ledger, _temp) = create_witnessed_ledger(config)?;
 
@@ -276,6 +280,7 @@ async fn test_witness_threshold_respected() -> Result<()> {
         default_policy: WitnessPolicy::Counterparty,
         threshold: Some(100),
         collection_timeout_secs: 300,
+        min_witness_trust: None,
     };
     let (_ledger, _temp) = create_witnessed_ledger(config.clone())?;
 

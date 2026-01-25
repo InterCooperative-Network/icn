@@ -303,7 +303,7 @@ pub struct Ledger {
         Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Trust graph for entry validation (wrapped in RwLock for live updates)
-    trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
+    pub(crate) trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
 
     /// Minimum trust score for entry acceptance
     min_trust_for_entry: f64,
@@ -1175,7 +1175,7 @@ impl Ledger {
         witnessed: crate::types::WitnessedEntry,
     ) -> Result<ContentHash> {
         // Validate witness signatures
-        if let Err(e) = self.validate_witness_signatures(&witnessed) {
+        if let Err(e) = self.validate_witness_signatures(&witnessed).await {
             icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
             return Err(e);
         }
@@ -1226,8 +1226,12 @@ impl Ledger {
     /// 1. Valid Ed25519 signatures over the entry hash
     /// 2. Not timestamped in the future (with small tolerance for clock skew)
     /// 3. Not expired (if `WitnessConfig::collection_timeout_secs` is configured)
-    fn validate_witness_signatures(&self, witnessed: &crate::types::WitnessedEntry) -> Result<()> {
-        crate::ledger_impl::witness_ops::validate_witness_signatures(self, witnessed)
+    /// 4. Have sufficient trust score (if `WitnessConfig::min_witness_trust` is configured)
+    async fn validate_witness_signatures(
+        &self,
+        witnessed: &crate::types::WitnessedEntry,
+    ) -> Result<()> {
+        crate::ledger_impl::witness_ops::validate_witness_signatures(self, witnessed).await
     }
 
     /// Store witness signatures for an entry (for fork resolution)
@@ -1833,7 +1837,7 @@ impl Ledger {
                 witnessed.entry.id = Some(hash.clone());
 
                 // Validate witness signatures before accepting
-                if let Err(e) = self.validate_witness_signatures(&witnessed) {
+                if let Err(e) = self.validate_witness_signatures(&witnessed).await {
                     warn!(
                         entry_hash = %hash,
                         error = %e,
@@ -3369,8 +3373,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&alice, "hours"), 10);
     }
 
-    #[test]
-    fn test_freeze_with_metadata() {
+    #[tokio::test]
+    async fn test_freeze_with_metadata() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3396,8 +3400,8 @@ mod tests {
         assert_eq!(record.frozen_by, Some(admin));
     }
 
-    #[test]
-    fn test_list_frozen_members() {
+    #[tokio::test]
+    async fn test_list_frozen_members() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let alice = KeyPair::generate().unwrap().did().clone();
@@ -3717,8 +3721,8 @@ mod tests {
         assert_eq!(total, 10);
     }
 
-    #[test]
-    fn test_pagination_empty_ledger() {
+    #[tokio::test]
+    async fn test_pagination_empty_ledger() {
         let (ledger, _temp) = create_test_ledger();
 
         let (entries, total) = ledger.get_entries_paginated(0, 10).unwrap();
@@ -4003,8 +4007,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_witness_signature_timestamp_future_rejected() {
+    #[tokio::test]
+    async fn test_witness_signature_timestamp_future_rejected() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4037,7 +4041,7 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("in the future"),
@@ -4045,8 +4049,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_witness_signature_timestamp_expired_rejected() {
+    #[tokio::test]
+    async fn test_witness_signature_timestamp_expired_rejected() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4081,7 +4085,7 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("expired"),
@@ -4089,8 +4093,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_witness_signature_timestamp_valid_accepted() {
+    #[tokio::test]
+    async fn test_witness_signature_timestamp_valid_accepted() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4125,15 +4129,15 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(
             result.is_ok(),
             "Valid timestamp should be accepted: {result:?}"
         );
     }
 
-    #[test]
-    fn test_witness_signature_timestamp_within_clock_skew_accepted() {
+    #[tokio::test]
+    async fn test_witness_signature_timestamp_within_clock_skew_accepted() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4166,15 +4170,15 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(
             result.is_ok(),
             "Timestamp within clock skew tolerance should be accepted: {result:?}"
         );
     }
 
-    #[test]
-    fn test_witness_signature_exactly_at_clock_skew_boundary() {
+    #[tokio::test]
+    async fn test_witness_signature_exactly_at_clock_skew_boundary() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4207,15 +4211,15 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(
             result.is_ok(),
             "Timestamp exactly at clock skew boundary should be accepted: {result:?}"
         );
     }
 
-    #[test]
-    fn test_witness_signature_just_past_clock_skew_boundary() {
+    #[tokio::test]
+    async fn test_witness_signature_just_past_clock_skew_boundary() {
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4248,7 +4252,7 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("in the future"),
@@ -4256,8 +4260,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_witness_signature_future_rejected_without_witness_config() {
+    #[tokio::test]
+    async fn test_witness_signature_future_rejected_without_witness_config() {
         // Test that future validation still works even without witness_config
         let (ledger, _temp) = create_test_ledger();
         // Don't set witness_config - ledger has None
@@ -4290,7 +4294,7 @@ mod tests {
         };
 
         // Future validation should still work without witness_config
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(result.is_err());
         assert!(
             result.unwrap_err().to_string().contains("in the future"),
@@ -4302,8 +4306,8 @@ mod tests {
     // Witness Signature Edge Case Tests (Issue #689)
     // ============================================================================
 
-    #[test]
-    fn test_duplicate_witness_signatures_deduplicated() {
+    #[tokio::test]
+    async fn test_duplicate_witness_signatures_deduplicated() {
         // Test that duplicate signatures from the same witness are deduplicated
         // when counting unique signers for fork resolution
         let (_ledger, _temp) = create_test_ledger();
@@ -4358,8 +4362,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_quorum_required_zero() {
+    #[tokio::test]
+    async fn test_quorum_required_zero() {
         // Test that quorum with required = 0 doesn't require any signatures
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4387,8 +4391,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_quorum_required_exceeds_available() {
+    #[tokio::test]
+    async fn test_quorum_required_exceeds_available() {
         // Test that quorum fails when required > available witnesses
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4426,8 +4430,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_invalid_signature_format() {
+    #[tokio::test]
+    async fn test_invalid_signature_format() {
         // Test that invalid signature format (non-64-byte) is rejected
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
@@ -4457,7 +4461,7 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(
             result.is_err(),
             "Invalid signature format should be rejected"
@@ -4472,8 +4476,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_witnessed_entry_without_hash() {
+    #[tokio::test]
+    async fn test_witnessed_entry_without_hash() {
         // Test that witnessed entry without hash is rejected
         let (mut ledger, _temp) = create_test_ledger();
         let alice_kp = KeyPair::generate().unwrap();
@@ -4511,7 +4515,7 @@ mod tests {
             policy_applied: crate::types::WitnessPolicy::Counterparty,
         };
 
-        let result = ledger.validate_witness_signatures(&witnessed);
+        let result = ledger.validate_witness_signatures(&witnessed).await;
         assert!(result.is_err(), "Entry without hash should be rejected");
         assert!(
             result.unwrap_err().to_string().contains("hash"),
@@ -4519,8 +4523,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_author_as_witness_not_double_counted() {
+    #[tokio::test]
+    async fn test_author_as_witness_not_double_counted() {
         // Test that if author appears in witness list, they're not double-counted
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();
@@ -4561,8 +4565,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_all_parties_policy_requires_all_counterparties() {
+    #[tokio::test]
+    async fn test_all_parties_policy_requires_all_counterparties() {
         // Test that AllParties policy requires all non-author accounts to sign
         let alice_kp = KeyPair::generate().unwrap();
         let alice = alice_kp.did().clone();

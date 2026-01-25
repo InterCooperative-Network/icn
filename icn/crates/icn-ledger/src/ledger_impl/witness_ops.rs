@@ -22,6 +22,8 @@
 use crate::ledger::{Ledger, WITNESS_PREFIX};
 use crate::types::{ContentHash, JournalEntry};
 use anyhow::{Context, Result};
+use icn_identity::Did;
+use std::collections::HashSet;
 use tracing::debug;
 
 /// Validates witness signatures on an entry
@@ -30,14 +32,30 @@ use tracing::debug;
 /// 1. Valid Ed25519 signatures over the entry hash
 /// 2. Not timestamped in the future (with small tolerance for clock skew)
 /// 3. Not expired (if `WitnessConfig::collection_timeout_secs` is configured)
+/// 4. Have sufficient trust score (if `WitnessConfig::min_witness_trust` is configured)
+///
+/// # Trust Validation
+///
+/// When `min_witness_trust` is set, witnesses must have the minimum trust score
+/// with the trust graph owner (typically the ledger owner or cooperative).
+///
+/// **Current Limitation**: Trust is computed from the trust graph owner's perspective,
+/// not from each transaction party's perspective. This means all parties share the
+/// same trust requirements. For future enhancement, per-party trust validation could
+/// be implemented by querying trust from each party's perspective.
+///
+/// Trust scores are computed using the combined score from all three trust
+/// dimensions (social, economic, technical). If the trust graph is not available,
+/// trust validation is skipped with a warning.
 ///
 /// # Arguments
 /// * `ledger` - The ledger instance
 /// * `witnessed` - The witnessed entry to validate
 ///
 /// # Errors
-/// Returns error if any signature is invalid, expired, or from the future
-pub(crate) fn validate_witness_signatures(
+/// Returns error if any signature is invalid, expired, from the future, or
+/// has insufficient trust score
+pub(crate) async fn validate_witness_signatures(
     ledger: &Ledger,
     witnessed: &crate::types::WitnessedEntry,
 ) -> Result<()> {
@@ -59,6 +77,13 @@ pub(crate) fn validate_witness_signatures(
     // ledger security requires tighter timestamp validation to limit the replay
     // attack window. Witness signatures should be created and validated promptly.
     const MAX_CLOCK_SKEW_SECS: u64 = 5;
+
+    // Extract all parties involved in the transaction (for trust validation)
+    let mut transaction_parties: HashSet<Did> = HashSet::new();
+    transaction_parties.insert(witnessed.entry.author.clone());
+    for account_delta in &witnessed.entry.accounts {
+        transaction_parties.insert(account_delta.account_id.clone());
+    }
 
     for sig in &witnessed.witness_signatures {
         // Extract public key from witness DID using icn-identity
@@ -97,6 +122,15 @@ pub(crate) fn validate_witness_signatures(
                     config.collection_timeout_secs
                 );
             }
+
+            // Validate trust score if required
+            if let Some(min_trust) = config.min_witness_trust {
+                validate_witness_trust_score(ledger, &sig.witness, &transaction_parties, min_trust)
+                    .await
+                    .with_context(|| {
+                        format!("Trust validation failed for witness {}", sig.witness)
+                    })?;
+            }
         }
 
         debug!(
@@ -105,6 +139,71 @@ pub(crate) fn validate_witness_signatures(
             "Witness signature verified"
         );
     }
+
+    Ok(())
+}
+
+/// Validate that a witness has sufficient trust score with the trust graph owner
+///
+/// **Current Implementation**: Trust is computed from the trust graph owner's perspective.
+/// This is a simplification - ideally trust should be computed from each transaction
+/// party's perspective individually. This is left as a future enhancement (TODO).
+///
+/// # Arguments
+/// * `ledger` - The ledger instance
+/// * `witness` - The DID of the witness to validate
+/// * `parties` - All parties involved in the transaction (for future per-party validation)
+/// * `min_trust` - Minimum required trust score
+///
+/// # Errors
+/// Returns error if witness has insufficient trust with the trust graph owner
+async fn validate_witness_trust_score(
+    ledger: &Ledger,
+    witness: &Did,
+    _parties: &HashSet<Did>, // Reserved for future per-party validation
+    min_trust: f64,
+) -> Result<()> {
+    // If no trust graph is available, skip trust validation with a warning.
+    // SECURITY NOTE: This graceful degradation prioritizes availability over strict
+    // enforcement. Cooperatives configuring min_witness_trust MUST also call
+    // set_trust_graph() or trust validation will be skipped silently.
+    // The metric below allows monitoring for this misconfiguration.
+    let trust_graph = match &ledger.trust_graph {
+        Some(tg) => tg,
+        None => {
+            tracing::warn!(
+                "Trust validation requested but no trust graph available, skipping trust check for witness {}",
+                witness
+            );
+            icn_obs::metrics::ledger::witness_trust_validation_skipped_inc();
+            return Ok(());
+        }
+    };
+
+    // Compute trust score from trust graph owner's perspective
+    // TODO: For future enhancement, compute trust from each party's perspective
+    // by creating per-party trust lookups or using party-specific trust graphs
+    let trust_score = {
+        let graph = trust_graph.read().await;
+        graph.compute_trust_score(witness).unwrap_or(0.0)
+    };
+
+    if trust_score < min_trust {
+        icn_obs::metrics::ledger::witness_trust_validation_failed_inc();
+        anyhow::bail!(
+            "Witness {} has insufficient trust score {:.3} (minimum: {:.3})",
+            witness,
+            trust_score,
+            min_trust
+        );
+    }
+
+    debug!(
+        witness = %witness,
+        trust_score = trust_score,
+        min_trust = min_trust,
+        "Witness trust score validated"
+    );
 
     Ok(())
 }
