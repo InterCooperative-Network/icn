@@ -45,6 +45,13 @@ Key documents:
 - **ARCHITECTURE_QUICK_REF.md** - Quick reference
 - Plus 12+ detailed architecture documents
 
+### 🎯 Feature Guides
+**Location**: `docs/features/`
+
+Developer guides for specific features:
+
+- **witness-signature-best-practices.md** - Witness signatures for high-value resources (PR #826)
+
 ### 📝 Work Sessions
 **Location**: `docs/sessions/`
 
@@ -109,6 +116,7 @@ Detailed development notes and historical records:
 2. Review [ECONOMIC_ARCHITECTURE.md](ECONOMIC_ARCHITECTURE.md) - economic system design
 3. Check [dev-journal/ROADMAP.md](dev-journal/ROADMAP.md) - implementation roadmap
 4. Browse [README.md](../README.md) - quick start and deployment
+5. See [features/witness-signature-best-practices.md](features/witness-signature-best-practices.md) - witness signatures for resources
 
 ### For Learning/Training
 1. Start with [docs/security/EDUCATIONAL_GUIDE_SECURITY_FIXES.md](security/EDUCATIONAL_GUIDE_SECURITY_FIXES.md)
