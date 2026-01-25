@@ -135,9 +135,36 @@ Monitor batching performance via Prometheus metrics:
 
 ### Alerting Recommendations
 
-- **`icn_gossip_batch_mutex_poisoned_total > 0`**: Investigate thread panics immediately. This indicates a critical bug in batch processing.
-- **`icn_gossip_trust_check_lock_skipped_total` increasing**: Trust graph lock contention. Consider increasing trust graph capacity or reducing message rate.
-- **`icn_gossip_batches_rejected_oversized_total` increasing**: Potential DoS attempts or misconfigured peers. Review peer trust levels and rate limits.
+| Alert Condition | Severity | Action |
+|-----------------|----------|--------|
+| `icn_gossip_batch_mutex_poisoned_total > 0` | **Critical** | Investigate thread panics immediately. This indicates a serious bug in batch processing. |
+| `icn_gossip_trust_check_lock_skipped_total` rate > 10/min | **Warning** | Trust graph lock contention. Consider increasing trust graph capacity or reducing message rate. |
+| `icn_gossip_trust_check_lock_skipped_total` rate > 100/min | **Critical** | Severe lock contention affecting security. Messages are being rejected; investigate trust graph performance. |
+| `icn_gossip_batches_rejected_oversized_total` rate > 5/min | **Warning** | Potential DoS attempts or misconfigured peers. Review peer trust levels and rate limits. |
+| `icn_gossip_batches_rejected_oversized_total` rate > 50/min | **Critical** | Likely active DoS attack. Consider temporarily blocking high-volume senders. |
+
+**Example Prometheus Alert Rules:**
+
+```yaml
+groups:
+  - name: gossip_batching
+    rules:
+      - alert: GossipBatchMutexPoisoned
+        expr: icn_gossip_batch_mutex_poisoned_total > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gossip batch mutex poisoned (thread panic)"
+
+      - alert: GossipTrustCheckLockContention
+        expr: rate(icn_gossip_trust_check_lock_skipped_total[5m]) > 0.17  # ~10/min
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Trust graph lock contention affecting message processing"
+```
 
 ## Best Practices
 
