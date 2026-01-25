@@ -435,7 +435,7 @@ pub struct WitnessConfig {
     /// Minimum trust score required for witnesses (optional).
     /// When set, witnesses must have at least this trust score with
     /// all parties involved in the transaction (author and counterparties).
-    /// 
+    ///
     /// This integrates with ICN's trust graph to prevent collusion with
     /// unknown/untrusted entities. Trust scores are computed using the
     /// combined score from all three trust dimensions (social, economic, technical).
@@ -455,7 +455,7 @@ impl Default for WitnessConfig {
             default_policy: WitnessPolicy::None,
             threshold: None,
             collection_timeout_secs: 300, // 5 minutes default
-            min_witness_trust: None,     // Trust validation disabled by default
+            min_witness_trust: None,      // Trust validation disabled by default
         }
     }
 }
@@ -485,7 +485,16 @@ impl WitnessConfig {
     }
 
     /// Create config requiring counterparty signature with minimum trust score
+    ///
+    /// # Panics
+    ///
+    /// Panics if `min_trust` is not in the valid range [0.0, 1.0] or is NaN.
     pub fn counterparty_with_trust(threshold: u64, min_trust: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&min_trust) && !min_trust.is_nan(),
+            "min_trust must be in range [0.0, 1.0], got {}",
+            min_trust
+        );
         WitnessConfig {
             default_policy: WitnessPolicy::Counterparty,
             threshold: Some(threshold),
@@ -495,7 +504,16 @@ impl WitnessConfig {
     }
 
     /// Create config requiring quorum with minimum trust score for witnesses
+    ///
+    /// # Panics
+    ///
+    /// Panics if `min_trust` is not in the valid range [0.0, 1.0] or is NaN.
     pub fn quorum_with_trust(required: u32, witnesses: Vec<Did>, min_trust: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&min_trust) && !min_trust.is_nan(),
+            "min_trust must be in range [0.0, 1.0], got {}",
+            min_trust
+        );
         WitnessConfig {
             default_policy: WitnessPolicy::Quorum {
                 required,

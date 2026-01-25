@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the trust-graph integration for witness validation in ICN's ledger system, implemented to address [Issue #826](https://github.com/InterCooperative-Network/icn/issues/826).
+This document describes the trust-graph integration for witness validation in ICN's ledger system, implemented to address [Issue #832](https://github.com/InterCooperative-Network/icn/issues/832).
 
 ## Background
 
@@ -83,19 +83,19 @@ pub struct WitnessConfig {
 2. **Timestamp Validation**: Clock skew and expiration checks (existing)
 3. **Trust Validation** (new):
    - Extract all transaction parties (author + counterparties)
-   - For each witness, compute trust score from each party's perspective
-   - Reject if witness has insufficient trust with any party
+   - For each witness, compute trust score from the trust graph owner's perspective
+   - Reject if witness has insufficient trust score
    - Skip if trust graph not available (logs warning)
 
 ### Trust Score Computation
 
-Trust scores are computed from the trust graph owner's perspective using the combined score from all three trust dimensions:
+Trust scores are computed from the trust graph owner's perspective as a **single scalar value** derived from ICN's trust graph implementation.
 
-- **Social**: 60% direct, 40% transitive
-- **Economic**: 80% direct, 20% transitive  
-- **Technical**: 90% direct, 10% transitive
+For ledger witness validation, the score uses a single-dimension `TrustGraph` with fixed weights:
+- **Direct trust**: 70%
+- **Transitive trust**: 30%
 
-The combined score uses weights: 50% social + 30% economic + 20% technical.
+Multi-dimensional trust (social, economic, technical) is supported by the `icn-trust` crate but is **not** currently used by the ledger witness validation path; only this single aggregated score is consulted.
 
 ### Async Implementation
 
@@ -204,7 +204,7 @@ cargo test -p icn-ledger witness_trust
 Potential improvements for future iterations:
 
 1. **Per-Party Trust Lookups**: Compute trust from each transaction party's perspective
-2. **Trust Caching**: Cache trust scores to reduce graph traversal overhead
+2. **Witness-Level Trust Caching**: Build on the existing LRU trust-score cache in `TrustGraph` by adding caching at the witness-validation layer (e.g., per-transaction or batch validation) to further reduce repeated trust lookups
 3. **Governance Integration**: Allow cooperatives to set default witness policies via governance
 4. **Trust Decay Handling**: Handle trust score changes over time
 5. **Multi-Graph Support**: Use different trust dimensions for different witness requirements
@@ -218,5 +218,5 @@ Potential improvements for future iterations:
 
 ## References
 
-- Issue: [feat(ledger): Add trust-graph integration for witness validation](https://github.com/InterCooperative-Network/icn/issues/XXX)
+- Issue: [feat(ledger): Add trust-graph integration for witness validation](https://github.com/InterCooperative-Network/icn/issues/832)
 - PR: [feat(ledger): Add witness signatures for HandoffProcedure completion](https://github.com/InterCooperative-Network/icn/pull/826)

@@ -29,6 +29,16 @@ pub fn init_descriptions() {
         "Total number of entries rejected due to low trust"
     );
 
+    // Witness trust validation metrics (PR #847)
+    describe_counter!(
+        "icn_ledger_witness_trust_validation_skipped_total",
+        "Total number of witness trust validations skipped due to missing trust graph (security concern)"
+    );
+    describe_counter!(
+        "icn_ledger_witness_trust_validation_failed_total",
+        "Total number of witnesses rejected due to insufficient trust score"
+    );
+
     // Parent/orphan handling
     describe_counter!(
         "icn_ledger_missing_parents_total",
@@ -172,6 +182,21 @@ pub fn witness_signature_count_record(count: u64) {
 /// Increment entries rejected due to low trust
 pub fn entries_rejected_low_trust_inc() {
     counter!("icn_ledger_entries_rejected_low_trust_total").increment(1);
+}
+
+// Witness trust validation metrics
+
+/// Increment witness trust validation skipped counter (due to missing trust graph)
+///
+/// This indicates a potential misconfiguration: min_witness_trust is set but
+/// set_trust_graph() was not called. Monitor this metric in production.
+pub fn witness_trust_validation_skipped_inc() {
+    counter!("icn_ledger_witness_trust_validation_skipped_total").increment(1);
+}
+
+/// Increment witness trust validation failed counter
+pub fn witness_trust_validation_failed_inc() {
+    counter!("icn_ledger_witness_trust_validation_failed_total").increment(1);
 }
 
 // Parent/orphan handling metrics

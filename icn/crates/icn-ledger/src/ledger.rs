@@ -1227,7 +1227,10 @@ impl Ledger {
     /// 2. Not timestamped in the future (with small tolerance for clock skew)
     /// 3. Not expired (if `WitnessConfig::collection_timeout_secs` is configured)
     /// 4. Have sufficient trust score (if `WitnessConfig::min_witness_trust` is configured)
-    async fn validate_witness_signatures(&self, witnessed: &crate::types::WitnessedEntry) -> Result<()> {
+    async fn validate_witness_signatures(
+        &self,
+        witnessed: &crate::types::WitnessedEntry,
+    ) -> Result<()> {
         crate::ledger_impl::witness_ops::validate_witness_signatures(self, witnessed).await
     }
 

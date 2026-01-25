@@ -16,7 +16,9 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 
 /// Create a test ledger with trust graph owned by a specific DID
-fn create_ledger_with_trust_for_owner(owner_did: icn_identity::Did) -> (Ledger, TempDir, Arc<RwLock<TrustGraph>>) {
+fn create_ledger_with_trust_for_owner(
+    owner_did: icn_identity::Did,
+) -> (Ledger, TempDir, Arc<RwLock<TrustGraph>>) {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
 
@@ -28,7 +30,7 @@ fn create_ledger_with_trust_for_owner(owner_did: icn_identity::Did) -> (Ledger, 
     // Create ledger with trust graph
     let mut ledger = Ledger::new(store).unwrap();
     ledger.set_trust_graph(trust_graph_arc.clone());
-    
+
     // Disable entry author trust validation for these tests
     // (we're testing witness trust validation, not entry author validation)
     ledger.set_min_trust_for_entry(0.0);
@@ -142,7 +144,8 @@ async fn test_witness_trust_validation_insufficient_trust() {
     eprintln!("Error message: {}", err_msg);
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'", err_msg
+        "Error should mention trust or insufficient: got '{}'",
+        err_msg
     );
 
     // Verify entry was NOT stored
@@ -198,7 +201,8 @@ async fn test_witness_trust_validation_unknown_witness() {
     eprintln!("Error message: {}", err_msg);
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'", err_msg
+        "Error should mention trust or insufficient: got '{}'",
+        err_msg
     );
 
     // Verify entry was NOT stored
@@ -249,7 +253,9 @@ async fn test_witness_trust_validation_backward_compatible() {
     // Verify entry was stored
     assert!(ledger.get_entry(&hash).unwrap().is_some());
 
-    println!("✓ Backward compatibility maintained (no trust validation when min_witness_trust = None)");
+    println!(
+        "✓ Backward compatibility maintained (no trust validation when min_witness_trust = None)"
+    );
 }
 
 #[tokio::test]
@@ -492,7 +498,8 @@ async fn test_witness_trust_validation_quorum_insufficient_trusted_witnesses() {
     eprintln!("Error message: {}", err_msg);
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'", err_msg
+        "Error should mention trust or insufficient: got '{}'",
+        err_msg
     );
 
     // Verify entry was NOT stored
