@@ -10,7 +10,6 @@ icn-encoding = { path = "../icn-encoding" }
 icn-identity.workspace = true
 icn-time = { path = "../icn-time" }
 icn-trust.workspace = true
-icn-kernel-api = { path = "../icn-kernel-api" }
 icn-obs.workspace = true
 icn-snapshot.workspace = true
 icn-store.workspace = true

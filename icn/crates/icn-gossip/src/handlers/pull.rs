@@ -86,33 +86,8 @@ impl GossipActor {
         // We're behind! Send PullRequest with empty want_ids to request ALL entries
         debug!("Detected we're behind - sending PullRequest for all entries");
 
-        // Get limits from policy oracle
-        let request = icn_kernel_api::authz::PolicyRequest::new(
-            peer_did.as_str().to_string(),
-            icn_kernel_api::authz::ActionKind::Read,
-            icn_kernel_api::authz::Domain::trust(),
-        );
-        let decision = self.policy_oracle.evaluate(&request);
-        
-        // Map oracle constraints to trust class for TrustResourceLimits (temporary bridge)
-        let trust_class = if let Some(constraints) = decision.constraints() {
-            if let Some(max_topics) = constraints.max_topics {
-                if max_topics >= 500 {
-                    icn_trust::TrustClass::Federated
-                } else if max_topics >= 100 {
-                    icn_trust::TrustClass::Partner
-                } else if max_topics >= 25 {
-                    icn_trust::TrustClass::Known
-                } else {
-                    icn_trust::TrustClass::Isolated
-                }
-            } else {
-                icn_trust::TrustClass::Isolated
-            }
-        } else {
-            icn_trust::TrustClass::Isolated
-        };
-        
+        // Get trust class and limits
+        let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
         let limits = TrustResourceLimits::for_trust_class(trust_class);
         let max_bytes = limits.max_pull_bytes;
 
@@ -376,33 +351,9 @@ impl GossipActor {
             if let Some(cursor) = next_cursor {
                 icn_obs::metrics::gossip::pull_continuation_received_inc();
 
-                // Get trust-based limits for continuation from policy oracle
-                let request = icn_kernel_api::authz::PolicyRequest::new(
-                    peer_for_continuation.as_str().to_string(),
-                    icn_kernel_api::authz::ActionKind::Read,
-                    icn_kernel_api::authz::Domain::trust(),
-                );
-                let decision = self.policy_oracle.evaluate(&request);
-                
-                // Map oracle constraints to trust class for TrustResourceLimits (temporary bridge)
-                let trust_class = if let Some(constraints) = decision.constraints() {
-                    if let Some(max_topics) = constraints.max_topics {
-                        if max_topics >= 500 {
-                            icn_trust::TrustClass::Federated
-                        } else if max_topics >= 100 {
-                            icn_trust::TrustClass::Partner
-                        } else if max_topics >= 25 {
-                            icn_trust::TrustClass::Known
-                        } else {
-                            icn_trust::TrustClass::Isolated
-                        }
-                    } else {
-                        icn_trust::TrustClass::Isolated
-                    }
-                } else {
-                    icn_trust::TrustClass::Isolated
-                };
-                
+                // Get trust-based limits for continuation
+                let trust_class = (self.trust_lookup)(&peer_for_continuation)
+                    .unwrap_or(icn_trust::TrustClass::Isolated);
                 let limits = TrustResourceLimits::for_trust_class(trust_class);
 
                 // Check backpressure before continuing

@@ -6,7 +6,7 @@ use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Topic
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
-use icn_kernel_api::authz::{ActionKind, Domain, PolicyOracle, PolicyRequest};
+use icn_trust::TrustClass;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -40,39 +40,92 @@ pub type StorageProofCallback =
 pub type StorageContentNotFoundCallback =
     Arc<dyn Fn(icn_store::StorageContentNotFound) -> anyhow::Result<()> + Send + Sync>;
 
+/// Trust lookup function for resource limits
+/// Parameters: (did) -> `Option<TrustClass>`
+/// Returns the trust class for a DID to determine resource limits
+pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
+
 /// Maximum subscribers per topic to prevent unbounded memory growth
 pub(crate) const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
 /// Maximum topics per peer (base limit) to prevent subscription spam
-/// This can be increased for higher-trust peers via policy oracle
+/// This can be increased for higher-trust peers via trust-weighted multipliers
 const MAX_TOPICS_PER_PEER_BASE: usize = 100;
 
-/// Get per-peer topic limit from policy oracle constraints.
-///
-/// The policy oracle (typically the trust app) determines subscription limits
-/// based on trust scores, membership status, etc. The kernel enforces these
-/// limits without understanding their semantic origin.
-pub(crate) fn topics_per_peer_limit(
-    oracle: &Arc<dyn PolicyOracle>,
-    peer: &Did,
-) -> usize {
-    let request = PolicyRequest::new(
-        peer.as_str().to_string(),
-        ActionKind::Subscribe,
-        Domain::trust(),
-    );
-    
-    let decision = oracle.evaluate(&request);
-    
-    if let Some(constraints) = decision.constraints() {
-        if let Some(max_topics) = constraints.max_topics {
-            return max_topics as usize;
+/// Trust multipliers for per-peer topic limits
+/// Higher trust classes get higher subscription limits
+pub(crate) fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
+    match trust_class {
+        Some(TrustClass::Federated) => MAX_TOPICS_PER_PEER_BASE * 4, // 400 topics
+        Some(TrustClass::Partner) => MAX_TOPICS_PER_PEER_BASE * 2,   // 200 topics
+        Some(TrustClass::Known) => MAX_TOPICS_PER_PEER_BASE,         // 100 topics
+        Some(TrustClass::Isolated) | None => MAX_TOPICS_PER_PEER_BASE / 2, // 50 topics
+    }
+}
+
+/// Cache for trust scores to avoid blocking async operations
+/// Uses std::sync::Mutex for synchronous access from non-async code
+pub(crate) struct TrustScoreCache {
+    scores: std::sync::Mutex<HashMap<Did, (f64, Instant)>>,
+    ttl: Duration,
+}
+
+impl TrustScoreCache {
+    fn new(ttl: Duration) -> Self {
+        Self {
+            scores: std::sync::Mutex::new(HashMap::new()),
+            ttl,
         }
     }
-    
-    // Fallback to base limit if no constraints provided
-    MAX_TOPICS_PER_PEER_BASE / 2 // Default to restricted limit
+
+    /// Get cached trust score if still valid
+    pub(crate) fn get(&self, did: &Did) -> Option<f64> {
+        if let Ok(cache) = self.scores.lock() {
+            if let Some((score, cached_at)) = cache.get(did) {
+                if cached_at.elapsed() < self.ttl {
+                    return Some(*score);
+                }
+            }
+        }
+        None
+    }
+
+    /// Insert a trust score into the cache
+    pub(crate) fn insert(&self, did: &Did, score: f64) {
+        if let Ok(mut cache) = self.scores.lock() {
+            cache.insert(did.clone(), (score, Instant::now()));
+            // Limit cache size to prevent unbounded growth
+            if cache.len() > 10_000 {
+                // Remove oldest entries (simple eviction)
+                let now = Instant::now();
+                cache.retain(|_, (_, cached_at)| now.duration_since(*cached_at) < self.ttl);
+            }
+        }
+    }
+
+    /// Get cached trust score if valid, or compute and cache it (sync version)
+    #[allow(dead_code)]
+    fn get_or_compute<F>(&self, did: &Did, compute: F) -> f64
+    where
+        F: FnOnce() -> f64,
+    {
+        // Try to get from cache first
+        if let Some(score) = self.get(did) {
+            return score;
+        }
+
+        // Compute new score
+        let score = compute();
+
+        // Cache it
+        self.insert(did, score);
+
+        score
+    }
 }
+
+/// Default TTL for trust score cache (5 seconds)
+const TRUST_CACHE_TTL: Duration = Duration::from_secs(5);
 
 /// Spawn a violation recording task without blocking
 /// This is fire-and-forget - we don't wait for the result
@@ -115,12 +168,19 @@ pub struct GossipActor {
     /// Subscriptions (topic -> subscribers)
     pub(crate) subscriptions: HashMap<String, Vec<Did>>,
 
-    /// Policy oracle for authorization decisions (trust, rate limiting, etc.)
+    /// Trust lookup function (returns trust class for resource limits)
+    pub(crate) trust_lookup: TrustLookup,
+
+    /// Trust graph for fine-grained trust score computation (optional)
     ///
-    /// The oracle converts domain semantics (trust scores, membership) into
-    /// kernel-enforceable constraints. The gossip actor never interprets
-    /// semantic meaning - it only enforces oracle decisions.
-    pub(crate) policy_oracle: Arc<dyn PolicyOracle>,
+    /// When provided, enables trust-gated subscription authorization.
+    /// Accessed by the `subscriptions` module for authorization checks.
+    pub(crate) trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+
+    /// Trust score cache to avoid blocking async operations
+    ///
+    /// Accessed by the `subscriptions` module for cached trust lookups.
+    pub(crate) trust_cache: TrustScoreCache,
 
     /// Send message callback (optional, for sending responses)
     send_callback: Option<SendMessageCallback>,
@@ -174,8 +234,17 @@ pub struct GossipActor {
 }
 
 impl GossipActor {
-    /// Create a new gossip actor with a policy oracle
-    pub fn new(own_did: Did, policy_oracle: Arc<dyn PolicyOracle>) -> Self {
+    /// Create a new gossip actor
+    pub fn new(own_did: Did, trust_lookup: TrustLookup) -> Self {
+        Self::new_with_trust_graph(own_did, trust_lookup, None)
+    }
+
+    /// Create a new gossip actor with optional trust graph for fine-grained trust control
+    pub fn new_with_trust_graph(
+        own_did: Did,
+        trust_lookup: TrustLookup,
+        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+    ) -> Self {
         let mut gossip = GossipActor {
             own_did: own_did.clone(),
             keypair: None,
@@ -185,7 +254,9 @@ impl GossipActor {
             entries: HashMap::new(),
             bloom_filters: HashMap::new(),
             subscriptions: HashMap::new(),
-            policy_oracle,
+            trust_lookup,
+            trust_graph,
+            trust_cache: TrustScoreCache::new(TRUST_CACHE_TTL),
             send_callback: None,
             notification_callback: None,
             peer_sampling: None,
@@ -204,8 +275,6 @@ impl GossipActor {
         };
 
         // Create default topics with appropriate scopes
-        // Note: AccessControl::TrustClass still used here - it will be migrated
-        // in a follow-up phase when AccessControl enum is refactored
         gossip.create_topic(
             Topic::new("global:identity".to_string(), AccessControl::Public)
                 .with_scope(crate::types::Scope::Global), // Identity propagates globally
@@ -217,7 +286,7 @@ impl GossipActor {
         gossip.create_topic(
             Topic::new(
                 "trust:attestations".to_string(),
-                AccessControl::TrustClass(icn_trust::TrustClass::Known),
+                AccessControl::TrustClass(TrustClass::Known),
             )
             .with_scope(crate::types::Scope::Regional), // Trust attestations are regional
         );
@@ -226,21 +295,21 @@ impl GossipActor {
         gossip.create_topic(
             Topic::new(
                 crate::labor_shares::topics::LABOR_SHARES_ALLOCATIONS.to_string(),
-                AccessControl::TrustClass(icn_trust::TrustClass::Known), // FederationOpen equivalent
+                AccessControl::TrustClass(TrustClass::Known), // FederationOpen equivalent
             )
             .with_scope(crate::types::Scope::Global), // Labor share events propagate globally
         );
         gossip.create_topic(
             Topic::new(
                 crate::labor_shares::topics::BONDS_ISSUANCE.to_string(),
-                AccessControl::TrustClass(icn_trust::TrustClass::Known), // FederationOpen equivalent
+                AccessControl::TrustClass(TrustClass::Known), // FederationOpen equivalent
             )
             .with_scope(crate::types::Scope::Global), // Bond offerings propagate globally
         );
         gossip.create_topic(
             Topic::new(
                 crate::labor_shares::topics::BONDS_PAYMENTS.to_string(),
-                AccessControl::TrustClass(icn_trust::TrustClass::Partner), // TrustClass::Partner
+                AccessControl::TrustClass(TrustClass::Partner), // TrustClass::Partner
             )
             .with_scope(crate::types::Scope::Regional), // Payment notifications are regional
         );
@@ -249,7 +318,7 @@ impl GossipActor {
         gossip.create_topic(
             Topic::new(
                 crate::key_rotation::TOPIC_KEY_ROTATION.to_string(),
-                AccessControl::TrustClass(icn_trust::TrustClass::Known), // Known peers can receive rotations
+                AccessControl::TrustClass(TrustClass::Known), // Known peers can receive rotations
             )
             .with_scope(crate::types::Scope::Global), // Key rotations propagate globally
         );
@@ -787,37 +856,8 @@ impl GossipActor {
 
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Check ACL - Note: This still uses TrustClass via AccessControl enum
-        // which will be refactored in a follow-up phase
-        let request = PolicyRequest::new(
-            self.own_did.as_str().to_string(),
-            ActionKind::Publish,
-            Domain::trust(),
-        );
-        let decision = self.policy_oracle.evaluate(&request);
-        
-        // For now, we still need to check can_publish with TrustClass
-        // This will be removed when AccessControl enum is refactored
-        // Extract max_topics from constraints as a proxy for trust level
-        let trust_class = if let Some(constraints) = decision.constraints() {
-            if let Some(max_topics) = constraints.max_topics {
-                // Map max_topics back to TrustClass (temporary bridge)
-                if max_topics >= 500 {
-                    Some(icn_trust::TrustClass::Federated)
-                } else if max_topics >= 100 {
-                    Some(icn_trust::TrustClass::Partner)
-                } else if max_topics >= 25 {
-                    Some(icn_trust::TrustClass::Known)
-                } else {
-                    Some(icn_trust::TrustClass::Isolated)
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        
+        // Check ACL
+        let trust_class = (self.trust_lookup)(&self.own_did);
         if !topic_obj.can_publish(&self.own_did, trust_class) {
             bail!("Not authorized to publish to topic: {topic}");
         }
@@ -1309,8 +1349,17 @@ pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
 impl GossipActor {
     /// Spawn a gossip actor and return a handle
-    pub fn spawn(own_did: Did, policy_oracle: Arc<dyn PolicyOracle>) -> GossipHandle {
-        let actor = GossipActor::new(own_did, policy_oracle);
+    pub fn spawn(own_did: Did, trust_lookup: TrustLookup) -> GossipHandle {
+        Self::spawn_with_trust_graph(own_did, trust_lookup, None)
+    }
+
+    /// Spawn a gossip actor with optional trust graph and return a handle
+    pub fn spawn_with_trust_graph(
+        own_did: Did,
+        trust_lookup: TrustLookup,
+        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+    ) -> GossipHandle {
+        let actor = GossipActor::new_with_trust_graph(own_did, trust_lookup, trust_graph);
         Arc::new(RwLock::new(actor))
     }
 }

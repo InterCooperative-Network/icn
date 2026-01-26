@@ -1,13 +1,13 @@
 //! Topic subscription management
 //!
-//! This module handles topic subscription lifecycle with policy-based authorization.
+//! This module handles topic subscription lifecycle with trust-based authorization.
 //! It enforces per-peer and per-topic limits to prevent resource exhaustion.
 //!
 //! # Authorization Layers
 //!
-//! 1. **Trust threshold** - Fine-grained trust score check (if configured via PolicyOracle)
-//! 2. **Access control** - Coarse-grained ACL check (temporary TrustClass bridge)
-//! 3. **Rate limits** - Per-peer subscription limits (oracle-determined)
+//! 1. **Trust threshold** - Fine-grained trust score check (if configured)
+//! 2. **Access control** - Coarse-grained ACL check based on trust class
+//! 3. **Rate limits** - Per-peer subscription limits (trust-weighted)
 //! 4. **Capacity limits** - Per-topic subscriber limits
 //!
 //! # Key Functions
@@ -24,7 +24,6 @@ use crate::gossip::{
 use crate::types::Subscription;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
-use icn_kernel_api::authz::{ActionKind, Domain, PolicyRequest};
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
@@ -34,86 +33,70 @@ impl GossipActor {
     pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Use policy oracle for trust decision
-        let request = PolicyRequest::new(
-            subscriber.as_str().to_string(),
-            ActionKind::Subscribe,
-            Domain::trust(),
-        );
-        let decision = self.policy_oracle.evaluate(&request);
-
-        // Extract trust score from oracle decision (if credit_multiplier is set)
-        // The trust app sets credit_multiplier = trust_score
-        let trust_score = decision
-            .constraints()
-            .and_then(|c| c.credit_multiplier)
-            .unwrap_or(0.0);
-
         // Priority 1: Check fine-grained trust threshold (if configured)
         if let Some(threshold) = topic_obj.min_trust_threshold {
-            // Enforce trust threshold
-            if trust_score < threshold {
-                warn!(
-                    "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
-                    subscriber, topic, trust_score, threshold
-                );
+            if let Some(trust_graph) = &self.trust_graph {
+                // Get trust score from cache or compute it async
+                let trust_score = if let Some(cached) = self.trust_cache.get(&subscriber) {
+                    cached
+                } else {
+                    // Compute async and cache
+                    let graph = trust_graph.read().await;
+                    let score = graph.compute_trust_score(&subscriber).unwrap_or(0.0);
+                    self.trust_cache.insert(&subscriber, score);
+                    score
+                };
 
-                // Track rejection metrics
-                icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
-
-                // Record misbehavior violation (fire-and-forget, non-blocking)
-                if let Some(ref detector) = self.misbehavior_detector {
-                    use sha2::{Digest, Sha256};
-                    let mut hasher = Sha256::new();
-                    hasher.update(subscriber.as_str().as_bytes());
-                    hasher.update(topic.as_bytes());
-                    hasher.update(b"unauthorized_subscription");
-                    let evidence = hasher.finalize().to_vec();
-
-                    let violation = icn_security::Violation::ExcessiveResourceUse {
-                        metric: format!("unauthorized_subscription:{topic}"),
-                        observed: 1,
-                        limit: 0,
-                    };
-
-                    spawn_violation_recording(
-                        Arc::clone(detector),
-                        subscriber.clone(),
-                        violation,
-                        evidence,
+                // Enforce trust threshold
+                if trust_score < threshold {
+                    warn!(
+                        "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
+                        subscriber, topic, trust_score, threshold
                     );
+
+                    // Track rejection metrics
+                    icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
+
+                    // Record misbehavior violation (fire-and-forget, non-blocking)
+                    if let Some(ref detector) = self.misbehavior_detector {
+                        use sha2::{Digest, Sha256};
+                        let mut hasher = Sha256::new();
+                        hasher.update(subscriber.as_str().as_bytes());
+                        hasher.update(topic.as_bytes());
+                        hasher.update(b"unauthorized_subscription");
+                        let evidence = hasher.finalize().to_vec();
+
+                        let violation = icn_security::Violation::ExcessiveResourceUse {
+                            metric: format!("unauthorized_subscription:{topic}"),
+                            observed: 1,
+                            limit: 0,
+                        };
+
+                        spawn_violation_recording(
+                            Arc::clone(detector),
+                            subscriber.clone(),
+                            violation,
+                            evidence,
+                        );
+                    }
+
+                    bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
                 }
 
-                bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
+                info!(
+                    "✅ Subscription authorized: DID {} to topic {} (trust score: {:.3})",
+                    subscriber, topic, trust_score
+                );
+            } else {
+                warn!(
+                    "Topic {} has min_trust_threshold {:.3} but GossipActor has no trust_graph - falling back to ACL check",
+                    topic, threshold
+                );
             }
-
-            info!(
-                "✅ Subscription authorized: DID {} to topic {} (trust score: {:.3})",
-                subscriber, topic, trust_score
-            );
         }
 
         // Priority 2: Check AccessControl-based ACL (coarse-grained)
-        // Map oracle constraints back to TrustClass (temporary bridge until AccessControl is refactored)
-        let trust_class = if let Some(constraints) = decision.constraints() {
-            if let Some(max_topics) = constraints.max_topics {
-                // Map max_topics back to TrustClass (temporary bridge)
-                if max_topics >= 500 {
-                    Some(icn_trust::TrustClass::Federated)
-                } else if max_topics >= 100 {
-                    Some(icn_trust::TrustClass::Partner)
-                } else if max_topics >= 25 {
-                    Some(icn_trust::TrustClass::Known)
-                } else {
-                    Some(icn_trust::TrustClass::Isolated)
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
+        let trust_class = (self.trust_lookup)(&subscriber);
         if !topic_obj.can_subscribe(&subscriber, trust_class) {
             // Record misbehavior violation (fire-and-forget, non-blocking)
             if let Some(ref detector) = self.misbehavior_detector {
@@ -141,10 +124,10 @@ impl GossipActor {
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
-        // Check per-peer subscription limit (oracle-determined)
+        // Check per-peer subscription limit (trust-weighted)
         // This prevents a single peer from subscribing to too many topics
         let peer_topics = self.get_subscriptions(&subscriber);
-        let peer_limit = topics_per_peer_limit(&self.policy_oracle, &subscriber);
+        let peer_limit = topics_per_peer_limit(trust_class);
         if peer_topics.len() >= peer_limit {
             // Record misbehavior violation (fire-and-forget, non-blocking)
             if let Some(ref detector) = self.misbehavior_detector {
