@@ -17,6 +17,7 @@ use icn_identity::Did as IdentityDid;
 use icn_kernel_api::authz::{
     ConstraintSet, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
 };
+use ordered_float::OrderedFloat;
 
 // Re-export for tests that need it
 #[cfg(test)]
@@ -134,7 +135,7 @@ impl TrustPolicyOracle {
             .with_max_topics(Self::max_topics_for_score(score))
             .with_max_connections(Self::max_connections_for_score(score))
             .with_voting_weight(score) // Voting weight equals trust score
-            .with_custom("trust_score", ConstraintValue::Float(score))
+            .with_custom("trust_score", ConstraintValue::Float(OrderedFloat(score)))
             .with_custom(
                 "trust_class",
                 ConstraintValue::String(format!("{:?}", TrustClass::from_score(score))),
@@ -177,7 +178,7 @@ impl TrustPolicyOracle {
                 "score" => {
                     // Caller wants just the score
                     let constraints = ConstraintSet::new()
-                        .with_custom("trust_score", ConstraintValue::Float(score));
+                        .with_custom("trust_score", ConstraintValue::Float(OrderedFloat(score)));
                     return PolicyDecision::allow_with(constraints);
                 }
                 "class" => {
@@ -321,7 +322,7 @@ mod tests {
         // Check custom constraints
         assert!(matches!(
             constraints.custom.get("trust_score"),
-            Some(ConstraintValue::Float(s)) if (*s - 0.55).abs() < 0.001
+            Some(ConstraintValue::Float(s)) if (s.into_inner() - 0.55).abs() < 0.001
         ));
         assert!(matches!(
             constraints.custom.get("trust_class"),

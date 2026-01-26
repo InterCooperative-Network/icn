@@ -1993,6 +1993,7 @@ dependencies = [
  "icn-kernel-api",
  "icn-store",
  "icn-trust",
+ "ordered-float 4.6.0",
  "serde",
  "serde_json",
  "tokio",
@@ -2361,9 +2362,11 @@ name = "icn-kernel-api"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "ordered-float 4.6.0",
  "parking_lot 0.12.5",
  "serde",
  "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -2615,7 +2618,7 @@ dependencies = [
  "icn-time",
  "lru",
  "multibase",
- "ordered-float",
+ "ordered-float 5.1.0",
  "serde",
  "serde_json",
  "sha2",
@@ -3446,6 +3449,17 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordered-float"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+]
+
+[[package]]
+name = "ordered-float"
 version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f4779c6901a562440c3786d08192c6fbda7c1c2060edd10006b05ee35d10f2d"
@@ -3885,6 +3899,7 @@ dependencies = [
  "libc",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
+ "serde",
 ]
 
 [[package]]
@@ -3924,6 +3939,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.17",
+ "serde",
 ]
 
 [[package]]

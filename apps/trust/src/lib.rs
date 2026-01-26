@@ -156,19 +156,17 @@ impl Reducer for TrustEdgeReducer {
         };
 
         // Parse DIDs
-        let source_did = icn_identity::Did::from_str(&update.source).map_err(|e| {
-            DispatchError::Handler(format!("Invalid source DID: {}", e))
-        })?;
-        let target_did = icn_identity::Did::from_str(&update.target).map_err(|e| {
-            DispatchError::Handler(format!("Invalid target DID: {}", e))
-        })?;
+        let source_did = icn_identity::Did::from_str(&update.source)
+            .map_err(|e| DispatchError::Handler(format!("Invalid source DID: {e}")))?;
+        let target_did = icn_identity::Did::from_str(&update.target)
+            .map_err(|e| DispatchError::Handler(format!("Invalid target DID: {e}")))?;
 
         // Build trust edge
         let mut edge = TrustEdge::new_typed(
             source_did,
             target_did,
             TrustScore::unchecked(update.score),
-            graph_type.clone(),
+            graph_type,
         );
 
         for label in &update.labels {
@@ -188,9 +186,9 @@ impl Reducer for TrustEdgeReducer {
                 TrustGraphType::TechnicalReliability => graph.technical_mut(),
             };
 
-            typed_graph.add_edge(edge).map_err(|e| {
-                DispatchError::Handler(format!("Failed to add edge: {}", e))
-            })
+            typed_graph
+                .add_edge(edge)
+                .map_err(|e| DispatchError::Handler(format!("Failed to add edge: {e}")))
         })?;
 
         // Create state delta for persistence
@@ -242,9 +240,8 @@ impl Service for TrustQueryService {
                 })?;
 
                 // Parse target as DID
-                let target = icn_identity::Did::from_str(&target_str).map_err(|e| {
-                    DispatchError::Handler(format!("Invalid DID: {}", e))
-                })?;
+                let target = icn_identity::Did::from_str(&target_str)
+                    .map_err(|e| DispatchError::Handler(format!("Invalid DID: {e}")))?;
 
                 let graph = self.graph.read().await;
                 let score = graph
@@ -266,9 +263,8 @@ impl Service for TrustQueryService {
                 })?;
 
                 // Parse target as DID
-                let target = icn_identity::Did::from_str(&target_str).map_err(|e| {
-                    DispatchError::Handler(format!("Invalid DID: {}", e))
-                })?;
+                let target = icn_identity::Did::from_str(&target_str)
+                    .map_err(|e| DispatchError::Handler(format!("Invalid DID: {e}")))?;
 
                 let graph = self.graph.read().await;
                 let score = graph
@@ -279,7 +275,7 @@ impl Service for TrustQueryService {
 
                 TrustQueryResponse {
                     score: Some(score),
-                    trust_class: Some(format!("{:?}", class)),
+                    trust_class: Some(format!("{class:?}")),
                     dids: vec![],
                     success: true,
                     error: None,

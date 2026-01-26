@@ -405,9 +405,12 @@ impl AppRuntime {
     }
 
     /// Get app status.
+    ///
+    /// Note: This calls `AppHandle::status()` which checks the failed flag,
+    /// returning `Failed` if the dispatcher task has failed.
     pub async fn status(&self, app_id: &AppId) -> Option<AppStatus> {
         let apps = self.apps.read().await;
-        apps.get(app_id).map(|a| a.status)
+        apps.get(app_id).map(|a| a.status())
     }
 
     /// Get app handle (read-only).

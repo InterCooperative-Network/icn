@@ -136,8 +136,12 @@ impl DecisionCache {
             entries.retain(|_, v| v.expires_at > now);
         }
 
-        // If still at capacity after eviction, skip insertion
+        // If still at capacity after eviction, skip insertion and log warning
         if entries.len() >= self.max_entries {
+            tracing::warn!(
+                cache_size = self.max_entries,
+                "Decision cache is full after eviction; dropping new entry. Consider increasing cache size."
+            );
             return;
         }
 
@@ -476,10 +480,16 @@ impl GenesisCapabilities {
 
         // Generate capability ID using system time (Instant::elapsed() would panic on future time)
         let seq = self.counter.fetch_add(1, AtomicOrdering::SeqCst);
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or(Duration::ZERO)
-            .as_nanos();
+        let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(d) => d.as_nanos(),
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "System clock is before UNIX epoch during genesis capability issuance; using 0 timestamp"
+                );
+                0
+            }
+        };
         let cap_id = format!("genesis:{:016x}:{}", timestamp, seq);
 
         Ok(Capability {

@@ -558,11 +558,7 @@ pub fn parse_expr(s: &str) -> Result<SchemaExpr, SchemaError> {
         if s.ends_with(')') {
             let name = s[..paren_pos].trim();
             // Only treat as function if name is a valid identifier
-            if !name.is_empty()
-                && name
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_')
-            {
+            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
                 let args_str = &s[paren_pos + 1..s.len() - 1];
                 // Split on commas, but respect nested parentheses
                 let args = split_args(args_str)?;

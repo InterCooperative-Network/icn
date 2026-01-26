@@ -37,6 +37,7 @@
 //! - Any policy logic (just enforcement)
 
 use crate::types::{CapabilityId, Did, LogicalTimestamp};
+use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -293,14 +294,21 @@ impl RateLimit {
 /// Bounded constraint value - NOT Box<dyn Any>.
 ///
 /// This is serializable and has known size, unlike dynamic types.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+///
+/// # Float Handling
+///
+/// Uses `OrderedFloat<f64>` for the Float variant to ensure correct
+/// equality semantics (NaN == NaN) for cache keys and ConstraintSet
+/// comparisons. This prevents subtle cache misses when constraints
+/// contain NaN values.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ConstraintValue {
     /// Boolean value
     Bool(bool),
     /// Integer value
     Int(i64),
-    /// Floating point value
-    Float(f64),
+    /// Floating point value (uses OrderedFloat for correct equality semantics)
+    Float(OrderedFloat<f64>),
     /// String value
     String(String),
     /// List of values
@@ -321,7 +329,7 @@ impl From<i64> for ConstraintValue {
 
 impl From<f64> for ConstraintValue {
     fn from(v: f64) -> Self {
-        Self::Float(v)
+        Self::Float(OrderedFloat(v))
     }
 }
 
@@ -844,7 +852,10 @@ mod tests {
     fn test_constraint_value_conversions() {
         assert_eq!(ConstraintValue::from(true), ConstraintValue::Bool(true));
         assert_eq!(ConstraintValue::from(42i64), ConstraintValue::Int(42));
-        assert_eq!(ConstraintValue::from(2.5f64), ConstraintValue::Float(2.5));
+        assert_eq!(
+            ConstraintValue::from(2.5f64),
+            ConstraintValue::Float(OrderedFloat(2.5))
+        );
         assert_eq!(
             ConstraintValue::from("test"),
             ConstraintValue::String("test".to_string())
