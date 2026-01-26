@@ -1,7 +1,7 @@
 //! Rate limiting for network messages
 //!
 //! Implements a token bucket algorithm for per-peer rate limiting to prevent DoS attacks.
-//! Supports trust-gated rate limiting where different limits apply based on peer trust level.
+//! Supports policy-based rate limiting where limits are determined by PolicyOracle.
 //!
 //! ## Sybil Resistance (Issue #675)
 //!
@@ -11,7 +11,7 @@
 //! PersonhoodAnchor share a single rate limit bucket.
 
 use icn_identity::{Did, PersonhoodStoreTrait};
-use icn_trust::TrustClass;
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyOracle, PolicyRequest};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -33,13 +33,13 @@ impl fmt::Display for HexDisplay<'_> {
     }
 }
 
-// Helper to convert TrustClass to string for metrics
-fn trust_class_to_str(class: TrustClass) -> &'static str {
-    match class {
-        TrustClass::Isolated => "isolated",
-        TrustClass::Known => "known",
-        TrustClass::Partner => "partner",
-        TrustClass::Federated => "federated",
+// Helper to determine rate tier label for metrics based on rate limit values
+fn rate_tier_label(messages_per_second: u32) -> &'static str {
+    match messages_per_second {
+        0..=10 => "restricted",
+        11..=50 => "throttled",
+        51..=150 => "standard",
+        _ => "unlimited",
     }
 }
 
@@ -62,73 +62,6 @@ impl Default for RateLimitConfig {
             max_messages_per_second: 100, // 100 msgs/sec = reasonable for gossip
             burst_capacity: 20,           // Allow bursts of 20 messages
             refill_interval: Duration::from_millis(100), // Refill every 100ms
-        }
-    }
-}
-
-/// Trust-gated rate limiting configuration
-/// Different limits apply based on peer trust classification
-#[derive(Clone, Debug)]
-pub struct TrustGatedRateLimitConfig {
-    /// Limits for isolated peers (untrusted, score < 0.1)
-    pub isolated: RateLimitConfig,
-
-    /// Limits for known peers (limited trust, score 0.1-0.4)
-    pub known: RateLimitConfig,
-
-    /// Limits for partner peers (trusted, score 0.4-0.7)
-    pub partner: RateLimitConfig,
-
-    /// Limits for federated peers (highly trusted, score 0.7+)
-    pub federated: RateLimitConfig,
-
-    /// Refill interval (shared across all trust levels)
-    pub refill_interval: Duration,
-
-    /// Minimum trust score required for TLS connections (default: 0.0 = allow all authenticated DIDs)
-    /// Peers with trust scores below this threshold will be rejected during TLS handshake
-    pub min_trust_threshold: f64,
-}
-
-impl Default for TrustGatedRateLimitConfig {
-    fn default() -> Self {
-        let refill_interval = Duration::from_millis(100);
-
-        TrustGatedRateLimitConfig {
-            isolated: RateLimitConfig {
-                max_messages_per_second: 10,
-                burst_capacity: 2,
-                refill_interval,
-            },
-            known: RateLimitConfig {
-                max_messages_per_second: 50,
-                burst_capacity: 10,
-                refill_interval,
-            },
-            partner: RateLimitConfig {
-                max_messages_per_second: 100,
-                burst_capacity: 20,
-                refill_interval,
-            },
-            federated: RateLimitConfig {
-                max_messages_per_second: 200,
-                burst_capacity: 50,
-                refill_interval,
-            },
-            refill_interval,
-            min_trust_threshold: 0.0, // Default: allow all authenticated DIDs
-        }
-    }
-}
-
-impl TrustGatedRateLimitConfig {
-    /// Get the rate limit config for a specific trust class
-    pub fn for_class(&self, class: TrustClass) -> &RateLimitConfig {
-        match class {
-            TrustClass::Isolated => &self.isolated,
-            TrustClass::Known => &self.known,
-            TrustClass::Partner => &self.partner,
-            TrustClass::Federated => &self.federated,
         }
     }
 }
@@ -208,9 +141,6 @@ struct TokenBucket {
 
     /// Refill interval
     refill_interval: Duration,
-
-    /// Current trust class (for detecting changes in trust-gated mode)
-    trust_class: Option<TrustClass>,
 }
 
 impl TokenBucket {
@@ -218,7 +148,6 @@ impl TokenBucket {
         capacity: f64,
         refill_rate: f64,
         refill_interval: Duration,
-        trust_class: Option<TrustClass>,
     ) -> Self {
         TokenBucket {
             tokens: capacity, // Start with full bucket
@@ -226,28 +155,27 @@ impl TokenBucket {
             refill_rate,
             last_refill: Instant::now(),
             refill_interval,
-            trust_class,
         }
     }
 
-    /// Update bucket configuration if trust class has changed
+    /// Update bucket configuration
     fn update_config(
         &mut self,
         new_capacity: f64,
         new_refill_rate: f64,
-        new_trust_class: Option<TrustClass>,
     ) -> bool {
-        // Only update if trust class actually changed
-        if self.trust_class != new_trust_class {
+        // Check if config changed
+        let changed = (self.capacity - new_capacity).abs() > f64::EPSILON
+            || (self.refill_rate - new_refill_rate).abs() > f64::EPSILON;
+        
+        if changed {
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;
-            self.trust_class = new_trust_class;
-            // Reset to full capacity when trust class changes
-            // This gives immediate benefit for trust upgrades
+            // Reset to full capacity when config changes
             self.tokens = new_capacity;
             self.last_refill = Instant::now();
-            true // Changed
-        } else {
+        }
+        changed
             false // No change
         }
     }
@@ -284,22 +212,18 @@ impl TokenBucket {
 
 /// Per-peer rate limiter using token bucket algorithm
 ///
-/// Supports three layers of rate limiting:
-/// 1. Per-DID: Basic rate limiting per identity
-/// 2. Trust-gated: Different limits based on peer trust class
-/// 3. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
+/// Supports two layers of rate limiting:
+/// 1. Per-DID: Policy-based rate limiting via PolicyOracle
+/// 2. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
 pub struct RateLimiter {
-    /// Trust-gated configuration (if enabled)
-    trust_gated_config: Option<TrustGatedRateLimitConfig>,
+    /// Policy oracle for determining rate limits (optional)
+    oracle: Option<Arc<dyn PolicyOracle>>,
 
-    /// Fallback configuration (used when trust-gated is disabled)
+    /// Fallback configuration (used when oracle is not provided)
     fallback_config: RateLimitConfig,
 
     /// Token buckets per peer DID
     buckets: Arc<RwLock<HashMap<Did, TokenBucket>>>,
-
-    /// Trust graph for looking up peer trust classes (optional)
-    trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
 
     // --- Sybil resistance (Issue #675) ---
     /// Per-anchor (per-person) token buckets for Sybil resistance
@@ -313,51 +237,48 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    /// Create a new rate limiter with the given configuration (no trust-gating)
+    /// Create a new rate limiter with the given fallback configuration
     pub fn new(config: RateLimitConfig) -> Self {
         RateLimiter {
-            trust_gated_config: None,
+            oracle: None,
             fallback_config: config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: None,
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: None,
             anchor_rate_config: None,
         }
     }
 
-    /// Create a new trust-gated rate limiter
-    pub fn new_trust_gated(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    /// Create a new rate limiter with PolicyOracle
+    pub fn new_with_oracle(
+        oracle: Arc<dyn PolicyOracle>,
+        fallback_config: RateLimitConfig,
     ) -> Self {
         RateLimiter {
-            trust_gated_config: Some(config.clone()),
-            fallback_config: config.isolated.clone(), // Use most restrictive as fallback
+            oracle: Some(oracle),
+            fallback_config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: Some(trust_graph),
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: None,
             anchor_rate_config: None,
         }
     }
 
-    /// Create a new trust-gated rate limiter with Sybil resistance
+    /// Create a new rate limiter with PolicyOracle and Sybil resistance
     ///
     /// This constructor enables per-anchor (per-person) rate limiting in addition
     /// to per-DID rate limiting, preventing Sybil attacks where an attacker
     /// creates multiple DIDs to bypass aggregate rate limits.
-    pub fn new_with_sybil_resistance(
-        trust_gated_config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    pub fn new_with_oracle_and_sybil_resistance(
+        oracle: Arc<dyn PolicyOracle>,
+        fallback_config: RateLimitConfig,
         personhood_store: Arc<dyn PersonhoodStoreTrait>,
         anchor_config: AnchorRateLimitConfig,
     ) -> Self {
         RateLimiter {
-            trust_gated_config: Some(trust_gated_config.clone()),
-            fallback_config: trust_gated_config.isolated.clone(),
+            oracle: Some(oracle),
+            fallback_config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: Some(trust_graph),
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: Some(personhood_store),
             anchor_rate_config: Some(anchor_config),
@@ -378,71 +299,50 @@ impl RateLimiter {
     /// Check if a message from the given peer should be allowed.
     /// Returns true if allowed, false if rate limited.
     ///
-    /// This implementation uses an atomic update pattern to eliminate the TOCTOU
-    /// window between trust class lookup and bucket update (Issue #426).
+    /// Uses PolicyOracle to determine rate limits based on trust/policy.
     pub async fn check_rate_limit(&self, peer: &Did) -> bool {
-        const MAX_RETRIES: usize = 3;
-
-        for attempt in 0..MAX_RETRIES {
-            // Phase 1: Get current trust class (releases lock immediately)
-            let (config, trust_class) = if let (Some(trust_gated_config), Some(trust_graph)) =
-                (&self.trust_gated_config, &self.trust_graph)
-            {
-                let trust_class = {
-                    let graph = trust_graph.read().await;
-                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
-                };
-                (trust_gated_config.for_class(trust_class), Some(trust_class))
-            } else {
-                // Fallback mode: no TOCTOU possible
-                (&self.fallback_config, None)
-            };
-
-            // Phase 2: Acquire buckets lock
-            let mut buckets = self.buckets.write().await;
-
-            // Phase 3: Verify trust class hasn't changed (eliminates TOCTOU)
-            //
-            // SAFETY: This nested lock acquisition (trust_graph.read() while holding
-            // buckets.write()) is safe because no code path in the codebase acquires
-            // buckets.write() while holding trust_graph.write(). See issue #426.
-            if let (Some(trust_gated_config), Some(trust_graph)) =
-                (&self.trust_gated_config, &self.trust_graph)
-            {
-                let current_trust_class = {
-                    let graph = trust_graph.read().await;
-                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
-                };
-
-                if Some(current_trust_class) != trust_class {
-                    // TOCTOU detected - trust class changed between phases 1 and 2
-                    icn_obs::metrics::network::trust_class_toctou_mismatches_inc();
-
-                    if attempt < MAX_RETRIES - 1 {
-                        // Release locks and retry with fresh trust class
-                        drop(buckets);
-                        // Brief yield to prevent tight spinning if trust class is thrashing
-                        tokio::task::yield_now().await;
-                        continue;
+        // Get rate limit config from oracle or fallback
+        let config = if let Some(oracle) = &self.oracle {
+            // Query oracle for policy decision
+            let request = PolicyRequest::new(
+                peer.clone(),
+                ActionKind::Custom("network_message".to_string()),
+                Domain::new("net"),
+            );
+            
+            let decision = oracle.evaluate(&request);
+            
+            // Extract rate limit from constraints, or use fallback
+            if let Some(constraints) = decision.constraints() {
+                if let Some(rate_limit) = &constraints.rate_limit {
+                    // Convert from kernel-api RateLimit to our RateLimitConfig
+                    RateLimitConfig {
+                        max_messages_per_second: rate_limit.messages_per_second,
+                        burst_capacity: rate_limit.burst_size,
+                        refill_interval: self.fallback_config.refill_interval,
                     }
-
-                    // Final attempt - use the verified current trust class
-                    let verified_config = trust_gated_config.for_class(current_trust_class);
-                    return self.do_rate_limit_check(
-                        &mut buckets,
-                        peer,
-                        verified_config,
-                        Some(current_trust_class),
-                    );
+                } else {
+                    // No rate limit in constraints, use fallback
+                    self.fallback_config.clone()
+                }
+            } else {
+                // Decision was Deny or no constraints, use most restrictive
+                RateLimitConfig {
+                    max_messages_per_second: 5,
+                    burst_capacity: 5,
+                    refill_interval: self.fallback_config.refill_interval,
                 }
             }
+        } else {
+            // No oracle, use fallback
+            self.fallback_config.clone()
+        };
 
-            // Trust class is consistent - proceed with rate limit check
-            return self.do_rate_limit_check(&mut buckets, peer, config, trust_class);
-        }
+        // Acquire buckets lock
+        let mut buckets = self.buckets.write().await;
 
-        // Should never reach here, but if we do, use most restrictive limit
-        false
+        // Perform rate limit check
+        self.do_rate_limit_check(&mut buckets, peer, &config)
     }
 
     /// Internal helper to perform the actual rate limit check
@@ -451,7 +351,6 @@ impl RateLimiter {
         buckets: &mut HashMap<Did, TokenBucket>,
         peer: &Did,
         config: &RateLimitConfig,
-        trust_class: Option<TrustClass>,
     ) -> bool {
         // Calculate refill rate: tokens per interval
         let refill_rate =
@@ -462,24 +361,21 @@ impl RateLimiter {
 
         // Get or create bucket for this peer
         let bucket = buckets.entry(peer.clone()).or_insert_with(|| {
-            TokenBucket::new(capacity, refill_rate, refill_interval, trust_class)
+            TokenBucket::new(capacity, refill_rate, refill_interval)
         });
 
-        // Update bucket config if trust class has changed
-        let changed = bucket.update_config(capacity, refill_rate, trust_class);
+        // Update bucket config if it has changed
+        let changed = bucket.update_config(capacity, refill_rate);
         if changed {
             icn_obs::metrics::network::trust_class_changes_inc();
         }
 
         let allowed = bucket.try_consume();
 
-        // Record per-class rate limiting metric (general counter recorded in actor.rs)
+        // Record rate limiting metric by tier
         if !allowed {
-            if let Some(class) = trust_class {
-                icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(
-                    class,
-                ));
-            }
+            let tier = rate_tier_label(config.max_messages_per_second);
+            icn_obs::metrics::network::messages_rate_limited_by_class_inc(tier);
         }
 
         allowed
@@ -567,7 +463,6 @@ impl RateLimiter {
                 capacity,
                 refill_rate,
                 anchor_config.refill_interval,
-                None, // Anchor buckets don't track trust class
             )
         });
 
