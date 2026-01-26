@@ -156,9 +156,7 @@ impl rustls::client::danger::ServerCertVerifier for TofuServerCertVerifier {
         _now: rustls::pki_types::UnixTime,
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         // Accept any certificate - verification happens at application layer
-        debug!(
-            "TOFU: Accepting server certificate (identity verification via PolicyOracle)"
-        );
+        debug!("TOFU: Accepting server certificate (identity verification via PolicyOracle)");
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 

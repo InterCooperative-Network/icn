@@ -205,6 +205,14 @@ pub fn trust_class_changes_inc() {
     counter!("icn_network_trust_class_changes_total").increment(1);
 }
 
+/// Increment rate limit configuration change counter
+///
+/// Called when rate limit parameters change for a peer (e.g., due to policy updates).
+/// This replaces the legacy trust_class_changes metric for policy-based rate limiting.
+pub fn rate_limit_config_changes_inc() {
+    counter!("icn_network_rate_limit_config_changes_total").increment(1);
+}
+
 /// Increment TOCTOU mismatch counter (Issue #426)
 ///
 /// Called when trust class changes between initial lookup and bucket update

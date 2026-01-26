@@ -144,11 +144,7 @@ struct TokenBucket {
 }
 
 impl TokenBucket {
-    fn new(
-        capacity: f64,
-        refill_rate: f64,
-        refill_interval: Duration,
-    ) -> Self {
+    fn new(capacity: f64, refill_rate: f64, refill_interval: Duration) -> Self {
         TokenBucket {
             tokens: capacity, // Start with full bucket
             capacity,
@@ -159,15 +155,11 @@ impl TokenBucket {
     }
 
     /// Update bucket configuration
-    fn update_config(
-        &mut self,
-        new_capacity: f64,
-        new_refill_rate: f64,
-    ) -> bool {
+    fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64) -> bool {
         // Check if config changed
         let changed = (self.capacity - new_capacity).abs() > f64::EPSILON
             || (self.refill_rate - new_refill_rate).abs() > f64::EPSILON;
-        
+
         if changed {
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;
@@ -176,8 +168,6 @@ impl TokenBucket {
             self.last_refill = Instant::now();
         }
         changed
-            false // No change
-        }
     }
 
     /// Try to consume a token. Returns true if allowed, false if rate limited.
@@ -305,13 +295,13 @@ impl RateLimiter {
         let config = if let Some(oracle) = &self.oracle {
             // Query oracle for policy decision
             let request = PolicyRequest::new(
-                peer.clone(),
+                peer.to_string(),
                 ActionKind::Custom("network_message".to_string()),
                 Domain::new("net"),
             );
-            
+
             let decision = oracle.evaluate(&request);
-            
+
             // Extract rate limit from constraints, or use fallback
             if let Some(constraints) = decision.constraints() {
                 if let Some(rate_limit) = &constraints.rate_limit {
@@ -326,12 +316,9 @@ impl RateLimiter {
                     self.fallback_config.clone()
                 }
             } else {
-                // Decision was Deny or no constraints, use most restrictive
-                RateLimitConfig {
-                    max_messages_per_second: 5,
-                    burst_capacity: 5,
-                    refill_interval: self.fallback_config.refill_interval,
-                }
+                // Decision was Deny or no constraints, use fallback config
+                // This ensures consistency with the behavior when no oracle is provided
+                self.fallback_config.clone()
             }
         } else {
             // No oracle, use fallback
@@ -360,14 +347,14 @@ impl RateLimiter {
         let refill_interval = config.refill_interval;
 
         // Get or create bucket for this peer
-        let bucket = buckets.entry(peer.clone()).or_insert_with(|| {
-            TokenBucket::new(capacity, refill_rate, refill_interval)
-        });
+        let bucket = buckets
+            .entry(peer.clone())
+            .or_insert_with(|| TokenBucket::new(capacity, refill_rate, refill_interval));
 
         // Update bucket config if it has changed
         let changed = bucket.update_config(capacity, refill_rate);
         if changed {
-            icn_obs::metrics::network::trust_class_changes_inc();
+            icn_obs::metrics::network::rate_limit_config_changes_inc();
         }
 
         let allowed = bucket.try_consume();
@@ -459,11 +446,7 @@ impl RateLimiter {
 
         // Get or create bucket for this anchor
         let bucket = anchor_buckets.entry(anchor_id).or_insert_with(|| {
-            TokenBucket::new(
-                capacity,
-                refill_rate,
-                anchor_config.refill_interval,
-            )
+            TokenBucket::new(capacity, refill_rate, anchor_config.refill_interval)
         });
 
         let allowed = bucket.try_consume();

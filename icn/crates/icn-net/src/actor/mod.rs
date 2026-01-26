@@ -827,10 +827,13 @@ impl NetworkHandle {
         self.send_message(first_hop, net_msg).await
     }
 
-    /// Select relay nodes for onion routing based on trust scores
+    /// Select relay nodes for onion routing based on trust scores (deprecated)
     ///
     /// Returns an ordered list of relay DIDs suitable for creating an onion circuit.
     /// Uses the trust graph to select nodes with sufficient trust.
+    ///
+    /// **Note**: This method is deprecated. Trust-based relay selection should use
+    /// PolicyOracle for policy decisions. This method is kept for backward compatibility.
     ///
     /// # Arguments
     /// * `trust_graph` - Trust graph for scoring peers
@@ -839,6 +842,7 @@ impl NetworkHandle {
     ///
     /// # Returns
     /// Empty vec if insufficient trusted relays are available.
+    #[deprecated(note = "Use PolicyOracle for trust-based relay selection")]
     pub async fn select_onion_relays(
         &self,
         trust_graph: &Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
@@ -880,7 +884,6 @@ pub struct NetworkActor {
     identity_bundle: IdentityBundle,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     topology_config: Option<TopologyConfig>,
-    trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
     /// Per-peer connection metadata (version, capabilities, X25519 keys)
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
     /// Blob location registry for data locality (Phase 16C Week 2)
@@ -926,12 +929,7 @@ impl NetworkActor {
         // Start session manager (no TLS trust gating anymore - handled by PolicyOracle in protocol)
         let mut session_manager = SessionManager::new();
         session_manager
-            .start(
-                &identity_bundle,
-                listen_addr,
-                stun_servers,
-                turn_config,
-            )
+            .start(&identity_bundle, listen_addr, stun_servers, turn_config)
             .await
             .context("Failed to start session manager")?;
 
@@ -955,7 +953,7 @@ impl NetworkActor {
                 info!("Using default fallback rate limit config");
                 RateLimitConfig::default()
             });
-            
+
             // Add Sybil resistance if personhood store is provided
             if let Some(ps) = personhood_store {
                 let anchor_config = anchor_rate_config.unwrap_or_else(|| {
@@ -1156,7 +1154,6 @@ impl NetworkActor {
             identity_bundle,
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
-            trust_graph: trust_graph.clone(),
             peer_connections: peer_connections.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
@@ -1268,8 +1265,7 @@ mod tests {
             addr,
             shutdown_tx.clone(),
             None, // incoming_handler
-            None, // trust_graph
-            None, // trust_gated_config
+            None, // oracle
             None, // fallback_config
             None, // topology_config
             None, // stun_servers
