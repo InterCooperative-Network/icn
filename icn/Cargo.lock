@@ -3204,6 +3204,7 @@ dependencies = [
  "icn-encoding",
  "icn-gossip",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-obs",
  "icn-privacy",
