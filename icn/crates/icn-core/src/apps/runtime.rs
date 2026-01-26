@@ -22,10 +22,10 @@
 use super::dispatcher::{BoxedReducer, BoxedService, ComputeDispatcher};
 use super::manifest::{Manifest, ManifestError};
 use super::state_factory::{AppNamespace, AppState, StateFactory};
+use icn_kernel_api::authz::{Constraints, Domain, PolicyOracle};
 use icn_kernel_api::bootstrap::{
     BootstrapPhase, CapabilityRequest, CapabilitySet, GenesisCapabilities, OracleRegistry,
 };
-use icn_kernel_api::authz::{Constraints, Domain, PolicyOracle};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -181,10 +181,7 @@ impl AppRuntime {
     ///
     /// This validates the manifest and creates state handles, returning
     /// a builder that allows registering handlers before finalizing.
-    pub async fn prepare(
-        &self,
-        manifest: Manifest,
-    ) -> Result<AppBuilder, RuntimeError> {
+    pub async fn prepare(&self, manifest: Manifest) -> Result<AppBuilder, RuntimeError> {
         // Check if already installed
         {
             let apps = self.apps.read().await;
@@ -456,8 +453,12 @@ pub enum RuntimeError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::apps::dispatcher::{Event, Reducer, Request, Response, Service, StateDelta, StateSnapshot, DispatchError};
-    use crate::apps::manifest::{ComputeConfig, KvConfig, ReducerConfig, ServiceConfig, StateConfig};
+    use crate::apps::dispatcher::{
+        DispatchError, Event, Reducer, Request, Response, Service, StateDelta, StateSnapshot,
+    };
+    use crate::apps::manifest::{
+        ComputeConfig, KvConfig, ReducerConfig, ServiceConfig, StateConfig,
+    };
     use icn_kernel_api::authz::Capability;
     use tokio::sync::mpsc;
 
@@ -465,7 +466,11 @@ mod tests {
     struct EchoReducer;
 
     impl Reducer for EchoReducer {
-        fn reduce(&self, _state: &StateSnapshot, event: &Event) -> Result<StateDelta, DispatchError> {
+        fn reduce(
+            &self,
+            _state: &StateSnapshot,
+            event: &Event,
+        ) -> Result<StateDelta, DispatchError> {
             let mut delta = StateDelta::new();
             let key = format!("msg:{}", event.timestamp);
             delta.kv_set("echoes", key, event.payload.clone());
@@ -541,7 +546,10 @@ mod tests {
 
         let manifest = test_manifest();
         let builder = runtime.prepare(manifest).await.unwrap();
-        let app_id = runtime.install(builder, &root_capability_set()).await.unwrap();
+        let app_id = runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
 
         assert!(runtime.status(&app_id).await.is_some());
         assert_eq!(runtime.status(&app_id).await, Some(AppStatus::Installed));
@@ -554,7 +562,10 @@ mod tests {
 
         let manifest = test_manifest();
         let builder = runtime.prepare(manifest).await.unwrap();
-        let app_id = runtime.install(builder, &root_capability_set()).await.unwrap();
+        let app_id = runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
 
         // Start
         runtime.start(&app_id).await.unwrap();
@@ -578,7 +589,10 @@ mod tests {
             .with_reducer("echo:message", Box::new(EchoReducer))
             .with_service("echo:query", Box::new(EchoService));
 
-        let app_id = runtime.install(builder, &root_capability_set()).await.unwrap();
+        let app_id = runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
         runtime.start(&app_id).await.unwrap();
 
         // Get dispatcher and send event
@@ -608,7 +622,10 @@ mod tests {
 
         let manifest = test_manifest();
         let builder = runtime.prepare(manifest.clone()).await.unwrap();
-        runtime.install(builder, &root_capability_set()).await.unwrap();
+        runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
 
         // Try to install again
         let builder2 = runtime.prepare(manifest).await;
@@ -622,7 +639,10 @@ mod tests {
 
         let manifest = test_manifest();
         let builder = runtime.prepare(manifest).await.unwrap();
-        let app_id = runtime.install(builder, &root_capability_set()).await.unwrap();
+        let app_id = runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
 
         runtime.start(&app_id).await.unwrap();
         runtime.uninstall(&app_id).await.unwrap();
@@ -637,7 +657,10 @@ mod tests {
 
         let manifest = test_manifest();
         let builder = runtime.prepare(manifest).await.unwrap();
-        let app_id = runtime.install(builder, &root_capability_set()).await.unwrap();
+        let app_id = runtime
+            .install(builder, &root_capability_set())
+            .await
+            .unwrap();
 
         let apps = runtime.list().await;
         assert_eq!(apps.len(), 1);

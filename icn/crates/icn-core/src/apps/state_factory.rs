@@ -453,7 +453,10 @@ mod tests {
             blobs: vec![],
         };
 
-        let state = factory.create_for_app(namespace.clone(), &config).await.unwrap();
+        let state = factory
+            .create_for_app(namespace.clone(), &config)
+            .await
+            .unwrap();
 
         assert!(state.log("events").is_some());
         assert!(state.kv("cache").is_some());

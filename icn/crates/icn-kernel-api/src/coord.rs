@@ -75,11 +75,21 @@ pub enum CrdtOp {
     /// Remove element from set
     Remove { element: Vec<u8> },
     /// Set register value
-    Set { value: Vec<u8>, timestamp: LogicalTimestamp },
+    Set {
+        value: Vec<u8>,
+        timestamp: LogicalTimestamp,
+    },
     /// Set map key
-    MapSet { key: Vec<u8>, value: Vec<u8>, timestamp: LogicalTimestamp },
+    MapSet {
+        key: Vec<u8>,
+        value: Vec<u8>,
+        timestamp: LogicalTimestamp,
+    },
     /// Remove map key
-    MapRemove { key: Vec<u8>, timestamp: LogicalTimestamp },
+    MapRemove {
+        key: Vec<u8>,
+        timestamp: LogicalTimestamp,
+    },
 }
 
 /// CRDT value (read result).
@@ -103,16 +113,11 @@ pub enum GroupStatus {
     /// Group is forming (waiting for quorum)
     Forming,
     /// Group is healthy and has a leader
-    Healthy {
-        leader: NodeId,
-    },
+    Healthy { leader: NodeId },
     /// Group is in election
     Electing,
     /// Group has lost quorum
-    Degraded {
-        available: u32,
-        required: u32,
-    },
+    Degraded { available: u32, required: u32 },
 }
 
 /// Coordination service.
@@ -175,8 +180,11 @@ pub trait Coordination: Send + Sync {
     // ===== Leader Election =====
 
     /// Participate in leader election.
-    fn elect_leader(&self, group: &GroupId, lease_duration: Duration)
-        -> Result<LeaderLease, CoordError>;
+    fn elect_leader(
+        &self,
+        group: &GroupId,
+        lease_duration: Duration,
+    ) -> Result<LeaderLease, CoordError>;
 
     /// Check if we hold the leader lease.
     fn is_leader(&self, group: &GroupId) -> Result<bool, CoordError>;

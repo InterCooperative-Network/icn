@@ -30,7 +30,7 @@ pub mod upgrade_actor;
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
 pub use apps::{
     AppBuilder, AppHandle, AppId, AppRuntime, AppStatus, ComputeDispatcher, Event, Manifest,
-    Reducer, Request, Response, RuntimeError, Service, StateSnapshot, StateDelta,
+    Reducer, Request, Response, RuntimeError, Service, StateDelta, StateSnapshot,
 };
 pub use config::Config;
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};

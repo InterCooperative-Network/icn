@@ -61,13 +61,15 @@ impl Event {
         payload: &T,
         source: impl Into<String>,
     ) -> Result<Self, DispatchError> {
-        let bytes = serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
+        let bytes =
+            serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
         Ok(Self::new(event_type, bytes, source))
     }
 
     /// Parse the payload as a typed value.
     pub fn parse_payload<T: DeserializeOwned>(&self) -> Result<T, DispatchError> {
-        serde_json::from_slice(&self.payload).map_err(|e| DispatchError::Deserialization(e.to_string()))
+        serde_json::from_slice(&self.payload)
+            .map_err(|e| DispatchError::Deserialization(e.to_string()))
     }
 }
 
@@ -86,11 +88,7 @@ pub struct Request {
 
 impl Request {
     /// Create a new request.
-    pub fn new(
-        request_type: impl Into<String>,
-        payload: Vec<u8>,
-        from: impl Into<String>,
-    ) -> Self {
+    pub fn new(request_type: impl Into<String>, payload: Vec<u8>, from: impl Into<String>) -> Self {
         Self {
             request_type: request_type.into(),
             payload,
@@ -105,13 +103,15 @@ impl Request {
         payload: &T,
         from: impl Into<String>,
     ) -> Result<Self, DispatchError> {
-        let bytes = serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
+        let bytes =
+            serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
         Ok(Self::new(request_type, bytes, from))
     }
 
     /// Parse the payload as a typed value.
     pub fn parse_payload<T: DeserializeOwned>(&self) -> Result<T, DispatchError> {
-        serde_json::from_slice(&self.payload).map_err(|e| DispatchError::Deserialization(e.to_string()))
+        serde_json::from_slice(&self.payload)
+            .map_err(|e| DispatchError::Deserialization(e.to_string()))
     }
 }
 
@@ -144,7 +144,8 @@ impl Response {
         request_id: impl Into<String>,
         payload: &T,
     ) -> Result<Self, DispatchError> {
-        let bytes = serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
+        let bytes =
+            serde_json::to_vec(payload).map_err(|e| DispatchError::Serialization(e.to_string()))?;
         Ok(Self::success(request_id, bytes))
     }
 
@@ -160,7 +161,8 @@ impl Response {
 
     /// Parse the payload as a typed value.
     pub fn parse_payload<T: DeserializeOwned>(&self) -> Result<T, DispatchError> {
-        serde_json::from_slice(&self.payload).map_err(|e| DispatchError::Deserialization(e.to_string()))
+        serde_json::from_slice(&self.payload)
+            .map_err(|e| DispatchError::Deserialization(e.to_string()))
     }
 }
 
@@ -250,8 +252,15 @@ impl StateDelta {
 /// KV operation in a delta.
 #[derive(Clone, Debug)]
 pub enum KvOp {
-    Set { store: String, key: String, value: Vec<u8> },
-    Delete { store: String, key: String },
+    Set {
+        store: String,
+        key: String,
+        value: Vec<u8>,
+    },
+    Delete {
+        store: String,
+        key: String,
+    },
 }
 
 /// Log operation in a delta.
@@ -370,7 +379,9 @@ impl ComputeDispatcher {
             .ok_or_else(|| DispatchError::NoHandler(request.request_type.clone()))?;
 
         let snapshot = StateSnapshot::from_app_state(&self.state).await;
-        service.handle(request, &snapshot, self.event_tx.clone()).await
+        service
+            .handle(request, &snapshot, self.event_tx.clone())
+            .await
     }
 
     /// Apply a state delta.
@@ -383,14 +394,20 @@ impl ComputeDispatcher {
                         .state
                         .kv(&store)
                         .ok_or_else(|| DispatchError::StoreNotFound(store.clone()))?;
-                    handle.set(&key, value).await.map_err(|e| DispatchError::State(e.to_string()))?;
+                    handle
+                        .set(&key, value)
+                        .await
+                        .map_err(|e| DispatchError::State(e.to_string()))?;
                 }
                 KvOp::Delete { store, key } => {
                     let handle = self
                         .state
                         .kv(&store)
                         .ok_or_else(|| DispatchError::StoreNotFound(store.clone()))?;
-                    handle.delete(&key).await.map_err(|e| DispatchError::State(e.to_string()))?;
+                    handle
+                        .delete(&key)
+                        .await
+                        .map_err(|e| DispatchError::State(e.to_string()))?;
                 }
             }
         }
@@ -403,7 +420,10 @@ impl ComputeDispatcher {
                         .state
                         .log(&log)
                         .ok_or_else(|| DispatchError::StoreNotFound(log.clone()))?;
-                    handle.append(data).await.map_err(|e| DispatchError::State(e.to_string()))?;
+                    handle
+                        .append(data)
+                        .await
+                        .map_err(|e| DispatchError::State(e.to_string()))?;
                 }
             }
         }
@@ -526,7 +546,11 @@ mod tests {
     struct EchoReducer;
 
     impl Reducer for EchoReducer {
-        fn reduce(&self, _state: &StateSnapshot, event: &Event) -> Result<StateDelta, DispatchError> {
+        fn reduce(
+            &self,
+            _state: &StateSnapshot,
+            event: &Event,
+        ) -> Result<StateDelta, DispatchError> {
             let mut delta = StateDelta::new();
             // Store event in KV
             let key = format!("event:{}", event.timestamp);

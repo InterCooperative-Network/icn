@@ -110,7 +110,12 @@ pub trait IdentityService: Send + Sync {
     /// Verify a signature against a DID.
     ///
     /// Returns true if the signature is valid.
-    fn verify(&self, did: &Did, payload: &[u8], signature: &Signature) -> Result<bool, IdentityError>;
+    fn verify(
+        &self,
+        did: &Did,
+        payload: &[u8],
+        signature: &Signature,
+    ) -> Result<bool, IdentityError>;
 
     /// Get the current DID document.
     fn get_document(&self, did: &Did) -> Result<DidDocument, IdentityError>;
@@ -147,7 +152,12 @@ pub trait Keystore: Send + Sync {
     fn sign(&self, key_id: &KeyId, payload: &[u8]) -> Result<Signature, IdentityError>;
 
     /// Verify a signature with a specific key.
-    fn verify(&self, key_id: &KeyId, payload: &[u8], signature: &Signature) -> Result<bool, IdentityError>;
+    fn verify(
+        &self,
+        key_id: &KeyId,
+        payload: &[u8],
+        signature: &Signature,
+    ) -> Result<bool, IdentityError>;
 
     /// Generate a new key pair.
     ///

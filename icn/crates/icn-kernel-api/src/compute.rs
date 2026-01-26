@@ -229,7 +229,10 @@ pub enum ComputeError {
 
     /// ABI version mismatch
     #[error("ABI version mismatch: expected {expected:?}, got {got:?}")]
-    AbiMismatch { expected: AbiVersion, got: AbiVersion },
+    AbiMismatch {
+        expected: AbiVersion,
+        got: AbiVersion,
+    },
 
     /// Fuel exhausted during execution
     #[error("Fuel exhausted")]

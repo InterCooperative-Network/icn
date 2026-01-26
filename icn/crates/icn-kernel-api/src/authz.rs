@@ -825,7 +825,9 @@ mod tests {
 
     #[test]
     fn test_constraint_set_merge() {
-        let mut base = ConstraintSet::new().with_max_topics(5).with_voting_weight(0.5);
+        let mut base = ConstraintSet::new()
+            .with_max_topics(5)
+            .with_voting_weight(0.5);
 
         let overlay = ConstraintSet::new()
             .with_max_topics(10)

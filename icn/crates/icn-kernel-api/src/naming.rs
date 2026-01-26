@@ -21,7 +21,9 @@
 //! - Dispute resolution (just enforces signatures)
 //! - Global namespace (scoped by design)
 
-use crate::types::{Did, Duration, Endpoint, Hash, Name, Namespace, Scope, Signature, Subscription};
+use crate::types::{
+    Did, Duration, Endpoint, Hash, Name, Namespace, Scope, Signature, Subscription,
+};
 
 /// Target that a name resolves to.
 #[derive(Clone, Debug)]
@@ -183,11 +185,7 @@ pub trait NamingService: Send + Sync {
 /// Service discovery.
 pub trait Discovery: Send + Sync {
     /// Announce a service.
-    fn announce(
-        &self,
-        scope: Scope,
-        announcement: ServiceAnnouncement,
-    ) -> Result<(), NamingError>;
+    fn announce(&self, scope: Scope, announcement: ServiceAnnouncement) -> Result<(), NamingError>;
 
     /// Withdraw a service announcement.
     fn withdraw(

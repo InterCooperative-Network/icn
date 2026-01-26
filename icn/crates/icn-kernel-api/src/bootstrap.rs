@@ -298,9 +298,7 @@ impl OracleRegistry {
                 // In Genesis/CoreApps: allow (bootstrap needs flexibility)
                 // In Running: deny (missing oracle is a security hole)
                 let decision = match phase {
-                    BootstrapPhase::Genesis | BootstrapPhase::CoreApps => {
-                        PolicyDecision::allow()
-                    }
+                    BootstrapPhase::Genesis | BootstrapPhase::CoreApps => PolicyDecision::allow(),
                     BootstrapPhase::Running => {
                         PolicyDecision::deny(format!("No oracle registered for domain: {}", domain))
                     }
@@ -322,7 +320,8 @@ impl OracleRegistry {
         let ttl = oracle.cache_ttl();
 
         // Cache the decision
-        self.cache.insert(request.core.clone(), decision.clone(), ttl);
+        self.cache
+            .insert(request.core.clone(), decision.clone(), ttl);
 
         decision
     }
@@ -478,7 +477,11 @@ impl GenesisCapabilities {
 
         // Generate capability ID
         let seq = self.counter.fetch_add(1, AtomicOrdering::SeqCst);
-        let cap_id = format!("genesis:{:016x}:{}", self.expires_at.elapsed().as_nanos(), seq);
+        let cap_id = format!(
+            "genesis:{:016x}:{}",
+            self.expires_at.elapsed().as_nanos(),
+            seq
+        );
 
         Ok(Capability {
             id: cap_id,
@@ -659,7 +662,11 @@ mod tests {
         assert!(cache.get(&core).is_none());
 
         // Insert and retrieve
-        cache.insert(core.clone(), PolicyDecision::allow(), Duration::from_secs(60));
+        cache.insert(
+            core.clone(),
+            PolicyDecision::allow(),
+            Duration::from_secs(60),
+        );
         assert!(cache.get(&core).is_some());
 
         // Different core should miss
@@ -686,8 +693,16 @@ mod tests {
             Domain::ledger(),
         );
 
-        cache.insert(core1.clone(), PolicyDecision::allow(), Duration::from_secs(60));
-        cache.insert(core2.clone(), PolicyDecision::allow(), Duration::from_secs(60));
+        cache.insert(
+            core1.clone(),
+            PolicyDecision::allow(),
+            Duration::from_secs(60),
+        );
+        cache.insert(
+            core2.clone(),
+            PolicyDecision::allow(),
+            Duration::from_secs(60),
+        );
 
         assert_eq!(cache.len(), 2);
 
@@ -735,15 +750,13 @@ mod tests {
 
         // Verify it's a proper denial with reason
         match decision {
-            PolicyDecision::Deny { reason } => {
-                match reason {
-                    crate::authz::PolicyError::Denied(msg) => {
-                        assert!(msg.contains("No oracle registered"));
-                        assert!(msg.contains("trust"));
-                    }
-                    _ => panic!("Expected Denied error variant"),
+            PolicyDecision::Deny { reason } => match reason {
+                crate::authz::PolicyError::Denied(msg) => {
+                    assert!(msg.contains("No oracle registered"));
+                    assert!(msg.contains("trust"));
                 }
-            }
+                _ => panic!("Expected Denied error variant"),
+            },
             _ => panic!("Expected Deny decision in Running phase"),
         }
     }
@@ -825,11 +838,8 @@ mod tests {
     #[test]
     fn test_genesis_capabilities_phase_guard() {
         let phase = Arc::new(AtomicU8::new(BootstrapPhase::Running as u8));
-        let genesis = GenesisCapabilities::new(
-            phase,
-            Duration::from_secs(60),
-            "did:icn:issuer".to_string(),
-        );
+        let genesis =
+            GenesisCapabilities::new(phase, Duration::from_secs(60), "did:icn:issuer".to_string());
 
         assert!(!genesis.is_valid());
 

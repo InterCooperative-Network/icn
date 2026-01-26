@@ -102,7 +102,11 @@ impl Manifest {
         }
 
         // Name must be valid identifier
-        if !self.name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if !self
+            .name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             return Err(ManifestError::Validation(format!(
                 "App name '{}' contains invalid characters",
                 self.name

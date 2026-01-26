@@ -32,34 +32,34 @@
 //!
 //! The kernel is deliberately dumb. It provides pipes, not policies.
 
-pub mod types;
-pub mod identity;
 pub mod authz;
 pub mod bootstrap;
-pub mod state;
-pub mod compute;
 pub mod comms;
-pub mod time;
+pub mod compute;
 pub mod coord;
+pub mod identity;
 pub mod naming;
+pub mod state;
+pub mod time;
+pub mod types;
 
 // Re-export primary traits for convenience
-pub use identity::{IdentityService, DidResolver, Keystore};
 pub use authz::{
-    CapabilityEngine, PolicyOracle, PolicyDecision, PolicyRequest, PolicyRequestCore,
-    PolicyRequestExt, ConstraintSet, ConstraintValue, RateLimit, Domain, ActionKind,
-    AllowAllOracle, DenyAllOracle, PolicyError,
+    ActionKind, AllowAllOracle, CapabilityEngine, ConstraintSet, ConstraintValue, DenyAllOracle,
+    Domain, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest, PolicyRequestCore,
+    PolicyRequestExt, RateLimit,
 };
 pub use bootstrap::{
-    OracleRegistry, BootstrapPhase, GenesisCapabilities, DecisionCache,
-    CapabilitySet, CapabilityRequest, CacheStats,
+    BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,
+    GenesisCapabilities, OracleRegistry,
 };
-pub use state::{LogService, BlobService, KvService};
-pub use compute::{ComputeEngine, Job, Trigger};
 pub use comms::{PubSub, RequestResponse, Streams};
-pub use time::TimeService;
+pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
-pub use naming::{NamingService, Discovery};
+pub use identity::{DidResolver, IdentityService, Keystore};
+pub use naming::{Discovery, NamingService};
+pub use state::{BlobService, KvService, LogService};
+pub use time::TimeService;
 
 // Re-export common types
 pub use types::*;

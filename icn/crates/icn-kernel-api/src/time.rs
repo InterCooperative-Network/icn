@@ -68,11 +68,7 @@ pub trait TimeService: Send + Sync {
     /// Acquire a lease on a resource.
     ///
     /// Leases provide time-limited exclusive access.
-    fn acquire_lease(
-        &self,
-        resource: &ResourceId,
-        duration: Duration,
-    ) -> Result<Lease, TimeError>;
+    fn acquire_lease(&self, resource: &ResourceId, duration: Duration) -> Result<Lease, TimeError>;
 
     /// Renew an existing lease.
     fn renew_lease(&self, lease: &Lease, duration: Duration) -> Result<Lease, TimeError>;
