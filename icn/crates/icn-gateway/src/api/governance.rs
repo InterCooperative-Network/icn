@@ -28,6 +28,7 @@ use icn_governance::{
     VoteChoice,
 };
 use icn_identity::Did;
+use icn_trust::TrustScore;
 use icn_obs::metrics::{action_items, gateway};
 
 // ============================================================================
@@ -1034,9 +1035,13 @@ pub async fn create_join_federation_proposal(
     let data_sharing_level = parse_data_sharing_level(&data_sharing_level_str)?;
     let dispute_resolution = parse_dispute_resolution(&dispute_resolution_str)?;
 
+    // Validate and convert trust score from f64 to TrustScore
+    validation::validate_trust_score(req.terms.min_trust_threshold)?;
+    let min_trust_threshold = TrustScore::unchecked(req.terms.min_trust_threshold);
+
     // Build FederationTerms
     let terms = FederationTerms {
-        min_trust_threshold: req.terms.min_trust_threshold,
+        min_trust_threshold,
         governance_binding: req.terms.governance_binding,
         data_sharing_level,
         dispute_resolution,
@@ -1224,10 +1229,14 @@ pub async fn create_update_federation_policy_proposal(
         ));
     }
 
+    // Validate and convert trust_decay_factor if present
+    validation::validate_trust_decay_factor(req.trust_decay_factor)?;
+    let trust_decay_factor = req.trust_decay_factor.map(TrustScore::unchecked);
+
     // Build FederationProposal
     let fed_proposal = FederationProposal::UpdateFederationPolicy {
         auto_accept_vouch_threshold: req.auto_accept_vouch_threshold,
-        trust_decay_factor: req.trust_decay_factor,
+        trust_decay_factor,
         max_attestations_per_minute: req.max_attestations_per_minute,
     };
 
@@ -2667,7 +2676,6 @@ mod tests {
         Proposal, ProposalState,
     };
     use icn_identity::IdentityBundle;
-    use icn_trust::TrustScore;
 
     fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
         TokenClaims {
@@ -3970,7 +3978,7 @@ mod tests {
             description: "Proposal to join the regional food cooperative federation".to_string(),
             federation_id: "regional-food-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: TrustScore::unchecked(0.6),
+                min_trust_threshold: 0.6,
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4285,7 +4293,7 @@ mod tests {
             title: "Update Federation Policy".to_string(),
             description: "Adjust auto-accept threshold and rate limits".to_string(),
             auto_accept_vouch_threshold: Some(0.7),
-            trust_decay_factor: Some(TrustScore::unchecked(0.05)),
+            trust_decay_factor: Some(0.05),
             max_attestations_per_minute: Some(30),
         };
 
@@ -4354,7 +4362,7 @@ mod tests {
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 400); // Bad Request - TrustScore validation rejects 1.5
+        assert_eq!(resp.status(), 400); // Bad Request - trust score validation rejects 1.5
     }
 
     #[actix_web::test]
@@ -4482,7 +4490,7 @@ mod tests {
             description: "Test proposal".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: TrustScore::unchecked(0.5),
+                min_trust_threshold: 0.5,
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4532,7 +4540,7 @@ mod tests {
             description: "Test proposal".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: TrustScore::unchecked(0.5),
+                min_trust_threshold: 0.5,
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4630,7 +4638,7 @@ mod tests {
             description: "Using arbitrator for dispute resolution".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: TrustScore::unchecked(0.5),
+                min_trust_threshold: 0.5,
                 governance_binding: true,
                 data_sharing_level: "full".to_string(),
                 dispute_resolution: "arbitrator:neutral-coop".to_string(),

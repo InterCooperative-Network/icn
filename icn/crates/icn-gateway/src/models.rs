@@ -1,6 +1,5 @@
 //! API request/response models
 
-use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -514,7 +513,7 @@ pub struct FederationProposalCommon {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FederationTermsRequest {
     /// Minimum trust score required for federation members (0.0-1.0)
-    pub min_trust_threshold: TrustScore,
+    pub min_trust_threshold: f64,
     /// Whether federation governance decisions are binding
     pub governance_binding: bool,
     /// Data sharing level: "none", "metadata_only", "full"
@@ -650,7 +649,7 @@ pub struct UpdateFederationPolicyProposalRequest {
     pub auto_accept_vouch_threshold: Option<f64>,
     /// Trust decay factor (0.0-1.0)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub trust_decay_factor: Option<TrustScore>,
+    pub trust_decay_factor: Option<f64>,
     /// Maximum attestations per minute (must be > 0)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_attestations_per_minute: Option<u32>,
