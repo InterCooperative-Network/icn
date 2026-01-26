@@ -450,6 +450,24 @@ impl RateLimiter {
     /// Returns true if allowed, false if rate limited.
     ///
     /// Uses PolicyOracle to determine rate limits based on trust/policy.
+    ///
+    /// ## Oracle Evaluation
+    ///
+    /// The oracle is consulted on each message to get the current policy decision:
+    /// - `PolicyDecision::Allow { constraints }`: Extract rate limit from constraints
+    /// - `PolicyDecision::Deny { .. }`: Return false immediately (message rejected)
+    ///
+    /// ## Deny Decision Semantics
+    ///
+    /// When the oracle returns `Deny`, no token bucket is created for the peer.
+    /// This means subsequent messages from denied peers will re-query the oracle
+    /// each time. This is intentional:
+    /// - Allows oracle to change its decision if circumstances change
+    /// - Avoids stale cached decisions for peers whose trust status improves
+    /// - Negligible overhead since denied peers should be rare in healthy networks
+    ///
+    /// If oracle call overhead becomes a concern, consider adding a TTL cache
+    /// for Deny decisions in the future.
     pub async fn check_rate_limit(&self, peer: &Did) -> bool {
         // Get rate limit config from oracle or fallback
         let config = if let Some(oracle) = &self.oracle {

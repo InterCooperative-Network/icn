@@ -308,6 +308,28 @@ pub fn create_server_config_no_client_auth(
 ///
 /// This uses a simple TOFU certificate verifier that accepts all valid self-signed
 /// certificates. Trust enforcement happens at the application layer via PolicyOracle.
+///
+/// ## Trust Enforcement Flow
+///
+/// The ICN network uses a layered trust model:
+///
+/// 1. **TLS Layer (this function)**: TOFU accepts any cryptographically valid certificate.
+///    The peer's DID is embedded in the certificate's Subject Alternative Name (SAN).
+///    This layer only ensures the peer owns the corresponding private key.
+///
+/// 2. **Protocol Layer**: After TLS handshake, the NetworkActor extracts the peer's DID
+///    from the certificate. HelloMessage exchange confirms both parties' identities.
+///
+/// 3. **Application Layer**: When messages arrive, the `RateLimiter::check_rate_limit()`
+///    method consults the PolicyOracle to determine if the peer should be allowed:
+///    - `PolicyDecision::Allow { constraints }`: Message allowed, rate limit applied from constraints
+///    - `PolicyDecision::Deny { .. }`: Message immediately rejected (returns false)
+///
+/// 4. **Untrusted Peer Handling**: Peers that fail PolicyOracle checks have their
+///    messages dropped. If no oracle is configured, the fallback rate limit is applied.
+///
+/// This architecture implements the "meaning firewall" principle: TLS accepts connections,
+/// but the PolicyOracle (provided by apps like TrustPolicyOracle) makes authorization decisions.
 pub fn create_tofu_client_config(
     certs: Vec<CertificateDer<'static>>,
     key: PrivateKeyDer<'static>,

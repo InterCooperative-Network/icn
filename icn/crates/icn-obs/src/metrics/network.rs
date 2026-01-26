@@ -40,7 +40,7 @@ pub fn init_descriptions() {
     );
     describe_counter!(
         "icn_network_messages_rate_limited_by_rate_total",
-        "Total number of messages rate limited by applied rate limit"
+        "Total number of messages rate limited, bucketed by rate limit (0-10, 11-50, 51-100, 100+)"
     );
     describe_counter!(
         "icn_network_rate_limit_config_changes_total",
@@ -244,10 +244,18 @@ pub fn peers_discovered_set(value: u64) {
 }
 
 // Labeled counters
+/// Increment rate-limited message counter with a rate bucket label.
+/// Uses buckets to avoid high cardinality: "0-10", "11-50", "51-100", "100+"
 pub fn messages_rate_limited_by_rate_inc(messages_per_second: u32) {
+    let bucket = match messages_per_second {
+        0..=10 => "0-10",
+        11..=50 => "11-50",
+        51..=100 => "51-100",
+        _ => "100+",
+    };
     counter!(
         "icn_network_messages_rate_limited_by_rate_total",
-        "limit" => messages_per_second.to_string()
+        "limit_bucket" => bucket
     )
     .increment(1);
 }
