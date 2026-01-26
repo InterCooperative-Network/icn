@@ -103,10 +103,7 @@ impl SessionManager {
     /// listening for incoming connections using TOFU (Trust-On-First-Use) model:
     /// - Server accepts all valid self-signed certificates
     /// - Client accepts all valid self-signed certificates  
-    /// - Trust enforcement happens at application layer (Hello message handler)
-    ///
-    /// If trust_graph is provided, it is used for application-layer trust decisions.
-    /// The min_trust_threshold parameter is currently ignored (always uses 0.0 at TLS layer).
+    /// - Trust enforcement happens at application layer via PolicyOracle
     ///
     /// If stun_servers is provided, performs NAT traversal discovery to determine
     /// the node's public endpoint (IP and port visible from the internet).
@@ -117,8 +114,6 @@ impl SessionManager {
         &mut self,
         identity_bundle: &icn_identity::IdentityBundle,
         listen_addr: SocketAddr,
-        trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
-        min_trust_threshold: Option<f64>,
         stun_servers: Option<Vec<SocketAddr>>,
         turn_config: Option<crate::TurnConfig>,
     ) -> Result<()> {
@@ -143,38 +138,9 @@ impl SessionManager {
         let transport_config = Arc::new(create_transport_config());
         server_config.transport_config(transport_config.clone());
 
-        // Create client config with TOFU mode (trust enforcement at application layer)
-        // Always use threshold 0.0 at TLS layer to allow initial connections
-        // Trust-based access control happens in Hello message handler
-        let client_config = if let Some(trust_graph) = trust_graph {
-            info!(
-                "TOFU mode enabled - trust enforcement at application layer (requested threshold: {:?})",
-                min_trust_threshold
-            );
-            tls::create_client_config(
-                certs.clone(),
-                key.clone_key(),
-                trust_graph,
-                own_did,
-                Some(0.0), // Always use TOFU mode at TLS layer
-            )?
-        } else {
-            // Fallback: create a permissive client config for development mode
-            // Note: In production, trust_graph should always be provided
-            warn!("TLS verification in development mode (no trust graph) - not suitable for production");
-            // Create a temporary trust graph for development mode
-            let temp_store: Arc<dyn icn_store::Store> =
-                Arc::new(icn_store::SledStore::temporary()?);
-            let temp_trust_graph = icn_trust::TrustGraph::new(temp_store, own_did.clone());
-            // Development mode uses 0.0 threshold; production should use trust_graph with proper threshold
-            tls::create_client_config(
-                certs.clone(),
-                key.clone_key(),
-                Arc::new(RwLock::new(temp_trust_graph)),
-                own_did,
-                Some(0.0),
-            )?
-        };
+        // Create client config with TOFU mode (trust enforcement at application layer via PolicyOracle)
+        info!("TOFU mode enabled - trust enforcement at application layer via PolicyOracle");
+        let client_config = tls::create_tofu_client_config(certs.clone(), key.clone_key())?;
         let mut client_config = ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
         ));
