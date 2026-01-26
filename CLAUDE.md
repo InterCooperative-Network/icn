@@ -398,3 +398,84 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete de
 - Shutdown via `tokio::sync::broadcast`
 - Integration tests need unique ports per node
 - Vector clocks prevent duplicate gossip processing
+
+## Kernel/App Separation Architecture
+
+### The Meaning Firewall
+
+The kernel enforces constraints WITHOUT understanding their semantic origin. This is the core architectural principle.
+
+**Rule**: Domain semantics (trust scores, governance rules, membership criteria) stay in apps. Kernel only sees:
+- `ConstraintSet` (rate limits, credit multipliers, voting weights)
+- `PolicyDecision` (Allow/Deny)
+- Capabilities (bearer tokens)
+
+**Violation Detection**:
+```rust
+// VIOLATION - kernel code importing domain types
+use icn_trust::{TrustGraph, TrustClass};  // ❌ NEVER in kernel crates
+
+// CORRECT - kernel code using generic types
+use icn_kernel_api::{PolicyOracle, ConstraintSet};  // ✅
+```
+
+### PolicyOracle Pattern
+
+Apps implement `PolicyOracle` to provide domain-specific authorization:
+
+```rust
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        // 1. Compute domain-specific value (trust score)
+        let score = self.graph.compute_trust_score(&actor);
+
+        // 2. Convert to generic constraints (MEANING FIREWALL BOUNDARY)
+        let constraints = ConstraintSet::new()
+            .with_rate_limit(score_to_rate_limit(score))
+            .with_credit_multiplier(score);
+
+        // 3. Return decision kernel can enforce blindly
+        PolicyDecision::Allow { constraints }
+    }
+}
+```
+
+### App Lifecycle
+
+```
+[Prepare] → [Install] → [Start] → [Stop] → [Uninstall]
+     ↓           ↓          ↓         ↓
+  Validate   Create     Spawn    Signal    Remove
+  manifest   state      task     shutdown  from
+             handles              +timeout  registry
+```
+
+### CCL (Cooperative Contract Language)
+
+CCL is the constitutional layer for governed entities:
+- **Entities**: Community, Cooperative, Federation, Individual
+- **Governance**: Bodies, decisions, delegation, thresholds
+- **Economics**: Capital, surplus allocation, credit policy
+- **Agreements**: Federation treaties, boundary protocols
+
+CCL documents are stored as state, interpreted by apps, and converted to `ConstraintSet` for kernel enforcement.
+
+### Bootstrap Phases
+
+1. **Genesis**: AllowAllOracle active, genesis capabilities can be issued
+2. **CoreApps**: First-party apps loading, trust oracle registering
+3. **Running**: Deny-by-default for unknown domains, full enforcement
+
+### Crate Organization
+
+**Kernel crates** (domain-agnostic):
+- `icn-kernel-api`: Primitive traits (PolicyOracle, State, Compute, Comms)
+- `icn-core`: Runtime, supervisor, dispatcher
+- `icn-net`, `icn-gateway`, `icn-gossip`: Network primitives
+
+**App crates** (domain-specific):
+- `apps/trust`: Trust graph → PolicyOracle
+- `apps/governance`: CCL governance → PolicyOracle (future)
+- `apps/membership`: Entity management (future)
+
+**Never import domain crates into kernel crates.**

@@ -35,7 +35,7 @@ pub enum EntitySubtype {
     // Federation subtypes
     Trade,
     Geographic,
-    Sectoral2, // Different from community sectoral
+    FederationSectoral, // Different from community sectoral
     // Custom
     Custom(String),
 }

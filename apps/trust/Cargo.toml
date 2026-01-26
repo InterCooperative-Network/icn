@@ -1,22 +1,43 @@
 [package]
-name = "icn-app-trust"
+name = "icn-trust-app"
 version = "0.1.0"
 edition = "2021"
-description = "ICN Trust App - Policy oracle for trust-based authorization"
+description = "Trust app - provides trust-based policy decisions for the ICN kernel"
 license = "MIT OR Apache-2.0"
+publish = false
 
 [dependencies]
-icn-core = { path = "../../icn/crates/icn-core" }
+# Kernel API for PolicyOracle trait and types
 icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
+
+# Internal trust graph implementation (not exposed to kernel)
 icn-trust = { path = "../../icn/crates/icn-trust" }
-icn-identity = { path = "../../icn/crates/icn-identity" }
+
+# App runtime support
+icn-core = { path = "../../icn/crates/icn-core" }
+
+# Storage for trust state
 icn-store = { path = "../../icn/crates/icn-store" }
+
+# Identity types (for Did conversion)
+icn-identity = { path = "../../icn/crates/icn-identity" }
+
+# Async runtime
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync"] }
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-async-trait = "0.1"
-tokio = { version = "1.0", features = ["sync"] }
+
+# Sync primitives (for PolicyOracle sync requirement)
+parking_lot = "0.12"
+
+# Logging
 tracing = "0.1"
-ordered-float = "4.2"
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full", "test-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"

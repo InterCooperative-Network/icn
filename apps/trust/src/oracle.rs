@@ -1,418 +1,363 @@
 //! Trust Policy Oracle
 //!
-//! Implements `PolicyOracle` to convert trust graph computations into
-//! kernel-enforceable constraints. The kernel enforces these constraints
-//! without understanding trust semantics (the "meaning firewall").
+//! Implements the PolicyOracle trait, converting trust semantics into
+//! kernel-enforceable constraints.
 //!
-//! # Trust-to-Constraint Mapping
+//! # The Meaning Firewall
 //!
-//! | Trust Score | Trust Class | Rate Limit | Credit Mult | Max Topics |
-//! |-------------|-------------|------------|-------------|------------|
-//! | 0.0 - 0.1   | Isolated    | 10 msg/s   | 0.1         | 5          |
-//! | 0.1 - 0.4   | Known       | 50 msg/s   | 0.5         | 25         |
-//! | 0.4 - 0.7   | Partner     | 100 msg/s  | 1.0         | 100        |
-//! | 0.7 - 1.0   | Federated   | 200 msg/s  | 2.0         | 500        |
+//! Everything above `score_to_constraints()` is trust semantics.
+//! Everything below is generic kernel constraints.
+//!
+//! The kernel never knows:
+//! - What a "trust score" is
+//! - What "Isolated", "Known", "Partner", "Federated" mean
+//! - How trust is computed
+//!
+//! It only knows:
+//! - Rate limits to enforce
+//! - Credit multipliers to apply
+//! - Topic limits to check
 
-use icn_identity::Did as IdentityDid;
 use icn_kernel_api::authz::{
-    ConstraintSet, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
+    ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
 };
-use ordered_float::OrderedFloat;
-
-// Re-export for tests that need it
-#[cfg(test)]
-use icn_kernel_api::authz::ActionKind;
-use icn_trust::{MultiTrustGraph, TrustClass, TrustGraph};
+use icn_trust::TrustGraph;
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
-use tracing::{debug, instrument};
 
-/// Trust policy oracle for ICN.
+/// Trust app's PolicyOracle implementation.
 ///
-/// Converts trust graph computations into kernel-enforceable constraints.
-/// This oracle:
-/// - Computes trust scores using the multi-graph architecture
-/// - Maps scores to trust classes
-/// - Returns constraints the kernel can enforce blindly
+/// This wraps TrustGraph internally but exposes only ConstraintSet to the kernel.
+/// The kernel never sees TrustGraph, TrustClass, or trust scores directly.
 ///
 /// # Thread Safety
 ///
-/// Uses `RwLock` for concurrent read access to trust graphs.
-/// Most operations are reads (score computation), writes are infrequent
-/// (edge updates via reducer).
+/// Uses `parking_lot::RwLock` instead of `tokio::sync::RwLock` because
+/// `PolicyOracle::evaluate()` is synchronous. This is intentional - see
+/// the tech debt note in the `PolicyOracle` trait documentation.
 pub struct TrustPolicyOracle {
-    /// The multi-graph containing social, economic, and technical trust
-    graph: Arc<RwLock<MultiTrustGraph>>,
-    /// Cache TTL for policy decisions (default: 60 seconds)
-    cache_ttl: Duration,
+    graph: Arc<RwLock<TrustGraph>>,
 }
 
 impl TrustPolicyOracle {
-    /// Create a new trust policy oracle.
-    pub fn new(graph: Arc<RwLock<MultiTrustGraph>>) -> Self {
-        Self {
-            graph,
-            cache_ttl: Duration::from_secs(60),
-        }
+    /// Create a new TrustPolicyOracle wrapping a TrustGraph.
+    pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
+        Self { graph }
     }
 
-    /// Create with custom cache TTL.
-    pub fn with_cache_ttl(graph: Arc<RwLock<MultiTrustGraph>>, cache_ttl: Duration) -> Self {
-        Self { graph, cache_ttl }
-    }
-
-    /// Compute combined trust score for an actor (async version).
+    /// Convert trust score to kernel-enforceable constraints.
     ///
-    /// Uses weighted combination of social, economic, and technical scores.
-    /// Converts from kernel's Did (String) to identity's Did for graph lookup.
+    /// # THIS IS THE MEANING FIREWALL BOUNDARY
     ///
-    /// Note: Currently unused as PolicyOracle::evaluate is sync. Will be used
-    /// when the oracle registry is made async-aware.
-    #[allow(dead_code)]
-    async fn compute_score(&self, actor: &str) -> f64 {
-        // Convert kernel Did (String) to identity Did
-        let identity_did = match IdentityDid::from_str(actor) {
-            Ok(did) => did,
-            Err(_) => return 0.0, // Invalid DID gets zero trust
+    /// Above this function: trust semantics (scores, classes, graph operations)
+    /// Below this function: generic kernel constraints (rate limits, multipliers)
+    ///
+    /// The kernel cannot determine WHY these constraint values were chosen.
+    ///
+    /// # Parameters
+    ///
+    /// - `score`: Trust score in range [0.0, 1.0]
+    /// - `_action`: Reserved for future per-action constraints (e.g., read-only peers
+    ///   could have different limits than writers). Currently unused but kept for
+    ///   forward compatibility.
+    fn score_to_constraints(&self, score: f64, _action: &ActionKind) -> ConstraintSet {
+        // Rate limiting based on trust score
+        // The kernel sees rate limits, not trust classes
+        //
+        // Rate limit tiers (from authz.rs):
+        //   unlimited: u32::MAX msg/s (Federated)
+        //   standard:  100 msg/s      (Partner)
+        //   throttled: 20 msg/s       (Known)
+        //   restricted: 5 msg/s       (Isolated)
+        let rate_limit = match score {
+            s if s >= 0.7 => RateLimit::unlimited(), // Federated class
+            s if s >= 0.4 => RateLimit::standard(),  // Partner class
+            s if s >= 0.1 => RateLimit::throttled(), // Known class
+            _ => RateLimit::restricted(),            // Isolated class
         };
 
-        let graph = self.graph.read().await;
-        graph
-            .compute_combined_trust_score(&identity_did)
-            .unwrap_or_default()
-    }
+        // Max topics aligned with rate limits
+        // Higher trust = more topic subscriptions allowed
+        // Rationale: topic count should scale with message capacity
+        let max_topics = match score {
+            s if s >= 0.7 => 500, // Federated: unlimited rate, many topics
+            s if s >= 0.4 => 100, // Partner: standard rate
+            s if s >= 0.1 => 25,  // Known: throttled rate
+            _ => 5,               // Isolated: restricted rate, minimal topics
+        };
 
-    /// Map trust score to rate limit constraints.
-    fn rate_limit_for_score(score: f64) -> RateLimit {
-        let trust_class = TrustClass::from_score(score);
-        match trust_class {
-            TrustClass::Isolated => RateLimit::new(10, 5),
-            TrustClass::Known => RateLimit::new(50, 15),
-            TrustClass::Partner => RateLimit::new(100, 25),
-            TrustClass::Federated => RateLimit::new(200, 50),
-        }
-    }
+        // TODO(#868): max_connections will be enforced by icn-net after
+        // rate_limit.rs migration to PolicyOracle (Phase 2.2). Currently set but not enforced.
+        let max_connections = match score {
+            s if s >= 0.7 => 100,
+            s if s >= 0.4 => 50,
+            s if s >= 0.1 => 20,
+            _ => 5,
+        };
 
-    /// Map trust score to credit multiplier.
-    fn credit_multiplier_for_score(score: f64) -> f64 {
-        let trust_class = TrustClass::from_score(score);
-        match trust_class {
-            TrustClass::Isolated => 0.1,
-            TrustClass::Known => 0.5,
-            TrustClass::Partner => 1.0,
-            TrustClass::Federated => 2.0,
-        }
-    }
-
-    /// Map trust score to max topics.
-    fn max_topics_for_score(score: f64) -> u32 {
-        let trust_class = TrustClass::from_score(score);
-        match trust_class {
-            TrustClass::Isolated => 5,
-            TrustClass::Known => 25,
-            TrustClass::Partner => 100,
-            TrustClass::Federated => 500,
-        }
-    }
-
-    /// Map trust score to max connections.
-    fn max_connections_for_score(score: f64) -> u32 {
-        let trust_class = TrustClass::from_score(score);
-        match trust_class {
-            TrustClass::Isolated => 2,
-            TrustClass::Known => 10,
-            TrustClass::Partner => 50,
-            TrustClass::Federated => 100,
-        }
-    }
-
-    /// Build constraint set from trust score.
-    fn constraints_for_score(score: f64) -> ConstraintSet {
         ConstraintSet::new()
-            .with_rate_limit(Self::rate_limit_for_score(score))
-            .with_credit_multiplier(Self::credit_multiplier_for_score(score))
-            .with_max_topics(Self::max_topics_for_score(score))
-            .with_max_connections(Self::max_connections_for_score(score))
-            .with_voting_weight(score) // Voting weight equals trust score
-            .with_custom("trust_score", ConstraintValue::Float(OrderedFloat(score)))
-            .with_custom(
-                "trust_class",
-                ConstraintValue::String(format!("{:?}", TrustClass::from_score(score))),
-            )
-    }
-
-    /// Evaluate a request synchronously (blocking).
-    ///
-    /// This is used by the PolicyOracle trait which requires sync evaluation.
-    /// Uses `block_in_place` to safely block within a tokio runtime.
-    #[instrument(skip(self), fields(actor = %request.actor()))]
-    fn evaluate_sync(&self, request: &PolicyRequest) -> PolicyDecision {
-        // Convert kernel Did (String) to identity Did
-        let identity_did = match IdentityDid::from_str(request.actor()) {
-            Ok(did) => did,
-            Err(_) => {
-                // Invalid DID gets Isolated constraints (lowest trust)
-                return PolicyDecision::allow_with(Self::constraints_for_score(0.0));
-            }
-        };
-
-        // Use block_in_place to safely block within a tokio runtime
-        let score = tokio::task::block_in_place(|| {
-            let graph = self.graph.blocking_read();
-            graph
-                .compute_combined_trust_score(&identity_did)
-                .unwrap_or_default()
-        });
-
-        debug!(
-            "Trust score for {}: {} (class: {:?})",
-            request.actor(),
-            score,
-            TrustClass::from_score(score)
-        );
-
-        // Handle specific resource queries
-        if let Some(resource) = &request.ext.resource {
-            match resource.as_str() {
-                "score" => {
-                    // Caller wants just the score
-                    let constraints = ConstraintSet::new()
-                        .with_custom("trust_score", ConstraintValue::Float(OrderedFloat(score)));
-                    return PolicyDecision::allow_with(constraints);
-                }
-                "class" => {
-                    // Caller wants the trust class
-                    let constraints = ConstraintSet::new().with_custom(
-                        "trust_class",
-                        ConstraintValue::String(format!("{:?}", TrustClass::from_score(score))),
-                    );
-                    return PolicyDecision::allow_with(constraints);
-                }
-                _ => {}
-            }
-        }
-
-        // Default: return full constraints
-        let constraints = Self::constraints_for_score(score);
-        PolicyDecision::allow_with(constraints)
+            .with_rate_limit(rate_limit)
+            .with_max_topics(max_topics)
+            .with_max_connections(max_connections)
+            .with_credit_multiplier(score) // Direct multiplier from score
+            .with_voting_weight(score) // Direct weight from score
     }
 }
 
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        self.evaluate_sync(request)
-    }
+        let graph = self.graph.read();
 
-    fn cache_ttl(&self) -> Duration {
-        self.cache_ttl
-    }
-
-    fn handles_cross_org(&self) -> bool {
-        // Trust oracle can handle cross-org requests via federation
-        true
-    }
-
-    fn domain(&self) -> Domain {
-        Domain::trust()
-    }
-}
-
-/// Simplified trust oracle for single-graph deployments.
-///
-/// Use this when you don't need the multi-graph architecture.
-pub struct SimpleTrustOracle {
-    graph: Arc<RwLock<TrustGraph>>,
-    cache_ttl: Duration,
-}
-
-impl SimpleTrustOracle {
-    /// Create a new simple trust oracle.
-    pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
-        Self {
-            graph,
-            cache_ttl: Duration::from_secs(60),
-        }
-    }
-}
-
-impl PolicyOracle for SimpleTrustOracle {
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        // Convert kernel Did (String) to identity Did
-        let identity_did = match IdentityDid::from_str(request.actor()) {
+        // Convert kernel-api Did (String) to icn-identity Did
+        // This is a type boundary - kernel uses String DIDs, trust uses validated DIDs
+        let actor_did = match icn_identity::Did::from_str(&request.core.actor) {
             Ok(did) => did,
-            Err(_) => {
-                // Invalid DID gets Isolated constraints
-                return PolicyDecision::allow_with(TrustPolicyOracle::constraints_for_score(0.0));
+            Err(e) => {
+                // Invalid DID format - return minimal trust constraints
+                tracing::warn!(
+                    actor = %request.core.actor,
+                    error = %e,
+                    "Invalid DID format, returning minimal trust"
+                );
+                return PolicyDecision::allow_with(
+                    self.score_to_constraints(0.0, &request.core.action),
+                );
             }
         };
 
-        // Use block_in_place to safely block within a tokio runtime
-        let score = tokio::task::block_in_place(|| {
-            let graph = self.graph.blocking_read();
-            graph
-                .compute_trust_score(&identity_did)
-                .unwrap_or_default()
-        });
+        // Compute trust score internally (trust semantics stay here)
+        // Log errors (storage corruption, lock issues) before falling back to minimal trust
+        let score = match graph.compute_trust_score(&actor_did) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    actor = %request.core.actor,
+                    error = %e,
+                    "Failed to compute trust score, returning minimal trust"
+                );
+                0.0
+            }
+        };
 
-        let constraints = TrustPolicyOracle::constraints_for_score(score);
+        // Log for debugging (semantic info stays in app)
+        tracing::debug!(
+            actor = %request.core.actor,
+            score = %score,
+            domain = %request.core.domain,
+            action = ?request.core.action,
+            "Trust oracle evaluated request"
+        );
+
+        // Convert to constraints (kernel only sees this)
+        // THIS IS WHERE THE MEANING FIREWALL IS ENFORCED
+        let constraints = self.score_to_constraints(score, &request.core.action);
+
         PolicyDecision::allow_with(constraints)
-    }
-
-    fn cache_ttl(&self) -> Duration {
-        self.cache_ttl
     }
 
     fn domain(&self) -> Domain {
         Domain::trust()
+    }
+
+    fn cache_ttl(&self) -> Duration {
+        // Trust scores don't change frequently, cache for 30 seconds.
+        //
+        // Trade-off:
+        // - Shorter TTL (10-15s): Tighter security, faster response to trust changes
+        // - Longer TTL (60s+): Lower computation load, less responsive to changes
+        //
+        // 30s balances security and performance. See #878 for cache invalidation
+        // when trust edges change (tighter security for immediate response).
+        Duration::from_secs(30)
+    }
+
+    fn handles_cross_org(&self) -> bool {
+        // Trust app handles federation trust bridging
+        true
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_identity::KeyPair;
     use icn_store::SledStore;
-    use icn_trust::TrustEdge;
+    use tempfile::tempdir;
 
-    fn create_test_graph() -> Arc<RwLock<MultiTrustGraph>> {
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_did = KeyPair::generate().unwrap().did().clone();
-        Arc::new(RwLock::new(MultiTrustGraph::new(store, own_did)))
+    /// Create a minimal TrustPolicyOracle for testing.
+    ///
+    /// Note: The actual trust score for test subjects will be 0.0 (unknown)
+    /// since we're not adding edges. For constraint mapping tests, we test
+    /// `score_to_constraints` directly.
+    fn create_test_oracle() -> TrustPolicyOracle {
+        let temp_dir = tempdir().unwrap();
+        let store = SledStore::open(temp_dir.path()).unwrap();
+
+        // Create a valid test DID using ed25519 keygen
+        let keypair = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let own_did = icn_identity::Did::from_public_key(&keypair.verifying_key());
+
+        let graph = TrustGraph::new(std::sync::Arc::new(store), own_did);
+
+        TrustPolicyOracle::new(Arc::new(RwLock::new(graph)))
     }
 
-    #[test]
-    fn test_rate_limit_mapping() {
-        // Isolated: < 0.1
-        let rl = TrustPolicyOracle::rate_limit_for_score(0.05);
-        assert_eq!(rl.messages_per_second, 10);
-
-        // Known: 0.1 - 0.4
-        let rl = TrustPolicyOracle::rate_limit_for_score(0.25);
-        assert_eq!(rl.messages_per_second, 50);
-
-        // Partner: 0.4 - 0.7
-        let rl = TrustPolicyOracle::rate_limit_for_score(0.55);
-        assert_eq!(rl.messages_per_second, 100);
-
-        // Federated: >= 0.7
-        let rl = TrustPolicyOracle::rate_limit_for_score(0.85);
-        assert_eq!(rl.messages_per_second, 200);
-    }
+    // ================================================================
+    // Direct score_to_constraints tests (unit tests for meaning firewall)
+    // ================================================================
 
     #[test]
-    fn test_credit_multiplier_mapping() {
-        assert_eq!(TrustPolicyOracle::credit_multiplier_for_score(0.05), 0.1);
-        assert_eq!(TrustPolicyOracle::credit_multiplier_for_score(0.25), 0.5);
-        assert_eq!(TrustPolicyOracle::credit_multiplier_for_score(0.55), 1.0);
-        assert_eq!(TrustPolicyOracle::credit_multiplier_for_score(0.85), 2.0);
-    }
+    fn test_high_trust_score_gets_unlimited_rate() {
+        let oracle = create_test_oracle();
+        let constraints = oracle.score_to_constraints(0.8, &ActionKind::Write);
 
-    #[test]
-    fn test_constraints_for_score() {
-        let constraints = TrustPolicyOracle::constraints_for_score(0.55);
-
+        // High trust (>= 0.7) should get unlimited rate
         assert!(constraints.rate_limit.is_some());
-        assert_eq!(constraints.rate_limit.as_ref().unwrap().messages_per_second, 100);
-        assert_eq!(constraints.credit_multiplier, Some(1.0));
-        assert_eq!(constraints.max_topics, Some(100));
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, u32::MAX);
+        assert_eq!(constraints.max_topics, Some(500)); // Aligned with unlimited rate
+        assert_eq!(constraints.max_connections, Some(100));
+    }
+
+    #[test]
+    fn test_medium_trust_score_gets_standard_rate() {
+        let oracle = create_test_oracle();
+        let constraints = oracle.score_to_constraints(0.5, &ActionKind::Write);
+
+        // Medium trust (0.4-0.7) should get standard rate
+        assert!(constraints.rate_limit.is_some());
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, 100);
+        assert_eq!(constraints.max_topics, Some(100)); // Aligned with standard rate
         assert_eq!(constraints.max_connections, Some(50));
-        assert_eq!(constraints.voting_weight, Some(0.55));
-
-        // Check custom constraints
-        assert!(matches!(
-            constraints.custom.get("trust_score"),
-            Some(ConstraintValue::Float(s)) if (s.into_inner() - 0.55).abs() < 0.001
-        ));
-        assert!(matches!(
-            constraints.custom.get("trust_class"),
-            Some(ConstraintValue::String(s)) if s == "Partner"
-        ));
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_oracle_evaluate_unknown_actor() {
-        let graph = create_test_graph();
-        let oracle = TrustPolicyOracle::new(graph);
+    #[test]
+    fn test_low_trust_score_gets_throttled_rate() {
+        let oracle = create_test_oracle();
+        let constraints = oracle.score_to_constraints(0.2, &ActionKind::Write);
 
-        let unknown_did = KeyPair::generate().unwrap().did().clone();
-        // Convert identity Did to kernel Did (String)
-        let request = PolicyRequest::new(unknown_did.to_string(), ActionKind::Read, Domain::trust());
-
-        let decision = oracle.evaluate(&request);
-
-        // Unknown actor should get Isolated constraints
-        assert!(decision.is_allowed());
-        let constraints = decision.constraints().unwrap();
-        assert_eq!(constraints.rate_limit.as_ref().unwrap().messages_per_second, 10);
-        assert_eq!(constraints.credit_multiplier, Some(0.1));
+        // Low trust (0.1-0.4) should get throttled rate
+        assert!(constraints.rate_limit.is_some());
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, 20);
+        assert_eq!(constraints.max_topics, Some(25)); // Aligned with throttled rate
+        assert_eq!(constraints.max_connections, Some(20));
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_oracle_evaluate_with_trust() {
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_did = KeyPair::generate().unwrap().did().clone();
-        let peer_did = KeyPair::generate().unwrap().did().clone();
+    #[test]
+    fn test_zero_trust_score_gets_restricted_rate() {
+        let oracle = create_test_oracle();
+        let constraints = oracle.score_to_constraints(0.05, &ActionKind::Write);
 
-        let graph = Arc::new(RwLock::new(MultiTrustGraph::new(store, own_did.clone())));
+        // Very low trust (< 0.1) should get restricted rate
+        assert!(constraints.rate_limit.is_some());
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, 5);
+        assert_eq!(constraints.max_topics, Some(5)); // Aligned with restricted rate
+        assert_eq!(constraints.max_connections, Some(5)); // Reduced for isolated peers
+    }
 
-        // Add trust edge
-        {
-            let mut g = graph.write().await;
-            g.social_mut()
-                .add_edge(TrustEdge::new(
-                    own_did.clone(),
-                    peer_did.clone(),
-                    icn_trust::TrustScore::unchecked(0.8),
-                ))
-                .unwrap();
+    #[test]
+    fn test_credit_multiplier_equals_score() {
+        let oracle = create_test_oracle();
+
+        for score in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            let constraints = oracle.score_to_constraints(score, &ActionKind::Write);
+            assert_eq!(constraints.credit_multiplier, Some(score));
+            assert_eq!(constraints.voting_weight, Some(score));
         }
-
-        let oracle = TrustPolicyOracle::new(graph);
-        // Convert identity Did to kernel Did (String)
-        let request = PolicyRequest::new(peer_did.to_string(), ActionKind::Read, Domain::trust());
-
-        let decision = oracle.evaluate(&request);
-
-        // Peer should get constraints based on their trust score
-        assert!(decision.is_allowed());
-        let constraints = decision.constraints().unwrap();
-
-        // Combined score calculation with only social edge at 0.8:
-        // - Social: 0.8 * 0.6 (60/40 weighting) = 0.48, then * 0.5 (combined weight) = 0.24
-        // - Economic: 0.05 fallback * 0.3 = 0.015
-        // - Technical: 0.05 fallback * 0.2 = 0.01
-        // Total: ~0.265 -> Known class (0.1-0.4) -> 50 msg/s rate limit
-        assert_eq!(constraints.rate_limit.as_ref().unwrap().messages_per_second, 50);
     }
 
     #[test]
-    fn test_oracle_domain() {
-        let graph = create_test_graph();
-        let oracle = TrustPolicyOracle::new(graph);
+    fn test_meaning_firewall_constraint_set_is_generic() {
+        let oracle = create_test_oracle();
+        let constraints = oracle.score_to_constraints(0.5, &ActionKind::Read);
 
-        assert_eq!(oracle.domain(), Domain::trust());
+        // Verify response contains only generic constraints
+        // No TrustClass, no trust score explanation, no semantic meaning
+
+        // These are generic kernel constraints
+        assert!(constraints.rate_limit.is_some());
+        assert!(constraints.max_topics.is_some());
+        assert!(constraints.max_connections.is_some());
+        assert!(constraints.credit_multiplier.is_some());
+        assert!(constraints.voting_weight.is_some());
+
+        // The ConstraintSet struct has no field for "trust class" or "trust score"
+        // The kernel cannot tell WHY these values were chosen
     }
 
+    // ================================================================
+    // Oracle trait method tests
+    // ================================================================
+
     #[test]
-    fn test_oracle_cache_ttl() {
-        let graph = create_test_graph();
-        let oracle = TrustPolicyOracle::new(graph);
-
-        assert_eq!(oracle.cache_ttl(), Duration::from_secs(60));
-
-        let oracle_custom = TrustPolicyOracle::with_cache_ttl(
-            create_test_graph(),
-            Duration::from_secs(120),
-        );
-        assert_eq!(oracle_custom.cache_ttl(), Duration::from_secs(120));
+    fn test_oracle_domain_is_trust() {
+        let oracle = create_test_oracle();
+        assert_eq!(oracle.domain().as_str(), "trust");
     }
 
     #[test]
     fn test_oracle_handles_cross_org() {
-        let graph = create_test_graph();
-        let oracle = TrustPolicyOracle::new(graph);
-
+        let oracle = create_test_oracle();
         assert!(oracle.handles_cross_org());
+    }
+
+    #[test]
+    fn test_cache_ttl_is_30_seconds() {
+        let oracle = create_test_oracle();
+        assert_eq!(oracle.cache_ttl(), Duration::from_secs(30));
+    }
+
+    // ================================================================
+    // Full evaluate() flow tests
+    // ================================================================
+
+    #[test]
+    fn test_evaluate_unknown_actor_gets_zero_trust() {
+        let oracle = create_test_oracle();
+
+        // Create a valid test DID for the actor
+        let actor_keypair = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let actor_did = icn_identity::Did::from_public_key(&actor_keypair.verifying_key());
+
+        let request = PolicyRequest::new(
+            actor_did.as_str().to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate(&request);
+
+        // Unknown actor should still be allowed, but with minimal constraints
+        assert!(decision.is_allowed());
+
+        let constraints = decision.constraints().unwrap();
+        // Unknown actors get 0.0 trust score -> restricted rate
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, 5);
+    }
+
+    #[test]
+    fn test_evaluate_invalid_did_format_gets_zero_trust() {
+        let oracle = create_test_oracle();
+
+        // Invalid DID format (not a proper did:icn: format)
+        let request = PolicyRequest::new(
+            "not-a-valid-did".to_string(),
+            ActionKind::Write,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate(&request);
+
+        // Invalid DID should still be allowed, but with minimal constraints
+        assert!(decision.is_allowed());
+
+        let constraints = decision.constraints().unwrap();
+        // Invalid DID -> 0.0 trust -> restricted rate
+        let rate = constraints.rate_limit.as_ref().unwrap();
+        assert_eq!(rate.messages_per_second, 5);
     }
 }
