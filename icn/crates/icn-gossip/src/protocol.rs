@@ -43,42 +43,36 @@ impl GossipActor {
 
     /// Inner implementation of handle_message (for latency tracking)
     async fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
-        // H7 fix: Trust-gated message handling
+        // H7 fix: Trust-gated message handling via PolicyOracle
         // Check sender's trust score before processing messages
         const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
 
-        if let Some(ref trust_graph) = self.trust_graph {
-            if let Ok(tg) = trust_graph.try_read() {
-                match tg.compute_trust_score(sender) {
-                    Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
-                        warn!(
-                            peer_did = %sender,
-                            trust_score = score,
-                            min_required = MIN_TRUST_FOR_MESSAGE,
-                            message_type = message.variant_name(),
-                            "Rejecting message from low-trust sender"
-                        );
-                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!(
-                            "Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
-                        );
-                    }
-                    Ok(_) => {
-                        // Trust validated successfully
-                    }
-                    Err(e) => {
-                        // Unknown sender - reject by default
-                        debug!(
-                            peer_did = %sender,
-                            error = %e,
-                            "Cannot compute trust score for message sender"
-                        );
-                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for message sender {sender}: {e}");
-                    }
-                }
-            }
-            // If we can't acquire lock, skip trust check (avoid blocking)
+        // Use policy oracle to get trust decision
+        let request = icn_kernel_api::authz::PolicyRequest::new(
+            sender.as_str().to_string(),
+            icn_kernel_api::authz::ActionKind::Write, // Messages are write operations
+            icn_kernel_api::authz::Domain::trust(),
+        );
+        let decision = self.policy_oracle.evaluate(&request);
+        
+        // Extract trust score from oracle decision (credit_multiplier = trust_score)
+        let trust_score = decision
+            .constraints()
+            .and_then(|c| c.credit_multiplier)
+            .unwrap_or(0.0);
+        
+        if trust_score < MIN_TRUST_FOR_MESSAGE {
+            warn!(
+                peer_did = %sender,
+                trust_score = trust_score,
+                min_required = MIN_TRUST_FOR_MESSAGE,
+                message_type = message.variant_name(),
+                "Rejecting message from low-trust sender"
+            );
+            icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+            anyhow::bail!(
+                "Message sender {sender} has insufficient trust ({trust_score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
+            );
         }
 
         // Phase 18 Week 3: Record contact for partition detection

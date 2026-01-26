@@ -3068,6 +3068,7 @@ dependencies = [
  "hex",
  "icn-encoding",
  "icn-identity",
+ "icn-kernel-api",
  "icn-obs",
  "icn-security",
  "icn-snapshot",
