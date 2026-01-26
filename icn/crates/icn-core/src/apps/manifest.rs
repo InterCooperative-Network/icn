@@ -274,6 +274,12 @@ impl StateConfig {
         }
 
         for kv in &self.kv {
+            // Check for empty name before duplicate check
+            if kv.name.is_empty() {
+                return Err(ManifestError::Validation(
+                    "KV store name cannot be empty".to_string(),
+                ));
+            }
             if !names.insert(&kv.name) {
                 return Err(ManifestError::Validation(format!(
                     "Duplicate state name: '{}'",
@@ -283,6 +289,12 @@ impl StateConfig {
         }
 
         for blob in &self.blobs {
+            // Check for empty name before duplicate check
+            if blob.name.is_empty() {
+                return Err(ManifestError::Validation(
+                    "Blob store name cannot be empty".to_string(),
+                ));
+            }
             if !names.insert(&blob.name) {
                 return Err(ManifestError::Validation(format!(
                     "Duplicate state name: '{}'",
@@ -665,5 +677,20 @@ state:
 "#;
         let manifest = Manifest::parse(yaml).unwrap();
         assert_eq!(manifest.state.logs[0].ordering, LogOrdering::Total);
+    }
+
+    #[test]
+    fn test_invalid_manifest_empty_kv_name() {
+        let yaml = r#"
+name: test
+version: 1.0.0
+publisher: did:icn:test
+state:
+  kv:
+    - name: ""
+"#;
+        let result = Manifest::parse(yaml);
+        assert!(matches!(result, Err(ManifestError::Validation(_))));
+        assert!(result.unwrap_err().to_string().contains("KV store name cannot be empty"));
     }
 }

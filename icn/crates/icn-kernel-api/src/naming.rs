@@ -62,7 +62,7 @@ pub struct NameRecord {
 }
 
 /// Name resolution options.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ResolveOptions {
     /// Maximum recursion depth for aliases
     pub max_depth: Option<u32>,
@@ -72,6 +72,12 @@ pub struct ResolveOptions {
     pub scope: Option<Scope>,
     /// Return cached result if available
     pub allow_cached: bool,
+}
+
+impl Default for ResolveOptions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ResolveOptions {

@@ -7,6 +7,9 @@
 // Allow unwrap/expect in test code - panics are acceptable for tests
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+#[cfg(test)]
+mod meaning_firewall;
+
 pub mod anti_entropy;
 pub mod apps;
 pub mod config;
