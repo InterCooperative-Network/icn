@@ -14,6 +14,9 @@ use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
 };
+// TODO(Phase 2.4): Remove this import when deprecated TrustGatedRateLimitConfig is removed.
+// Currently only used by deprecated `for_class()` method for backward compatibility.
+#[allow(deprecated)]
 use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::fmt;
@@ -343,6 +346,14 @@ impl RateLimiter {
     }
 
     /// Create a new rate limiter with PolicyOracle
+    ///
+    /// The oracle is consulted on each message to determine the appropriate rate limit.
+    /// If the oracle returns `PolicyDecision::Allow`, rate limits from the constraints
+    /// are applied. If it returns `PolicyDecision::Deny`, messages are immediately rejected.
+    ///
+    /// The `fallback_config` is used when constraint extraction fails or when constraints
+    /// don't specify a rate limit. This provides sensible defaults while still allowing
+    /// the oracle to make authorization decisions.
     pub fn new_with_oracle(
         oracle: Arc<dyn PolicyOracle>,
         fallback_config: RateLimitConfig,
