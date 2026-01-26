@@ -182,6 +182,9 @@ impl Response {
 /// Read-only state snapshot for reducers.
 ///
 /// Reducers receive this immutable view and return a new state.
+// TODO(#873): Implement copy-on-write for StateSnapshot to avoid O(n) clone per reducer.
+// Currently acceptable for Phase 1, but should use Arc<HashMap> or persistent data
+// structures (e.g., `im` crate) for production workloads with large state.
 #[derive(Clone)]
 pub struct StateSnapshot {
     /// KV data (cloned for isolation)

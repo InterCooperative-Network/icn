@@ -134,7 +134,7 @@ impl Manifest {
     ///
     /// To prevent DoS via large manifest files, this method enforces a
     /// maximum size of 1MB. Callers should also rate limit manifest parsing
-    /// at the API layer.
+    /// at the API layer (see #875 for tracking).
     pub fn parse(yaml: &str) -> Result<Self, ManifestError> {
         // Enforce maximum manifest size to prevent DoS
         if yaml.len() > MAX_MANIFEST_SIZE {

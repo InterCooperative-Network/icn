@@ -115,23 +115,23 @@ pub fn dispatch_request_duration_observe(app_id: &str, request_type: &str, durat
 }
 
 /// Increment apps installed counter.
-pub fn apps_installed_total_inc() {
-    counter!("icn_apps_installed_total").increment(1);
+pub fn apps_installed_total_inc(app_id: &str) {
+    counter!("icn_apps_installed_total", "app_id" => app_id.to_owned()).increment(1);
 }
 
 /// Increment apps uninstalled counter.
-pub fn apps_uninstalled_total_inc() {
-    counter!("icn_apps_uninstalled_total").increment(1);
+pub fn apps_uninstalled_total_inc(app_id: &str) {
+    counter!("icn_apps_uninstalled_total", "app_id" => app_id.to_owned()).increment(1);
 }
 
 /// Increment apps started counter.
-pub fn apps_started_total_inc() {
-    counter!("icn_apps_started_total").increment(1);
+pub fn apps_started_total_inc(app_id: &str) {
+    counter!("icn_apps_started_total", "app_id" => app_id.to_owned()).increment(1);
 }
 
 /// Increment apps stopped counter.
-pub fn apps_stopped_total_inc() {
-    counter!("icn_apps_stopped_total").increment(1);
+pub fn apps_stopped_total_inc(app_id: &str) {
+    counter!("icn_apps_stopped_total", "app_id" => app_id.to_owned()).increment(1);
 }
 
 /// Increment shutdown timeout counter with app ID.

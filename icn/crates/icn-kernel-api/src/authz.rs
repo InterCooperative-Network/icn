@@ -554,7 +554,7 @@ impl PolicyRequest {
 /// 2. Pre-compute values during async initialization
 /// 3. Cache results internally
 ///
-/// **Tech Debt**: If evaluation latency becomes a bottleneck, consider
+/// **Tech Debt** (see #874): If evaluation latency becomes a bottleneck, consider
 /// adding an `async fn evaluate_async()` method with default impl calling
 /// `evaluate()`. This would allow gradual migration without breaking changes.
 pub trait PolicyOracle: Send + Sync {
