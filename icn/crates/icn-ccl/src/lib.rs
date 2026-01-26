@@ -56,6 +56,7 @@ pub mod messages;
 pub mod registry;
 pub mod registry_actor;
 pub mod runtime;
+pub mod schema;
 pub mod types;
 
 // Re-export commonly used types

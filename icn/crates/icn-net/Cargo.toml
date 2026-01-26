@@ -19,7 +19,8 @@ icn-encoding = { path = "../icn-encoding" }
 icn-crypto-pq = { path = "../icn-crypto-pq", optional = true }
 icn-time = { path = "../icn-time" }
 icn-gossip.workspace = true
-icn-trust.workspace = true
+icn-kernel-api = { path = "../icn-kernel-api" }
+icn-trust.workspace = true  # TODO: Remove after Phase 2 migration is complete
 icn-ledger.workspace = true
 icn-store.workspace = true
 icn-obs.workspace = true
@@ -48,6 +49,7 @@ zstd = "0.13"
 
 [dev-dependencies]
 icn-store.workspace = true
+icn-trust.workspace = true  # For tests only - will be removed when tests use mock oracles
 tracing-subscriber.workspace = true
 rand_core.workspace = true
 criterion = "0.5"

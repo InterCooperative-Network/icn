@@ -8,6 +8,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod anti_entropy;
+pub mod apps;
 pub mod config;
 pub mod dead_letter;
 pub mod error;
@@ -27,6 +28,10 @@ pub mod upgrade;
 pub mod upgrade_actor;
 
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
+pub use apps::{
+    AppBuilder, AppHandle, AppId, AppRuntime, AppStatus, ComputeDispatcher, Event, Manifest,
+    Reducer, Request, Response, RuntimeError, Service, StateDelta, StateSnapshot,
+};
 pub use config::Config;
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};
 pub use error::{CoreError, Result};

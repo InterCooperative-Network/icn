@@ -1,0 +1,25 @@
+name: echo
+version: 0.1.0
+publisher: did:icn:test
+
+description: >
+  Test app that echoes messages to state.
+  Used to validate the app runtime before extracting real apps like trust.
+
+capabilities_required:
+  - state:kv:write:self
+  - state:kv:read:self
+
+capabilities_provided: []
+
+state:
+  kv:
+    - name: echoes
+
+compute:
+  reducers:
+    - name: echo_reducer
+      event_type: echo:message
+  services:
+    - name: echo_query
+      request_type: echo:query

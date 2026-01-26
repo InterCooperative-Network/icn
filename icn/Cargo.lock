@@ -2754,6 +2754,7 @@ dependencies = [
  "icn-trust",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
@@ -2875,6 +2876,7 @@ dependencies = [
  "icn-gossip",
  "icn-governance",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-net",
  "icn-obs",
@@ -2889,8 +2891,10 @@ dependencies = [
  "portpicker",
  "rand 0.8.5",
  "rustls",
+ "semver",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "sled",
  "tempfile",
@@ -3142,6 +3146,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-kernel-api"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "ordered-float 4.6.0",
+ "parking_lot 0.12.5",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-ledger"
 version = "0.1.0"
 dependencies = [
@@ -3187,6 +3204,7 @@ dependencies = [
  "icn-encoding",
  "icn-gossip",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-obs",
  "icn-privacy",
@@ -4638,6 +4656,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
 dependencies = [
  "num-traits",
+ "rand 0.8.5",
+ "serde",
 ]
 
 [[package]]
@@ -5358,6 +5378,7 @@ dependencies = [
  "libc",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
+ "serde",
 ]
 
 [[package]]
@@ -5397,6 +5418,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
+ "serde",
 ]
 
 [[package]]
