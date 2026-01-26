@@ -39,7 +39,7 @@ hex = "0.4"
 lru = "0.16"
 
 # HSM support (optional)
-cryptoki = { version = "0.8", optional = true }
+cryptoki = { version = "0.12", optional = true }
 
 # TPM support (optional)
 tss-esapi = { version = "7.6", optional = true }
