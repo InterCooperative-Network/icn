@@ -66,6 +66,19 @@ jobs:
         run: cargo fmt --all --check
         working-directory: ./icn
 
+  meaning-firewall:
+    name: Meaning Firewall Check
+    runs-on: ubuntu-latest
+    # Non-blocking until Phase 2 completes (#865, #866, #867)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check kernel/app separation
+        run: ./scripts/check-meaning-firewall.sh
+        # Reports violations but doesn't fail CI until Phase 2 is done
+        # After Phase 2: remove continue-on-error above to enforce
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
