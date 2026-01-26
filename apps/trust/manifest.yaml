@@ -1,0 +1,36 @@
+name: trust
+version: 0.1.0
+publisher: did:icn:system
+
+description: >
+  Trust policy oracle for the ICN kernel/app separation architecture.
+
+  Implements PolicyOracle to convert trust graph computations into
+  kernel-enforceable constraints (rate limits, credit multipliers,
+  voting weights). The kernel enforces these constraints without
+  understanding trust semantics.
+
+capabilities_required:
+  - state:kv:read:self
+  - state:kv:write:self
+
+capabilities_provided:
+  - oracle:trust:policy
+
+state:
+  kv:
+    - name: social_edges
+    - name: economic_edges
+    - name: technical_edges
+    - name: score_cache
+
+compute:
+  reducers:
+    - name: trust_edge_reducer
+      event_type: trust:edge:update
+  services:
+    - name: trust_query
+      request_type: trust:query
+
+oracle:
+  domain: trust

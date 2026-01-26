@@ -1,0 +1,21 @@
+[package]
+name = "icn-app-trust"
+version = "0.1.0"
+edition = "2021"
+description = "ICN Trust App - Policy oracle for trust-based authorization"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+icn-core = { path = "../../icn/crates/icn-core" }
+icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
+icn-trust = { path = "../../icn/crates/icn-trust" }
+icn-identity = { path = "../../icn/crates/icn-identity" }
+icn-store = { path = "../../icn/crates/icn-store" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["sync"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full", "test-util"] }
