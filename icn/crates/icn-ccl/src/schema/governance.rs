@@ -4,6 +4,7 @@
 
 use super::SchemaError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Convening schedule for a body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -235,6 +236,28 @@ pub struct GovernanceSchema {
 impl GovernanceSchema {
     /// Validate the governance schema.
     pub fn validate(&self) -> Result<(), SchemaError> {
+        // Check for duplicate body names
+        let mut body_name_set = HashSet::new();
+        for body in &self.bodies {
+            if !body_name_set.insert(&body.name) {
+                return Err(SchemaError::Validation(format!(
+                    "Duplicate body name: '{}'",
+                    body.name
+                )));
+            }
+        }
+
+        // Check for duplicate decision names
+        let mut decision_name_set = HashSet::new();
+        for decision in &self.decisions {
+            if !decision_name_set.insert(&decision.name) {
+                return Err(SchemaError::Validation(format!(
+                    "Duplicate decision name: '{}'",
+                    decision.name
+                )));
+            }
+        }
+
         let body_names: Vec<_> = self.bodies.iter().map(|b| &b.name).collect();
 
         // Validate decision authority references
@@ -365,5 +388,36 @@ decisions:
 
         let emergency = &gov.decisions[0];
         assert!(emergency.constraint.is_some());
+    }
+
+    #[test]
+    fn test_validate_duplicate_body_names() {
+        let yaml = r#"
+bodies:
+  - name: board
+  - name: board
+decisions: []
+"#;
+        let gov: GovernanceSchema = serde_yaml::from_str(yaml).expect("Failed to parse");
+        let err = gov.validate().unwrap_err();
+        assert!(err.to_string().contains("Duplicate body name"));
+    }
+
+    #[test]
+    fn test_validate_duplicate_decision_names() {
+        let yaml = r#"
+bodies:
+  - name: board
+decisions:
+  - name: operational
+    authority: board
+    threshold: simple_majority
+  - name: operational
+    authority: board
+    threshold: unanimous
+"#;
+        let gov: GovernanceSchema = serde_yaml::from_str(yaml).expect("Failed to parse");
+        let err = gov.validate().unwrap_err();
+        assert!(err.to_string().contains("Duplicate decision name"));
     }
 }
