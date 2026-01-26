@@ -42,8 +42,8 @@ state:
     - name: scores_cache
       max_keys: 5000
 
-# Compute handlers (TODO: Implement in Phase 2.2)
-# These are commented out until handlers are implemented to prevent runtime errors.
+# Compute handlers (TODO: See #877 for implementation)
+# Commented out until attestation_reducer and score_query are implemented.
 # compute:
 #   reducers:
 #     - name: attestation_reducer

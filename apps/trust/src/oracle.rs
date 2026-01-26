@@ -87,8 +87,8 @@ impl TrustPolicyOracle {
             _ => 5,               // Isolated: restricted rate, minimal topics
         };
 
-        // TODO(Phase 2.2): max_connections will be enforced by icn-net
-        // after rate_limit.rs migration to PolicyOracle. Currently set but not enforced.
+        // TODO(#868): max_connections will be enforced by icn-net after
+        // rate_limit.rs migration to PolicyOracle (Phase 2.2). Currently set but not enforced.
         let max_connections = match score {
             s if s >= 0.7 => 100,
             s if s >= 0.4 => 50,
@@ -167,8 +167,8 @@ impl PolicyOracle for TrustPolicyOracle {
         // - Shorter TTL (10-15s): Tighter security, faster response to trust changes
         // - Longer TTL (60s+): Lower computation load, less responsive to changes
         //
-        // 30s balances security and performance. In Phase 2.2, consider adding
-        // cache invalidation when trust edges change for immediate response.
+        // 30s balances security and performance. See #878 for cache invalidation
+        // when trust edges change (tighter security for immediate response).
         Duration::from_secs(30)
     }
 
