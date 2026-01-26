@@ -15,8 +15,8 @@
 //! just with PolicyOracle registration.
 
 use icn_core::apps::{
-    AppBuilder, DispatchError, Event, Reducer, Request, Response, Service,
-    StateDelta, StateSnapshot,
+    AppBuilder, DispatchError, Event, Reducer, Request, Response, Service, StateDelta,
+    StateSnapshot,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -64,7 +64,8 @@ impl Reducer for EchoReducer {
 
         // Store message with timestamp as key
         let key = format!("msg:{}", event.timestamp);
-        let value = serde_json::to_vec(&msg).map_err(|e| DispatchError::Serialization(e.to_string()))?;
+        let value =
+            serde_json::to_vec(&msg).map_err(|e| DispatchError::Serialization(e.to_string()))?;
         delta.kv_set("echoes", key, value);
 
         Ok(delta)
@@ -115,7 +116,10 @@ impl Service for EchoService {
                 }
             }
             _ => {
-                return Ok(Response::error(&request.id, format!("Unknown query: {}", query.query)));
+                return Ok(Response::error(
+                    &request.id,
+                    format!("Unknown query: {}", query.query),
+                ));
             }
         };
 
@@ -186,7 +190,8 @@ mod tests {
             content: "Hello, ICN!".to_string(),
             sender: Some("test".to_string()),
         };
-        let event = Event::with_payload("echo:message", &msg, "test").expect("Failed to create event");
+        let event =
+            Event::with_payload("echo:message", &msg, "test").expect("Failed to create event");
 
         {
             let d = dispatcher.read().await;
@@ -197,7 +202,8 @@ mod tests {
         let query = EchoQuery {
             query: "count".to_string(),
         };
-        let request = Request::with_payload("echo:query", &query, "test").expect("Failed to create request");
+        let request =
+            Request::with_payload("echo:query", &query, "test").expect("Failed to create request");
 
         let response = {
             let d = dispatcher.read().await;
@@ -212,7 +218,10 @@ mod tests {
         runtime.stop(&app_id).await.expect("Failed to stop");
 
         // Uninstall
-        runtime.uninstall(&app_id).await.expect("Failed to uninstall");
+        runtime
+            .uninstall(&app_id)
+            .await
+            .expect("Failed to uninstall");
     }
 
     #[tokio::test]
@@ -224,7 +233,8 @@ mod tests {
             sender: None,
         };
 
-        let event = Event::with_payload("echo:message", &msg, "test").expect("Failed to create event");
+        let event =
+            Event::with_payload("echo:message", &msg, "test").expect("Failed to create event");
         let snapshot = StateSnapshot::from_app_state(&create_empty_state().await).await;
 
         let delta = reducer.reduce(&snapshot, &event).expect("Reduce failed");
@@ -233,7 +243,7 @@ mod tests {
     }
 
     async fn create_empty_state() -> icn_core::apps::AppState {
-        use icn_core::apps::{AppNamespace, StateConfig, StateFactory, KvConfig};
+        use icn_core::apps::{AppNamespace, KvConfig, StateConfig, StateFactory};
 
         let factory = StateFactory::new();
         let namespace = AppNamespace::new("did:icn:test", "echo");
@@ -244,6 +254,9 @@ mod tests {
             ..Default::default()
         };
 
-        factory.create_for_app(namespace, &config).await.expect("Failed to create state")
+        factory
+            .create_for_app(namespace, &config)
+            .await
+            .expect("Failed to create state")
     }
 }

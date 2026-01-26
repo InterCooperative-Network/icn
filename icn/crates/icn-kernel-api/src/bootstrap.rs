@@ -613,9 +613,12 @@ impl CapabilityRequest {
     }
 
     /// Parse a capability request from a string like "state:logs:append:self".
+    ///
+    /// Returns None if the string is malformed (e.g., empty parts like ":::").
     pub fn parse(s: &str) -> Option<Self> {
         let parts: Vec<&str> = s.split(':').collect();
-        if parts.len() >= 2 {
+        // Require at least 2 parts and all parts must be non-empty
+        if parts.len() >= 2 && parts.iter().all(|p| !p.is_empty()) {
             // Last part is typically the action, rest is resource
             let action = parts.last()?.to_string();
             let resource = parts[..parts.len() - 1].join(":");

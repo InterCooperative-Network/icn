@@ -481,10 +481,13 @@ impl ComputeDispatcher {
 
     /// Stop the event loop.
     pub async fn stop(&self) {
-        let mut running = self.running.write().await;
-        *running = false;
-        // Signal shutdown to wake up the run loop
+        // Signal shutdown first (no lock needed) to wake up the run loop
         let _ = self.shutdown_tx.send(true);
+        // Then update flag - avoids deadlock if run loop is waiting on write lock
+        {
+            let mut running = self.running.write().await;
+            *running = false;
+        }
     }
 
     /// Check if dispatcher is running.

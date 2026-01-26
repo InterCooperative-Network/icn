@@ -237,10 +237,14 @@ impl AppRuntime {
 
         // Validate capability requests
         for cap_str in &manifest.capabilities_required {
-            if let Some(cap_req) = CapabilityRequest::parse(cap_str) {
-                if !installer_caps.can_delegate(&cap_req) {
-                    return Err(RuntimeError::InsufficientPrivilege(cap_str.clone()));
-                }
+            let cap_req = CapabilityRequest::parse(cap_str).ok_or_else(|| {
+                RuntimeError::Manifest(ManifestError::Validation(format!(
+                    "Invalid capability format: {}",
+                    cap_str
+                )))
+            })?;
+            if !installer_caps.can_delegate(&cap_req) {
+                return Err(RuntimeError::InsufficientPrivilege(cap_str.clone()));
             }
         }
 
