@@ -2,7 +2,7 @@
 //!
 //! Metrics for app lifecycle, dispatcher, and event processing.
 
-use metrics::{counter, describe_counter, describe_histogram, histogram};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 
 /// Initialize app metrics descriptions
 pub fn init_descriptions() {
@@ -53,6 +53,12 @@ pub fn init_descriptions() {
     describe_histogram!(
         "icn_apps_snapshot_keys_count",
         "Number of keys included in a state snapshot"
+    );
+
+    // Queue metrics
+    describe_gauge!(
+        "icn_apps_event_queue_depth",
+        "Current number of events waiting in dispatcher queue"
     );
 }
 
@@ -128,9 +134,9 @@ pub fn apps_stopped_total_inc() {
     counter!("icn_apps_stopped_total").increment(1);
 }
 
-/// Increment shutdown timeout counter.
-pub fn apps_shutdown_timeout_total_inc() {
-    counter!("icn_apps_shutdown_timeout_total").increment(1);
+/// Increment shutdown timeout counter with app ID.
+pub fn apps_shutdown_timeout_total_inc(app_id: &str) {
+    counter!("icn_apps_shutdown_timeout_total", "app_id" => app_id.to_owned()).increment(1);
 }
 
 /// Record state snapshot creation duration.
@@ -149,4 +155,13 @@ pub fn snapshot_keys_count_observe(app_id: &str, key_count: u64) {
         "app_id" => app_id.to_owned()
     )
     .record(key_count as f64);
+}
+
+/// Set current event queue depth.
+pub fn event_queue_depth_set(app_id: &str, depth: usize) {
+    gauge!(
+        "icn_apps_event_queue_depth",
+        "app_id" => app_id.to_owned()
+    )
+    .set(depth as f64);
 }

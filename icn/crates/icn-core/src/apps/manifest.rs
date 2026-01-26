@@ -2,9 +2,29 @@
 //!
 //! Defines the YAML manifest format for ICN apps.
 //!
+//! # Schema Version
+//!
+//! The manifest schema version is tracked to ensure compatibility.
+//! Current version: 1. Future versions will maintain backwards compatibility
+//! where possible.
+//!
+//! # State Limits
+//!
+//! To ensure efficient state snapshots during reducer invocations:
+//!
+//! - **Recommended**: Keep total KV keys under 1000 per store
+//! - **Maximum**: 10,000 keys per store (enforced via `max_keys`)
+//! - **Snapshot overhead**: O(n) where n = total keys across all stores
+//!
+//! Apps with large state should:
+//! - Use blob storage for large values
+//! - Shard data across multiple KV stores
+//! - Consider external storage for cold data
+//!
 //! # Example Manifest
 //!
 //! ```yaml
+//! schema_version: 1
 //! name: trust
 //! version: 1.0.0
 //! publisher: did:icn:icn-foundation
@@ -23,6 +43,7 @@
 //!       ordering: causal
 //!   kv:
 //!     - name: scores
+//!       max_keys: 1000  # Optional limit
 //!
 //! compute:
 //!   reducers:
@@ -42,9 +63,32 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Current manifest schema version.
+pub const MANIFEST_SCHEMA_VERSION: u32 = 1;
+
+/// Maximum supported schema version for forward compatibility.
+const MAX_SUPPORTED_SCHEMA_VERSION: u32 = 1;
+
+/// Default max keys per KV store.
+const DEFAULT_MAX_KEYS: u32 = 10_000;
+
+/// Recommended max keys for optimal performance.
+pub const RECOMMENDED_MAX_KEYS: u32 = 1_000;
+
+/// Maximum manifest file size (1MB).
+const MAX_MANIFEST_SIZE: usize = 1024 * 1024;
+
+fn default_schema_version() -> u32 {
+    1
+}
+
 /// App manifest defining an app's requirements and capabilities.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Manifest {
+    /// Schema version for compatibility checking.
+    /// Defaults to 1 if not specified.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     /// App name (unique identifier within publisher namespace)
     pub name: String,
     /// Semantic version
@@ -85,7 +129,21 @@ impl Manifest {
     }
 
     /// Parse a manifest from YAML string.
+    ///
+    /// # Rate Limiting
+    ///
+    /// To prevent DoS via large manifest files, this method enforces a
+    /// maximum size of 1MB. Callers should also rate limit manifest parsing
+    /// at the API layer.
     pub fn parse(yaml: &str) -> Result<Self, ManifestError> {
+        // Enforce maximum manifest size to prevent DoS
+        if yaml.len() > MAX_MANIFEST_SIZE {
+            return Err(ManifestError::Validation(format!(
+                "Manifest exceeds maximum size of {} bytes",
+                MAX_MANIFEST_SIZE
+            )));
+        }
+
         let manifest: Manifest =
             serde_yaml::from_str(yaml).map_err(|e| ManifestError::Parse(e.to_string()))?;
         manifest.validate()?;
@@ -94,6 +152,19 @@ impl Manifest {
 
     /// Validate the manifest.
     pub fn validate(&self) -> Result<(), ManifestError> {
+        // Check schema version compatibility
+        if self.schema_version > MAX_SUPPORTED_SCHEMA_VERSION {
+            return Err(ManifestError::Validation(format!(
+                "Manifest schema version {} is not supported (max: {})",
+                self.schema_version, MAX_SUPPORTED_SCHEMA_VERSION
+            )));
+        }
+        if self.schema_version == 0 {
+            return Err(ManifestError::Validation(
+                "Manifest schema version must be at least 1".to_string(),
+            ));
+        }
+
         // Name must not be empty
         if self.name.is_empty() {
             return Err(ManifestError::Validation(
@@ -263,6 +334,25 @@ pub enum LogOrdering {
 pub struct KvConfig {
     /// Store name
     pub name: String,
+    /// Maximum number of keys (default: 10,000).
+    ///
+    /// For optimal snapshot performance, keep under 1,000 keys.
+    /// The runtime will reject writes that exceed this limit.
+    #[serde(default = "default_max_keys")]
+    pub max_keys: u32,
+}
+
+fn default_max_keys() -> u32 {
+    DEFAULT_MAX_KEYS
+}
+
+impl Default for KvConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            max_keys: DEFAULT_MAX_KEYS,
+        }
+    }
 }
 
 /// Blob store configuration.

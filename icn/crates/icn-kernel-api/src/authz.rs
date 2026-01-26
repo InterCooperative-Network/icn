@@ -543,11 +543,32 @@ impl PolicyRequest {
 /// Oracles convert domain semantics (trust scores, membership status)
 /// into kernel-enforceable constraints. The kernel never knows the
 /// semantic origin of these constraints.
+///
+/// # Synchronous Design
+///
+/// This trait is intentionally synchronous to enable efficient caching
+/// and avoid async overhead on the hot path. Oracle implementations that
+/// need to access async resources (like tokio RwLocks) should:
+///
+/// 1. Use `parking_lot::RwLock` instead of `tokio::sync::RwLock`
+/// 2. Pre-compute values during async initialization
+/// 3. Cache results internally
+///
+/// **Tech Debt**: If evaluation latency becomes a bottleneck, consider
+/// adding an `async fn evaluate_async()` method with default impl calling
+/// `evaluate()`. This would allow gradual migration without breaking changes.
 pub trait PolicyOracle: Send + Sync {
     /// Evaluate whether a request should be allowed.
     ///
     /// Returns Allow with constraints or Deny with reason.
     /// The kernel enforces the decision without understanding it.
+    ///
+    /// # Performance
+    ///
+    /// This method is called on the hot path. Implementations should:
+    /// - Complete in <1ms for cached results
+    /// - Avoid blocking I/O or async runtime operations
+    /// - Use internal caching for expensive computations
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
 
     /// Get cache TTL for decisions from this oracle.

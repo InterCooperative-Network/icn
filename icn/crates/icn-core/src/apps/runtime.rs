@@ -19,6 +19,57 @@
 //! Apps that provide `capabilities_provided: [oracle:*]` can register
 //! a PolicyOracle. The runtime wires it to the OracleRegistry.
 //!
+//! # App Lifecycle
+//!
+//! ```text
+//! [Install] -> Installed -> [Start] -> Starting -> Running
+//!                                            |
+//!                                       [Stop/Error]
+//!                                            |
+//!                                            v
+//!                              Stopping -> Stopped/Failed
+//!                                            |
+//!                                       [Uninstall]
+//!                                            |
+//!                                            v
+//!                                        (removed)
+//! ```
+//!
+//! ## State Transitions
+//!
+//! - **Installed**: App manifest loaded, state namespace created
+//! - **Starting**: Dispatcher initializing, reducers/services registering
+//! - **Running**: Dispatcher active, processing events
+//! - **Stopping**: Shutdown signal sent, waiting for graceful termination
+//! - **Stopped**: Clean shutdown completed, ready for restart or uninstall
+//! - **Failed**: Shutdown timed out or error occurred, may need cleanup
+//!
+//! ## Cleanup Behavior
+//!
+//! When an app is **uninstalled**:
+//! - If running, it is stopped first (with timeout protection)
+//! - The app entry is removed from the registry
+//! - **State is NOT automatically deleted** (preserves data for re-install)
+//!
+//! When **stop times out**:
+//! - App status is set to `Failed`
+//! - Timeout metric is incremented
+//! - The app remains in the registry and can be:
+//!   - Retried with another stop attempt
+//!   - Force-uninstalled (removes registry entry only)
+//!   - Left for manual intervention
+//!
+//! When an app enters **Failed** state:
+//! - The dispatcher task may still be running (leaked)
+//! - State may be inconsistent
+//! - Recommend logging the failure for operator review
+//!
+//! ## Concurrent Operations
+//!
+//! The runtime guards against concurrent operations on the same app:
+//! - `uninstall()` checks if app is being modified and returns error
+//! - Lock ordering prevents deadlocks (see below)
+//!
 //! # Lock Ordering Invariants
 //!
 //! To prevent deadlocks, locks must be acquired in this order:
@@ -386,7 +437,7 @@ impl AppRuntime {
     ///
     /// This operation has a timeout to prevent indefinite blocking. If the
     /// operation times out, a `ShutdownTimeout` error is returned and the
-    /// app may be in an inconsistent state.
+    /// app is marked as `Failed`.
     pub async fn stop(&self, app_id: &AppId) -> Result<(), RuntimeError> {
         let app_id_clone = app_id.clone();
         match tokio::time::timeout(STOP_OPERATION_TIMEOUT, self.stop_inner(app_id)).await {
@@ -397,6 +448,17 @@ impl AppRuntime {
                     timeout_secs = STOP_OPERATION_TIMEOUT.as_secs(),
                     "App stop operation timed out"
                 );
+
+                // Record metric for timeout
+                icn_obs::metrics::apps::apps_shutdown_timeout_total_inc(&app_id_clone);
+
+                // Mark app as failed due to shutdown timeout
+                if let Ok(mut apps) = self.apps.try_write() {
+                    if let Some(app) = apps.get_mut(&app_id_clone) {
+                        app.status = AppStatus::Failed;
+                    }
+                }
+
                 Err(RuntimeError::ShutdownTimeout(
                     STOP_OPERATION_TIMEOUT.as_secs(),
                 ))
@@ -636,6 +698,7 @@ mod tests {
 
     fn test_manifest() -> Manifest {
         Manifest {
+            schema_version: 1,
             name: "test-app".to_string(),
             version: "0.1.0".to_string(),
             publisher: "did:icn:test".to_string(),
@@ -645,6 +708,7 @@ mod tests {
             state: StateConfig {
                 kv: vec![KvConfig {
                     name: "echoes".to_string(),
+                    ..Default::default()
                 }],
                 ..Default::default()
             },

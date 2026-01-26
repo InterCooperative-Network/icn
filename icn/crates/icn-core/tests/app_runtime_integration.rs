@@ -17,6 +17,7 @@ async fn test_state_snapshot_performance_with_large_state() {
     let config = StateConfig {
         kv: vec![KvConfig {
             name: "data".to_string(),
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -64,9 +65,11 @@ async fn test_state_snapshot_key_count_accuracy() {
         kv: vec![
             KvConfig {
                 name: "store1".to_string(),
+                ..Default::default()
             },
             KvConfig {
                 name: "store2".to_string(),
+                ..Default::default()
             },
         ],
         ..Default::default()
@@ -100,6 +103,7 @@ async fn test_state_snapshot_empty_state() {
     let config = StateConfig {
         kv: vec![KvConfig {
             name: "data".to_string(),
+            ..Default::default()
         }],
         ..Default::default()
     };

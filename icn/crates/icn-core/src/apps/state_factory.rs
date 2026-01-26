@@ -574,6 +574,7 @@ mod tests {
             }],
             kv: vec![KvConfig {
                 name: "cache".to_string(),
+                ..Default::default()
             }],
             blobs: vec![],
         };

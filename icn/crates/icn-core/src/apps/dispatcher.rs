@@ -30,6 +30,7 @@ use super::state_factory::AppState;
 use icn_obs::metrics::apps as app_metrics;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{mpsc, watch, RwLock};
@@ -322,6 +323,28 @@ pub trait Service: Send + Sync {
 /// Type-erased service for registry.
 pub type BoxedService = Box<dyn Service>;
 
+/// A tracked event sender that increments/decrements a counter for queue depth metrics.
+#[derive(Clone)]
+pub struct TrackedEventSender {
+    inner: mpsc::Sender<Event>,
+    pending: Arc<AtomicUsize>,
+}
+
+impl TrackedEventSender {
+    /// Send an event and increment the pending counter.
+    pub async fn send(&self, event: Event) -> Result<(), mpsc::error::SendError<Event>> {
+        self.pending.fetch_add(1, Ordering::Relaxed);
+        match self.inner.send(event).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // Decrement on send failure
+                self.pending.fetch_sub(1, Ordering::Relaxed);
+                Err(e)
+            }
+        }
+    }
+}
+
 /// Compute dispatcher - routes events and requests.
 pub struct ComputeDispatcher {
     /// App identifier for metrics
@@ -342,6 +365,8 @@ pub struct ComputeDispatcher {
     shutdown_tx: watch::Sender<bool>,
     /// Shutdown signal receiver
     shutdown_rx: watch::Receiver<bool>,
+    /// Pending event counter for queue depth metrics
+    pending_events: Arc<AtomicUsize>,
 }
 
 impl ComputeDispatcher {
@@ -359,6 +384,7 @@ impl ComputeDispatcher {
             running: Arc::new(RwLock::new(false)),
             shutdown_tx,
             shutdown_rx,
+            pending_events: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -373,8 +399,18 @@ impl ComputeDispatcher {
     }
 
     /// Get an event sender for emitting events.
-    pub fn event_sender(&self) -> mpsc::Sender<Event> {
-        self.event_tx.clone()
+    ///
+    /// The returned sender tracks pending events for queue depth metrics.
+    pub fn event_sender(&self) -> TrackedEventSender {
+        TrackedEventSender {
+            inner: self.event_tx.clone(),
+            pending: Arc::clone(&self.pending_events),
+        }
+    }
+
+    /// Get the current pending event count.
+    pub fn pending_event_count(&self) -> usize {
+        self.pending_events.load(Ordering::Relaxed)
     }
 
     /// Dispatch an event directly (for testing or internal use).
@@ -501,6 +537,9 @@ impl ComputeDispatcher {
                 event = rx.recv() => {
                     match event {
                         Some(event) => {
+                            // Decrement pending counter (was incremented by TrackedEventSender)
+                            self.pending_events.fetch_sub(1, Ordering::Relaxed);
+
                             let event_type = event.event_type.clone();
                             let start = Instant::now();
 
@@ -535,6 +574,10 @@ impl ComputeDispatcher {
                                     );
                                 }
                             }
+
+                            // Report current queue depth
+                            let depth = self.pending_events.load(Ordering::Relaxed);
+                            app_metrics::event_queue_depth_set(&self.app_id, depth);
                         }
                         None => break, // Channel closed
                     }
@@ -670,6 +713,7 @@ mod tests {
         let config = StateConfig {
             kv: vec![KvConfig {
                 name: "echoes".to_string(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -696,6 +740,7 @@ mod tests {
         let config = StateConfig {
             kv: vec![KvConfig {
                 name: "echoes".to_string(),
+                ..Default::default()
             }],
             ..Default::default()
         };

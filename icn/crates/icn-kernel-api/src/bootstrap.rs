@@ -924,4 +924,92 @@ mod tests {
         // All 300 IDs should be unique
         assert_eq!(ids.len(), 300);
     }
+
+    #[test]
+    fn test_oracle_registry_concurrent_replacement() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let registry = Arc::new(OracleRegistry::new());
+        registry.set_phase(BootstrapPhase::Running);
+
+        // Spawn multiple threads that replace oracles concurrently
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                let reg = Arc::clone(&registry);
+                thread::spawn(move || {
+                    // Each thread registers its own oracle multiple times
+                    for j in 0..100 {
+                        let oracle = Arc::new(DenyAllOracle::new(
+                            Domain::trust(),
+                            &format!("test-{}-{}", i, j),
+                        ));
+                        reg.register(Domain::trust(), oracle);
+
+                        // Also do some reads to create contention
+                        let _ = reg.get(&Domain::trust());
+                        let _ = reg.domains();
+                    }
+                })
+            })
+            .collect();
+
+        // Wait for all threads to complete
+        for handle in handles {
+            handle.join().expect("Thread should not panic");
+        }
+
+        // Registry should be in a consistent state
+        // - Exactly one oracle for trust domain
+        // - domains() returns it
+        let domains = registry.domains();
+        assert_eq!(domains.len(), 1);
+        assert!(domains.contains(&Domain::trust()));
+
+        // Oracle should work correctly
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let decision = registry.evaluate(&request);
+        // The final oracle is a DenyAllOracle, so it should deny
+        assert!(!decision.is_allowed());
+    }
+
+    #[test]
+    fn test_genesis_capabilities_expiration() {
+        use std::thread;
+        use std::time::Duration;
+
+        // Create genesis capabilities with very short expiration (100ms)
+        let phase = Arc::new(AtomicU8::new(BootstrapPhase::Genesis as u8));
+        let genesis = GenesisCapabilities::new(
+            phase,
+            Duration::from_millis(100),
+            "did:icn:issuer".to_string(),
+        );
+
+        // Should be valid initially
+        assert!(genesis.is_valid());
+
+        // Issue a capability
+        let cap = genesis
+            .issue_simple("state:*", "read", &"did:icn:holder".to_string())
+            .expect("Should issue capability while valid");
+        assert!(!cap.id.is_empty());
+
+        // Wait for expiration
+        thread::sleep(Duration::from_millis(150));
+
+        // Should no longer be valid after expiration
+        assert!(!genesis.is_valid());
+
+        // Should fail to issue new capabilities
+        let result = genesis.issue_simple("state:*", "write", &"did:icn:holder".to_string());
+        assert!(
+            matches!(result, Err(AuthzError::GenesisExpired)),
+            "Expected GenesisExpired error after expiration"
+        );
+    }
 }
