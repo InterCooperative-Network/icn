@@ -660,7 +660,7 @@ async fn spawn_network_actor(
     identity_bundle: &IdentityBundle,
     did: &icn_identity::Did,
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
-    trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
+    _trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
     misbehavior_detector: &Arc<RwLock<icn_security::MisbehaviorDetector>>,
     shutdown_tx: &ShutdownTx,
 ) -> Result<icn_net::NetworkHandle> {
@@ -679,20 +679,15 @@ async fn spawn_network_actor(
         });
 
     // Prepare rate limiting configuration
-    let (trust_graph_for_rate_limit, trust_gated_config, fallback_config) =
-        if config.rate_limiting.enabled {
-            (
-                Some(trust_graph_handle.clone()),
-                Some(
-                    config
-                        .rate_limiting
-                        .to_trust_gated_config(config.network.min_trust_threshold.value()),
-                ),
-                Some(config.rate_limiting.to_fallback_config()),
-            )
-        } else {
-            (None, None, None)
-        };
+    // TODO(Phase 2.3): Wire up PolicyOracle from trust app instead of using fallback
+    let (oracle, fallback_config) = if config.rate_limiting.enabled {
+        (
+            None, // TODO: Create oracle from apps/trust
+            Some(config.rate_limiting.to_fallback_config()),
+        )
+    } else {
+        (None, None)
+    };
 
     info!(
         "Using identity bundle with DID-TLS binding: {}",
@@ -742,8 +737,7 @@ async fn spawn_network_actor(
         listen_addr,
         shutdown_tx.clone(),
         Some(incoming_handler),
-        trust_graph_for_rate_limit,
-        trust_gated_config,
+        oracle,
         fallback_config,
         Some(config.topology.clone()),
         stun_servers,

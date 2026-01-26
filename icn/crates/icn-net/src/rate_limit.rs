@@ -1,7 +1,7 @@
 //! Rate limiting for network messages
 //!
 //! Implements a token bucket algorithm for per-peer rate limiting to prevent DoS attacks.
-//! Supports trust-gated rate limiting where different limits apply based on peer trust level.
+//! Supports policy-based rate limiting where limits are determined by PolicyOracle.
 //!
 //! ## Sybil Resistance (Issue #675)
 //!
@@ -11,6 +11,12 @@
 //! PersonhoodAnchor share a single rate limit bucket.
 
 use icn_identity::{Did, PersonhoodStoreTrait};
+use icn_kernel_api::authz::{
+    ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
+};
+// TODO(Phase 2.4): Remove this import when deprecated TrustGatedRateLimitConfig is removed.
+// Currently only used by deprecated `for_class()` method for backward compatibility.
+#[allow(deprecated)]
 use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::fmt;
@@ -33,15 +39,8 @@ impl fmt::Display for HexDisplay<'_> {
     }
 }
 
-// Helper to convert TrustClass to string for metrics
-fn trust_class_to_str(class: TrustClass) -> &'static str {
-    match class {
-        TrustClass::Isolated => "isolated",
-        TrustClass::Known => "known",
-        TrustClass::Partner => "partner",
-        TrustClass::Federated => "federated",
-    }
-}
+const NETWORK_MESSAGE_ACTION: &str = "network_message";
+const NETWORK_DOMAIN: &str = "net";
 
 /// Configuration for rate limiting
 #[derive(Clone, Debug)]
@@ -66,8 +65,7 @@ impl Default for RateLimitConfig {
     }
 }
 
-/// Trust-gated rate limiting configuration
-/// Different limits apply based on peer trust classification
+/// Trust-gated rate limiting configuration (deprecated)
 #[derive(Clone, Debug)]
 pub struct TrustGatedRateLimitConfig {
     /// Limits for isolated peers (untrusted, score < 0.1)
@@ -86,14 +84,12 @@ pub struct TrustGatedRateLimitConfig {
     pub refill_interval: Duration,
 
     /// Minimum trust score required for TLS connections (default: 0.0 = allow all authenticated DIDs)
-    /// Peers with trust scores below this threshold will be rejected during TLS handshake
     pub min_trust_threshold: f64,
 }
 
 impl Default for TrustGatedRateLimitConfig {
     fn default() -> Self {
         let refill_interval = Duration::from_millis(100);
-
         TrustGatedRateLimitConfig {
             isolated: RateLimitConfig {
                 max_messages_per_second: 10,
@@ -116,7 +112,7 @@ impl Default for TrustGatedRateLimitConfig {
                 refill_interval,
             },
             refill_interval,
-            min_trust_threshold: 0.0, // Default: allow all authenticated DIDs
+            min_trust_threshold: 0.0,
         }
     }
 }
@@ -130,6 +126,49 @@ impl TrustGatedRateLimitConfig {
             TrustClass::Partner => &self.partner,
             TrustClass::Federated => &self.federated,
         }
+    }
+
+    #[deprecated(note = "Trust-gated configuration will be removed; use PolicyOracle directly")]
+    /// Build a trust-based oracle from this configuration (deprecated).
+    pub fn to_oracle(
+        &self,
+        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    ) -> Arc<dyn PolicyOracle> {
+        struct TrustGraphOracle {
+            trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+            config: TrustGatedRateLimitConfig,
+        }
+
+        impl PolicyOracle for TrustGraphOracle {
+            fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+                let did = match Did::from_str(request.actor().as_str()) {
+                    Ok(did) => did,
+                    Err(_) => return PolicyDecision::deny("invalid did"),
+                };
+                let class = {
+                    match self.trust_graph.try_read() {
+                        Ok(graph) => graph.trust_class(&did).unwrap_or(TrustClass::Isolated),
+                        Err(_) => TrustClass::Isolated,
+                    }
+                };
+                let limit = self.config.for_class(class);
+                PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(
+                    icn_kernel_api::authz::RateLimit::new(
+                        limit.max_messages_per_second,
+                        limit.burst_capacity,
+                    ),
+                ))
+            }
+
+            fn domain(&self) -> Domain {
+                Domain::new(NETWORK_DOMAIN)
+            }
+        }
+
+        Arc::new(TrustGraphOracle {
+            trust_graph,
+            config: self.clone(),
+        })
     }
 }
 
@@ -208,48 +247,33 @@ struct TokenBucket {
 
     /// Refill interval
     refill_interval: Duration,
-
-    /// Current trust class (for detecting changes in trust-gated mode)
-    trust_class: Option<TrustClass>,
 }
 
 impl TokenBucket {
-    fn new(
-        capacity: f64,
-        refill_rate: f64,
-        refill_interval: Duration,
-        trust_class: Option<TrustClass>,
-    ) -> Self {
+    fn new(capacity: f64, refill_rate: f64, refill_interval: Duration) -> Self {
         TokenBucket {
             tokens: capacity, // Start with full bucket
             capacity,
             refill_rate,
             last_refill: Instant::now(),
             refill_interval,
-            trust_class,
         }
     }
 
-    /// Update bucket configuration if trust class has changed
-    fn update_config(
-        &mut self,
-        new_capacity: f64,
-        new_refill_rate: f64,
-        new_trust_class: Option<TrustClass>,
-    ) -> bool {
-        // Only update if trust class actually changed
-        if self.trust_class != new_trust_class {
+    /// Update bucket configuration
+    fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64) -> bool {
+        // Check if config changed
+        let changed = (self.capacity - new_capacity).abs() > f64::EPSILON
+            || (self.refill_rate - new_refill_rate).abs() > f64::EPSILON;
+
+        if changed {
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;
-            self.trust_class = new_trust_class;
-            // Reset to full capacity when trust class changes
-            // This gives immediate benefit for trust upgrades
+            // Reset to full capacity when config changes
             self.tokens = new_capacity;
             self.last_refill = Instant::now();
-            true // Changed
-        } else {
-            false // No change
         }
+        changed
     }
 
     /// Try to consume a token. Returns true if allowed, false if rate limited.
@@ -284,22 +308,18 @@ impl TokenBucket {
 
 /// Per-peer rate limiter using token bucket algorithm
 ///
-/// Supports three layers of rate limiting:
-/// 1. Per-DID: Basic rate limiting per identity
-/// 2. Trust-gated: Different limits based on peer trust class
-/// 3. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
+/// Supports two layers of rate limiting:
+/// 1. Per-DID: Policy-based rate limiting via PolicyOracle
+/// 2. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
 pub struct RateLimiter {
-    /// Trust-gated configuration (if enabled)
-    trust_gated_config: Option<TrustGatedRateLimitConfig>,
+    /// Policy oracle for determining rate limits (optional)
+    oracle: Option<Arc<dyn PolicyOracle>>,
 
-    /// Fallback configuration (used when trust-gated is disabled)
+    /// Fallback configuration (used when oracle is not provided)
     fallback_config: RateLimitConfig,
 
     /// Token buckets per peer DID
     buckets: Arc<RwLock<HashMap<Did, TokenBucket>>>,
-
-    /// Trust graph for looking up peer trust classes (optional)
-    trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
 
     // --- Sybil resistance (Issue #675) ---
     /// Per-anchor (per-person) token buckets for Sybil resistance
@@ -313,54 +333,116 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    /// Create a new rate limiter with the given configuration (no trust-gating)
+    /// Create a new rate limiter with the given fallback configuration
     pub fn new(config: RateLimitConfig) -> Self {
         RateLimiter {
-            trust_gated_config: None,
+            oracle: None,
             fallback_config: config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: None,
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: None,
             anchor_rate_config: None,
         }
     }
 
-    /// Create a new trust-gated rate limiter
-    pub fn new_trust_gated(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    /// Create a new rate limiter with PolicyOracle
+    ///
+    /// The oracle is consulted on each message to determine the appropriate rate limit.
+    /// If the oracle returns `PolicyDecision::Allow`, rate limits from the constraints
+    /// are applied. If it returns `PolicyDecision::Deny`, messages are immediately rejected.
+    ///
+    /// The `fallback_config` is used when constraint extraction fails or when constraints
+    /// don't specify a rate limit. This provides sensible defaults while still allowing
+    /// the oracle to make authorization decisions.
+    pub fn new_with_oracle(
+        oracle: Arc<dyn PolicyOracle>,
+        fallback_config: RateLimitConfig,
     ) -> Self {
         RateLimiter {
-            trust_gated_config: Some(config.clone()),
-            fallback_config: config.isolated.clone(), // Use most restrictive as fallback
+            oracle: Some(oracle),
+            fallback_config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: Some(trust_graph),
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: None,
             anchor_rate_config: None,
         }
     }
 
-    /// Create a new trust-gated rate limiter with Sybil resistance
+    /// Create a new rate limiter with PolicyOracle and Sybil resistance
     ///
     /// This constructor enables per-anchor (per-person) rate limiting in addition
     /// to per-DID rate limiting, preventing Sybil attacks where an attacker
     /// creates multiple DIDs to bypass aggregate rate limits.
-    pub fn new_with_sybil_resistance(
-        trust_gated_config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    pub fn new_with_oracle_and_sybil_resistance(
+        oracle: Arc<dyn PolicyOracle>,
+        fallback_config: RateLimitConfig,
         personhood_store: Arc<dyn PersonhoodStoreTrait>,
         anchor_config: AnchorRateLimitConfig,
     ) -> Self {
         RateLimiter {
-            trust_gated_config: Some(trust_gated_config.clone()),
-            fallback_config: trust_gated_config.isolated.clone(),
+            oracle: Some(oracle),
+            fallback_config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
-            trust_graph: Some(trust_graph),
             anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
             personhood_store: Some(personhood_store),
             anchor_rate_config: Some(anchor_config),
+        }
+    }
+
+    /// Create a new trust-gated rate limiter (deprecated compatibility shim).
+    #[allow(deprecated)]
+    #[deprecated(note = "Use new_with_oracle or new_with_oracle_and_sybil_resistance")]
+    pub fn new_trust_gated(
+        config: TrustGatedRateLimitConfig,
+        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+    ) -> Self {
+        let oracle = config.to_oracle(trust_graph);
+        RateLimiter::new_with_oracle(oracle, config.isolated.clone())
+    }
+
+    /// Create a new trust-gated rate limiter with Sybil resistance (deprecated).
+    #[allow(deprecated)]
+    #[deprecated(note = "Use new_with_oracle_and_sybil_resistance")]
+    pub fn new_with_sybil_resistance(
+        config: TrustGatedRateLimitConfig,
+        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+        personhood_store: Arc<dyn PersonhoodStoreTrait>,
+        anchor_config: AnchorRateLimitConfig,
+    ) -> Self {
+        let oracle = config.to_oracle(trust_graph);
+        RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            config.isolated.clone(),
+            personhood_store,
+            anchor_config,
+        )
+    }
+
+    /// Convert an oracle decision into a rate limit config (or None if denied).
+    fn rate_limit_from_decision(
+        fallback_config: &RateLimitConfig,
+        decision: PolicyDecision,
+    ) -> Option<RateLimitConfig> {
+        match decision {
+            PolicyDecision::Allow { constraints } => Some(Self::rate_limit_from_constraints(
+                fallback_config,
+                &constraints,
+            )),
+            PolicyDecision::Deny { .. } => None,
+        }
+    }
+
+    fn rate_limit_from_constraints(
+        fallback_config: &RateLimitConfig,
+        constraints: &ConstraintSet,
+    ) -> RateLimitConfig {
+        match &constraints.rate_limit {
+            Some(rate_limit) => RateLimitConfig {
+                max_messages_per_second: rate_limit.messages_per_second,
+                burst_capacity: rate_limit.burst_size,
+                refill_interval: fallback_config.refill_interval,
+            },
+            None => fallback_config.clone(),
         }
     }
 
@@ -378,71 +460,47 @@ impl RateLimiter {
     /// Check if a message from the given peer should be allowed.
     /// Returns true if allowed, false if rate limited.
     ///
-    /// This implementation uses an atomic update pattern to eliminate the TOCTOU
-    /// window between trust class lookup and bucket update (Issue #426).
+    /// Uses PolicyOracle to determine rate limits based on trust/policy.
+    ///
+    /// ## Oracle Evaluation
+    ///
+    /// The oracle is consulted on each message to get the current policy decision:
+    /// - `PolicyDecision::Allow { constraints }`: Extract rate limit from constraints
+    /// - `PolicyDecision::Deny { .. }`: Return false immediately (message rejected)
+    ///
+    /// ## Deny Decision Semantics
+    ///
+    /// When the oracle returns `Deny`, no token bucket is created for the peer.
+    /// This means subsequent messages from denied peers will re-query the oracle
+    /// each time. This is intentional:
+    /// - Allows oracle to change its decision if circumstances change
+    /// - Avoids stale cached decisions for peers whose trust status improves
+    /// - Negligible overhead since denied peers should be rare in healthy networks
+    ///
+    /// If oracle call overhead becomes a concern, consider adding a TTL cache
+    /// for Deny decisions in the future.
     pub async fn check_rate_limit(&self, peer: &Did) -> bool {
-        const MAX_RETRIES: usize = 3;
+        // Get rate limit config from oracle or fallback
+        let config = if let Some(oracle) = &self.oracle {
+            let request = PolicyRequest::new(
+                peer.to_string(),
+                ActionKind::Custom(NETWORK_MESSAGE_ACTION.to_string()),
+                Domain::new(NETWORK_DOMAIN),
+            );
 
-        for attempt in 0..MAX_RETRIES {
-            // Phase 1: Get current trust class (releases lock immediately)
-            let (config, trust_class) = if let (Some(trust_gated_config), Some(trust_graph)) =
-                (&self.trust_gated_config, &self.trust_graph)
-            {
-                let trust_class = {
-                    let graph = trust_graph.read().await;
-                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
-                };
-                (trust_gated_config.for_class(trust_class), Some(trust_class))
-            } else {
-                // Fallback mode: no TOCTOU possible
-                (&self.fallback_config, None)
-            };
-
-            // Phase 2: Acquire buckets lock
-            let mut buckets = self.buckets.write().await;
-
-            // Phase 3: Verify trust class hasn't changed (eliminates TOCTOU)
-            //
-            // SAFETY: This nested lock acquisition (trust_graph.read() while holding
-            // buckets.write()) is safe because no code path in the codebase acquires
-            // buckets.write() while holding trust_graph.write(). See issue #426.
-            if let (Some(trust_gated_config), Some(trust_graph)) =
-                (&self.trust_gated_config, &self.trust_graph)
-            {
-                let current_trust_class = {
-                    let graph = trust_graph.read().await;
-                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
-                };
-
-                if Some(current_trust_class) != trust_class {
-                    // TOCTOU detected - trust class changed between phases 1 and 2
-                    icn_obs::metrics::network::trust_class_toctou_mismatches_inc();
-
-                    if attempt < MAX_RETRIES - 1 {
-                        // Release locks and retry with fresh trust class
-                        drop(buckets);
-                        // Brief yield to prevent tight spinning if trust class is thrashing
-                        tokio::task::yield_now().await;
-                        continue;
-                    }
-
-                    // Final attempt - use the verified current trust class
-                    let verified_config = trust_gated_config.for_class(current_trust_class);
-                    return self.do_rate_limit_check(
-                        &mut buckets,
-                        peer,
-                        verified_config,
-                        Some(current_trust_class),
-                    );
-                }
+            match Self::rate_limit_from_decision(&self.fallback_config, oracle.evaluate(&request)) {
+                Some(config) => config,
+                None => return false,
             }
+        } else {
+            self.fallback_config.clone()
+        };
 
-            // Trust class is consistent - proceed with rate limit check
-            return self.do_rate_limit_check(&mut buckets, peer, config, trust_class);
-        }
+        // Acquire buckets lock
+        let mut buckets = self.buckets.write().await;
 
-        // Should never reach here, but if we do, use most restrictive limit
-        false
+        // Perform rate limit check
+        self.do_rate_limit_check(&mut buckets, peer, &config)
     }
 
     /// Internal helper to perform the actual rate limit check
@@ -451,7 +509,6 @@ impl RateLimiter {
         buckets: &mut HashMap<Did, TokenBucket>,
         peer: &Did,
         config: &RateLimitConfig,
-        trust_class: Option<TrustClass>,
     ) -> bool {
         // Calculate refill rate: tokens per interval
         let refill_rate =
@@ -461,25 +518,23 @@ impl RateLimiter {
         let refill_interval = config.refill_interval;
 
         // Get or create bucket for this peer
-        let bucket = buckets.entry(peer.clone()).or_insert_with(|| {
-            TokenBucket::new(capacity, refill_rate, refill_interval, trust_class)
-        });
+        let bucket = buckets
+            .entry(peer.clone())
+            .or_insert_with(|| TokenBucket::new(capacity, refill_rate, refill_interval));
 
-        // Update bucket config if trust class has changed
-        let changed = bucket.update_config(capacity, refill_rate, trust_class);
+        // Update bucket config if it has changed
+        let changed = bucket.update_config(capacity, refill_rate);
         if changed {
-            icn_obs::metrics::network::trust_class_changes_inc();
+            icn_obs::metrics::network::rate_limit_config_changes_inc();
         }
 
         let allowed = bucket.try_consume();
 
-        // Record per-class rate limiting metric (general counter recorded in actor.rs)
+        // Record rate limiting metric by rate value
         if !allowed {
-            if let Some(class) = trust_class {
-                icn_obs::metrics::network::messages_rate_limited_by_class_inc(trust_class_to_str(
-                    class,
-                ));
-            }
+            icn_obs::metrics::network::messages_rate_limited_by_rate_inc(
+                config.max_messages_per_second,
+            );
         }
 
         allowed
@@ -563,12 +618,7 @@ impl RateLimiter {
 
         // Get or create bucket for this anchor
         let bucket = anchor_buckets.entry(anchor_id).or_insert_with(|| {
-            TokenBucket::new(
-                capacity,
-                refill_rate,
-                anchor_config.refill_interval,
-                None, // Anchor buckets don't track trust class
-            )
+            TokenBucket::new(capacity, refill_rate, anchor_config.refill_interval)
         });
 
         let allowed = bucket.try_consume();
@@ -678,6 +728,7 @@ impl RateLimiter {
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+    use icn_kernel_api::authz::{AllowAllOracle, ConstraintSet, DenyAllOracle, RateLimit};
 
     #[tokio::test]
     async fn test_rate_limiter_allows_within_limit() {
@@ -741,6 +792,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_rate_limiter_oracle_deny_blocks() {
+        let oracle = Arc::new(DenyAllOracle::new(Domain::new(NETWORK_DOMAIN), "denied"));
+        let limiter = RateLimiter::new_with_oracle(oracle, RateLimitConfig::default());
+        let peer = KeyPair::generate().unwrap().did().clone();
+        assert!(!limiter.check_rate_limit(&peer).await);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_oracle_rate_limit() {
+        struct TestOracle;
+        impl PolicyOracle for TestOracle {
+            fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+                PolicyDecision::allow_with(
+                    ConstraintSet::new().with_rate_limit(RateLimit::new(5, 2)),
+                )
+            }
+
+            fn domain(&self) -> Domain {
+                Domain::new(NETWORK_DOMAIN)
+            }
+        }
+
+        let oracle = Arc::new(TestOracle);
+        let limiter = RateLimiter::new_with_oracle(oracle, RateLimitConfig::default());
+        let peer = KeyPair::generate().unwrap().did().clone();
+
+        for _ in 0..2 {
+            assert!(limiter.check_rate_limit(&peer).await);
+        }
+        assert!(!limiter.check_rate_limit(&peer).await);
+    }
+
+    #[tokio::test]
     async fn test_cleanup_old_buckets() {
         let config = RateLimitConfig::default();
         let limiter = RateLimiter::new(config);
@@ -762,50 +846,42 @@ mod tests {
 
     #[tokio::test]
     async fn test_trust_gated_rate_limiting_different_classes() {
-        use icn_store::SledStore;
-        use icn_trust::{TrustEdge, TrustGraph, TrustScore};
+        struct PerPeerOracle {
+            isolated_peer: Did,
+            known_peer: Did,
+            partner_peer: Did,
+            federated_peer: Did,
+        }
 
-        // Create temporary store and trust graph
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let own_did = own_keypair.did().clone();
-        let mut graph = TrustGraph::new(store, own_did);
+        impl PolicyOracle for PerPeerOracle {
+            fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+                let limits = match request.actor().as_str() {
+                    actor if actor == self.isolated_peer.as_str() => RateLimit::new(10, 2),
+                    actor if actor == self.known_peer.as_str() => RateLimit::new(50, 10),
+                    actor if actor == self.partner_peer.as_str() => RateLimit::new(100, 20),
+                    actor if actor == self.federated_peer.as_str() => RateLimit::new(200, 50),
+                    _ => RateLimit::new(10, 2),
+                };
+                PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(limits))
+            }
 
-        // Create peers with different trust levels
-        // Note: TrustGraph computes final score as 70% direct + 30% transitive
-        // So we need to adjust direct scores to achieve desired final trust classes:
-        let isolated_peer = KeyPair::generate().unwrap().did().clone(); // No trust edge = Isolated (final < 0.1)
-        let known_peer = KeyPair::generate().unwrap().did().clone(); // Direct 0.3 -> final 0.21 = Known
-        let partner_peer = KeyPair::generate().unwrap().did().clone(); // Direct 0.7 -> final 0.49 = Partner
-        let federated_peer = KeyPair::generate().unwrap().did().clone(); // Direct 1.0 -> final 0.7 = Federated
+            fn domain(&self) -> Domain {
+                Domain::new(NETWORK_DOMAIN)
+            }
+        }
 
-        // Add trust edges with adjusted scores
-        graph
-            .add_edge(TrustEdge::new(
-                own_keypair.did().clone(),
-                known_peer.clone(),
-                TrustScore::unchecked(0.3),
-            ))
-            .unwrap();
-        graph
-            .add_edge(TrustEdge::new(
-                own_keypair.did().clone(),
-                partner_peer.clone(),
-                TrustScore::unchecked(0.7),
-            ))
-            .unwrap();
-        graph
-            .add_edge(TrustEdge::new(
-                own_keypair.did().clone(),
-                federated_peer.clone(),
-                TrustScore::unchecked(1.0),
-            ))
-            .unwrap();
+        let isolated_peer = KeyPair::generate().unwrap().did().clone();
+        let known_peer = KeyPair::generate().unwrap().did().clone();
+        let partner_peer = KeyPair::generate().unwrap().did().clone();
+        let federated_peer = KeyPair::generate().unwrap().did().clone();
 
-        // Create trust-gated rate limiter
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-        let limiter =
-            RateLimiter::new_trust_gated(TrustGatedRateLimitConfig::default(), graph_handle);
+        let oracle = Arc::new(PerPeerOracle {
+            isolated_peer: isolated_peer.clone(),
+            known_peer: known_peer.clone(),
+            partner_peer: partner_peer.clone(),
+            federated_peer: federated_peer.clone(),
+        });
+        let limiter = RateLimiter::new_with_oracle(oracle, RateLimitConfig::default());
 
         // Isolated peer (burst 2) - should be rate limited after 2 messages
         assert!(limiter.check_rate_limit(&isolated_peer).await);
@@ -833,33 +909,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_trust_gated_rate_limiting_trust_class_change() {
-        use icn_store::SledStore;
-        use icn_trust::{TrustEdge, TrustGraph, TrustScore};
+        struct MutableOracle {
+            first_limit: RateLimit,
+            upgraded_limit: RateLimit,
+            upgraded: std::sync::atomic::AtomicBool,
+        }
 
-        // Create temporary store and trust graph
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let own_did = own_keypair.did().clone();
-        let mut graph = TrustGraph::new(store, own_did);
+        impl PolicyOracle for MutableOracle {
+            fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+                let limit = if self.upgraded.load(std::sync::atomic::Ordering::SeqCst) {
+                    self.upgraded_limit.clone()
+                } else {
+                    self.first_limit.clone()
+                };
+                PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(limit))
+            }
 
+            fn domain(&self) -> Domain {
+                Domain::new(NETWORK_DOMAIN)
+            }
+        }
+
+        let oracle = Arc::new(MutableOracle {
+            first_limit: RateLimit::new(50, 10),
+            upgraded_limit: RateLimit::new(200, 50),
+            upgraded: std::sync::atomic::AtomicBool::new(false),
+        });
+        let limiter = RateLimiter::new_with_oracle(oracle.clone(), RateLimitConfig::default());
         let peer = KeyPair::generate().unwrap().did().clone();
-
-        // Start with low trust (Known = burst 10)
-        // Direct score 0.3 -> final 0.21 = Known class
-        graph
-            .add_edge(TrustEdge::new(
-                own_keypair.did().clone(),
-                peer.clone(),
-                TrustScore::unchecked(0.3),
-            ))
-            .unwrap();
-
-        // Create trust-gated rate limiter
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-        let limiter = RateLimiter::new_trust_gated(
-            TrustGatedRateLimitConfig::default(),
-            graph_handle.clone(),
-        );
 
         // Consume all tokens for Known class (10)
         for _ in 0..10 {
@@ -867,18 +944,9 @@ mod tests {
         }
         assert!(!limiter.check_rate_limit(&peer).await); // Rate limited
 
-        // Upgrade trust to Federated (burst 50)
-        // Direct score 1.0 -> final 0.7 = Federated class
-        {
-            let mut graph = graph_handle.write().await;
-            graph
-                .add_edge(TrustEdge::new(
-                    own_keypair.did().clone(),
-                    peer.clone(),
-                    TrustScore::unchecked(1.0),
-                ))
-                .unwrap();
-        }
+        oracle
+            .upgraded
+            .store(true, std::sync::atomic::Ordering::SeqCst);
 
         // After trust upgrade, should get more capacity
         // (Note: bucket is recreated with new capacity, starting fresh at 50 tokens)
@@ -890,36 +958,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_trust_gated_config_for_class() {
-        let config = TrustGatedRateLimitConfig::default();
+        struct SimpleOracle;
 
-        // Verify each trust class gets the right config
-        assert_eq!(config.for_class(TrustClass::Isolated).burst_capacity, 2);
-        assert_eq!(config.for_class(TrustClass::Known).burst_capacity, 10);
-        assert_eq!(config.for_class(TrustClass::Partner).burst_capacity, 20);
-        assert_eq!(config.for_class(TrustClass::Federated).burst_capacity, 50);
+        impl PolicyOracle for SimpleOracle {
+            fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+                PolicyDecision::allow_with(
+                    ConstraintSet::new().with_rate_limit(RateLimit::new(25, 5)),
+                )
+            }
 
-        assert_eq!(
-            config
-                .for_class(TrustClass::Isolated)
-                .max_messages_per_second,
-            10
-        );
-        assert_eq!(
-            config.for_class(TrustClass::Known).max_messages_per_second,
-            50
-        );
-        assert_eq!(
-            config
-                .for_class(TrustClass::Partner)
-                .max_messages_per_second,
-            100
-        );
-        assert_eq!(
-            config
-                .for_class(TrustClass::Federated)
-                .max_messages_per_second,
-            200
-        );
+            fn domain(&self) -> Domain {
+                Domain::new(NETWORK_DOMAIN)
+            }
+        }
+
+        let oracle = Arc::new(SimpleOracle);
+        let limiter = RateLimiter::new_with_oracle(oracle, RateLimitConfig::default());
+        let peer = KeyPair::generate().unwrap().did().clone();
+
+        for _ in 0..5 {
+            assert!(limiter.check_rate_limit(&peer).await);
+        }
+        assert!(!limiter.check_rate_limit(&peer).await);
     }
 
     // ========================================================================
@@ -946,15 +1006,6 @@ mod tests {
     /// for the actual Sybil resistance test.
     #[tokio::test]
     async fn test_per_person_rate_limiting() {
-        use icn_store::SledStore;
-        use icn_trust::TrustGraph;
-
-        // Create components
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let graph = TrustGraph::new(store, own_keypair.did().clone());
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-
         let personhood_store = create_test_personhood_store();
 
         // Create 10 different people, each with their own anchor and DID
@@ -970,13 +1021,11 @@ mod tests {
 
         // Create rate limiter with Sybil resistance
         // Use high per-DID limits so per-anchor limits are the bottleneck
-        let trust_config = TrustGatedRateLimitConfig {
-            isolated: RateLimitConfig {
-                max_messages_per_second: 100,
-                burst_capacity: 20, // High per-DID limit
-                refill_interval: Duration::from_millis(100),
-            },
-            ..Default::default()
+        let oracle = Arc::new(AllowAllOracle::new(Domain::new(NETWORK_DOMAIN)));
+        let fallback_config = RateLimitConfig {
+            max_messages_per_second: 100,
+            burst_capacity: 20, // High per-DID limit
+            refill_interval: Duration::from_millis(100),
         };
 
         let anchor_config = AnchorRateLimitConfig {
@@ -987,9 +1036,9 @@ mod tests {
             refill_interval: Duration::from_millis(100),
         };
 
-        let limiter = RateLimiter::new_with_sybil_resistance(
-            trust_config,
-            graph_handle,
+        let limiter = RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            fallback_config,
             personhood_store.clone() as Arc<dyn PersonhoodStoreTrait>,
             anchor_config,
         );
@@ -1031,14 +1080,6 @@ mod tests {
     /// With per-anchor limiting, all their DIDs share ONE bucket.
     #[tokio::test]
     async fn test_sybil_attack_multiple_dids_one_anchor() {
-        use icn_store::SledStore;
-        use icn_trust::TrustGraph;
-
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let graph = TrustGraph::new(store, own_keypair.did().clone());
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-
         let personhood_store = create_test_personhood_store();
 
         // Create ONE person (one anchor)
@@ -1067,13 +1108,11 @@ mod tests {
         );
 
         // Create rate limiter with Sybil resistance
-        let trust_config = TrustGatedRateLimitConfig {
-            isolated: RateLimitConfig {
-                max_messages_per_second: 100,
-                burst_capacity: 20, // High per-DID limit (would allow 200 total without anchor limiting)
-                refill_interval: Duration::from_millis(100),
-            },
-            ..Default::default()
+        let oracle = Arc::new(AllowAllOracle::new(Domain::new(NETWORK_DOMAIN)));
+        let fallback_config = RateLimitConfig {
+            max_messages_per_second: 100,
+            burst_capacity: 20, // High per-DID limit (would allow 200 total without anchor limiting)
+            refill_interval: Duration::from_millis(100),
         };
 
         let anchor_config = AnchorRateLimitConfig {
@@ -1084,9 +1123,9 @@ mod tests {
             refill_interval: Duration::from_millis(100),
         };
 
-        let limiter = RateLimiter::new_with_sybil_resistance(
-            trust_config,
-            graph_handle,
+        let limiter = RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            fallback_config,
             personhood_store.clone() as Arc<dyn PersonhoodStoreTrait>,
             anchor_config,
         );
@@ -1134,14 +1173,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_personhood_anchor_graceful_fallback() {
-        use icn_store::SledStore;
-        use icn_trust::TrustGraph;
-
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let graph = TrustGraph::new(store, own_keypair.did().clone());
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-
         let personhood_store = create_test_personhood_store();
 
         // Create a peer without any personhood anchor
@@ -1153,9 +1184,10 @@ mod tests {
             ..Default::default()
         };
 
-        let limiter = RateLimiter::new_with_sybil_resistance(
-            TrustGatedRateLimitConfig::default(),
-            graph_handle,
+        let oracle = Arc::new(AllowAllOracle::new(Domain::new(NETWORK_DOMAIN)));
+        let limiter = RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            RateLimitConfig::default(),
             personhood_store as Arc<dyn PersonhoodStoreTrait>,
             anchor_config,
         );
@@ -1174,14 +1206,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_require_personhood_mode() {
-        use icn_store::SledStore;
-        use icn_trust::TrustGraph;
-
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let graph = TrustGraph::new(store, own_keypair.did().clone());
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-
         let personhood_store = create_test_personhood_store();
 
         // Create a peer without any personhood anchor
@@ -1193,9 +1217,10 @@ mod tests {
             ..Default::default()
         };
 
-        let limiter = RateLimiter::new_with_sybil_resistance(
-            TrustGatedRateLimitConfig::default(),
-            graph_handle,
+        let oracle = Arc::new(AllowAllOracle::new(Domain::new(NETWORK_DOMAIN)));
+        let limiter = RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            RateLimitConfig::default(),
             personhood_store as Arc<dyn PersonhoodStoreTrait>,
             anchor_config,
         );
@@ -1214,14 +1239,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_log_only_mode_allows_excess() {
-        use icn_store::SledStore;
-        use icn_trust::TrustGraph;
-
-        let store = Arc::new(SledStore::temporary().unwrap());
-        let own_keypair = KeyPair::generate().unwrap();
-        let graph = TrustGraph::new(store, own_keypair.did().clone());
-        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
-
         let personhood_store = create_test_personhood_store();
 
         // Create anchor and use its DID
@@ -1239,9 +1256,10 @@ mod tests {
             ..Default::default()
         };
 
-        let limiter = RateLimiter::new_with_sybil_resistance(
-            TrustGatedRateLimitConfig::default(),
-            graph_handle,
+        let oracle = Arc::new(AllowAllOracle::new(Domain::new(NETWORK_DOMAIN)));
+        let limiter = RateLimiter::new_with_oracle_and_sybil_resistance(
+            oracle,
+            RateLimitConfig::default(),
             personhood_store as Arc<dyn PersonhoodStoreTrait>,
             anchor_config,
         );

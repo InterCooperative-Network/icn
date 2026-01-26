@@ -39,7 +39,6 @@ impl NetworkActor {
         replay_guard: Arc<RwLock<ReplayGuard>>,
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
-        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
@@ -79,7 +78,6 @@ impl NetworkActor {
                         let replay_guard_clone = replay_guard.clone();
                         let neighbor_sets_clone = neighbor_sets.clone();
                         let topology_config_clone = topology_config.clone();
-                        let trust_graph_clone = trust_graph.clone();
                         let session_mgr_clone = session_manager.clone();
                         let peer_connections_clone = peer_connections.clone();
                         let blob_registry_clone = blob_registry.clone();
@@ -94,7 +92,6 @@ impl NetworkActor {
                                 replay_guard_clone,
                                 neighbor_sets_clone,
                                 topology_config_clone,
-                                trust_graph_clone,
                                 session_mgr_clone,
                                 peer_connections_clone,
                                 blob_registry_clone,
@@ -133,7 +130,6 @@ impl NetworkActor {
         replay_guard: Arc<RwLock<ReplayGuard>>,
         neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
         topology_config: Option<TopologyConfig>,
-        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
         session_manager: Arc<RwLock<SessionManager>>,
         peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
         blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
@@ -150,7 +146,6 @@ impl NetworkActor {
             replay_guard.clone(),
             neighbor_sets.clone(),
             topology_config.clone(),
-            trust_graph.clone(),
             session_manager.clone(),
             peer_connections.clone(),
             blob_registry.clone(),

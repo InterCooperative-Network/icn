@@ -827,10 +827,13 @@ impl NetworkHandle {
         self.send_message(first_hop, net_msg).await
     }
 
-    /// Select relay nodes for onion routing based on trust scores
+    /// Select relay nodes for onion routing based on trust scores (deprecated)
     ///
     /// Returns an ordered list of relay DIDs suitable for creating an onion circuit.
     /// Uses the trust graph to select nodes with sufficient trust.
+    ///
+    /// **Note**: This method is deprecated. Trust-based relay selection should use
+    /// PolicyOracle for policy decisions. This method is kept for backward compatibility.
     ///
     /// # Arguments
     /// * `trust_graph` - Trust graph for scoring peers
@@ -839,6 +842,7 @@ impl NetworkHandle {
     ///
     /// # Returns
     /// Empty vec if insufficient trusted relays are available.
+    #[deprecated(note = "Use PolicyOracle for trust-based relay selection")]
     pub async fn select_onion_relays(
         &self,
         trust_graph: &Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
@@ -880,7 +884,6 @@ pub struct NetworkActor {
     identity_bundle: IdentityBundle,
     neighbor_sets: Option<Arc<RwLock<NeighborSets>>>,
     topology_config: Option<TopologyConfig>,
-    trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
     /// Per-peer connection metadata (version, capabilities, X25519 keys)
     peer_connections: Arc<RwLock<std::collections::HashMap<Did, PeerConnectionInfo>>>,
     /// Blob location registry for data locality (Phase 16C Week 2)
@@ -893,8 +896,7 @@ impl NetworkActor {
     /// Start the network actor
     ///
     /// Initializes discovery and session management on the given address.
-    /// If trust_graph is provided, enables trust-gated rate limiting with different
-    /// limits for different trust classes.
+    /// If oracle is provided, enables policy-based rate limiting.
     /// If topology_config is provided, enables topology-aware neighbor management.
     /// If personhood_store is provided, enables Sybil resistance via per-person rate limiting.
     #[allow(clippy::too_many_arguments)]
@@ -903,8 +905,7 @@ impl NetworkActor {
         listen_addr: SocketAddr,
         shutdown_tx: tokio::sync::broadcast::Sender<()>,
         incoming_handler: Option<IncomingMessageHandler>,
-        trust_graph: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>,
-        trust_gated_config: Option<crate::rate_limit::TrustGatedRateLimitConfig>,
+        oracle: Option<Arc<dyn icn_kernel_api::authz::PolicyOracle>>,
         fallback_config: Option<RateLimitConfig>,
         topology_config: Option<TopologyConfig>,
         stun_servers: Option<Vec<SocketAddr>>,
@@ -925,20 +926,10 @@ impl NetworkActor {
             .await
             .context("Failed to start discovery")?;
 
-        // Start session manager with trust-gated TLS if trust_graph provided
+        // Start session manager (no TLS trust gating anymore - handled by PolicyOracle in protocol)
         let mut session_manager = SessionManager::new();
-        let tls_trust_threshold = trust_gated_config
-            .as_ref()
-            .map(|cfg| cfg.min_trust_threshold);
         session_manager
-            .start(
-                &identity_bundle,
-                listen_addr,
-                trust_graph.clone(),
-                tls_trust_threshold,
-                stun_servers,
-                turn_config,
-            )
+            .start(&identity_bundle, listen_addr, stun_servers, turn_config)
             .await
             .context("Failed to start session manager")?;
 
@@ -955,14 +946,13 @@ impl NetworkActor {
         // Wrap session_manager in Arc for sharing between tasks
         let session_manager = Arc::new(RwLock::new(session_manager));
 
-        // Create rate limiter (trust-gated if trust_graph provided, otherwise fallback)
-        let rate_limiter = if let Some(ref tg) = trust_graph {
-            let config = trust_gated_config.unwrap_or_else(|| {
-                info!("Using default trust-gated rate limit config");
-                crate::rate_limit::TrustGatedRateLimitConfig::default()
+        // Create rate limiter (policy-based if oracle provided, otherwise fallback)
+        let rate_limiter = if let Some(oracle) = oracle {
+            info!("Policy-based rate limiting enabled with oracle");
+            let fallback = fallback_config.unwrap_or_else(|| {
+                info!("Using default fallback rate limit config");
+                RateLimitConfig::default()
             });
-            info!("Trust-gated rate limiting enabled");
-            let mut limiter = RateLimiter::new_trust_gated(config, tg.clone());
 
             // Add Sybil resistance if personhood store is provided
             if let Some(ps) = personhood_store {
@@ -975,23 +965,27 @@ impl NetworkActor {
                     person_burst = anchor_config.person_burst_capacity,
                     "Sybil resistance enabled via personhood anchors"
                 );
-                limiter = limiter.with_sybil_resistance(ps, anchor_config);
+                Arc::new(RateLimiter::new_with_oracle_and_sybil_resistance(
+                    oracle,
+                    fallback,
+                    ps,
+                    anchor_config,
+                ))
+            } else {
+                Arc::new(RateLimiter::new_with_oracle(oracle, fallback))
             }
-
-            Arc::new(limiter)
         } else {
             let config = fallback_config.unwrap_or_else(|| {
                 info!("Using default fallback rate limit config");
                 RateLimitConfig::default()
             });
-            info!("Using fallback rate limiting (no trust graph)");
+            info!("Using fallback rate limiting (no policy oracle)");
 
-            // Note: Sybil resistance requires trust-gated mode for full benefit
-            // but we can still add basic per-person limiting
+            // Add Sybil resistance if personhood store is provided
             let mut limiter = RateLimiter::new(config);
             if let Some(ps) = personhood_store {
                 let anchor_config = anchor_rate_config.unwrap_or_default();
-                info!("Sybil resistance enabled (without trust-gating)");
+                info!("Sybil resistance enabled (without policy oracle)");
                 limiter = limiter.with_sybil_resistance(ps, anchor_config);
             }
 
@@ -1056,7 +1050,6 @@ impl NetworkActor {
             let replay_guard_clone = replay_guard.clone();
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
-            let trust_graph_clone = trust_graph.clone();
             let peer_connections_clone = peer_connections.clone();
             let blob_registry_clone = blob_registry.clone();
             let misbehavior_detector_clone = misbehavior_detector.clone();
@@ -1071,7 +1064,6 @@ impl NetworkActor {
                     replay_guard_clone,
                     neighbor_sets_clone,
                     topology_config_clone,
-                    trust_graph_clone,
                     peer_connections_clone,
                     blob_registry_clone,
                     misbehavior_detector_clone,
@@ -1162,7 +1154,6 @@ impl NetworkActor {
             identity_bundle,
             neighbor_sets: neighbor_sets.clone(),
             topology_config: topology_config.clone(),
-            trust_graph: trust_graph.clone(),
             peer_connections: peer_connections.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
@@ -1274,8 +1265,7 @@ mod tests {
             addr,
             shutdown_tx.clone(),
             None, // incoming_handler
-            None, // trust_graph
-            None, // trust_gated_config
+            None, // oracle
             None, // fallback_config
             None, // topology_config
             None, // stun_servers

@@ -8,10 +8,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use icn_identity::{Did, KeyPair};
-use icn_net::{
-    MessagePayload, NetworkMessage, RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig,
-};
-use icn_trust::TrustClass;
+use icn_net::{MessagePayload, NetworkMessage, RateLimitConfig, RateLimiter};
 
 /// Create a test DID using a real keypair.
 /// This ensures the DID contains a valid Ed25519 public key for serialization.
@@ -153,19 +150,14 @@ fn bench_rate_limiter(c: &mut Criterion) {
 fn bench_trust_gated_rate_limiter(c: &mut Criterion) {
     let mut group = c.benchmark_group("trust_gated_rate_limiter");
 
-    // Test different trust classes
-    let trust_classes = [
-        (TrustClass::Isolated, "isolated"),
-        (TrustClass::Known, "known"),
-        (TrustClass::Partner, "partner"),
-        (TrustClass::Federated, "federated"),
-    ];
-
-    for (trust_class, name) in trust_classes.iter() {
-        group.bench_function(format!("check_{name}"), |b| {
-            let config = TrustGatedRateLimitConfig::default();
-            let limit_config = config.for_class(*trust_class);
-            let limiter = RateLimiter::new(limit_config.clone());
+    let tiers = [10u32, 50u32, 100u32, 200u32];
+    for limit in tiers.iter() {
+        group.bench_function(format!("check_limit_{limit}"), |b| {
+            let limiter = RateLimiter::new(RateLimitConfig {
+                max_messages_per_second: *limit,
+                burst_capacity: 10,
+                refill_interval: std::time::Duration::from_millis(100),
+            });
             let did = test_did(1);
             b.iter(|| limiter.check_rate_limit(black_box(&did)));
         });

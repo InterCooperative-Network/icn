@@ -397,23 +397,8 @@ mod tests {
     fn test_rate_limiting_config_conversion() {
         let config = RateLimitingConfig::default();
 
-        // Convert to icn-net types with default trust threshold
-        let threshold = default_min_trust_threshold();
-        let trust_gated = config.to_trust_gated_config(threshold.value());
+        // Convert to icn-net types
         let fallback = config.to_fallback_config();
-
-        // Verify trust-gated config
-        assert_eq!(trust_gated.isolated.max_messages_per_second, 10);
-        assert_eq!(trust_gated.isolated.burst_capacity, 2);
-        assert_eq!(trust_gated.known.max_messages_per_second, 50);
-        assert_eq!(trust_gated.known.burst_capacity, 10);
-        assert_eq!(trust_gated.partner.max_messages_per_second, 100);
-        assert_eq!(trust_gated.partner.burst_capacity, 20);
-        assert_eq!(trust_gated.federated.max_messages_per_second, 200);
-        assert_eq!(trust_gated.federated.burst_capacity, 50);
-        assert_eq!(trust_gated.refill_interval.as_millis(), 100);
-        // Verify the passed trust threshold is used
-        assert!((trust_gated.min_trust_threshold - threshold.value()).abs() < f64::EPSILON);
 
         // Verify fallback config
         assert_eq!(fallback.max_messages_per_second, 100);
@@ -808,11 +793,8 @@ log_level = "info"
         let config: Config = toml::from_str(custom_toml).unwrap();
         assert!((config.network.min_trust_threshold.value() - 0.0).abs() < f64::EPSILON);
 
-        // Test that trust threshold is passed through to rate limiting config
-        let trust_gated = config
-            .rate_limiting
-            .to_trust_gated_config(config.network.min_trust_threshold.value());
-        assert!((trust_gated.min_trust_threshold - 0.0).abs() < f64::EPSILON);
+        // Test that fallback config can be generated
+        let _fallback = config.rate_limiting.to_fallback_config();
     }
 
     #[test]

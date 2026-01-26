@@ -7,12 +7,8 @@
 use anyhow::Result;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::NetworkActor;
-use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
 use tracing::info;
 
 /// Get an available port to avoid conflicts when tests run in parallel
@@ -44,20 +40,6 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     info!("Alice DID: {}", alice_did);
     info!("Bob DID: {}", bob_did);
 
-    // Create trust graphs
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-
-    // Alice trusts Bob with high score (0.8)
-    let trust_edge = TrustEdge::new(
-        alice_did.clone(),
-        bob_did.clone(),
-        TrustScore::unchecked(0.8),
-    );
-    alice_trust_graph.add_edge(trust_edge)?;
-
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
-
     // Create shutdown channels
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
@@ -71,7 +53,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         None,
-        Some(alice_trust.clone()),
+        None,
         None,
         None,
         None,
@@ -79,7 +61,6 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -106,7 +87,6 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -155,11 +135,6 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     info!("Alice DID: {}", alice_did);
     info!("Mallory DID: {} (untrusted)", mallory_did);
 
-    // Create Alice's trust graph (does NOT trust Mallory)
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
-
     // Create shutdown channels
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
@@ -172,18 +147,21 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         None,
-        Some(alice_trust.clone()),
-        Some(TrustGatedRateLimitConfig {
-            min_trust_threshold: 0.1, // Reject isolated peers (score < 0.1)
-            ..Default::default()
-        }),
+        None,
+        Some(
+            TrustGatedRateLimitConfig {
+                min_trust_threshold: 0.1, // Reject isolated peers (score < 0.1)
+                ..Default::default()
+            }
+            .isolated
+            .clone(),
+        ),
         None,
         None,
         None, // No STUN servers for tests
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -210,7 +188,6 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -263,17 +240,6 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     info!("Alice DID: {}", alice_did);
     info!("Bob DID: {}", bob_did);
 
-    // Create Alice's trust graph with Bob at exact threshold (0.4 = Partner minimum)
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    let trust_edge = TrustEdge::new(
-        alice_did.clone(),
-        bob_did.clone(),
-        TrustScore::unchecked(0.4),
-    );
-    alice_trust_graph.add_edge(trust_edge)?;
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
-
     // Spawn Alice with threshold 0.4
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
@@ -284,18 +250,21 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         None,
-        Some(alice_trust.clone()),
-        Some(TrustGatedRateLimitConfig {
-            min_trust_threshold: 0.4,
-            ..Default::default()
-        }),
+        None,
+        Some(
+            TrustGatedRateLimitConfig {
+                min_trust_threshold: 0.4,
+                ..Default::default()
+            }
+            .isolated
+            .clone(),
+        ),
         None,
         None,
         None, // No STUN servers for tests
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -319,7 +288,6 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;

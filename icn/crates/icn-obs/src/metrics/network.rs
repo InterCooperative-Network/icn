@@ -39,16 +39,12 @@ pub fn init_descriptions() {
         "Total number of messages dropped due to rate limiting"
     );
     describe_counter!(
-        "icn_network_messages_rate_limited_by_class_total",
-        "Total number of messages rate limited by trust class"
-    );
-    describe_gauge!(
-        "icn_network_active_peers_by_class",
-        "Number of active peers by trust class"
+        "icn_network_messages_rate_limited_by_rate_total",
+        "Total number of messages rate limited, bucketed by rate limit (0-10, 11-50, 51-100, 100+)"
     );
     describe_counter!(
-        "icn_network_trust_class_changes_total",
-        "Total number of peer trust class changes affecting rate limits"
+        "icn_network_rate_limit_config_changes_total",
+        "Total number of peer rate limit configuration changes"
     );
     describe_counter!(
         "icn_network_trust_class_toctou_mismatches_total",
@@ -201,8 +197,11 @@ pub fn messages_rate_limited_inc() {
     counter!("icn_network_messages_rate_limited_total").increment(1);
 }
 
-pub fn trust_class_changes_inc() {
-    counter!("icn_network_trust_class_changes_total").increment(1);
+/// Increment rate limit configuration change counter
+///
+/// Called when rate limit parameters change for a peer (e.g., due to policy updates).
+pub fn rate_limit_config_changes_inc() {
+    counter!("icn_network_rate_limit_config_changes_total").increment(1);
 }
 
 /// Increment TOCTOU mismatch counter (Issue #426)
@@ -245,10 +244,18 @@ pub fn peers_discovered_set(value: u64) {
 }
 
 // Labeled counters
-pub fn messages_rate_limited_by_class_inc(trust_class: &str) {
+/// Increment rate-limited message counter with a rate bucket label.
+/// Uses buckets to avoid high cardinality: "0-10", "11-50", "51-100", "100+"
+pub fn messages_rate_limited_by_rate_inc(messages_per_second: u32) {
+    let bucket = match messages_per_second {
+        0..=10 => "0-10",
+        11..=50 => "11-50",
+        51..=100 => "51-100",
+        _ => "100+",
+    };
     counter!(
-        "icn_network_messages_rate_limited_by_class_total",
-        "class" => trust_class.to_string()
+        "icn_network_messages_rate_limited_by_rate_total",
+        "limit_bucket" => bucket
     )
     .increment(1);
 }
@@ -270,14 +277,6 @@ pub fn version_negotiation_success_inc(negotiated_version: u32) {
 }
 
 // Labeled gauges
-pub fn active_peers_by_class_set(trust_class: &str, count: u64) {
-    gauge!(
-        "icn_network_active_peers_by_class",
-        "class" => trust_class.to_string()
-    )
-    .set(count as f64);
-}
-
 pub fn peer_version_set(version: u32, count: u64) {
     gauge!(
         "icn_network_peer_versions",

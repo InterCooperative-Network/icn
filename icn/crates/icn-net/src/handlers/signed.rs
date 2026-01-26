@@ -273,7 +273,6 @@ mod tests {
             replay_guard,
             neighbor_sets: None,
             topology_config: None,
-            trust_graph: None,
             session_manager,
             peer_connections,
             blob_registry: None,

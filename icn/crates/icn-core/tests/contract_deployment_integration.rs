@@ -140,12 +140,8 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            Some(trust_graph_handle.clone()), // Pass trust graph for TLS client cert verification
-            Some(icn_net::rate_limit::TrustGatedRateLimitConfig {
-                min_trust_threshold: 0.0, // Accept any trusted peer (tests establish explicit trust)
-                ..Default::default()
-            }),
-            None,
+            None, // oracle (not needed for tests)
+            None, // fallback_config
             None, // No topology config for tests
             None, // No STUN servers
             None, // No TURN config
