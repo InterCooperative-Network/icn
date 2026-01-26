@@ -4,14 +4,79 @@ This document contains detailed history of all completed development phases. For
 
 ## Current Status
 
-**Pilot Readiness**: Ready - Byzantine fault-tolerant infrastructure operational with comprehensive monitoring.
+**Current Focus**: Kernel/App Separation Architecture
+**Tracking Issue**: [#856](https://github.com/InterCooperative-Network/icn/issues/856)
 
-**Three-Layer Security Architecture** (Production Ready):
-1. **Transport Layer**: QUIC/TLS with DID-TLS binding
-2. **Message Layer**: SignedEnvelope with Ed25519 signatures + replay protection
-3. **Application Layer**: EncryptedEnvelope with end-to-end encryption
+**Architecture Reset** (2026-01-26): Previous roadmap superseded by kernel/app separation initiative. See [KERNEL_APP_SEPARATION.md](KERNEL_APP_SEPARATION.md) for details.
 
-**What's Next**: See [ROADMAP.md](../ROADMAP.md) for complete strategic roadmap.
+---
+
+## Kernel/App Separation - Phase 0-1.5 (Complete) - 2026-01-26
+
+**PR**: [#855](https://github.com/InterCooperative-Network/icn/pull/855)
+
+Major architectural initiative to separate kernel infrastructure from domain-specific apps.
+
+### Phase 0: PolicyOracle Infrastructure
+
+Added core authorization infrastructure to `icn-kernel-api`:
+
+- **OracleRegistry**: Atomic oracle replacement via ArcSwap, per-domain routing, TTL-based caching
+- **BootstrapPhase**: Genesis → CoreApps → Running state machine with security guarantees
+- **DecisionCache**: High-performance caching with automatic invalidation on oracle swap
+- **GenesisCapabilities**: Time-limited bootstrap capabilities that expire after startup
+
+Key files:
+- `icn/crates/icn-kernel-api/src/authz.rs` - PolicyOracle trait, PolicyRequest, PolicyDecision
+- `icn/crates/icn-kernel-api/src/bootstrap.rs` - OracleRegistry, BootstrapPhase, GenesisCapabilities
+
+### Phase 1: App Runtime
+
+Added app lifecycle management to `icn-core/src/apps/`:
+
+- **AppRuntime**: Lifecycle management (prepare → install → start → stop → uninstall)
+- **ComputeDispatcher**: Event/request routing with Reducer (pure) / Service (async) split
+- **Manifest**: YAML parsing for app configuration
+- **StateFactory**: Per-app isolated state namespaces
+
+Key files:
+- `icn/crates/icn-core/src/apps/runtime.rs` - AppRuntime, AppHandle, AppStatus
+- `icn/crates/icn-core/src/apps/dispatcher.rs` - ComputeDispatcher, Reducer, Service
+- `icn/crates/icn-core/src/apps/manifest.rs` - Manifest, OracleConfig
+
+### Phase 1.5: CCL Schema Layer
+
+Added declarative YAML schema support to `icn-ccl/src/schema/`:
+
+- **Entity Schema**: Cooperatives, communities, federations, membership classes, rights
+- **Governance Schema**: Bodies, decisions, voting thresholds, delegation
+- **Economics Schema**: Capital structure, surplus allocation, credit policies
+- **Agreement Schema**: Federation agreements, boundary protocols, dispute resolution
+- **Expression Evaluator**: Deterministic mini-language for computed values
+
+Key insight: Federation agreements use **binary boundary outcomes** — internal process is sovereign, boundary outcomes are interoperable.
+
+Key files:
+- `icn/crates/icn-ccl/src/schema/entity.rs` - EntitySchema, MembershipClass, Criteria
+- `icn/crates/icn-ccl/src/schema/governance.rs` - GovernanceSchema, DecisionType
+- `icn/crates/icn-ccl/src/schema/economics.rs` - EconomicsSchema, SurplusConfig
+- `icn/crates/icn-ccl/src/schema/agreement.rs` - AgreementSchema, BoundaryProtocol
+- `icn/crates/icn-ccl/src/schema/expr.rs` - SchemaExpr, EvalContext
+
+### Test App: Echo
+
+Created reference implementation in `apps/echo/`:
+
+- Demonstrates full app lifecycle
+- Uses Reducer for state mutations
+- Uses Service for queries
+- 2 passing tests
+
+### Statistics
+
+- **Lines added**: ~5,000
+- **New tests**: 40+
+- **Files created**: 15+
 
 ---
 

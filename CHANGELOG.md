@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Kernel/App Separation Architecture (2026-01-26)
+
+**Major Architecture Initiative** (PR #855, Issue #856):
+
+Transform ICN from a tightly-coupled 27-crate system to a clean kernel/app architecture where kernel provides generic primitives and apps implement domain logic.
+
+**Phase 0: PolicyOracle Infrastructure**:
+- `OracleRegistry` with atomic oracle replacement via ArcSwap
+- `BootstrapPhase` state machine (Genesis → CoreApps → Running)
+- `DecisionCache` with TTL-based caching and automatic invalidation
+- `GenesisCapabilities` with time-limited bootstrap tokens
+- Deny-by-default authorization in Running phase
+
+**Phase 1: App Runtime**:
+- `AppRuntime` with full lifecycle management (prepare → install → start → stop → uninstall)
+- `ComputeDispatcher` with Reducer (pure/sync) and Service (async) split
+- YAML manifest parsing for app configuration
+- Per-app isolated state namespaces via `StateFactory`
+- Echo test app demonstrating full lifecycle
+
+**Phase 1.5: CCL Schema Layer**:
+- Declarative YAML schemas for entities, governance, economics, agreements
+- `EntitySchema` for cooperatives, communities, federations with membership classes
+- `GovernanceSchema` for bodies, decisions, voting thresholds, delegation
+- `EconomicsSchema` for capital, surplus allocation, credit policies
+- `AgreementSchema` for federation agreements with binary boundary outcomes
+- Deterministic expression evaluator (no loops, bounded depth)
+- Schema versioning for future migrations
+
+**Key Insight**: Federation agreements use binary boundary outcomes — internal governance process is sovereign, boundary outcomes are interoperable.
+
+**Breaking Changes**: Previous issues (#4-#854) closed as part of architecture reset. New tracking issues created (#856-#863).
+
 ### Added - Shared API Service Layer (2026-01-24)
 
 **icn-api Crate for Unified RPC/Gateway Logic** (PR #827):
