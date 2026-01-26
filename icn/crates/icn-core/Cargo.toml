@@ -12,6 +12,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml = "0.9"
 toml.workspace = true
 futures.workspace = true
 dirs = "6.0"
@@ -28,6 +29,7 @@ metrics.workspace = true
 icn-encoding = { path = "../icn-encoding" }
 
 # ICN crates
+icn-kernel-api = { path = "../icn-kernel-api" }
 icn-entity = { path = "../icn-entity" }
 icn-identity.workspace = true
 icn-store.workspace = true

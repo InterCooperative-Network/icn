@@ -15,6 +15,20 @@
 //! provide domain-specific logic. The kernel then enforces the
 //! decision without understanding why it was made.
 //!
+//! # The Meaning Firewall
+//!
+//! The kernel does NOT understand:
+//! - Trust classes or scores
+//! - Governance weights
+//! - Credit multipliers
+//! - Membership status
+//!
+//! It only understands:
+//! - Allow with constraints
+//! - Deny with reason
+//!
+//! Apps set constraint values. Kernel enforces them blindly.
+//!
 //! # Non-Goals
 //!
 //! - Role hierarchies (use capabilities instead)
@@ -23,8 +37,600 @@
 //! - Any policy logic (just enforcement)
 
 use crate::types::{CapabilityId, Did, LogicalTimestamp};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::time::Duration;
+
+// ============================================================================
+// Policy Decision Types
+// ============================================================================
+
+/// Result of a policy evaluation.
+///
+/// The kernel enforces these decisions WITHOUT understanding their semantic origin.
+/// Apps (trust, governance, ledger) populate ConstraintSet via PolicyOracle.
+#[derive(Clone, Debug)]
+pub enum PolicyDecision {
+    /// Request is allowed, optionally with constraints
+    Allow {
+        /// Constraints the kernel will enforce
+        constraints: ConstraintSet,
+    },
+    /// Request is denied
+    Deny {
+        /// Error describing why the request was denied
+        reason: PolicyError,
+    },
+}
+
+impl PolicyDecision {
+    /// Create an Allow decision with no constraints.
+    pub fn allow() -> Self {
+        Self::Allow {
+            constraints: ConstraintSet::default(),
+        }
+    }
+
+    /// Create an Allow decision with constraints.
+    pub fn allow_with(constraints: ConstraintSet) -> Self {
+        Self::Allow { constraints }
+    }
+
+    /// Create a Deny decision.
+    pub fn deny(reason: impl Into<String>) -> Self {
+        Self::Deny {
+            reason: PolicyError::Denied(reason.into()),
+        }
+    }
+
+    /// Create a Deny decision with a PolicyError.
+    pub fn deny_error(reason: PolicyError) -> Self {
+        Self::Deny { reason }
+    }
+
+    /// Check if this decision allows the request.
+    pub fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allow { .. })
+    }
+
+    /// Get constraints if allowed, None if denied.
+    pub fn constraints(&self) -> Option<&ConstraintSet> {
+        match self {
+            Self::Allow { constraints } => Some(constraints),
+            Self::Deny { .. } => None,
+        }
+    }
+}
+
+/// Error returned when a policy denies a request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum PolicyError {
+    /// Generic denial with reason
+    Denied(String),
+    /// Actor not recognized
+    UnknownActor,
+    /// Resource not found
+    ResourceNotFound,
+    /// Insufficient privilege
+    InsufficientPrivilege,
+    /// Rate limit exceeded
+    RateLimitExceeded,
+    /// Capability expired
+    CapabilityExpired,
+    /// Capability revoked
+    CapabilityRevoked,
+}
+
+impl std::fmt::Display for PolicyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Denied(reason) => write!(f, "Denied: {}", reason),
+            Self::UnknownActor => write!(f, "Unknown actor"),
+            Self::ResourceNotFound => write!(f, "Resource not found"),
+            Self::InsufficientPrivilege => write!(f, "Insufficient privilege"),
+            Self::RateLimitExceeded => write!(f, "Rate limit exceeded"),
+            Self::CapabilityExpired => write!(f, "Capability expired"),
+            Self::CapabilityRevoked => write!(f, "Capability revoked"),
+        }
+    }
+}
+
+impl std::error::Error for PolicyError {}
+
+// ============================================================================
+// Constraint Types
+// ============================================================================
+
+/// Kernel-enforced constraints.
+///
+/// The kernel does NOT know WHY these values exist.
+/// Apps (trust, governance, ledger) set them via PolicyOracle.
+/// Kernel enforces them blindly.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ConstraintSet {
+    /// Rate limiting parameters
+    pub rate_limit: Option<RateLimit>,
+    /// Maximum topics this actor can subscribe to
+    pub max_topics: Option<u32>,
+    /// Credit multiplier for ledger operations (set by trust app)
+    pub credit_multiplier: Option<f64>,
+    /// Voting weight for governance (set by trust/governance app)
+    pub voting_weight: Option<f64>,
+    /// Maximum message size in bytes
+    pub max_message_size: Option<u64>,
+    /// Maximum concurrent connections
+    pub max_connections: Option<u32>,
+    /// App-specific constraints (bounded, serializable)
+    pub custom: HashMap<String, ConstraintValue>,
+}
+
+impl ConstraintSet {
+    /// Create an empty constraint set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set rate limit.
+    pub fn with_rate_limit(mut self, rate_limit: RateLimit) -> Self {
+        self.rate_limit = Some(rate_limit);
+        self
+    }
+
+    /// Set max topics.
+    pub fn with_max_topics(mut self, max: u32) -> Self {
+        self.max_topics = Some(max);
+        self
+    }
+
+    /// Set credit multiplier.
+    pub fn with_credit_multiplier(mut self, mult: f64) -> Self {
+        self.credit_multiplier = Some(mult);
+        self
+    }
+
+    /// Set voting weight.
+    pub fn with_voting_weight(mut self, weight: f64) -> Self {
+        self.voting_weight = Some(weight);
+        self
+    }
+
+    /// Set max message size.
+    pub fn with_max_message_size(mut self, size: u64) -> Self {
+        self.max_message_size = Some(size);
+        self
+    }
+
+    /// Set max connections.
+    pub fn with_max_connections(mut self, max: u32) -> Self {
+        self.max_connections = Some(max);
+        self
+    }
+
+    /// Add a custom constraint.
+    pub fn with_custom(mut self, key: impl Into<String>, value: ConstraintValue) -> Self {
+        self.custom.insert(key.into(), value);
+        self
+    }
+
+    /// Merge another constraint set, preferring other's values when both present.
+    pub fn merge(&mut self, other: &ConstraintSet) {
+        if other.rate_limit.is_some() {
+            self.rate_limit = other.rate_limit.clone();
+        }
+        if other.max_topics.is_some() {
+            self.max_topics = other.max_topics;
+        }
+        if other.credit_multiplier.is_some() {
+            self.credit_multiplier = other.credit_multiplier;
+        }
+        if other.voting_weight.is_some() {
+            self.voting_weight = other.voting_weight;
+        }
+        if other.max_message_size.is_some() {
+            self.max_message_size = other.max_message_size;
+        }
+        if other.max_connections.is_some() {
+            self.max_connections = other.max_connections;
+        }
+        for (k, v) in &other.custom {
+            self.custom.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+/// Rate limit parameters.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RateLimit {
+    /// Maximum messages per second
+    pub messages_per_second: u32,
+    /// Burst size (token bucket)
+    pub burst_size: u32,
+}
+
+impl RateLimit {
+    /// Create a new rate limit.
+    pub fn new(messages_per_second: u32, burst_size: u32) -> Self {
+        Self {
+            messages_per_second,
+            burst_size,
+        }
+    }
+
+    /// Unlimited rate (effectively no limit).
+    pub fn unlimited() -> Self {
+        Self {
+            messages_per_second: u32::MAX,
+            burst_size: u32::MAX,
+        }
+    }
+
+    /// Standard rate limit (100 msg/s, 25 burst).
+    pub fn standard() -> Self {
+        Self {
+            messages_per_second: 100,
+            burst_size: 25,
+        }
+    }
+
+    /// Throttled rate limit (20 msg/s, 10 burst).
+    pub fn throttled() -> Self {
+        Self {
+            messages_per_second: 20,
+            burst_size: 10,
+        }
+    }
+
+    /// Restricted rate limit (5 msg/s, 5 burst).
+    pub fn restricted() -> Self {
+        Self {
+            messages_per_second: 5,
+            burst_size: 5,
+        }
+    }
+}
+
+/// Bounded constraint value - NOT Box<dyn Any>.
+///
+/// This is serializable and has known size, unlike dynamic types.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum ConstraintValue {
+    /// Boolean value
+    Bool(bool),
+    /// Integer value
+    Int(i64),
+    /// Floating point value
+    Float(f64),
+    /// String value
+    String(String),
+    /// List of values
+    List(Vec<ConstraintValue>),
+}
+
+impl From<bool> for ConstraintValue {
+    fn from(v: bool) -> Self {
+        Self::Bool(v)
+    }
+}
+
+impl From<i64> for ConstraintValue {
+    fn from(v: i64) -> Self {
+        Self::Int(v)
+    }
+}
+
+impl From<f64> for ConstraintValue {
+    fn from(v: f64) -> Self {
+        Self::Float(v)
+    }
+}
+
+impl From<String> for ConstraintValue {
+    fn from(v: String) -> Self {
+        Self::String(v)
+    }
+}
+
+impl From<&str> for ConstraintValue {
+    fn from(v: &str) -> Self {
+        Self::String(v.to_string())
+    }
+}
+
+// ============================================================================
+// Policy Request Types (Split for Caching)
+// ============================================================================
+
+/// Domain identifier for oracle routing.
+///
+/// Each domain has its own oracle. Examples: "trust", "governance", "ledger".
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Domain(pub String);
+
+impl Domain {
+    /// Create a new domain.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(name.into())
+    }
+
+    /// The trust domain.
+    pub fn trust() -> Self {
+        Self("trust".to_string())
+    }
+
+    /// The governance domain.
+    pub fn governance() -> Self {
+        Self("governance".to_string())
+    }
+
+    /// The ledger domain.
+    pub fn ledger() -> Self {
+        Self("ledger".to_string())
+    }
+
+    /// Get the domain name.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Domain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Action categories.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ActionKind {
+    /// Read operation
+    Read,
+    /// Write operation
+    Write,
+    /// Subscribe to events
+    Subscribe,
+    /// Publish events
+    Publish,
+    /// Execute compute
+    Execute,
+    /// Custom action (app-defined)
+    Custom(String),
+}
+
+impl ActionKind {
+    /// Create a custom action.
+    pub fn custom(name: impl Into<String>) -> Self {
+        Self::Custom(name.into())
+    }
+}
+
+/// Cacheable core of a policy request.
+///
+/// Small, hashable, no allocations on hot path.
+/// Used as cache key for oracle decisions.
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct PolicyRequestCore {
+    /// The actor making the request
+    pub actor: Did,
+    /// Action being performed
+    pub action: ActionKind,
+    /// Domain being accessed
+    pub domain: Domain,
+}
+
+impl PolicyRequestCore {
+    /// Create a new policy request core.
+    pub fn new(actor: Did, action: ActionKind, domain: Domain) -> Self {
+        Self {
+            actor,
+            action,
+            domain,
+        }
+    }
+}
+
+/// Extended metadata for policy request.
+///
+/// Inspected only on cache miss. Not part of cache key.
+#[derive(Clone, Debug, Default)]
+pub struct PolicyRequestExt {
+    /// Resource being accessed (if specific)
+    pub resource: Option<String>,
+    /// Namespace context
+    pub namespace: Option<String>,
+    /// Additional metadata for decision-making
+    pub metadata: HashMap<String, String>,
+    /// Capability presented (if any)
+    pub capability: Option<Capability>,
+}
+
+impl PolicyRequestExt {
+    /// Create empty extension.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set resource.
+    pub fn with_resource(mut self, resource: impl Into<String>) -> Self {
+        self.resource = Some(resource.into());
+        self
+    }
+
+    /// Set namespace.
+    pub fn with_namespace(mut self, namespace: impl Into<String>) -> Self {
+        self.namespace = Some(namespace.into());
+        self
+    }
+
+    /// Add metadata.
+    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set capability.
+    pub fn with_capability(mut self, capability: Capability) -> Self {
+        self.capability = Some(capability);
+        self
+    }
+}
+
+/// Full policy request combining core and extended data.
+#[derive(Clone, Debug)]
+pub struct PolicyRequest {
+    /// Cacheable core (used as cache key)
+    pub core: PolicyRequestCore,
+    /// Extended metadata (inspected on cache miss)
+    pub ext: PolicyRequestExt,
+}
+
+impl PolicyRequest {
+    /// Create a request with just core (no extended data).
+    pub fn new(actor: Did, action: ActionKind, domain: Domain) -> Self {
+        Self {
+            core: PolicyRequestCore::new(actor, action, domain),
+            ext: PolicyRequestExt::default(),
+        }
+    }
+
+    /// Create a request with core and extended data.
+    pub fn with_ext(core: PolicyRequestCore, ext: PolicyRequestExt) -> Self {
+        Self { core, ext }
+    }
+
+    /// Get the actor.
+    pub fn actor(&self) -> &Did {
+        &self.core.actor
+    }
+
+    /// Get the action.
+    pub fn action(&self) -> &ActionKind {
+        &self.core.action
+    }
+
+    /// Get the domain.
+    pub fn domain(&self) -> &Domain {
+        &self.core.domain
+    }
+}
+
+// ============================================================================
+// Policy Oracle Interface
+// ============================================================================
+
+/// Policy oracle interface - implemented by apps (e.g., trust app).
+///
+/// The kernel calls this trait to get authorization decisions.
+/// Apps implement domain-specific logic (trust scores, membership,
+/// reputation, etc.) and return a decision the kernel can enforce.
+///
+/// # Implementation Notes
+///
+/// - Implementations should be fast (< 100μs for cached decisions)
+/// - Results may be cached by the kernel for `cache_ttl()`
+/// - Cross-org requests may require federation lookups
+///
+/// # The Meaning Firewall
+///
+/// Oracles convert domain semantics (trust scores, membership status)
+/// into kernel-enforceable constraints. The kernel never knows the
+/// semantic origin of these constraints.
+pub trait PolicyOracle: Send + Sync {
+    /// Evaluate whether a request should be allowed.
+    ///
+    /// Returns Allow with constraints or Deny with reason.
+    /// The kernel enforces the decision without understanding it.
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
+
+    /// Get cache TTL for decisions from this oracle.
+    ///
+    /// The kernel may cache decisions for this duration.
+    /// Return `Duration::ZERO` to disable caching.
+    fn cache_ttl(&self) -> Duration {
+        Duration::from_secs(60)
+    }
+
+    /// Whether this oracle handles cross-org requests.
+    ///
+    /// If true, the oracle should be consulted for requests
+    /// involving external organizations.
+    fn handles_cross_org(&self) -> bool {
+        false
+    }
+
+    /// Domain this oracle is responsible for.
+    fn domain(&self) -> Domain;
+}
+
+/// Default oracle that allows everything.
+///
+/// Use this for simple single-coop deployments or during
+/// bootstrap before the trust app is loaded.
+pub struct AllowAllOracle {
+    domain: Domain,
+}
+
+impl AllowAllOracle {
+    /// Create an AllowAllOracle for a specific domain.
+    pub fn new(domain: Domain) -> Self {
+        Self { domain }
+    }
+
+    /// Create an AllowAllOracle for all domains (wildcard).
+    pub fn wildcard() -> Self {
+        Self {
+            domain: Domain::new("*"),
+        }
+    }
+}
+
+impl Default for AllowAllOracle {
+    fn default() -> Self {
+        Self::wildcard()
+    }
+}
+
+impl PolicyOracle for AllowAllOracle {
+    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+        PolicyDecision::allow()
+    }
+
+    fn domain(&self) -> Domain {
+        self.domain.clone()
+    }
+}
+
+/// Oracle that denies everything.
+///
+/// Useful for testing or lockdown scenarios.
+pub struct DenyAllOracle {
+    domain: Domain,
+    reason: String,
+}
+
+impl DenyAllOracle {
+    /// Create a deny-all oracle with a reason.
+    pub fn new(domain: Domain, reason: impl Into<String>) -> Self {
+        Self {
+            domain,
+            reason: reason.into(),
+        }
+    }
+}
+
+impl PolicyOracle for DenyAllOracle {
+    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+        PolicyDecision::deny(&self.reason)
+    }
+
+    fn domain(&self) -> Domain {
+        self.domain.clone()
+    }
+}
+
+// ============================================================================
+// Capability Types
+// ============================================================================
 
 /// Capability token granting specific access.
 ///
@@ -94,215 +700,6 @@ impl Constraints {
     }
 }
 
-/// Result of a policy evaluation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PolicyDecision {
-    /// Request is allowed
-    Allow,
-    /// Request is denied
-    Deny {
-        /// Reason for denial (for logging/debugging)
-        reason: String,
-    },
-    /// Request is allowed but rate-limited
-    RateLimit {
-        /// Rate limit class to apply
-        class: RateLimitClass,
-    },
-}
-
-impl PolicyDecision {
-    /// Create an Allow decision.
-    pub fn allow() -> Self {
-        Self::Allow
-    }
-
-    /// Create a Deny decision.
-    pub fn deny(reason: impl Into<String>) -> Self {
-        Self::Deny {
-            reason: reason.into(),
-        }
-    }
-
-    /// Create a RateLimit decision.
-    pub fn rate_limit(class: RateLimitClass) -> Self {
-        Self::RateLimit { class }
-    }
-
-    /// Check if this decision allows the request.
-    pub fn is_allowed(&self) -> bool {
-        matches!(self, Self::Allow | Self::RateLimit { .. })
-    }
-}
-
-/// Rate limit classification.
-///
-/// These classes are kernel-defined but the mapping of
-/// identities to classes is app-defined (via PolicyOracle).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RateLimitClass {
-    /// No rate limiting (fully trusted)
-    Unlimited,
-    /// Standard rate limits
-    Standard,
-    /// Reduced limits (lower trust)
-    Throttled,
-    /// Severely restricted (minimal trust)
-    Restricted,
-    /// Custom rate (messages per second)
-    Custom(u32),
-}
-
-impl RateLimitClass {
-    /// Get the rate limit in messages per second.
-    pub fn messages_per_second(&self) -> u32 {
-        match self {
-            Self::Unlimited => u32::MAX,
-            Self::Standard => 100,
-            Self::Throttled => 20,
-            Self::Restricted => 5,
-            Self::Custom(rate) => *rate,
-        }
-    }
-}
-
-/// Context for policy evaluation.
-#[derive(Clone, Debug)]
-pub struct PolicyContext {
-    /// The actor making the request
-    pub actor: Did,
-    /// Resource being accessed
-    pub resource: String,
-    /// Action being performed
-    pub action: String,
-    /// Namespace context (if applicable)
-    pub namespace: Option<String>,
-    /// Additional metadata for decision-making
-    pub metadata: HashMap<String, String>,
-}
-
-impl PolicyContext {
-    /// Create a new policy context.
-    pub fn new(actor: Did, resource: impl Into<String>, action: impl Into<String>) -> Self {
-        Self {
-            actor,
-            resource: resource.into(),
-            action: action.into(),
-            namespace: None,
-            metadata: HashMap::new(),
-        }
-    }
-
-    /// Set the namespace.
-    pub fn with_namespace(mut self, namespace: impl Into<String>) -> Self {
-        self.namespace = Some(namespace.into());
-        self
-    }
-
-    /// Add metadata.
-    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.metadata.insert(key.into(), value.into());
-        self
-    }
-}
-
-/// Request being evaluated by the policy oracle.
-#[derive(Clone, Debug)]
-pub struct PolicyRequest {
-    /// Context of the request
-    pub context: PolicyContext,
-    /// Capability presented (if any)
-    pub capability: Option<Capability>,
-}
-
-impl PolicyRequest {
-    /// Create a request with just context (no capability).
-    pub fn new(context: PolicyContext) -> Self {
-        Self {
-            context,
-            capability: None,
-        }
-    }
-
-    /// Create a request with a capability.
-    pub fn with_capability(context: PolicyContext, capability: Capability) -> Self {
-        Self {
-            context,
-            capability: Some(capability),
-        }
-    }
-}
-
-/// Policy oracle interface - implemented by apps (e.g., trust app).
-///
-/// The kernel calls this trait to get authorization decisions.
-/// Apps implement domain-specific logic (trust scores, membership,
-/// reputation, etc.) and return a decision the kernel can enforce.
-///
-/// # Implementation Notes
-///
-/// - Implementations should be fast (< 100μs for cached decisions)
-/// - Results may be cached by the kernel for `cache_ttl()`
-/// - Cross-org requests may require federation lookups
-pub trait PolicyOracle: Send + Sync {
-    /// Evaluate whether a request should be allowed.
-    ///
-    /// This is the core authorization decision point.
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
-
-    /// Get cache TTL for decisions.
-    ///
-    /// The kernel may cache decisions for this duration.
-    /// Return `Duration::ZERO` to disable caching.
-    fn cache_ttl(&self) -> Duration {
-        Duration::from_secs(60)
-    }
-
-    /// Whether this oracle handles cross-org requests.
-    ///
-    /// If true, the oracle should be consulted for requests
-    /// involving external organizations.
-    fn handles_cross_org(&self) -> bool {
-        false
-    }
-}
-
-/// Default oracle that allows everything.
-///
-/// Use this for simple single-coop deployments or during
-/// bootstrap before the trust app is loaded.
-pub struct AllowAllOracle;
-
-impl PolicyOracle for AllowAllOracle {
-    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
-        PolicyDecision::Allow
-    }
-}
-
-/// Oracle that denies everything.
-///
-/// Useful for testing or lockdown scenarios.
-pub struct DenyAllOracle {
-    reason: String,
-}
-
-impl DenyAllOracle {
-    /// Create a deny-all oracle with a reason.
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self {
-            reason: reason.into(),
-        }
-    }
-}
-
-impl PolicyOracle for DenyAllOracle {
-    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
-        PolicyDecision::Deny {
-            reason: self.reason.clone(),
-        }
-    }
-}
-
 /// Capability management engine.
 ///
 /// Handles issuance, verification, delegation, and revocation
@@ -319,8 +716,12 @@ pub trait CapabilityEngine: Send + Sync {
     ) -> Result<Capability, AuthzError>;
 
     /// Check if a capability authorizes a request.
-    fn check(&self, capability: &Capability, resource: &str, action: &str)
-        -> Result<(), AuthzError>;
+    fn check(
+        &self,
+        capability: &Capability,
+        resource: &str,
+        action: &str,
+    ) -> Result<(), AuthzError>;
 
     /// Delegate a capability with additional restrictions.
     ///
@@ -341,6 +742,10 @@ pub trait CapabilityEngine: Send + Sync {
     /// Verify a capability's signature.
     fn verify_signature(&self, capability: &Capability) -> Result<bool, AuthzError>;
 }
+
+// ============================================================================
+// Errors
+// ============================================================================
 
 /// Errors from authorization operations.
 #[derive(Debug, thiserror::Error)]
@@ -369,10 +774,22 @@ pub enum AuthzError {
     #[error("Invalid capability signature")]
     InvalidSignature,
 
+    /// Not in genesis phase (cannot issue genesis capabilities)
+    #[error("Not in genesis phase")]
+    NotInGenesis,
+
+    /// Genesis capabilities have expired
+    #[error("Genesis capabilities expired")]
+    GenesisExpired,
+
     /// Internal error
     #[error("Authorization error: {0}")]
     Internal(String),
 }
+
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -380,37 +797,127 @@ mod tests {
 
     #[test]
     fn test_policy_decision() {
-        assert!(PolicyDecision::Allow.is_allowed());
-        assert!(PolicyDecision::rate_limit(RateLimitClass::Standard).is_allowed());
+        assert!(PolicyDecision::allow().is_allowed());
+        assert!(PolicyDecision::allow_with(ConstraintSet::default()).is_allowed());
         assert!(!PolicyDecision::deny("test").is_allowed());
     }
 
     #[test]
-    fn test_rate_limit_class() {
-        assert_eq!(RateLimitClass::Unlimited.messages_per_second(), u32::MAX);
-        assert_eq!(RateLimitClass::Standard.messages_per_second(), 100);
-        assert_eq!(RateLimitClass::Throttled.messages_per_second(), 20);
-        assert_eq!(RateLimitClass::Restricted.messages_per_second(), 5);
-        assert_eq!(RateLimitClass::Custom(50).messages_per_second(), 50);
+    fn test_policy_decision_constraints() {
+        let constraints = ConstraintSet::new()
+            .with_rate_limit(RateLimit::standard())
+            .with_max_topics(10);
+
+        let decision = PolicyDecision::allow_with(constraints);
+
+        let c = decision.constraints().unwrap();
+        assert_eq!(c.rate_limit.as_ref().unwrap().messages_per_second, 100);
+        assert_eq!(c.max_topics, Some(10));
+    }
+
+    #[test]
+    fn test_rate_limit_presets() {
+        assert_eq!(RateLimit::unlimited().messages_per_second, u32::MAX);
+        assert_eq!(RateLimit::standard().messages_per_second, 100);
+        assert_eq!(RateLimit::throttled().messages_per_second, 20);
+        assert_eq!(RateLimit::restricted().messages_per_second, 5);
+    }
+
+    #[test]
+    fn test_constraint_set_merge() {
+        let mut base = ConstraintSet::new().with_max_topics(5).with_voting_weight(0.5);
+
+        let overlay = ConstraintSet::new()
+            .with_max_topics(10)
+            .with_credit_multiplier(1.5);
+
+        base.merge(&overlay);
+
+        assert_eq!(base.max_topics, Some(10)); // Overwritten
+        assert_eq!(base.voting_weight, Some(0.5)); // Preserved
+        assert_eq!(base.credit_multiplier, Some(1.5)); // Added
+    }
+
+    #[test]
+    fn test_constraint_value_conversions() {
+        assert_eq!(ConstraintValue::from(true), ConstraintValue::Bool(true));
+        assert_eq!(ConstraintValue::from(42i64), ConstraintValue::Int(42));
+        assert_eq!(ConstraintValue::from(3.14f64), ConstraintValue::Float(3.14));
+        assert_eq!(
+            ConstraintValue::from("test"),
+            ConstraintValue::String("test".to_string())
+        );
+    }
+
+    #[test]
+    fn test_policy_request_core() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        assert_eq!(core.actor, "did:icn:test");
+        assert_eq!(core.action, ActionKind::Read);
+        assert_eq!(core.domain, Domain::trust());
+    }
+
+    #[test]
+    fn test_policy_request_with_ext() {
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Write,
+            Domain::ledger(),
+        );
+
+        assert_eq!(request.actor(), "did:icn:test");
+        assert!(request.ext.resource.is_none());
     }
 
     #[test]
     fn test_allow_all_oracle() {
-        let oracle = AllowAllOracle;
-        let context = PolicyContext::new("did:icn:test".to_string(), "resource", "read");
-        let request = PolicyRequest::new(context);
-        assert_eq!(oracle.evaluate(&request), PolicyDecision::Allow);
+        let oracle = AllowAllOracle::default();
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate(&request);
+        assert!(decision.is_allowed());
     }
 
     #[test]
     fn test_deny_all_oracle() {
-        let oracle = DenyAllOracle::new("system locked");
-        let context = PolicyContext::new("did:icn:test".to_string(), "resource", "read");
-        let request = PolicyRequest::new(context);
-        match oracle.evaluate(&request) {
-            PolicyDecision::Deny { reason } => assert_eq!(reason, "system locked"),
+        let oracle = DenyAllOracle::new(Domain::trust(), "system locked");
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate(&request);
+        assert!(!decision.is_allowed());
+
+        match decision {
+            PolicyDecision::Deny { reason } => {
+                assert!(matches!(reason, PolicyError::Denied(r) if r == "system locked"));
+            }
             _ => panic!("Expected Deny"),
         }
+    }
+
+    #[test]
+    fn test_domain_presets() {
+        assert_eq!(Domain::trust().as_str(), "trust");
+        assert_eq!(Domain::governance().as_str(), "governance");
+        assert_eq!(Domain::ledger().as_str(), "ledger");
+    }
+
+    #[test]
+    fn test_action_kind_custom() {
+        let action = ActionKind::custom("witness");
+        assert_eq!(action, ActionKind::Custom("witness".to_string()));
     }
 
     #[test]

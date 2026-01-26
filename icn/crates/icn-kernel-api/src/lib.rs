@@ -35,6 +35,7 @@
 pub mod types;
 pub mod identity;
 pub mod authz;
+pub mod bootstrap;
 pub mod state;
 pub mod compute;
 pub mod comms;
@@ -44,7 +45,15 @@ pub mod naming;
 
 // Re-export primary traits for convenience
 pub use identity::{IdentityService, DidResolver, Keystore};
-pub use authz::{CapabilityEngine, PolicyOracle, PolicyDecision};
+pub use authz::{
+    CapabilityEngine, PolicyOracle, PolicyDecision, PolicyRequest, PolicyRequestCore,
+    PolicyRequestExt, ConstraintSet, ConstraintValue, RateLimit, Domain, ActionKind,
+    AllowAllOracle, DenyAllOracle, PolicyError,
+};
+pub use bootstrap::{
+    OracleRegistry, BootstrapPhase, GenesisCapabilities, DecisionCache,
+    CapabilitySet, CapabilityRequest, CacheStats,
+};
 pub use state::{LogService, BlobService, KvService};
 pub use compute::{ComputeEngine, Job, Trigger};
 pub use comms::{PubSub, RequestResponse, Streams};
