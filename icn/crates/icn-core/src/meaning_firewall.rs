@@ -45,7 +45,7 @@ const FORBIDDEN_IMPORTS: &[&str] = &[
 #[allow(dead_code)] // Documented for reference; will be used in Phase 2 migration
 const ALLOWED_ORACLE_TYPES: &[&str] = &[
     "PolicyRequest",
-    "PolicyDecision", 
+    "PolicyDecision",
     "ConstraintSet",
     "PolicyOracle",
     "Domain",
@@ -55,7 +55,10 @@ const ALLOWED_ORACLE_TYPES: &[&str] = &[
 fn get_workspace_root() -> PathBuf {
     // Navigate from icn/crates/icn-core to icn/crates
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.parent().expect("Could not find crates directory").to_path_buf()
+    manifest_dir
+        .parent()
+        .expect("Could not find crates directory")
+        .to_path_buf()
 }
 
 fn read_cargo_toml(crate_name: &str) -> Option<String> {
@@ -66,7 +69,7 @@ fn read_cargo_toml(crate_name: &str) -> Option<String> {
 fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
     let src_path = get_workspace_root().join(crate_name).join("src");
     let mut files = Vec::new();
-    
+
     fn collect_rs_files(dir: &std::path::Path, files: &mut Vec<PathBuf>) {
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
@@ -79,7 +82,7 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
             }
         }
     }
-    
+
     collect_rs_files(&src_path, &mut files);
     files
 }
@@ -87,13 +90,24 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
 /// Check if a Cargo.toml contains a dependency on a specific crate.
 fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
     // Handle various dependency declaration patterns:
-    // 1. Standard: icn-trust = "0.1.0" or icn-trust = { ... }
-    // 2. Workspace: icn-trust.workspace = true
-    // 3. Path: icn-trust = { path = "..." }
-    cargo_toml.contains(&format!("{dep_name} =")) || 
-    cargo_toml.contains(&format!("{dep_name}=")) ||
-    cargo_toml.contains(&format!("{dep_name}.workspace")) ||
-    cargo_toml.contains(&format!("\"{dep_name}\""))
+    // 1. Standard key forms:
+    //    icn-trust = "0.1.0"
+    //    icn-trust = { path = "...", version = "0.1.0" }
+    // 2. Workspace key form:
+    //    icn-trust.workspace = true
+    // 3. Table headers:
+    //    [dependencies.icn-trust]
+    //    [dev-dependencies.icn-trust]
+    //    [build-dependencies.icn-trust]
+    //
+    // Note: We intentionally do NOT match generic quoted occurrences like
+    // `"icn-trust"` to avoid false positives from comments or descriptions.
+    cargo_toml.contains(&format!("{dep_name} ="))
+        || cargo_toml.contains(&format!("{dep_name}="))
+        || cargo_toml.contains(&format!("{dep_name}.workspace"))
+        || cargo_toml.contains(&format!("[dependencies.{dep_name}]"))
+        || cargo_toml.contains(&format!("[dev-dependencies.{dep_name}]"))
+        || cargo_toml.contains(&format!("[build-dependencies.{dep_name}]"))
 }
 
 /// Count occurrences of a pattern in source files.
@@ -115,8 +129,12 @@ mod tests {
     /// This test should PASS now but will need to be removed after Phase 2.
     #[test]
     fn current_kernel_crates_have_trust_dependencies() {
+        // Explicitly document expected violations for Phase 1
+        const EXPECTED_VIOLATIONS: &[&str] =
+            &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
+
         let mut violations = Vec::new();
-        
+
         for crate_name in KERNEL_CRATES {
             if let Some(cargo_toml) = read_cargo_toml(crate_name) {
                 if has_dependency(&cargo_toml, "icn-trust") {
@@ -124,12 +142,14 @@ mod tests {
                 }
             }
         }
-        
+
         // This documents the current state - all 4 kernel crates depend on icn-trust
         assert_eq!(
-            violations.len(), 4,
-            "Expected 4 kernel crates with icn-trust deps (current state). \
-             Found: {:?}. If this changed, Phase 2 is making progress!",
+            violations.len(),
+            EXPECTED_VIOLATIONS.len(),
+            "Expected violations in {:?}, found {:?}. \
+             If this changed, Phase 2 is making progress!",
+            EXPECTED_VIOLATIONS,
             violations
         );
     }
@@ -139,12 +159,12 @@ mod tests {
     #[test]
     fn current_trust_import_count() {
         let mut total_imports = 0;
-        
+
         for crate_name in KERNEL_CRATES {
             let count = count_imports_in_crate(crate_name, "use icn_trust::");
             total_imports += count;
         }
-        
+
         // Document current state - expected to be >0 before Phase 2
         // As Phase 2 progresses, this number should decrease
         println!("Current icn_trust imports in kernel crates: {total_imports}");
@@ -197,13 +217,16 @@ mod tests {
         // Verify icn-kernel-api has the types kernel crates should use
         if let Some(cargo_toml) = read_cargo_toml("icn-kernel-api") {
             // icn-kernel-api should exist and be the bridge
-            assert!(cargo_toml.contains("icn-kernel-api"), "icn-kernel-api crate exists");
+            assert!(
+                cargo_toml.contains("icn-kernel-api"),
+                "icn-kernel-api crate exists"
+            );
         }
-        
+
         // Verify the PolicyOracle types are defined in kernel-api
         let kernel_api_files = list_rust_files("icn-kernel-api");
         let mut has_policy_oracle = false;
-        
+
         for file in kernel_api_files {
             if let Ok(content) = std::fs::read_to_string(&file) {
                 if content.contains("PolicyOracle") || content.contains("PolicyRequest") {
@@ -212,7 +235,7 @@ mod tests {
                 }
             }
         }
-        
+
         assert!(
             has_policy_oracle,
             "icn-kernel-api must provide PolicyOracle/PolicyRequest types \
@@ -226,7 +249,11 @@ mod tests {
         for file in list_rust_files("icn-kernel-api") {
             if let Ok(content) = std::fs::read_to_string(&file) {
                 // kernel-api should not define or re-export domain types
-                for pattern in &["struct TrustGraph", "pub struct TrustClass", "GovernanceRules"] {
+                for pattern in &[
+                    "struct TrustGraph",
+                    "pub struct TrustClass",
+                    "GovernanceRules",
+                ] {
                     assert!(
                         !content.contains(pattern),
                         "icn-kernel-api should not define domain type: {pattern}"
@@ -240,7 +267,7 @@ mod tests {
     #[test]
     fn firewall_status_summary() {
         println!("\n=== Meaning Firewall Status ===\n");
-        
+
         // Check Cargo.toml dependencies
         let mut cargo_violations = Vec::new();
         for crate_name in KERNEL_CRATES {
@@ -252,7 +279,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Check import statements
         let mut import_violations = Vec::new();
         for crate_name in KERNEL_CRATES {
@@ -261,19 +288,26 @@ mod tests {
                 import_violations.push(format!("{crate_name}: {count} imports"));
             }
         }
-        
+
         println!("Cargo.toml violations: {}", cargo_violations.len());
         for v in &cargo_violations {
             println!("  - {v}");
         }
-        
+
         println!("\nImport violations: {}", import_violations.len());
         for v in &import_violations {
             println!("  - {v}");
         }
-        
+
         let is_clean = cargo_violations.is_empty() && import_violations.is_empty();
-        println!("\nFirewall status: {}", if is_clean { "✅ CLEAN" } else { "⚠️ VIOLATIONS DETECTED" });
+        println!(
+            "\nFirewall status: {}",
+            if is_clean {
+                "✅ CLEAN"
+            } else {
+                "⚠️ VIOLATIONS DETECTED"
+            }
+        );
         println!("(Violations expected until Phase 2 completes - see #865, #866, #867)");
     }
 }

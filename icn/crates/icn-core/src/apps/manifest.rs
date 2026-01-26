@@ -691,6 +691,27 @@ state:
 "#;
         let result = Manifest::parse(yaml);
         assert!(matches!(result, Err(ManifestError::Validation(_))));
-        assert!(result.unwrap_err().to_string().contains("KV store name cannot be empty"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("KV store name cannot be empty"));
+    }
+
+    #[test]
+    fn test_invalid_manifest_empty_blob_name() {
+        let yaml = r#"
+name: test
+version: 1.0.0
+publisher: did:icn:test
+state:
+  blobs:
+    - name: ""
+"#;
+        let result = Manifest::parse(yaml);
+        assert!(matches!(result, Err(ManifestError::Validation(_))));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Blob store name cannot be empty"));
     }
 }
