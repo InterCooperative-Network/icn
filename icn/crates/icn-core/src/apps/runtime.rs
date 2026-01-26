@@ -28,6 +28,7 @@ use icn_kernel_api::bootstrap::{
 };
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -70,6 +71,8 @@ pub struct AppHandle {
     pub status: AppStatus,
     /// Dispatcher task handle
     dispatcher_task: Option<JoinHandle<()>>,
+    /// Flag set when dispatcher task fails (panic or error)
+    failed: Arc<AtomicBool>,
 }
 
 impl AppHandle {
@@ -79,13 +82,25 @@ impl AppHandle {
     }
 
     /// Get app status.
+    ///
+    /// Note: If the dispatcher task has failed, this returns Failed
+    /// regardless of the stored status.
     pub fn status(&self) -> AppStatus {
-        self.status
+        if self.failed.load(Ordering::SeqCst) {
+            AppStatus::Failed
+        } else {
+            self.status
+        }
     }
 
     /// Check if app is running.
     pub fn is_running(&self) -> bool {
-        self.status == AppStatus::Running
+        self.status == AppStatus::Running && !self.failed.load(Ordering::SeqCst)
+    }
+
+    /// Check if app has failed.
+    pub fn is_failed(&self) -> bool {
+        self.failed.load(Ordering::SeqCst)
     }
 }
 
@@ -260,6 +275,7 @@ impl AppRuntime {
             capabilities,
             status: AppStatus::Installed,
             dispatcher_task: None,
+            failed: Arc::new(AtomicBool::new(false)),
         };
 
         // Store app
@@ -301,10 +317,22 @@ impl AppRuntime {
 
         // Start dispatcher event loop
         let dispatcher = app.dispatcher.clone();
+        let failed = app.failed.clone();
+        let app_id_clone = app_id.clone();
         let task = tokio::spawn(async move {
-            let dispatcher = dispatcher.read().await;
-            if let Err(e) = dispatcher.run().await {
-                tracing::error!("Dispatcher error: {}", e);
+            let result = {
+                let mut dispatcher = dispatcher.write().await;
+                dispatcher.run().await
+            };
+
+            match result {
+                Ok(()) => {
+                    tracing::debug!("Dispatcher for {} stopped normally", app_id_clone);
+                }
+                Err(e) => {
+                    tracing::error!("Dispatcher for {} failed: {}", app_id_clone, e);
+                    failed.store(true, Ordering::SeqCst);
+                }
             }
         });
 

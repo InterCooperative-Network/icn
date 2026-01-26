@@ -311,8 +311,8 @@ pub struct ComputeDispatcher {
     services: HashMap<RequestType, BoxedService>,
     /// Event channel for services to emit events
     event_tx: mpsc::Sender<Event>,
-    /// Event receiver for dispatcher loop
-    event_rx: Arc<RwLock<mpsc::Receiver<Event>>>,
+    /// Event receiver for dispatcher loop. Option so it can be taken for the run loop.
+    event_rx: Option<mpsc::Receiver<Event>>,
     /// App state reference
     state: AppState,
     /// Running flag
@@ -332,7 +332,7 @@ impl ComputeDispatcher {
             reducers: HashMap::new(),
             services: HashMap::new(),
             event_tx,
-            event_rx: Arc::new(RwLock::new(event_rx)),
+            event_rx: Some(event_rx),
             state,
             running: Arc::new(RwLock::new(false)),
             shutdown_tx,
@@ -434,13 +434,19 @@ impl ComputeDispatcher {
     /// Start the event loop.
     ///
     /// Continuously processes events from the channel and routes to reducers.
-    pub async fn run(&self) -> Result<(), DispatchError> {
+    /// This method can only be called once - subsequent calls return an error.
+    pub async fn run(&mut self) -> Result<(), DispatchError> {
+        // Take the receiver - this ensures run() can only be called once
+        let mut rx = self
+            .event_rx
+            .take()
+            .ok_or_else(|| DispatchError::Handler("Dispatcher already running".to_string()))?;
+
         {
             let mut running = self.running.write().await;
             *running = true;
         }
 
-        let mut rx = self.event_rx.write().await;
         let mut shutdown_rx = self.shutdown_rx.clone();
 
         loop {

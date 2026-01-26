@@ -203,8 +203,8 @@ pub struct OracleRegistry {
     fallback: ArcSwap<Arc<dyn PolicyOracle>>,
     /// Decision cache.
     cache: DecisionCache,
-    /// Current bootstrap phase.
-    phase: AtomicU8,
+    /// Current bootstrap phase. Arc-wrapped so GenesisCapabilities can share it.
+    phase: Arc<AtomicU8>,
 }
 
 impl OracleRegistry {
@@ -214,7 +214,7 @@ impl OracleRegistry {
             oracles: ArcSwap::from_pointee(HashMap::new()),
             fallback: ArcSwap::from_pointee(Arc::new(AllowAllOracle::default())),
             cache: DecisionCache::default(),
-            phase: AtomicU8::new(BootstrapPhase::Genesis as u8),
+            phase: Arc::new(AtomicU8::new(BootstrapPhase::Genesis as u8)),
         }
     }
 
@@ -224,7 +224,7 @@ impl OracleRegistry {
             oracles: ArcSwap::from_pointee(HashMap::new()),
             fallback: ArcSwap::from_pointee(Arc::new(AllowAllOracle::default())),
             cache: DecisionCache::new(capacity),
-            phase: AtomicU8::new(BootstrapPhase::Genesis as u8),
+            phase: Arc::new(AtomicU8::new(BootstrapPhase::Genesis as u8)),
         }
     }
 
@@ -346,13 +346,12 @@ impl OracleRegistry {
         }
     }
 
-    /// Get an atomic reference to the phase for GenesisCapabilities.
+    /// Get a shared reference to the phase for GenesisCapabilities.
+    ///
+    /// This returns a clone of the Arc, so changes to the phase will be
+    /// visible to all holders of the reference.
     pub fn phase_ref(&self) -> Arc<AtomicU8> {
-        // This is a bit awkward - we need to share the phase atomically.
-        // In practice, GenesisCapabilities should be created with a reference
-        // to the same AtomicU8, but for now we'll create a wrapper.
-        // TODO: Refactor to share phase directly
-        Arc::new(AtomicU8::new(self.phase.load(AtomicOrdering::SeqCst)))
+        Arc::clone(&self.phase)
     }
 
     /// Get cache statistics.
