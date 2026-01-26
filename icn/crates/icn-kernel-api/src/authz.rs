@@ -844,7 +844,7 @@ mod tests {
     fn test_constraint_value_conversions() {
         assert_eq!(ConstraintValue::from(true), ConstraintValue::Bool(true));
         assert_eq!(ConstraintValue::from(42i64), ConstraintValue::Int(42));
-        assert_eq!(ConstraintValue::from(3.14f64), ConstraintValue::Float(3.14));
+        assert_eq!(ConstraintValue::from(2.5f64), ConstraintValue::Float(2.5));
         assert_eq!(
             ConstraintValue::from("test"),
             ConstraintValue::String("test".to_string())
