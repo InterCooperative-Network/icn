@@ -31,6 +31,19 @@
 - [ ] Tests cover error paths, not just happy path
 - [ ] TTL/cache values have documented security trade-offs
 
+### Quick Check Commands
+
+```bash
+# Check for meaning firewall violations (should output nothing):
+grep -r 'TrustClass\|TrustGraph' icn/crates/icn-{gossip,net,gateway,ledger}/src
+
+# Check for domain imports in kernel crates (should output nothing):
+grep -r 'use icn_trust::' icn/crates/icn-{net,gateway,gossip,ledger}/src
+
+# Verify all kernel tests pass:
+cargo test -p icn-gossip -p icn-net -p icn-ledger -p icn-gateway
+```
+
 ## Issue Labels
 
 - `kernel-api`: Changes to kernel primitive traits
@@ -46,6 +59,9 @@
 - Co-author: Include `Co-Authored-By: claude` for AI-assisted commits
 - Squash merge for feature PRs
 ## Anti-Patterns to Avoid
+
+> For detailed analysis of these anti-patterns with real-world examples from the codebase,
+> see [Phase 2 Assessment](../docs/dev-journal/2025-01-26-phase2-assessment.md).
 
 ### Anti-Pattern 1: Reverse Meaning Firewall
 **WRONG**: Converting generic constraints back to domain types

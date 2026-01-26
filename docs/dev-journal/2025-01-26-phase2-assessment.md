@@ -103,6 +103,19 @@ Rename and refactor:
 
 ## Implementation Order (Correct)
 
+### Estimated Timeline
+
+| Phase | Scope | Estimated Effort |
+|-------|-------|------------------|
+| 2.2a | icn-gossip | 1-2 days focused work |
+| 2.2b | icn-ledger | 1 day |
+| 2.2c | icn-net | 1-2 days |
+| 2.2d | icn-gateway | 1 day |
+| 2.3 | icn-core integration | 1 day |
+| **Total** | | **5-7 days** |
+
+*Note: Each phase should be a separate PR for reviewability.*
+
 ### Phase 2.2a: icn-gossip
 **Prerequisite**: Refactor `AccessControl` enum first
 - Remove all `TrustClass` references
@@ -197,3 +210,8 @@ Add to project rules:
 - Issue #857: Phase 2 - Trust Extraction
 - `apps/trust/src/oracle.rs`: Correct oracle implementation
 - `icn-kernel-api/src/authz.rs`: PolicyOracle trait definition
+
+## Related Documents
+
+- [Phase 2 Status Summary](./2025-01-26-phase2-status-summary.md) - Current status and execution order
+- [Project Rules](../../.claude/project_rules.md) - Anti-patterns and code review checklist

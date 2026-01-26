@@ -117,3 +117,8 @@ cargo test -p icn-gossip -p icn-net -p icn-ledger -p icn-gateway
 **The architectural violation has been documented, analyzed, and guidelines established.**
 
 The next step is to create the sub-issues and begin proper implementation. This PR serves as the foundation for that work by clearly documenting what went wrong and how to do it correctly.
+
+## Related Documents
+
+- [Phase 2 Assessment](./2025-01-26-phase2-assessment.md) - Detailed technical analysis, correct approach, and timeline
+- [Project Rules](../../.claude/project_rules.md) - Anti-patterns, red flags, and code review checklist
