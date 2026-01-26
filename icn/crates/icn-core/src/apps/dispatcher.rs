@@ -218,6 +218,13 @@ impl StateSnapshot {
             .map(|s| s.keys().collect())
             .unwrap_or_default()
     }
+
+    /// Get total number of keys across all KV stores.
+    ///
+    /// Used for metrics to track snapshot size.
+    pub fn total_key_count(&self) -> usize {
+        self.kv_data.values().map(|store| store.len()).sum()
+    }
 }
 
 /// Mutable state delta produced by a reducer.
@@ -377,7 +384,16 @@ impl ComputeDispatcher {
             .get(&event.event_type)
             .ok_or_else(|| DispatchError::NoHandler(event.event_type.clone()))?;
 
+        // Create snapshot with metrics
+        let snapshot_start = Instant::now();
         let snapshot = StateSnapshot::from_app_state(&self.state).await;
+        let key_count = snapshot.total_key_count();
+        app_metrics::snapshot_duration_observe(
+            &self.app_id,
+            snapshot_start.elapsed().as_secs_f64(),
+        );
+        app_metrics::snapshot_keys_count_observe(&self.app_id, key_count as u64);
+
         let delta = reducer.reduce(&snapshot, &event)?;
 
         // Apply delta to state
@@ -393,7 +409,16 @@ impl ComputeDispatcher {
             .get(&request.request_type)
             .ok_or_else(|| DispatchError::NoHandler(request.request_type.clone()))?;
 
+        // Create snapshot with metrics
+        let snapshot_start = Instant::now();
         let snapshot = StateSnapshot::from_app_state(&self.state).await;
+        let key_count = snapshot.total_key_count();
+        app_metrics::snapshot_duration_observe(
+            &self.app_id,
+            snapshot_start.elapsed().as_secs_f64(),
+        );
+        app_metrics::snapshot_keys_count_observe(&self.app_id, key_count as u64);
+
         service
             .handle(request, &snapshot, self.event_tx.clone())
             .await

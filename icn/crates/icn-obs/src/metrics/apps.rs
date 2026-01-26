@@ -33,25 +33,26 @@ pub fn init_descriptions() {
     );
 
     // App lifecycle metrics
-    describe_counter!(
-        "icn_apps_installed_total",
-        "Total number of apps installed"
-    );
+    describe_counter!("icn_apps_installed_total", "Total number of apps installed");
     describe_counter!(
         "icn_apps_uninstalled_total",
         "Total number of apps uninstalled"
     );
-    describe_counter!(
-        "icn_apps_started_total",
-        "Total number of app starts"
-    );
-    describe_counter!(
-        "icn_apps_stopped_total",
-        "Total number of app stops"
-    );
+    describe_counter!("icn_apps_started_total", "Total number of app starts");
+    describe_counter!("icn_apps_stopped_total", "Total number of app stops");
     describe_counter!(
         "icn_apps_shutdown_timeout_total",
         "Total number of app shutdown timeouts"
+    );
+
+    // State snapshot metrics
+    describe_histogram!(
+        "icn_apps_snapshot_duration_seconds",
+        "Time taken to create a state snapshot for reducer invocation"
+    );
+    describe_histogram!(
+        "icn_apps_snapshot_keys_count",
+        "Number of keys included in a state snapshot"
     );
 }
 
@@ -130,4 +131,22 @@ pub fn apps_stopped_total_inc() {
 /// Increment shutdown timeout counter.
 pub fn apps_shutdown_timeout_total_inc() {
     counter!("icn_apps_shutdown_timeout_total").increment(1);
+}
+
+/// Record state snapshot creation duration.
+pub fn snapshot_duration_observe(app_id: &str, duration_secs: f64) {
+    histogram!(
+        "icn_apps_snapshot_duration_seconds",
+        "app_id" => app_id.to_owned()
+    )
+    .record(duration_secs);
+}
+
+/// Record state snapshot key count.
+pub fn snapshot_keys_count_observe(app_id: &str, key_count: u64) {
+    histogram!(
+        "icn_apps_snapshot_keys_count",
+        "app_id" => app_id.to_owned()
+    )
+    .record(key_count as f64);
 }

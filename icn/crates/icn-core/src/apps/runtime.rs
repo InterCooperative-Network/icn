@@ -18,6 +18,23 @@
 //!
 //! Apps that provide `capabilities_provided: [oracle:*]` can register
 //! a PolicyOracle. The runtime wires it to the OracleRegistry.
+//!
+//! # Lock Ordering Invariants
+//!
+//! To prevent deadlocks, locks must be acquired in this order:
+//!
+//! 1. `AppRuntime.apps` (RwLock) - Top-level app registry
+//! 2. `InstalledApp.dispatcher` (RwLock) - Per-app dispatcher
+//!
+//! **Important**: Never acquire `apps` lock while holding `dispatcher` lock.
+//!
+//! The `stop()` operation holds `apps.write()` while calling `dispatcher.stop()`,
+//! but `dispatcher.stop()` only sends a shutdown signal and doesn't acquire
+//! the `apps` lock, so no deadlock occurs.
+//!
+//! The `stop_inner()` implementation is protected by an overall timeout
+//! (`STOP_OPERATION_TIMEOUT`) to prevent indefinite blocking if lock
+//! acquisition takes too long.
 
 use super::dispatcher::{BoxedReducer, BoxedService, ComputeDispatcher};
 use super::manifest::{Manifest, ManifestError};
@@ -426,15 +443,39 @@ impl AppRuntime {
     }
 
     /// Uninstall an app.
+    ///
+    /// # Race Condition Note
+    ///
+    /// This operation first calls `stop()` then removes the app under a new
+    /// lock acquisition. In rare cases where `stop()` times out and another
+    /// caller removes the app concurrently, this method will return
+    /// `NotFound`. This is acceptable as the app has been removed.
+    ///
+    /// For truly atomic uninstall, callers should ensure exclusive access
+    /// to the runtime (single writer pattern).
     pub async fn uninstall(&self, app_id: &AppId) -> Result<(), RuntimeError> {
-        // Stop first if running
-        self.stop(app_id).await.ok();
+        // Stop first if running (ignore errors - app may already be stopped or not exist)
+        let stop_result = self.stop(app_id).await;
 
-        // Remove app
+        // Remove app under lock
         let mut apps = self.apps.write().await;
-        let app = apps
-            .remove(app_id)
-            .ok_or_else(|| RuntimeError::NotFound(app_id.clone()))?;
+        let app = match apps.remove(app_id) {
+            Some(app) => app,
+            None => {
+                // App was removed between stop() and now, or never existed
+                // If stop succeeded, another caller removed it; if stop failed
+                // with NotFound, app never existed.
+                if matches!(stop_result, Err(RuntimeError::NotFound(_))) {
+                    return Err(RuntimeError::NotFound(app_id.clone()));
+                }
+                // App was removed by concurrent caller after successful stop
+                tracing::debug!(
+                    app_id = %app_id,
+                    "App already removed by concurrent operation"
+                );
+                return Ok(());
+            }
+        };
 
         // Unregister oracle if present
         if let Some(oracle_config) = &app.manifest.oracle {
@@ -539,7 +580,9 @@ pub enum RuntimeError {
     ShutdownTimeout(u64),
 
     /// Oracle domain mismatch
-    #[error("Oracle domain '{oracle_domain}' does not match manifest declaration '{manifest_domain}'")]
+    #[error(
+        "Oracle domain '{oracle_domain}' does not match manifest declaration '{manifest_domain}'"
+    )]
     OracleDomainMismatch {
         oracle_domain: String,
         manifest_domain: String,

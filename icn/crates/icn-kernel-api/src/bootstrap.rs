@@ -39,7 +39,7 @@ use crate::types::{Did, LogicalTimestamp};
 use arc_swap::ArcSwap;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -417,7 +417,11 @@ pub struct GenesisCapabilities {
     /// When genesis capabilities expire.
     expires_at: Instant,
     /// Counter for generating capability IDs.
-    counter: AtomicU8,
+    ///
+    /// Uses AtomicU64 to prevent overflow during genesis phase.
+    /// Even at 1 billion capabilities per second, this won't overflow
+    /// for ~585 years.
+    counter: AtomicU64,
     /// Issuer DID for generated capabilities.
     issuer: Did,
 }
@@ -434,7 +438,7 @@ impl GenesisCapabilities {
         Self {
             phase,
             expires_at: Instant::now() + ttl,
-            counter: AtomicU8::new(0),
+            counter: AtomicU64::new(0),
             issuer,
         }
     }
@@ -893,5 +897,31 @@ mod tests {
         let req2 = CapabilityRequest::parse("comms:subscribe:trust:*").unwrap();
         assert_eq!(req2.resource, "comms:subscribe:trust");
         assert_eq!(req2.action, "*");
+    }
+
+    #[test]
+    fn test_genesis_capabilities_counter_no_overflow() {
+        // Test that counter uses u64 and won't overflow during genesis
+        // (u8 would overflow after 256 issuances)
+        let phase = Arc::new(AtomicU8::new(BootstrapPhase::Genesis as u8));
+        let genesis =
+            GenesisCapabilities::new(phase, Duration::from_secs(60), "did:icn:issuer".to_string());
+
+        // Issue 300 capabilities (would overflow AtomicU8)
+        let mut ids = std::collections::HashSet::new();
+        for i in 0..300 {
+            let cap = genesis
+                .issue_simple("state:*", "write", &format!("did:icn:holder{}", i))
+                .expect("Should issue capability");
+            // Verify ID is unique
+            assert!(
+                ids.insert(cap.id.clone()),
+                "Capability ID should be unique, got duplicate: {}",
+                cap.id
+            );
+        }
+
+        // All 300 IDs should be unique
+        assert_eq!(ids.len(), 300);
     }
 }
