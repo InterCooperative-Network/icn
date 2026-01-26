@@ -39,11 +39,9 @@ impl ConnectionContext {
                 },
             };
 
-            let trust_score = if let Some(ref tg) = self.trust_graph {
-                tg.read().await.compute_trust_score(from).unwrap_or(0.0) as f32
-            } else {
-                0.5
-            };
+            // TODO(Phase 2.3): Get trust score from PolicyOracle when available
+            // For now, use neutral trust score for topology decisions
+            let trust_score = 0.5f32;
 
             let limits = self
                 .topology_config
@@ -235,7 +233,6 @@ mod tests {
             replay_guard,
             neighbor_sets: Some(neighbor_sets.clone()),
             topology_config: Some(topology_config),
-            trust_graph: None,
             session_manager,
             peer_connections,
             blob_registry: None,
@@ -265,7 +262,6 @@ mod tests {
             replay_guard,
             neighbor_sets: None,
             topology_config: None,
-            trust_graph: None,
             session_manager,
             peer_connections,
             blob_registry: None,

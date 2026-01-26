@@ -222,7 +222,6 @@ mod tests {
             replay_guard,
             neighbor_sets: None,
             topology_config: None,
-            trust_graph: None,
             session_manager,
             peer_connections,
             blob_registry: None,
@@ -369,7 +368,6 @@ mod tests {
             replay_guard: Arc::new(RwLock::new(ReplayGuard::new(300, 3600))),
             neighbor_sets: None,
             topology_config: None,
-            trust_graph: None,
             session_manager: Arc::new(RwLock::new(SessionManager::new())),
             peer_connections: Arc::new(RwLock::new(HashMap::new())), // Empty!
             blob_registry: None,

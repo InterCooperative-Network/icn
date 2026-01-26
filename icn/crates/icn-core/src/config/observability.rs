@@ -229,29 +229,6 @@ impl Default for RateLimitingConfig {
 }
 
 impl RateLimitingConfig {
-    /// Convert to trust-gated rate limit config for icn-net
-    ///
-    /// # Arguments
-    /// * `min_trust_threshold` - Minimum trust score required for TLS connections (from network config)
-    pub fn to_trust_gated_config(
-        &self,
-        min_trust_threshold: f64,
-    ) -> icn_net::TrustGatedRateLimitConfig {
-        use std::time::Duration;
-
-        let refill_interval = Duration::from_millis(self.refill_interval_ms);
-
-        icn_net::TrustGatedRateLimitConfig {
-            isolated: self.isolated.to_rate_limit_config(refill_interval),
-            known: self.known.to_rate_limit_config(refill_interval),
-            partner: self.partner.to_rate_limit_config(refill_interval),
-            federated: self.federated.to_rate_limit_config(refill_interval),
-            refill_interval,
-            // Use the configurable trust threshold from network config
-            min_trust_threshold,
-        }
-    }
-
     /// Convert to fallback rate limit config for icn-net
     pub fn to_fallback_config(&self) -> icn_net::RateLimitConfig {
         use std::time::Duration;

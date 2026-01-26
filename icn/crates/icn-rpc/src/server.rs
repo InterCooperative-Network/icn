@@ -50,7 +50,7 @@ use icn_federation::CooperativeRegistry;
 use icn_governance::GovernanceOps;
 use icn_identity::Did;
 use icn_ledger::{DisputeManager, Ledger};
-use icn_net::{NetworkHandle, RateLimiter, TrustGatedRateLimitConfig};
+use icn_net::{NetworkHandle, RateLimiter};
 use icn_store::Store;
 use icn_trust::TrustGraph;
 
@@ -192,25 +192,23 @@ impl RpcServer {
         Ok(())
     }
 
-    /// Enable trust-based rate limiting for API requests (C8)
+    /// Enable trust-based rate limiting for API requests (C8) - Deprecated
     ///
-    /// Requires a trust graph to be set first via `set_trust_handle`.
+    /// **Note**: This method is deprecated and temporarily disabled. Trust-based rate limiting
+    /// should use PolicyOracle. For now, uses basic rate limiter.
+    ///
     /// Different trust levels get different rate limits:
     /// - Isolated (< 0.1): 10 req/sec
     /// - Known (0.1-0.4): 50 req/sec
     /// - Partner (0.4-0.7): 100 req/sec
     /// - Federated (0.7+): 200 req/sec
+    #[deprecated(note = "Use PolicyOracle for trust-based rate limiting")]
     pub fn enable_trust_rate_limiting(&mut self) {
-        if let Some(ref trust_graph) = self.trust_handle {
-            let config = TrustGatedRateLimitConfig::default();
-            self.rate_limiter = Some(Arc::new(RateLimiter::new_trust_gated(
-                config,
-                trust_graph.clone(),
-            )));
-            info!("Trust-based rate limiting enabled for RPC server");
-        } else {
-            warn!("Cannot enable trust rate limiting: no trust graph configured");
-        }
+        // TODO(Phase 2.3): Implement with PolicyOracle
+        warn!("Trust-based rate limiting not yet implemented with PolicyOracle - using basic rate limiter");
+        use icn_net::RateLimitConfig;
+        self.rate_limiter = Some(Arc::new(RateLimiter::new(RateLimitConfig::default())));
+        info!("Basic rate limiting enabled for RPC server (trust-based pending Phase 2.3)");
     }
 
     /// Check if authentication is enabled

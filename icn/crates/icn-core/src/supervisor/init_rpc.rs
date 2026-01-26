@@ -100,6 +100,8 @@ pub fn spawn_rpc_server(
     }
 
     // Enable trust-based rate limiting for API requests (C8)
+    // TODO(Phase 2.3): Replace with PolicyOracle-based rate limiting
+    #[allow(deprecated)]
     if config.enable_trust_rate_limiting {
         rpc_server.enable_trust_rate_limiting();
     }

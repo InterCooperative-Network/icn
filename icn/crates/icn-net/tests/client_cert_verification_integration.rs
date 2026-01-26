@@ -9,8 +9,6 @@
 use anyhow::Result;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, NetworkActor, NetworkMessage};
-use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -40,10 +38,6 @@ impl SecureTestNode {
         let identity_bundle = IdentityBundle::from_keypair(keypair)?;
         let did = identity_bundle.did().clone();
 
-        // Create trust graph for this node
-        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, did.clone())));
-
         let (shutdown_tx, _) = broadcast::channel(1);
         let messages_received: Arc<RwLock<Vec<NetworkMessage>>> = Arc::new(RwLock::new(Vec::new()));
         let messages_clone = messages_received.clone();
@@ -62,7 +56,7 @@ impl SecureTestNode {
 
         let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
 
-        // Configure with trust-gated rate limiting
+        // Configure fallback rate limiting (trust gating handled by TOFU + app policy)
         let trust_config = icn_net::rate_limit::TrustGatedRateLimitConfig {
             min_trust_threshold,
             ..Default::default()
@@ -73,15 +67,14 @@ impl SecureTestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            Some(trust_graph),
-            Some(trust_config),
+            None,
+            Some(trust_config.isolated.clone()),
             None,
             None,
             None,
             None,
             None,
             None, // store
-            None, // personhood_store
             None, // anchor_rate_config
         )
         .await?;
@@ -130,7 +123,7 @@ impl SecureTestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None, // No trust graph - should log warning
+            None,
             None,
             None,
             None,
@@ -138,7 +131,6 @@ impl SecureTestNode {
             None,
             None,
             None, // store
-            None, // personhood_store
             None, // anchor_rate_config
         )
         .await?;
@@ -212,16 +204,6 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
     let alice_did = alice_keypair.did().clone();
     let bob_did = bob_keypair.did().clone();
 
-    // Create Alice with trust graph that trusts Bob
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    alice_trust_graph.add_edge(TrustEdge::new(
-        alice_did.clone(),
-        bob_did.clone(),
-        TrustScore::unchecked(0.8),
-    ))?;
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
-
     let (alice_shutdown_tx, _) = broadcast::channel(1);
     let alice_messages = Arc::new(RwLock::new(Vec::new()));
     let alice_messages_clone = alice_messages.clone();
@@ -243,18 +225,21 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         Some(alice_handler),
-        Some(alice_trust),
-        Some(icn_net::rate_limit::TrustGatedRateLimitConfig {
-            min_trust_threshold: 0.5,
-            ..Default::default()
-        }),
+        None,
+        Some(
+            icn_net::rate_limit::TrustGatedRateLimitConfig {
+                min_trust_threshold: 0.5,
+                ..Default::default()
+            }
+            .isolated
+            .clone(),
+        ),
         None,
         None,
         None,
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -279,7 +264,6 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -330,17 +314,13 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
 
     info!("=== Test: Client cert verification rejects untrusted peer ===");
 
-    // Create Alice with trust graph but NO trust for Mallory
+    // Create Alice (no trust graph needed for TOFU)
     let alice_keypair = KeyPair::generate()?;
     let mallory_keypair = KeyPair::generate()?;
     let alice_did = alice_keypair.did().clone();
     let _mallory_did = mallory_keypair.did().clone();
 
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
     // NOTE: Alice does NOT trust Mallory
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
-
     let (alice_shutdown_tx, _) = broadcast::channel(1);
     let alice_identity = IdentityBundle::from_keypair(alice_keypair)?;
     let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
@@ -349,18 +329,21 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         None,
-        Some(alice_trust),
-        Some(icn_net::rate_limit::TrustGatedRateLimitConfig {
-            min_trust_threshold: 0.1, // Reject untrusted/isolated peers
-            ..Default::default()
-        }),
+        None,
+        Some(
+            icn_net::rate_limit::TrustGatedRateLimitConfig {
+                min_trust_threshold: 0.1, // Reject untrusted/isolated peers
+                ..Default::default()
+            }
+            .isolated
+            .clone(),
+        ),
         None,
         None,
         None,
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -385,7 +368,6 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
@@ -485,17 +467,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
     let alice_keypair = KeyPair::generate()?;
     let bob_keypair = KeyPair::generate()?;
     let alice_did = alice_keypair.did().clone();
-    let bob_did = bob_keypair.did().clone();
-
-    // Alice trusts Bob
-    let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    alice_trust_graph.add_edge(TrustEdge::new(
-        alice_did.clone(),
-        bob_did.clone(),
-        TrustScore::unchecked(0.9),
-    ))?;
-    let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
+    let _bob_did = bob_keypair.did().clone();
 
     let (alice_shutdown_tx, _) = broadcast::channel(1);
     let alice_identity = IdentityBundle::from_keypair(alice_keypair)?;
@@ -505,7 +477,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         alice_addr,
         alice_shutdown_tx.clone(),
         None,
-        Some(alice_trust),
+        None,
         None,
         None,
         None,
@@ -513,22 +485,11 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;
 
     tokio::time::sleep(Duration::from_millis(500)).await;
-
-    // Bob with valid binding and trust graph (Bob trusts Alice)
-    let bob_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
-    let mut bob_trust_graph = TrustGraph::new(bob_store, bob_did.clone());
-    bob_trust_graph.add_edge(TrustEdge::new(
-        bob_did.clone(),
-        alice_did.clone(),
-        TrustScore::unchecked(0.9),
-    ))?;
-    let bob_trust = Arc::new(RwLock::new(bob_trust_graph));
 
     let (bob_shutdown_tx, _) = broadcast::channel(1);
     let bob_identity = IdentityBundle::from_keypair(bob_keypair)?;
@@ -538,7 +499,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         bob_addr,
         bob_shutdown_tx.clone(),
         None,
-        Some(bob_trust),
+        None,
         None,
         None,
         None,
@@ -546,7 +507,6 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None, // store
-        None, // personhood_store
         None, // anchor_rate_config
     )
     .await?;

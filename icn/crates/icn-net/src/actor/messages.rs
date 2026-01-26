@@ -76,7 +76,6 @@ impl NetworkActor {
                             let replay_guard = self.replay_guard.clone();
                             let neighbor_sets = self.neighbor_sets.clone();
                             let topology_config = self.topology_config.clone();
-                            let trust_graph = self.trust_graph.clone();
                             let session_manager = self.session_manager.clone();
                             let peer_connections = self.peer_connections.clone();
                             let blob_registry = self.blob_registry.clone();
@@ -92,7 +91,6 @@ impl NetworkActor {
                                     replay_guard,
                                     neighbor_sets,
                                     topology_config,
-                                    trust_graph,
                                     session_manager,
                                     peer_connections,
                                     blob_registry,

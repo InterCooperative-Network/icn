@@ -36,7 +36,7 @@ walkdir = "2.4"
 chrono = "0.4"
 tempfile = "3.24"
 reqwest = { workspace = true, features = ["blocking"] }
-uuid = { version = "1.7", features = ["v4"] }
+uuid = { version = "1.20", features = ["v4"] }
 qrcode = "0.14"
 image = { version = "0.25", default-features = false, features = ["png"] }
 

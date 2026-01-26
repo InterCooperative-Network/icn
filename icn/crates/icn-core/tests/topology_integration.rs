@@ -107,8 +107,7 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            Some(trust_graph.clone()),
-            None,                  // No trust-gated config for tests
+            None,                  // No PolicyOracle for tests
             None,                  // No fallback config for tests
             Some(topology_config), // Enable topology
             None,                  // No STUN servers for tests
