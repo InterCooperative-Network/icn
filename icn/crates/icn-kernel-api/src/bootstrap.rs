@@ -942,7 +942,7 @@ mod tests {
                     for j in 0..100 {
                         let oracle = Arc::new(DenyAllOracle::new(
                             Domain::trust(),
-                            &format!("test-{}-{}", i, j),
+                            format!("test-{}-{}", i, j),
                         ));
                         reg.register(Domain::trust(), oracle);
 

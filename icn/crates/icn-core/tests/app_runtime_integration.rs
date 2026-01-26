@@ -2,6 +2,8 @@
 //!
 //! Tests for app lifecycle management, concurrent shutdown, and performance.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use icn_core::apps::dispatcher::StateSnapshot;
 use icn_core::apps::manifest::{KvConfig, StateConfig};
 use icn_core::apps::state_factory::{AppNamespace, StateFactory};
