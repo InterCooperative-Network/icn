@@ -15,6 +15,16 @@
 //! ```text
 //! Request → Service → Event → Dispatcher → Reducer → State
 //! ```
+//!
+//! # Performance Considerations
+//!
+//! `StateSnapshot::from_app_state()` clones the entire KV store for each
+//! reducer invocation. This is acceptable for small state (<1000 keys).
+//! For apps with large state, consider:
+//!
+//! - Keeping state small (use BlobService for large values)
+//! - Batching multiple events before taking a snapshot
+//! - Future optimization: Copy-on-write snapshots (not yet implemented)
 
 use super::state_factory::AppState;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

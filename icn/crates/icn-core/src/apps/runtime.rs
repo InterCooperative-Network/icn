@@ -34,6 +34,10 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
+/// Timeout for dispatcher shutdown. If dispatcher doesn't stop within this
+/// duration, we log a warning and continue.
+const DISPATCHER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// App identifier.
 pub type AppId = String;
 
@@ -265,8 +269,16 @@ impl AppRuntime {
         // Register oracle if provided
         if let Some(oracle) = builder.oracle {
             if let Some(oracle_config) = &manifest.oracle {
-                let domain = Domain::new(&oracle_config.domain);
-                self.oracle_registry.register(domain, oracle);
+                // Validate oracle domain matches manifest declaration
+                let manifest_domain = Domain::new(&oracle_config.domain);
+                let oracle_domain = oracle.domain();
+                if oracle_domain.as_str() != manifest_domain.as_str() {
+                    return Err(RuntimeError::OracleDomainMismatch {
+                        oracle_domain: oracle_domain.as_str().to_string(),
+                        manifest_domain: manifest_domain.as_str().to_string(),
+                    });
+                }
+                self.oracle_registry.register(manifest_domain, oracle);
             }
         }
 
@@ -368,10 +380,14 @@ impl AppRuntime {
 
         // Wait for task to complete with timeout
         if let Some(task) = app.dispatcher_task.take() {
-            match tokio::time::timeout(Duration::from_secs(5), task).await {
+            match tokio::time::timeout(DISPATCHER_SHUTDOWN_TIMEOUT, task).await {
                 Ok(_) => {}
                 Err(_) => {
-                    tracing::warn!(app_id = %app_id, "Dispatcher task did not stop within timeout");
+                    tracing::warn!(
+                        app_id = %app_id,
+                        timeout_secs = DISPATCHER_SHUTDOWN_TIMEOUT.as_secs(),
+                        "Dispatcher task did not stop within timeout"
+                    );
                 }
             }
         }
@@ -489,6 +505,13 @@ pub enum RuntimeError {
     /// Dispatch error
     #[error("Dispatch error: {0}")]
     Dispatch(String),
+
+    /// Oracle domain mismatch
+    #[error("Oracle domain '{oracle_domain}' does not match manifest declaration '{manifest_domain}'")]
+    OracleDomainMismatch {
+        oracle_domain: String,
+        manifest_domain: String,
+    },
 }
 
 #[cfg(test)]

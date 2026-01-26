@@ -113,12 +113,10 @@ impl Manifest {
             )));
         }
 
-        // Version must be semver-like
-        if self.version.is_empty() {
-            return Err(ManifestError::Validation(
-                "Version cannot be empty".to_string(),
-            ));
-        }
+        // Version must be valid semver
+        semver::Version::parse(&self.version).map_err(|e| {
+            ManifestError::Validation(format!("Invalid semver version '{}': {e}", self.version))
+        })?;
 
         // Publisher must be a DID
         if !self.publisher.starts_with("did:") {
