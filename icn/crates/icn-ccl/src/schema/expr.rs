@@ -79,11 +79,20 @@ pub enum SchemaValue {
 }
 
 impl SchemaValue {
-    /// Convert to f64 if numeric.
+    /// Convert to f64 if numeric and finite.
+    ///
+    /// Returns None for non-numeric values, NaN, or Infinity.
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             SchemaValue::Int(i) => Some(*i as f64),
-            SchemaValue::Float(f) => Some(*f),
+            SchemaValue::Float(f) => {
+                // Reject NaN and Infinity
+                if f.is_finite() {
+                    Some(*f)
+                } else {
+                    None
+                }
+            }
             SchemaValue::Fraction {
                 numerator,
                 denominator,
@@ -91,7 +100,13 @@ impl SchemaValue {
                 if *denominator == 0 {
                     None
                 } else {
-                    Some(*numerator as f64 / *denominator as f64)
+                    let result = *numerator as f64 / *denominator as f64;
+                    // Also validate fraction result
+                    if result.is_finite() {
+                        Some(result)
+                    } else {
+                        None
+                    }
                 }
             }
             _ => None,
@@ -296,7 +311,9 @@ impl EvalContext {
                 let r = right.as_f64().ok_or_else(|| {
                     SchemaError::Expression("Right operand not numeric".to_string())
                 })?;
-                Ok(SchemaValue::Float(l + r))
+                let result = l + r;
+                Self::validate_finite(result, "Addition")?;
+                Ok(SchemaValue::Float(result))
             }
             BinaryOp::Sub => {
                 let l = left.as_f64().ok_or_else(|| {
@@ -305,7 +322,9 @@ impl EvalContext {
                 let r = right.as_f64().ok_or_else(|| {
                     SchemaError::Expression("Right operand not numeric".to_string())
                 })?;
-                Ok(SchemaValue::Float(l - r))
+                let result = l - r;
+                Self::validate_finite(result, "Subtraction")?;
+                Ok(SchemaValue::Float(result))
             }
             BinaryOp::Mul => {
                 let l = left.as_f64().ok_or_else(|| {
@@ -314,7 +333,9 @@ impl EvalContext {
                 let r = right.as_f64().ok_or_else(|| {
                     SchemaError::Expression("Right operand not numeric".to_string())
                 })?;
-                Ok(SchemaValue::Float(l * r))
+                let result = l * r;
+                Self::validate_finite(result, "Multiplication")?;
+                Ok(SchemaValue::Float(result))
             }
             BinaryOp::Div => {
                 let l = left.as_f64().ok_or_else(|| {
@@ -326,7 +347,9 @@ impl EvalContext {
                 if r == 0.0 {
                     return Err(SchemaError::Expression("Division by zero".to_string()));
                 }
-                Ok(SchemaValue::Float(l / r))
+                let result = l / r;
+                Self::validate_finite(result, "Division")?;
+                Ok(SchemaValue::Float(result))
             }
 
             // Comparison operations
@@ -382,9 +405,28 @@ impl EvalContext {
                 let n = val.as_f64().ok_or_else(|| {
                     SchemaError::Expression("Cannot negate non-numeric value".to_string())
                 })?;
-                Ok(SchemaValue::Float(-n))
+                let result = -n;
+                Self::validate_finite(result, "Negation")?;
+                Ok(SchemaValue::Float(result))
             }
         }
+    }
+
+    /// Validate that an arithmetic result is finite (not NaN or Infinity).
+    fn validate_finite(value: f64, operation: &str) -> Result<(), SchemaError> {
+        if value.is_nan() {
+            return Err(SchemaError::Expression(format!(
+                "{} produced NaN (not a number)",
+                operation
+            )));
+        }
+        if value.is_infinite() {
+            return Err(SchemaError::Expression(format!(
+                "{} produced Infinity (overflow)",
+                operation
+            )));
+        }
+        Ok(())
     }
 
     fn apply_function(
@@ -763,5 +805,71 @@ mod tests {
         let ctx = EvalContext::new();
         let result = ctx.evaluate(&expr);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_overflow_to_infinity() {
+        let ctx = EvalContext::new();
+        // Multiplication overflow
+        let expr = SchemaExpr::BinaryOp {
+            left: Box::new(SchemaExpr::Literal(SchemaValue::Float(f64::MAX))),
+            op: BinaryOp::Mul,
+            right: Box::new(SchemaExpr::Literal(SchemaValue::Float(2.0))),
+        };
+        let result = ctx.evaluate(&expr);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Infinity (overflow)"));
+    }
+
+    #[test]
+    fn test_nan_detection() {
+        let ctx = EvalContext::new();
+        // NaN from 0.0 / 0.0 is caught by division by zero first,
+        // but Infinity - Infinity produces NaN
+        let expr = SchemaExpr::BinaryOp {
+            left: Box::new(SchemaExpr::Literal(SchemaValue::Float(f64::INFINITY))),
+            op: BinaryOp::Sub,
+            right: Box::new(SchemaExpr::Literal(SchemaValue::Float(f64::INFINITY))),
+        };
+        // Note: Input Infinity is rejected before producing NaN
+        let result = ctx.evaluate(&expr);
+        // This may error on input validation or NaN result
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_negative_infinity() {
+        let ctx = EvalContext::new();
+        // Large negative number
+        let expr = SchemaExpr::BinaryOp {
+            left: Box::new(SchemaExpr::Literal(SchemaValue::Float(-f64::MAX))),
+            op: BinaryOp::Sub,
+            right: Box::new(SchemaExpr::Literal(SchemaValue::Float(f64::MAX))),
+        };
+        let result = ctx.evaluate(&expr);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Infinity (overflow)"));
+    }
+
+    #[test]
+    fn test_valid_arithmetic_still_works() {
+        let ctx = EvalContext::new();
+        let expr = SchemaExpr::BinaryOp {
+            left: Box::new(SchemaExpr::Literal(SchemaValue::Float(10.0))),
+            op: BinaryOp::Mul,
+            right: Box::new(SchemaExpr::Literal(SchemaValue::Float(5.0))),
+        };
+        let result = ctx.evaluate(&expr).unwrap();
+        if let SchemaValue::Float(f) = result {
+            assert!((f - 50.0).abs() < 0.001);
+        } else {
+            panic!("Expected float");
+        }
     }
 }

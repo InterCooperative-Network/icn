@@ -29,6 +29,7 @@ pub use legacy::*;
 
 pub mod action_items;
 pub mod agreement;
+pub mod apps;
 pub mod exchange;
 pub mod gateway;
 pub mod governance;

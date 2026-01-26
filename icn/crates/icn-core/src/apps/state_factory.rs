@@ -29,13 +29,77 @@ pub struct AppNamespace {
     pub app: String,
 }
 
+/// Error for invalid namespace components.
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum NamespaceError {
+    /// Path traversal attempt detected
+    #[error("Invalid namespace component: path traversal detected in '{0}'")]
+    PathTraversal(String),
+    /// Null byte in component
+    #[error("Invalid namespace component: null byte in '{0}'")]
+    NullByte(String),
+    /// Empty component
+    #[error("Invalid namespace component: empty {0}")]
+    Empty(&'static str),
+}
+
 impl AppNamespace {
     /// Create a new app namespace.
-    pub fn new(publisher: impl Into<String>, app: impl Into<String>) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the publisher or app name contains:
+    /// - Path traversal sequences (`..`, `/`, `\`)
+    /// - Null bytes
+    /// - Empty strings
+    pub fn new(
+        publisher: impl Into<String>,
+        app: impl Into<String>,
+    ) -> Result<Self, NamespaceError> {
+        let publisher = publisher.into();
+        let app = app.into();
+
+        // Validate publisher
+        Self::validate_component(&publisher, "publisher")?;
+
+        // Validate app name
+        Self::validate_component(&app, "app")?;
+
+        Ok(Self { publisher, app })
+    }
+
+    /// Create a namespace without validation (for internal use only).
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure the components are already validated.
+    #[cfg(test)]
+    pub(crate) fn new_unchecked(publisher: impl Into<String>, app: impl Into<String>) -> Self {
         Self {
             publisher: publisher.into(),
             app: app.into(),
         }
+    }
+
+    /// Validate a namespace component for path traversal attacks.
+    fn validate_component(component: &str, name: &'static str) -> Result<(), NamespaceError> {
+        // Check for empty
+        if component.is_empty() {
+            return Err(NamespaceError::Empty(name));
+        }
+
+        // Check for null bytes
+        if component.contains('\0') {
+            return Err(NamespaceError::NullByte(component.to_string()));
+        }
+
+        // Check for path traversal sequences
+        // Note: We allow ":" in DIDs like "did:icn:..."
+        if component.contains("..") || component.contains('/') || component.contains('\\') {
+            return Err(NamespaceError::PathTraversal(component.to_string()));
+        }
+
+        Ok(())
     }
 
     /// Get the namespace path.
@@ -431,16 +495,77 @@ mod tests {
 
     #[test]
     fn test_app_namespace() {
-        let ns = AppNamespace::new("did:icn:test", "echo");
+        let ns = AppNamespace::new("did:icn:test", "echo").unwrap();
         assert_eq!(ns.path(), "/did:icn:test/echo");
         assert_eq!(ns.store_path("data"), "/did:icn:test/echo/data");
         assert_eq!(ns.key_path("data", "key1"), "/did:icn:test/echo/data/key1");
     }
 
+    #[test]
+    fn test_app_namespace_path_traversal_rejection() {
+        // Test ".." path traversal
+        assert!(matches!(
+            AppNamespace::new("did:icn:../../root", "app"),
+            Err(NamespaceError::PathTraversal(_))
+        ));
+
+        // Test "/" in component
+        assert!(matches!(
+            AppNamespace::new("did:icn:test/../../etc", "app"),
+            Err(NamespaceError::PathTraversal(_))
+        ));
+
+        // Test backslash
+        assert!(matches!(
+            AppNamespace::new("did:icn:test", "app\\..\\.."),
+            Err(NamespaceError::PathTraversal(_))
+        ));
+
+        // Test ".." in app name
+        assert!(matches!(
+            AppNamespace::new("did:icn:test", ".."),
+            Err(NamespaceError::PathTraversal(_))
+        ));
+    }
+
+    #[test]
+    fn test_app_namespace_null_byte_rejection() {
+        assert!(matches!(
+            AppNamespace::new("did:icn:test\0evil", "app"),
+            Err(NamespaceError::NullByte(_))
+        ));
+
+        assert!(matches!(
+            AppNamespace::new("did:icn:test", "app\0"),
+            Err(NamespaceError::NullByte(_))
+        ));
+    }
+
+    #[test]
+    fn test_app_namespace_empty_rejection() {
+        assert!(matches!(
+            AppNamespace::new("", "app"),
+            Err(NamespaceError::Empty("publisher"))
+        ));
+
+        assert!(matches!(
+            AppNamespace::new("did:icn:test", ""),
+            Err(NamespaceError::Empty("app"))
+        ));
+    }
+
+    #[test]
+    fn test_app_namespace_valid_did_with_colons() {
+        // DIDs contain colons which should be allowed
+        let ns = AppNamespace::new("did:icn:abc123", "my-app").unwrap();
+        assert_eq!(ns.publisher, "did:icn:abc123");
+        assert_eq!(ns.app, "my-app");
+    }
+
     #[tokio::test]
     async fn test_state_factory_create() {
         let factory = StateFactory::new();
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new("did:icn:test", "echo").unwrap();
 
         let config = StateConfig {
             logs: vec![LogConfig {
@@ -466,7 +591,7 @@ mod tests {
     #[tokio::test]
     async fn test_state_factory_duplicate_namespace() {
         let factory = StateFactory::new();
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new("did:icn:test", "echo").unwrap();
         let config = StateConfig::default();
 
         factory
@@ -480,7 +605,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_log_handle_append_read() {
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let log = LogHandle::new(&namespace, "events", LogOrdering::Total);
 
         // Append entries
@@ -500,7 +625,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_log_handle_idempotent() {
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let log = LogHandle::new(&namespace, "events", LogOrdering::Total);
 
         let offset1 = log
@@ -519,7 +644,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_kv_handle_crud() {
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let kv = KvHandle::new(&namespace, "cache");
 
         // Set and get
@@ -538,7 +663,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_kv_handle_list() {
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let kv = KvHandle::new(&namespace, "cache");
 
         kv.set("user:1", b"alice".to_vec()).await.unwrap();
@@ -551,7 +676,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_blob_handle_size_limit() {
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let blob = BlobHandle::new(&namespace, "files", Some(100));
 
         // Small blob should work

@@ -27,9 +27,11 @@
 //! - Future optimization: Copy-on-write snapshots (not yet implemented)
 
 use super::state_factory::AppState;
+use icn_obs::metrics::apps as app_metrics;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::{mpsc, watch, RwLock};
 
 /// Event type identifier (e.g., "trust:attestation").
@@ -315,6 +317,8 @@ pub type BoxedService = Box<dyn Service>;
 
 /// Compute dispatcher - routes events and requests.
 pub struct ComputeDispatcher {
+    /// App identifier for metrics
+    app_id: String,
     /// Registered reducers by event type
     reducers: HashMap<EventType, BoxedReducer>,
     /// Registered services by request type
@@ -335,10 +339,11 @@ pub struct ComputeDispatcher {
 
 impl ComputeDispatcher {
     /// Create a new dispatcher.
-    pub fn new(state: AppState) -> Self {
+    pub fn new(app_id: impl Into<String>, state: AppState) -> Self {
         let (event_tx, event_rx) = mpsc::channel(1000);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         Self {
+            app_id: app_id.into(),
             reducers: HashMap::new(),
             services: HashMap::new(),
             event_tx,
@@ -471,8 +476,39 @@ impl ComputeDispatcher {
                 event = rx.recv() => {
                     match event {
                         Some(event) => {
-                            if let Err(e) = self.dispatch_event(event.clone()).await {
-                                tracing::error!("Failed to dispatch event {}: {}", event.event_type, e);
+                            let event_type = event.event_type.clone();
+                            let start = Instant::now();
+
+                            match self.dispatch_event(event).await {
+                                Ok(()) => {
+                                    app_metrics::dispatch_events_total_inc(&self.app_id, &event_type);
+                                    app_metrics::dispatch_event_duration_observe(
+                                        &self.app_id,
+                                        &event_type,
+                                        start.elapsed().as_secs_f64(),
+                                    );
+                                }
+                                Err(e) => {
+                                    let error_type = match &e {
+                                        DispatchError::NoHandler(_) => "no_handler",
+                                        DispatchError::Serialization(_) => "serialization",
+                                        DispatchError::Deserialization(_) => "deserialization",
+                                        DispatchError::State(_) => "state",
+                                        DispatchError::StoreNotFound(_) => "store_not_found",
+                                        DispatchError::Handler(_) => "handler",
+                                    };
+                                    app_metrics::dispatch_events_failed_total_inc(
+                                        &self.app_id,
+                                        &event_type,
+                                        error_type,
+                                    );
+                                    tracing::error!(
+                                        app_id = %self.app_id,
+                                        event_type = %event_type,
+                                        error_type = %error_type,
+                                        "Failed to dispatch event: {}", e
+                                    );
+                                }
                             }
                         }
                         None => break, // Channel closed
@@ -605,7 +641,7 @@ mod tests {
     #[tokio::test]
     async fn test_event_dispatch() {
         let factory = StateFactory::new();
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let config = StateConfig {
             kv: vec![KvConfig {
                 name: "echoes".to_string(),
@@ -614,7 +650,7 @@ mod tests {
         };
 
         let state = factory.create_for_app(namespace, &config).await.unwrap();
-        let mut dispatcher = ComputeDispatcher::new(state.clone());
+        let mut dispatcher = ComputeDispatcher::new("test-app", state.clone());
 
         // Register echo reducer
         dispatcher.register_reducer("echo:message", Box::new(EchoReducer));
@@ -631,7 +667,7 @@ mod tests {
     #[tokio::test]
     async fn test_request_handling() {
         let factory = StateFactory::new();
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let config = StateConfig {
             kv: vec![KvConfig {
                 name: "echoes".to_string(),
@@ -649,7 +685,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut dispatcher = ComputeDispatcher::new(state);
+        let mut dispatcher = ComputeDispatcher::new("test-app", state);
 
         // Register query service
         dispatcher.register_service("echo:query", Box::new(QueryService));
@@ -666,11 +702,11 @@ mod tests {
     #[tokio::test]
     async fn test_no_handler() {
         let factory = StateFactory::new();
-        let namespace = AppNamespace::new("did:icn:test", "echo");
+        let namespace = AppNamespace::new_unchecked("did:icn:test", "echo");
         let config = StateConfig::default();
 
         let state = factory.create_for_app(namespace, &config).await.unwrap();
-        let dispatcher = ComputeDispatcher::new(state);
+        let dispatcher = ComputeDispatcher::new("test-app", state);
 
         // Dispatch to non-existent handler
         let event = Event::new("unknown:event", b"data".to_vec(), "test");

@@ -38,6 +38,11 @@ use tokio::task::JoinHandle;
 /// duration, we log a warning and continue.
 const DISPATCHER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Timeout for overall stop operation including lock acquisition.
+/// This should be greater than DISPATCHER_SHUTDOWN_TIMEOUT to allow for
+/// graceful shutdown before timing out the entire operation.
+const STOP_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// App identifier.
 pub type AppId = String;
 
@@ -211,7 +216,8 @@ impl AppRuntime {
         }
 
         // Create namespace
-        let namespace = AppNamespace::new(&manifest.publisher, &manifest.name);
+        let namespace = AppNamespace::new(&manifest.publisher, &manifest.name)
+            .map_err(|e| RuntimeError::State(e.to_string()))?;
 
         // Create state handles
         let state = self
@@ -256,7 +262,7 @@ impl AppRuntime {
         let capabilities = self.issue_capabilities(&manifest)?;
 
         // Create dispatcher with registered handlers
-        let mut dispatcher = ComputeDispatcher::new(builder.state.clone());
+        let mut dispatcher = ComputeDispatcher::new(&app_id, builder.state.clone());
 
         for (event_type, reducer) in builder.reducers {
             dispatcher.register_reducer(event_type, reducer);
@@ -360,7 +366,29 @@ impl AppRuntime {
     }
 
     /// Stop an app.
+    ///
+    /// This operation has a timeout to prevent indefinite blocking. If the
+    /// operation times out, a `ShutdownTimeout` error is returned and the
+    /// app may be in an inconsistent state.
     pub async fn stop(&self, app_id: &AppId) -> Result<(), RuntimeError> {
+        let app_id_clone = app_id.clone();
+        match tokio::time::timeout(STOP_OPERATION_TIMEOUT, self.stop_inner(app_id)).await {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::error!(
+                    app_id = %app_id_clone,
+                    timeout_secs = STOP_OPERATION_TIMEOUT.as_secs(),
+                    "App stop operation timed out"
+                );
+                Err(RuntimeError::ShutdownTimeout(
+                    STOP_OPERATION_TIMEOUT.as_secs(),
+                ))
+            }
+        }
+    }
+
+    /// Internal stop implementation without timeout wrapper.
+    async fn stop_inner(&self, app_id: &AppId) -> Result<(), RuntimeError> {
         let mut apps = self.apps.write().await;
         let app = apps
             .get_mut(app_id)
@@ -505,6 +533,10 @@ pub enum RuntimeError {
     /// Dispatch error
     #[error("Dispatch error: {0}")]
     Dispatch(String),
+
+    /// Shutdown timeout
+    #[error("App shutdown timed out after {0} seconds")]
+    ShutdownTimeout(u64),
 
     /// Oracle domain mismatch
     #[error("Oracle domain '{oracle_domain}' does not match manifest declaration '{manifest_domain}'")]
