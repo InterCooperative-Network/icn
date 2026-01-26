@@ -153,9 +153,13 @@ impl EconomicsSchema {
             for rule in &surplus.allocation {
                 // Parse fraction - for now, simple float parsing
                 // In production, would parse expressions properly
-                if let Ok(f) = rule.fraction.parse::<f64>() {
-                    total += f;
-                }
+                let f = rule.fraction.parse::<f64>().map_err(|e| {
+                    SchemaError::Validation(format!(
+                        "Invalid surplus allocation fraction '{}': {}",
+                        rule.fraction, e
+                    ))
+                })?;
+                total += f;
             }
             if total > 1.0 + f64::EPSILON {
                 return Err(SchemaError::Validation(format!(
