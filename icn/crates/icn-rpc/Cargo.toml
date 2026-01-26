@@ -18,7 +18,7 @@ reqwest = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
-uuid = { version = "1.7", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde"] }
 jsonwebtoken = "9"
 ed25519-dalek = { version = "2", features = ["std"] }
 rand = "0.8"

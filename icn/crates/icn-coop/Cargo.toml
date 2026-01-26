@@ -20,7 +20,7 @@ thiserror = "2.0"
 tracing = "0.1"
 sled = "0.34"
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde"] }
 hex = "0.4"
 
 [dev-dependencies]
