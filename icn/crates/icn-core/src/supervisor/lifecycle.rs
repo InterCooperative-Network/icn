@@ -660,7 +660,7 @@ async fn spawn_network_actor(
     identity_bundle: &IdentityBundle,
     did: &icn_identity::Did,
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
-    trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
+    _trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
     misbehavior_detector: &Arc<RwLock<icn_security::MisbehaviorDetector>>,
     shutdown_tx: &ShutdownTx,
 ) -> Result<icn_net::NetworkHandle> {

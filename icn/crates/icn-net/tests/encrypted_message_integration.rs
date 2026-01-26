@@ -333,14 +333,14 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None, // No trust graph
-            None, // No trust-gated config
+            None, // No PolicyOracle
             None, // No fallback config
             None, // No topology config
             None, // No STUN servers for tests
             None, // No TURN config for tests
             None, // No misbehavior detector for tests
             None, // No store for tests
+            None, // personhood_store
             None, // anchor_rate_config
         )
         .await?;
