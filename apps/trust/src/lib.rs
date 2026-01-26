@@ -37,6 +37,7 @@ pub use oracle::TrustPolicyOracle;
 /// Register trust app handlers with the runtime.
 ///
 /// Called by the supervisor during app startup.
+#[allow(clippy::type_complexity)]
 pub fn register_handlers(
     _runtime: &AppRuntime,
 ) -> (
