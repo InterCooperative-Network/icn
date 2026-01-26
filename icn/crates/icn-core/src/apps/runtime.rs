@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
@@ -361,9 +362,14 @@ impl AppRuntime {
             dispatcher.stop().await;
         }
 
-        // Wait for task to complete
+        // Wait for task to complete with timeout
         if let Some(task) = app.dispatcher_task.take() {
-            let _ = task.await;
+            match tokio::time::timeout(Duration::from_secs(5), task).await {
+                Ok(_) => {}
+                Err(_) => {
+                    tracing::warn!(app_id = %app_id, "Dispatcher task did not stop within timeout");
+                }
+            }
         }
 
         app.status = AppStatus::Stopped;

@@ -41,7 +41,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 // ============================================================================
 // Bootstrap Phase
@@ -474,13 +474,13 @@ impl GenesisCapabilities {
             return Err(AuthzError::GenesisExpired);
         }
 
-        // Generate capability ID
+        // Generate capability ID using system time (Instant::elapsed() would panic on future time)
         let seq = self.counter.fetch_add(1, AtomicOrdering::SeqCst);
-        let cap_id = format!(
-            "genesis:{:016x}:{}",
-            self.expires_at.elapsed().as_nanos(),
-            seq
-        );
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_nanos();
+        let cap_id = format!("genesis:{:016x}:{}", timestamp, seq);
 
         Ok(Capability {
             id: cap_id,
