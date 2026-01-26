@@ -3155,7 +3155,7 @@ dependencies = [
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
