@@ -44,7 +44,7 @@ pub use protocol::{
     write_message_compressed, write_message_negotiated, CompressionFormat, EncodingFormat,
     KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, COMPRESSION_THRESHOLD,
 };
-pub use rate_limit::{RateLimitConfig, RateLimiter};
+pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::SessionManager;

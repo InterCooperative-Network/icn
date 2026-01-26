@@ -119,7 +119,7 @@ impl SessionManager {
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
-        let own_did = identity_bundle.did().clone();
+        let _own_did = identity_bundle.did().clone();
 
         // Use TLS certificate from IdentityBundle (already bound to DID)
         // This ensures the cert hash matches what's in BindingInfo
@@ -640,7 +640,7 @@ mod tests {
         let addr = "127.0.0.1:0".parse().unwrap();
 
         manager
-            .start(&identity_bundle, addr, None, None, None, None)
+            .start(&identity_bundle, addr, None, None)
             .await
             .unwrap();
 
@@ -660,7 +660,7 @@ mod tests {
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_identity, server_addr, None, None, None, None)
+            .start(&server_identity, server_addr, None, None)
             .await
             .unwrap();
 
@@ -679,7 +679,7 @@ mod tests {
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_identity, client_addr, None, None, None, None)
+            .start(&client_identity, client_addr, None, None)
             .await
             .unwrap();
 
