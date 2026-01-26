@@ -1052,7 +1052,6 @@ impl NetworkActor {
             let replay_guard_clone = replay_guard.clone();
             let neighbor_sets_clone = neighbor_sets.clone();
             let topology_config_clone = topology_config.clone();
-            let trust_graph_clone = trust_graph.clone();
             let peer_connections_clone = peer_connections.clone();
             let blob_registry_clone = blob_registry.clone();
             let misbehavior_detector_clone = misbehavior_detector.clone();
@@ -1067,7 +1066,6 @@ impl NetworkActor {
                     replay_guard_clone,
                     neighbor_sets_clone,
                     topology_config_clone,
-                    trust_graph_clone,
                     peer_connections_clone,
                     blob_registry_clone,
                     misbehavior_detector_clone,
