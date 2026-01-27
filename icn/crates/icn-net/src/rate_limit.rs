@@ -14,10 +14,7 @@ use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
 };
-// TODO(Phase 2.4): Remove this import when deprecated TrustGatedRateLimitConfig is removed.
-// Currently only used by deprecated `for_class()` method for backward compatibility.
-#[allow(deprecated)]
-use icn_trust::TrustClass;
+
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -65,112 +62,7 @@ impl Default for RateLimitConfig {
     }
 }
 
-/// Trust-gated rate limiting configuration (deprecated)
-#[derive(Clone, Debug)]
-pub struct TrustGatedRateLimitConfig {
-    /// Limits for isolated peers (untrusted, score < 0.1)
-    pub isolated: RateLimitConfig,
 
-    /// Limits for known peers (limited trust, score 0.1-0.4)
-    pub known: RateLimitConfig,
-
-    /// Limits for partner peers (trusted, score 0.4-0.7)
-    pub partner: RateLimitConfig,
-
-    /// Limits for federated peers (highly trusted, score 0.7+)
-    pub federated: RateLimitConfig,
-
-    /// Refill interval (shared across all trust levels)
-    pub refill_interval: Duration,
-
-    /// Minimum trust score required for TLS connections (default: 0.0 = allow all authenticated DIDs)
-    pub min_trust_threshold: f64,
-}
-
-impl Default for TrustGatedRateLimitConfig {
-    fn default() -> Self {
-        let refill_interval = Duration::from_millis(100);
-        TrustGatedRateLimitConfig {
-            isolated: RateLimitConfig {
-                max_messages_per_second: 10,
-                burst_capacity: 2,
-                refill_interval,
-            },
-            known: RateLimitConfig {
-                max_messages_per_second: 50,
-                burst_capacity: 10,
-                refill_interval,
-            },
-            partner: RateLimitConfig {
-                max_messages_per_second: 100,
-                burst_capacity: 20,
-                refill_interval,
-            },
-            federated: RateLimitConfig {
-                max_messages_per_second: 200,
-                burst_capacity: 50,
-                refill_interval,
-            },
-            refill_interval,
-            min_trust_threshold: 0.0,
-        }
-    }
-}
-
-impl TrustGatedRateLimitConfig {
-    /// Get the rate limit config for a specific trust class
-    pub fn for_class(&self, class: TrustClass) -> &RateLimitConfig {
-        match class {
-            TrustClass::Isolated => &self.isolated,
-            TrustClass::Known => &self.known,
-            TrustClass::Partner => &self.partner,
-            TrustClass::Federated => &self.federated,
-        }
-    }
-
-    #[deprecated(note = "Trust-gated configuration will be removed; use PolicyOracle directly")]
-    /// Build a trust-based oracle from this configuration (deprecated).
-    pub fn to_oracle(
-        &self,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-    ) -> Arc<dyn PolicyOracle> {
-        struct TrustGraphOracle {
-            trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-            config: TrustGatedRateLimitConfig,
-        }
-
-        impl PolicyOracle for TrustGraphOracle {
-            fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-                let did = match Did::from_str(request.actor().as_str()) {
-                    Ok(did) => did,
-                    Err(_) => return PolicyDecision::deny("invalid did"),
-                };
-                let class = {
-                    match self.trust_graph.try_read() {
-                        Ok(graph) => graph.trust_class(&did).unwrap_or(TrustClass::Isolated),
-                        Err(_) => TrustClass::Isolated,
-                    }
-                };
-                let limit = self.config.for_class(class);
-                PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(
-                    icn_kernel_api::authz::RateLimit::new(
-                        limit.max_messages_per_second,
-                        limit.burst_capacity,
-                    ),
-                ))
-            }
-
-            fn domain(&self) -> Domain {
-                Domain::new(NETWORK_DOMAIN)
-            }
-        }
-
-        Arc::new(TrustGraphOracle {
-            trust_graph,
-            config: self.clone(),
-        })
-    }
-}
 
 /// Enforcement mode for per-person (per-anchor) rate limiting
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
@@ -389,34 +281,7 @@ impl RateLimiter {
         }
     }
 
-    /// Create a new trust-gated rate limiter (deprecated compatibility shim).
-    #[allow(deprecated)]
-    #[deprecated(note = "Use new_with_oracle or new_with_oracle_and_sybil_resistance")]
-    pub fn new_trust_gated(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-    ) -> Self {
-        let oracle = config.to_oracle(trust_graph);
-        RateLimiter::new_with_oracle(oracle, config.isolated.clone())
-    }
 
-    /// Create a new trust-gated rate limiter with Sybil resistance (deprecated).
-    #[allow(deprecated)]
-    #[deprecated(note = "Use new_with_oracle_and_sybil_resistance")]
-    pub fn new_with_sybil_resistance(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-        personhood_store: Arc<dyn PersonhoodStoreTrait>,
-        anchor_config: AnchorRateLimitConfig,
-    ) -> Self {
-        let oracle = config.to_oracle(trust_graph);
-        RateLimiter::new_with_oracle_and_sybil_resistance(
-            oracle,
-            config.isolated.clone(),
-            personhood_store,
-            anchor_config,
-        )
-    }
 
     /// Convert an oracle decision into a rate limit config (or None if denied).
     fn rate_limit_from_decision(

@@ -88,7 +88,7 @@ pub enum LaborShareMessage {
 pub enum BondMessage {
     /// Announce a new bond offering is open for subscription
     ///
-    /// Propagates on `bonds:issuance` topic (`TrustClass::Known` - Known+).
+    /// Propagates on `bonds:issuance` topic (`MinTrustScore(0.1)` - Known+).
     BondOfferingAnnouncement {
         /// Unique bond offering ID
         bond_id: String,
@@ -144,7 +144,7 @@ pub enum BondMessage {
 
     /// Bond payment notification (trust-gated)
     ///
-    /// Propagates on `bonds:payments` topic (`TrustClass::Partner` - Partner+).
+    /// Propagates on `bonds:payments` topic (`MinTrustScore(0.4)` - Partner+).
     /// Only sent to subscribers with sufficient trust.
     PaymentNotification {
         /// Bond ID
@@ -195,13 +195,13 @@ pub enum BondPaymentType {
 
 /// Topic names for labor share gossip
 pub mod topics {
-    /// Surplus allocation announcements (`TrustClass::Known` - Known+)
+    /// Surplus allocation announcements (`MinTrustScore(0.1)` - Known+)
     pub const LABOR_SHARES_ALLOCATIONS: &str = "labor-shares:allocations";
 
-    /// Bond issuance announcements (`TrustClass::Known` - Known+)
+    /// Bond issuance announcements (`MinTrustScore(0.1)` - Known+)
     pub const BONDS_ISSUANCE: &str = "bonds:issuance";
 
-    /// Bond payment notifications (`TrustClass::Partner` - Partner+)
+    /// Bond payment notifications (`MinTrustScore(0.4)` - Partner+)
     pub const BONDS_PAYMENTS: &str = "bonds:payments";
 }
 

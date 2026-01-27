@@ -20,16 +20,13 @@
 //! ```rust,ignore
 //! use icn_gossip::{GossipActor, Topic, AccessControl};
 //! use icn_identity::KeyPair;
-//! use icn_trust::TrustClass;
 //! use std::sync::Arc;
 //!
 //! let keypair = KeyPair::generate().unwrap();
 //! let did = keypair.did().clone();
 //!
-//! // Trust lookup (simplified)
-//! let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
-//!
-//! let mut gossip = GossipActor::new(did, trust_lookup);
+//! // Create actor with no policy oracle (defaults to 0.0 trust)
+//! let mut gossip = GossipActor::new(did, None);
 //!
 //! // Publish to a topic (async)
 //! let data = b"Hello, distributed world!".to_vec();
@@ -72,7 +69,7 @@ pub use scalability::{CompressedVectorClock, ShardStats, ShardedTopic, TopicShar
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, AdaptiveFanoutConfig, ContentHash, GossipEntry, GossipMessage, Scope,
-    Subscription, SyncCursor, Topic, TopicAutoCreationPolicy, TrustResourceLimits,
+    Subscription, SyncCursor, Topic, TopicAutoCreationPolicy, ResourceLimits,
 };
 pub use vector_clock::VectorClock;
 

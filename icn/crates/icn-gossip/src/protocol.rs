@@ -27,6 +27,7 @@ use crate::handlers::DispatchResult;
 use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
+use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyRequest};
 use tracing::{debug, instrument, warn};
 
 impl GossipActor {
@@ -47,10 +48,23 @@ impl GossipActor {
         // Check sender's trust score before processing messages
         const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
 
-        if let Some(ref trust_graph) = self.trust_graph {
-            if let Ok(tg) = trust_graph.try_read() {
-                match tg.compute_trust_score(sender) {
-                    Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
+        if let Some(oracle) = &self.oracle {
+            let req = PolicyRequest::new(
+                sender.to_string(),
+                ActionKind::Read, // Treat general message handling as 'Read' access or basic interaction
+                Domain::trust(),
+            );
+            
+            match oracle.evaluate(&req) {
+                 icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
+                     let score = constraints.custom.get("trust_score")
+                         .and_then(|v| match v {
+                             ConstraintValue::Float(f) => Some(f.into_inner()),
+                             _ => None,
+                         })
+                         .unwrap_or(0.0);
+                     
+                     if score < MIN_TRUST_FOR_MESSAGE {
                         warn!(
                             peer_did = %sender,
                             trust_score = score,
@@ -62,23 +76,19 @@ impl GossipActor {
                         anyhow::bail!(
                             "Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
                         );
-                    }
-                    Ok(_) => {
-                        // Trust validated successfully
-                    }
-                    Err(e) => {
-                        // Unknown sender - reject by default
-                        debug!(
-                            peer_did = %sender,
-                            error = %e,
-                            "Cannot compute trust score for message sender"
-                        );
-                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for message sender {sender}: {e}");
-                    }
-                }
+                     }
+                 },
+                 icn_kernel_api::authz::PolicyDecision::Deny { reason } => {
+                     warn!(
+                        peer_did = %sender,
+                        reason = %reason,
+                        message_type = message.variant_name(),
+                        "Rejecting message: denied by policy"
+                     );
+                     icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                     anyhow::bail!("Message rejected by policy: {reason}");
+                 }
             }
-            // If we can't acquire lock, skip trust check (avoid blocking)
         }
 
         // Phase 18 Week 3: Record contact for partition detection

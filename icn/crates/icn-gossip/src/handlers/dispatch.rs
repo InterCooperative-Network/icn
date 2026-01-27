@@ -281,16 +281,11 @@ mod tests {
     use crate::types::GossipEntry;
     use crate::GossipActor;
     use icn_identity::KeyPair;
-    use icn_trust::TrustClass;
     use std::sync::Arc;
-
-    fn mock_trust_lookup(_did: &Did) -> Option<TrustClass> {
-        Some(TrustClass::Partner)
-    }
 
     fn create_test_actor() -> GossipActor {
         let keypair = KeyPair::generate().unwrap();
-        GossipActor::new(keypair.did().clone(), Arc::new(mock_trust_lookup))
+        GossipActor::new(keypair.did().clone(), None)
     }
 
     fn create_test_entry(topic: &str) -> GossipEntry {

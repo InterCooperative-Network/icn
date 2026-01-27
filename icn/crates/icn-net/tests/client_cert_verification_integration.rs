@@ -55,20 +55,13 @@ impl SecureTestNode {
         });
 
         let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
-
-        // Configure fallback rate limiting (trust gating handled by TOFU + app policy)
-        let trust_config = icn_net::rate_limit::TrustGatedRateLimitConfig {
-            min_trust_threshold,
-            ..Default::default()
-        };
-
         let network_handle = NetworkActor::spawn(
             identity_bundle,
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
             None,
-            Some(trust_config.isolated.clone()),
+            None, // TODO: Inject PolicyOracle for trust enforcement
             None,
             None,
             None,
@@ -226,14 +219,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         alice_shutdown_tx.clone(),
         Some(alice_handler),
         None,
-        Some(
-            icn_net::rate_limit::TrustGatedRateLimitConfig {
-                min_trust_threshold: 0.5,
-                ..Default::default()
-            }
-            .isolated
-            .clone(),
-        ),
+        None, // TODO: Inject PolicyOracle to enforce min_trust=0.5
         None,
         None,
         None,
@@ -330,14 +316,7 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         alice_shutdown_tx.clone(),
         None,
         None,
-        Some(
-            icn_net::rate_limit::TrustGatedRateLimitConfig {
-                min_trust_threshold: 0.1, // Reject untrusted/isolated peers
-                ..Default::default()
-            }
-            .isolated
-            .clone(),
-        ),
+        None, // TODO: Inject PolicyOracle to enforce min_trust=0.1
         None,
         None,
         None,
