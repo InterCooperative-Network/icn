@@ -615,9 +615,18 @@ async fn test_trust_oracle_abstains_on_wrong_domain() {
     // Should return Allow with empty constraints (Abstain)
     match decision {
         PolicyDecision::Allow { constraints } => {
-            assert!(constraints.custom.is_empty(), "Custom constraints should be empty");
-            assert!(constraints.rate_limit.is_none(), "Rate limit should be None");
+            assert!(
+                constraints.custom.is_empty(),
+                "Custom constraints should be empty"
+            );
+            assert!(
+                constraints.rate_limit.is_none(),
+                "Rate limit should be None"
+            );
         }
-        _ => panic!("Should allow non-trust domains (abstain), got {:?}", decision),
+        _ => panic!(
+            "Should allow non-trust domains (abstain), got {:?}",
+            decision
+        ),
     }
 }
