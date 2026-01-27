@@ -569,11 +569,11 @@ impl ResourceLimits {
             // Using max_message_size for both pull and push for now, casting u64 to u32
             max_pull_bytes: constraints
                 .max_message_size
-                .map(|s| (s as u32))
+                .map(|s| s as u32)
                 .unwrap_or(64 * 1024_u32),
             max_push_bytes: constraints
                 .max_message_size
-                .map(|s| (s as u32))
+                .map(|s| s as u32)
                 .unwrap_or(64 * 1024_u32),
             max_outstanding_reqs: constraints.max_outstanding_requests.unwrap_or(1),
             // Time-based limits (using defaults if not in ConstraintSet)
