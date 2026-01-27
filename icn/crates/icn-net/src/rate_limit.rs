@@ -150,17 +150,22 @@ impl TokenBucket {
         }
     }
 
-    /// Update bucket configuration
+    /// Tolerance for floating point comparison (1e-6 is appropriate for user-configured values)
+    const CONFIG_EPSILON: f64 = 1e-6;
+
+    /// Update bucket configuration with proportional refill
     fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64) -> bool {
-        // Check if config changed
-        let changed = (self.capacity - new_capacity).abs() > f64::EPSILON
-            || (self.refill_rate - new_refill_rate).abs() > f64::EPSILON;
+        // Check if config changed using appropriate tolerance
+        let changed = (self.capacity - new_capacity).abs() > Self::CONFIG_EPSILON
+            || (self.refill_rate - new_refill_rate).abs() > Self::CONFIG_EPSILON;
 
         if changed {
+            // Proportional refill: scale tokens by the capacity ratio to prevent
+            // exploitation via rapid trust cycling (repeatedly getting full buckets)
+            let ratio = new_capacity / self.capacity.max(1.0);
+            self.tokens = (self.tokens * ratio).min(new_capacity);
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;
-            // Reset to full capacity when config changes
-            self.tokens = new_capacity;
             self.last_refill = Instant::now();
         }
         changed
@@ -461,11 +466,13 @@ impl RateLimiter {
             }
             Err(e) => {
                 // Store lookup failed - graceful degradation
+                // But increment metric so operators know Sybil protection is degraded
                 warn!(
                     did = %peer,
                     error = %e,
                     "Failed to look up personhood anchor, falling back to per-DID limiting"
                 );
+                icn_obs::metrics::network::personhood_store_failures_inc();
                 return true;
             }
         };

@@ -12,7 +12,7 @@ use crate::types::{
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
-use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyOracle, PolicyRequest};
+use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyRequest};
 use tracing::{debug, warn};
 
 impl GossipActor {

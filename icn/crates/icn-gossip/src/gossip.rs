@@ -6,13 +6,10 @@ use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Topic
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
-// use icn_trust::TrustClass; // Removed
-use icn_kernel_api::authz::{
-    ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
-};
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 

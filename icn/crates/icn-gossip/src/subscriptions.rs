@@ -22,10 +22,7 @@ use crate::gossip::{spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_
 use crate::types::{ResourceLimits, Subscription};
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
-use icn_kernel_api::authz::{
-    ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
-    PolicyRequestExt,
-};
+use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyRequest};
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 

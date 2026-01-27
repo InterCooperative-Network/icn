@@ -28,7 +28,7 @@ use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
 use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyRequest};
-use tracing::{debug, instrument, warn};
+use tracing::{instrument, warn};
 
 impl GossipActor {
     /// Handle incoming gossip message from network

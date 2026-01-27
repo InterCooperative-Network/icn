@@ -146,20 +146,20 @@ impl TokenBucket {
         self.last_refill = now;
     }
 
-    /// Update bucket configuration
+    /// Tolerance for floating point comparison (1e-6 is appropriate for user-configured values)
+    const CONFIG_EPSILON: f64 = 1e-6;
+
+    /// Update bucket configuration with proportional refill
     fn update_config(&mut self, capacity: f64, refill_rate: f64) {
-        if (self.capacity - capacity).abs() > f64::EPSILON
-            || (self.refill_rate - refill_rate).abs() > f64::EPSILON
+        if (self.capacity - capacity).abs() > Self::CONFIG_EPSILON
+            || (self.refill_rate - refill_rate).abs() > Self::CONFIG_EPSILON
         {
+            // Proportional refill: scale tokens by the capacity ratio to prevent
+            // exploitation via rapid trust cycling (repeatedly getting full buckets)
+            let ratio = capacity / self.capacity.max(1.0);
+            self.tokens = (self.tokens * ratio).min(capacity);
             self.capacity = capacity;
             self.refill_rate = refill_rate;
-            // Fill to new capacity? Or just cap?
-            // TrustRateLimiter re-created the bucket.
-            // icn-net resets to full capacity.
-            // Let's reset to full capacity to be generous on upgrade, but maybe strict on downgrade?
-            // "Trust class changed, reconfiguring rate limit bucket" -> *bucket = TokenBucket::new(...)
-            // So it resets.
-            self.tokens = capacity;
             self.last_refill = Instant::now();
         }
     }
@@ -404,7 +404,17 @@ impl Default for CategoryRateLimiter {
 }
 
 /// IP-based rate limiter for unauthenticated endpoints (auth endpoints)
-/// Uses more aggressive limits to prevent DoS attacks
+///
+/// Uses more aggressive limits to prevent DoS attacks. This limiter is used
+/// for endpoints that don't have DID-based authentication yet.
+///
+/// # Security Limitation: IP Rotation
+///
+/// **Important**: Attackers can bypass IP-based rate limiting via IP rotation
+/// (e.g., using botnets, cloud instances, or Tor exit nodes). This limiter
+/// provides basic DoS mitigation but should not be relied upon as the sole
+/// defense. For authenticated endpoints, use DID-based rate limiting with
+/// personhood anchors for proper Sybil resistance.
 pub struct IpRateLimiter {
     buckets: Arc<RwLock<HashMap<String, TokenBucket>>>,
     config: RateLimitConfig,
