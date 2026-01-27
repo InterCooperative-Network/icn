@@ -43,7 +43,10 @@ pub type StorageContentNotFoundCallback =
 /// Maximum subscribers per topic to prevent memory exhaustion
 pub const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10000;
 
-// TrustLookup removed - use PolicyOracle
+// TrustLookup type alias for backward compatibility with legacy trust callbacks
+// This allows gradual migration to PolicyOracle while maintaining existing APIs
+pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>;
+
 // topics_per_peer_limit removed - use PolicyOracle constraints
 // TrustScoreCache removed - use PolicyOracle
 
@@ -144,10 +147,7 @@ pub struct GossipActor {
 
 impl GossipActor {
     /// Create a new gossip actor with legacy trust callback
-    pub fn new_with_legacy_trust(
-        own_did: Did,
-        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
-    ) -> Self {
+    pub fn new_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> Self {
         let oracle = Arc::new(LegacyTrustOracle {
             callback: trust_callback,
         });
@@ -1299,7 +1299,7 @@ pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
 /// Legacy adapter for trust lookup closures
 struct LegacyTrustOracle {
-    callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+    callback: TrustLookup,
 }
 
 impl PolicyOracle for LegacyTrustOracle {
@@ -1381,10 +1381,7 @@ impl GossipActor {
     }
 
     /// Spawn a gossip actor with a legacy trust callback
-    pub fn spawn_with_legacy_trust(
-        own_did: Did,
-        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
-    ) -> GossipHandle {
+    pub fn spawn_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> GossipHandle {
         let oracle = Arc::new(LegacyTrustOracle {
             callback: trust_callback,
         });
@@ -1394,7 +1391,7 @@ impl GossipActor {
     /// Spawn with trust graph (legacy signature for compatibility)
     pub fn spawn_with_trust_graph(
         own_did: Did,
-        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+        trust_callback: TrustLookup,
         _store: Option<Arc<icn_store::SledStore>>,
     ) -> GossipHandle {
         Self::spawn_with_legacy_trust(own_did, trust_callback)
