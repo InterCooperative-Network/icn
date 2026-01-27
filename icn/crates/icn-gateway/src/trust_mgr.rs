@@ -1006,11 +1006,12 @@ impl PolicyOracle for TrustPolicyOracle {
                     })
                 }
             } else {
-                // Log warning when DID parsing fails to aid debugging
+                // Log warning and track metric when DID parsing fails
                 warn!(
                     "TrustOracle: Failed to parse actor DID '{}', using default trust score",
                     target_str
                 );
+                metrics::counter!("trust_oracle_did_parse_failures_total").increment(1);
                 DEFAULT_TRUST_SCORE
             }
         } else {
