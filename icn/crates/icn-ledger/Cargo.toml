@@ -31,6 +31,7 @@ tempfile = "3.24"
 criterion = "0.5"
 rand = "0.8"
 icn-governance = { path = "../icn-governance" }
+icn-kernel-api = { path = "../icn-kernel-api" }
 
 [[bench]]
 name = "ledger_bench"

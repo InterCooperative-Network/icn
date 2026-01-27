@@ -11,7 +11,7 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, Violation};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -58,11 +58,7 @@ impl TestNode {
             })
         });
 
-        let gossip = GossipActor::spawn_with_trust_graph(
-            did.clone(),
-            trust_lookup,
-            Some(trust_graph.clone()),
-        );
+        let gossip = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
 
         // Set keypair for signing
         {
@@ -178,7 +174,7 @@ async fn test_acl_violation_rate_limit_quarantine() -> Result<()> {
         let mut gossip = node1.gossip.write().await;
         let topic = Topic::new(
             "private:data".to_string(),
-            AccessControl::TrustClass(TrustClass::Partner),
+            AccessControl::MinTrustScore(0.5),
         );
         gossip.create_topic(topic);
     }

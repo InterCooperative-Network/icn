@@ -10,11 +10,14 @@ use icn_core::resource_enforcer_actor::{
     ResourceAccessStore, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
 };
 use icn_entity::EntityId;
-use icn_gossip::{gossip::TrustLookup, GossipActor};
+use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
 use icn_ledger::{AccessModel, AntiSpeculationRules, ResourceAccess};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+type TrustLookup =
+    Arc<dyn Fn(&icn_identity::Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>;
 
 /// Wait time for async gossip publication tasks to complete.
 /// 200ms provides margin for multi-node scenarios where gossip

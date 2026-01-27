@@ -804,7 +804,7 @@ mod tests {
         // RateLimit::new(messages_per_second, burst_size)
         // burst_size is used as the bucket capacity
         let oracle = Arc::new(MutableOracle {
-            first_limit: RateLimit::new(10, 10), // capacity=10
+            first_limit: RateLimit::new(10, 10),    // capacity=10
             upgraded_limit: RateLimit::new(50, 50), // capacity=50
             upgraded: std::sync::atomic::AtomicBool::new(false),
         });

@@ -49,7 +49,10 @@ impl GossipActor {
                     limits = ResourceLimits::from_constraints(&constraints);
                 }
                 PolicyDecision::Deny { reason } => {
-                    warn!("PolicyOracle denied subscription for {}: {}", subscriber, reason);
+                    warn!(
+                        "PolicyOracle denied subscription for {}: {}",
+                        subscriber, reason
+                    );
                     bail!("Subscription denied by policy: {}", reason);
                 }
             }

@@ -79,7 +79,7 @@ impl MultiStateNode {
             })
         });
 
-        let mut gossip = GossipActor::new(did.clone(), trust_lookup);
+        let mut gossip = GossipActor::new_with_legacy_trust(did.clone(), trust_lookup);
         gossip.set_keypair(keypair.clone());
 
         // Create partition detection components

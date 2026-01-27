@@ -143,6 +143,17 @@ pub struct GossipActor {
 }
 
 impl GossipActor {
+    /// Create a new gossip actor with legacy trust callback
+    pub fn new_with_legacy_trust(
+        own_did: Did,
+        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+    ) -> Self {
+        let oracle = Arc::new(LegacyTrustOracle {
+            callback: trust_callback,
+        });
+        Self::new(own_did, Some(oracle))
+    }
+
     /// Create a new gossip actor
     pub fn new(own_did: Did, oracle: Option<Arc<dyn PolicyOracle>>) -> Self {
         let mut gossip = GossipActor {
@@ -1286,11 +1297,107 @@ impl GossipActor {
 /// Shared gossip actor handle
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
+/// Legacy adapter for trust lookup closures
+struct LegacyTrustOracle {
+    callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+}
+
+impl PolicyOracle for LegacyTrustOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        use icn_trust::TrustClass;
+
+        let did_str = &request.core.actor;
+        let did = match did_str.parse::<Did>() {
+            Ok(d) => d,
+            Err(_) => {
+                return PolicyDecision::Deny {
+                    reason: icn_kernel_api::authz::PolicyError::Denied(format!(
+                        "Invalid DID: {}",
+                        did_str
+                    )),
+                }
+            }
+        };
+
+        if let Some(trust_class) = (self.callback)(&did) {
+            let mut constraints = icn_kernel_api::authz::ConstraintSet::default();
+
+            match trust_class {
+                TrustClass::Federated => {
+                    constraints = constraints
+                        .with_max_subscriptions(1000)
+                        .with_max_outstanding_requests(3)
+                        .with_max_message_size(1024 * 1024);
+                    constraints
+                        .custom
+                        .insert("trust_score".to_string(), 0.8.into());
+                }
+                TrustClass::Partner => {
+                    constraints = constraints
+                        .with_max_subscriptions(500)
+                        .with_max_outstanding_requests(3)
+                        .with_max_message_size(1024 * 1024);
+                    constraints
+                        .custom
+                        .insert("trust_score".to_string(), 0.5.into());
+                }
+                TrustClass::Known => {
+                    constraints = constraints
+                        .with_max_subscriptions(100)
+                        .with_max_outstanding_requests(2)
+                        .with_max_message_size(256 * 1024);
+                    constraints
+                        .custom
+                        .insert("trust_score".to_string(), 0.2.into());
+                }
+                TrustClass::Isolated => {
+                    constraints = constraints
+                        .with_max_subscriptions(10)
+                        .with_max_outstanding_requests(1)
+                        .with_max_message_size(64 * 1024);
+                    constraints
+                        .custom
+                        .insert("trust_score".to_string(), 0.05.into());
+                }
+            }
+            PolicyDecision::Allow { constraints }
+        } else {
+            PolicyDecision::Deny {
+                reason: icn_kernel_api::authz::PolicyError::Denied("Untrusted".to_string()),
+            }
+        }
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
+
 impl GossipActor {
     /// Spawn a gossip actor and return a handle
     pub fn spawn(own_did: Did, oracle: Option<Arc<dyn PolicyOracle>>) -> GossipHandle {
         let actor = GossipActor::new(own_did, oracle);
         Arc::new(RwLock::new(actor))
+    }
+
+    /// Spawn a gossip actor with a legacy trust callback
+    pub fn spawn_with_legacy_trust(
+        own_did: Did,
+        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+    ) -> GossipHandle {
+        let oracle = Arc::new(LegacyTrustOracle {
+            callback: trust_callback,
+        });
+        Self::spawn(own_did, Some(oracle))
+    }
+
+    /// Spawn with trust graph (legacy signature for compatibility)
+    pub fn spawn_with_trust_graph(
+        own_did: Did,
+        trust_callback: Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>,
+        _store: Option<Arc<icn_store::SledStore>>,
+    ) -> GossipHandle {
+        Self::spawn_with_legacy_trust(own_did, trust_callback)
     }
 }
 
@@ -1420,8 +1527,6 @@ pub fn start_partition_checker(
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
-
-    use super::*;
 
     use icn_kernel_api::authz::{
         ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,

@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use icn_gossip::{AccessControl, GossipActor, GossipEntry, GossipMessage, Topic};
 use icn_identity::{Did, IdentityBundle, KeyPair};
+use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_net::{
     IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage,
 };
@@ -74,6 +75,68 @@ impl Default for NodeConfig {
     }
 }
 
+/// Simple PolicyOracle for tests that applies default trust class logic
+pub struct TestPolicyOracle {
+    default_trust: TrustClass,
+}
+
+impl TestPolicyOracle {
+    pub fn new(default_trust: TrustClass) -> Self {
+        Self { default_trust }
+    }
+}
+
+impl PolicyOracle for TestPolicyOracle {
+    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+        let mut constraints = ConstraintSet::default();
+
+        // Populate standard fields based on default trust class
+        match self.default_trust {
+            TrustClass::Federated => {
+                constraints = constraints
+                    .with_max_subscriptions(1000)
+                    .with_max_outstanding_requests(3)
+                    .with_max_message_size(1024 * 1024);
+            }
+            TrustClass::Partner => {
+                constraints = constraints
+                    .with_max_subscriptions(500)
+                    .with_max_outstanding_requests(3)
+                    .with_max_message_size(1024 * 1024);
+            }
+            TrustClass::Known => {
+                constraints = constraints
+                    .with_max_subscriptions(100)
+                    .with_max_outstanding_requests(2)
+                    .with_max_message_size(256 * 1024);
+            }
+            TrustClass::Isolated => {
+                constraints = constraints
+                    .with_max_subscriptions(10)
+                    .with_max_outstanding_requests(1)
+                    .with_max_message_size(64 * 1024);
+            }
+        }
+
+        // Also inject trust score for compatibility with any custom checks
+        let score = match self.default_trust {
+            TrustClass::Federated => 0.8,
+            TrustClass::Partner => 0.5,
+            TrustClass::Known => 0.2,
+            TrustClass::Isolated => 0.05,
+        };
+        constraints
+            .custom
+            .insert("trust_score".to_string(), score.into());
+
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
+
 /// A fully-functional test node with isolated state
 ///
 /// TestNode provides a complete ICN node suitable for integration testing.
@@ -132,12 +195,15 @@ impl TestNode {
         // Create storage
         let store = Arc::new(SledStore::temporary().context("Failed to create temp storage")?);
 
-        // Create trust lookup with configurable default
-        let default_trust = config.default_trust_class;
-        let trust_lookup = Arc::new(move |_did: &Did| Some(default_trust));
+        // Create policy oracle with configurable default
+        let oracle = Arc::new(TestPolicyOracle::new(config.default_trust_class));
 
         // Spawn gossip actor
-        let gossip = GossipActor::spawn(did.clone(), trust_lookup);
+        // Note: GossipActor::spawn is gone, use GossipActor::new + manual wrapping?
+        // Or if GossipActor::spawn is updated to take oracle, use that.
+        // The error message said: associated function defined here --> .../gossip.rs:1291:12 pub fn spawn...
+        // So GossipActor::spawn exists but takes Option<Arc<dyn PolicyOracle>>.
+        let gossip = GossipActor::spawn(did.clone(), Some(oracle));
 
         // Set up notification tracking
         let notifications = Arc::new(Mutex::new(NotificationMap::new()));

@@ -281,7 +281,6 @@ mod tests {
     use crate::types::GossipEntry;
     use crate::GossipActor;
     use icn_identity::KeyPair;
-    use std::sync::Arc;
 
     fn create_test_actor() -> GossipActor {
         let keypair = KeyPair::generate().unwrap();

@@ -49,7 +49,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
 
     // 3. Create gossip actor (required for governance)
     let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-    let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+    let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
     info!("Created gossip actor");
 

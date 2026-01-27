@@ -154,7 +154,10 @@ impl ResourceAccessStore for GossipResourceAccessStore {
 mod tests {
     use super::*;
     use icn_entity::EntityId;
-    use icn_gossip::gossip::TrustLookup;
+    // use icn_gossip::gossip::TrustLookup;
+    type TrustLookup = std::sync::Arc<
+        dyn Fn(&icn_identity::Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static,
+    >;
     use icn_identity::KeyPair;
     use icn_ledger::{AccessModel, ResourceAccess};
     use std::collections::HashMap;

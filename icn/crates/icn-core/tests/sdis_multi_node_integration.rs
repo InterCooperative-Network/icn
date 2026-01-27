@@ -54,7 +54,7 @@ impl SdisTestNode {
                     Err(_) => Some(TrustClass::Known),
                 },
             );
-        let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         {
             let mut gossip = gossip_handle.write().await;

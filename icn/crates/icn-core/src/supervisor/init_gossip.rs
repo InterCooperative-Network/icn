@@ -54,17 +54,97 @@ pub struct GossipDeps {
 /// - Sets up partition detection and healing
 /// - Initializes storage quota management
 /// - Spawns replication manager
+use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
+
+/// Adapter to expose TrustGraph as a PolicyOracle for GossipActor
+pub struct TrustGraphOracle {
+    trust_graph: Arc<RwLock<TrustGraph>>,
+}
+
+impl TrustGraphOracle {
+    pub fn new(trust_graph: Arc<RwLock<TrustGraph>>) -> Self {
+        Self { trust_graph }
+    }
+}
+
+impl PolicyOracle for TrustGraphOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        // Use block_in_place because we are likely in an async context but need to read the lock
+        // However, PolicyOracle::evaluate is synchronous.
+        // We should try to use referencing if possible or blocking.
+        // Since TrustGraph is RwLock, we need to read it.
+        // We utilize tokio::task::block_in_place for the synchronous trait method.
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.trust_graph.read().await;
+                // Extract actor DID from request
+                let subject_did_str = &request.core.actor;
+                let trust_score =
+                    if let Ok(subject_did) = subject_did_str.parse::<icn_identity::Did>() {
+                        graph.compute_trust_score(&subject_did).unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
+
+                let mut constraints = ConstraintSet::default();
+                constraints
+                    .custom
+                    .insert("trust_score".to_string(), trust_score.into());
+
+                // Populate standard fields based on trust score (similar to MockPolicyOracle in tests)
+                // This ensures resource limits are applied correctly by the kernel
+                if trust_score >= 0.7 {
+                    constraints = constraints
+                        .with_max_subscriptions(1000)
+                        .with_max_outstanding_requests(3)
+                        .with_max_message_size(1024 * 1024);
+                } else if trust_score >= 0.4 {
+                    constraints = constraints
+                        .with_max_subscriptions(500)
+                        .with_max_outstanding_requests(3)
+                        .with_max_message_size(1024 * 1024);
+                } else if trust_score >= 0.1 {
+                    constraints = constraints
+                        .with_max_subscriptions(100)
+                        .with_max_outstanding_requests(2)
+                        .with_max_message_size(256 * 1024);
+                } else {
+                    constraints = constraints
+                        .with_max_subscriptions(10)
+                        .with_max_outstanding_requests(1)
+                        .with_max_message_size(64 * 1024);
+                }
+
+                PolicyDecision::Allow { constraints }
+            })
+        })
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
+
+/// Initialize gossip services
+///
+/// Creates:
+/// - GossipActor with trust-gated subscriptions
+/// - Restores state from snapshot if available
+/// - Sets up partition detection and healing
+/// - Initializes storage quota management
+/// - Spawns replication manager
 pub async fn init_gossip_services(
     config: &Config,
     did: Did,
     deps: GossipDeps,
 ) -> anyhow::Result<GossipServices> {
-    // Spawn Gossip actor with trust graph for fine-grained trust-based subscription control
-    let gossip_handle = GossipActor::spawn_with_trust_graph(
-        did.clone(),
-        deps.trust_lookup,
-        Some(deps.trust_graph.clone()),
-    );
+    // Create PolicyOracle adapter for TrustGraph
+    let oracle = Arc::new(TrustGraphOracle::new(deps.trust_graph.clone()));
+
+    // Spawn Gossip actor with policy oracle
+    let gossip = GossipActor::new(did.clone(), Some(oracle));
+    let gossip_handle = Arc::new(RwLock::new(gossip));
 
     info!("Gossip actor spawned with trust-gated subscription support");
 

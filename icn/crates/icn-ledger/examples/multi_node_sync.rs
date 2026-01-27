@@ -9,11 +9,30 @@
 
 use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
+use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_ledger::{entry::JournalEntryBuilder, Ledger, LedgerSyncMessage};
 use icn_store::SledStore;
-use icn_trust::TrustClass;
 use std::sync::Arc;
 use tempfile::TempDir;
+
+struct MockPolicyOracle;
+impl PolicyOracle for MockPolicyOracle {
+    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+        let mut constraints = ConstraintSet::default();
+        constraints = constraints
+            .with_max_subscriptions(500)
+            .with_max_outstanding_requests(3)
+            .with_max_message_size(1024 * 1024);
+        constraints
+            .custom
+            .insert("trust_score".to_string(), 0.5.into());
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
 
 struct Node {
     _name: String,
@@ -31,8 +50,8 @@ impl Node {
         let did = keypair.did().clone();
 
         // Create gossip actor
-        let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
-        let gossip = GossipActor::spawn(did, trust_lookup);
+        let oracle = Arc::new(MockPolicyOracle);
+        let gossip = GossipActor::spawn(did, Some(oracle));
 
         // Create ledger with gossip
         let mut ledger = Ledger::new(store).unwrap();

@@ -58,7 +58,7 @@ impl TestNode {
 
         // Spawn gossip actor
         let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         info!("Gossip actor spawned");
 

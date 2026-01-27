@@ -27,6 +27,7 @@ rand.workspace = true
 
 # Crypto provider for TLS
 rustls.workspace = true
+icn-kernel-api = { version = "0.1.0", path = "../icn-kernel-api" }
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
