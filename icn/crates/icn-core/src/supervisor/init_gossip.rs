@@ -69,56 +69,67 @@ impl TrustGraphOracle {
 
 impl PolicyOracle for TrustGraphOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        // Use block_in_place because we are likely in an async context but need to read the lock
-        // However, PolicyOracle::evaluate is synchronous.
-        // We should try to use referencing if possible or blocking.
-        // Since TrustGraph is RwLock, we need to read it.
-        // We utilize tokio::task::block_in_place for the synchronous trait method.
-        tokio::task::block_in_place(|| {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                let graph = self.trust_graph.read().await;
-                // Extract actor DID from request
+        // Use try_read() to avoid blocking the Tokio runtime.
+        // If the lock is unavailable, return restricted constraints.
+        // This follows the "fail-safe" principle: when trust can't be verified,
+        // apply the most restrictive policy.
+        //
+        // NOTE: For high-throughput scenarios, consider Issue #874 (async PolicyOracle)
+        // or pre-computing trust scores in a background task.
+        let trust_score = match self.trust_graph.try_read() {
+            Ok(graph) => {
                 let subject_did_str = &request.core.actor;
-                let trust_score =
-                    if let Ok(subject_did) = subject_did_str.parse::<icn_identity::Did>() {
-                        graph.compute_trust_score(&subject_did).unwrap_or(0.0)
-                    } else {
-                        0.0
-                    };
-
-                let mut constraints = ConstraintSet::default();
-                constraints
-                    .custom
-                    .insert("trust_score".to_string(), trust_score.into());
-
-                // Populate standard fields based on trust score (similar to MockPolicyOracle in tests)
-                // This ensures resource limits are applied correctly by the kernel
-                if trust_score >= 0.7 {
-                    constraints = constraints
-                        .with_max_subscriptions(1000)
-                        .with_max_outstanding_requests(3)
-                        .with_max_message_size(1024 * 1024);
-                } else if trust_score >= 0.4 {
-                    constraints = constraints
-                        .with_max_subscriptions(500)
-                        .with_max_outstanding_requests(3)
-                        .with_max_message_size(1024 * 1024);
-                } else if trust_score >= 0.1 {
-                    constraints = constraints
-                        .with_max_subscriptions(100)
-                        .with_max_outstanding_requests(2)
-                        .with_max_message_size(256 * 1024);
+                if let Ok(subject_did) = subject_did_str.parse::<icn_identity::Did>() {
+                    graph.compute_trust_score(&subject_did).unwrap_or(0.0)
                 } else {
-                    constraints = constraints
-                        .with_max_subscriptions(10)
-                        .with_max_outstanding_requests(1)
-                        .with_max_message_size(64 * 1024);
+                    tracing::warn!(
+                        actor = %subject_did_str,
+                        "Failed to parse DID in PolicyOracle, using default trust score 0.0"
+                    );
+                    0.0
                 }
+            }
+            Err(_) => {
+                // Lock is held by another task - use default restrictive score.
+                // This is a performance trade-off to avoid blocking.
+                tracing::debug!(
+                    actor = %request.core.actor,
+                    "TrustGraph lock unavailable, using default trust score 0.0"
+                );
+                0.0
+            }
+        };
 
-                PolicyDecision::Allow { constraints }
-            })
-        })
+        let mut constraints = ConstraintSet::default();
+        constraints
+            .custom
+            .insert("trust_score".to_string(), trust_score.into());
+
+        // Populate standard fields based on trust score (matches MockPolicyOracle in tests)
+        // This ensures resource limits are applied correctly by the kernel
+        if trust_score >= 0.7 {
+            constraints = constraints
+                .with_max_subscriptions(1000)
+                .with_max_outstanding_requests(3)
+                .with_max_message_size(1024 * 1024);
+        } else if trust_score >= 0.4 {
+            constraints = constraints
+                .with_max_subscriptions(500)
+                .with_max_outstanding_requests(3)
+                .with_max_message_size(1024 * 1024);
+        } else if trust_score >= 0.1 {
+            constraints = constraints
+                .with_max_subscriptions(100)
+                .with_max_outstanding_requests(2)
+                .with_max_message_size(256 * 1024);
+        } else {
+            constraints = constraints
+                .with_max_subscriptions(10)
+                .with_max_outstanding_requests(1)
+                .with_max_message_size(64 * 1024);
+        }
+
+        PolicyDecision::Allow { constraints }
     }
 
     fn domain(&self) -> Domain {

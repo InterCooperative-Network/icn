@@ -43,8 +43,15 @@ pub type StorageContentNotFoundCallback =
 /// Maximum subscribers per topic to prevent memory exhaustion
 pub const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10000;
 
-// TrustLookup type alias for backward compatibility with legacy trust callbacks
-// This allows gradual migration to PolicyOracle while maintaining existing APIs
+/// Legacy trust lookup callback type.
+///
+/// **DEPRECATED**: This type exists for backward compatibility with code using closure-based
+/// trust lookups. New code should use `PolicyOracle` directly.
+///
+/// Migration path:
+/// 1. Replace `TrustLookup` closures with `PolicyOracle` implementations
+/// 2. Use `GossipActor::spawn()` instead of `spawn_with_legacy_trust()`
+/// 3. See `apps/trust/src/oracle.rs` for the canonical `TrustPolicyOracle` implementation
 pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>;
 
 // topics_per_peer_limit removed - use PolicyOracle constraints
@@ -146,7 +153,10 @@ pub struct GossipActor {
 }
 
 impl GossipActor {
-    /// Create a new gossip actor with legacy trust callback
+    /// Create a new gossip actor with legacy trust callback.
+    ///
+    /// **DEPRECATED**: Use `GossipActor::new()` with a `PolicyOracle` implementation instead.
+    /// See `TrustPolicyOracle` in `apps/trust/src/oracle.rs` for the migration target.
     pub fn new_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> Self {
         let oracle = Arc::new(LegacyTrustOracle {
             callback: trust_callback,
@@ -1297,7 +1307,10 @@ impl GossipActor {
 /// Shared gossip actor handle
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
-/// Legacy adapter for trust lookup closures
+/// Legacy adapter for trust lookup closures.
+///
+/// **DEPRECATED**: This is an internal adapter for legacy code.
+/// New code should use `PolicyOracle` directly.
 struct LegacyTrustOracle {
     callback: TrustLookup,
 }
@@ -1380,7 +1393,9 @@ impl GossipActor {
         Arc::new(RwLock::new(actor))
     }
 
-    /// Spawn a gossip actor with a legacy trust callback
+    /// Spawn a gossip actor with a legacy trust callback.
+    ///
+    /// **DEPRECATED**: Use `GossipActor::spawn()` with a `PolicyOracle` implementation instead.
     pub fn spawn_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> GossipHandle {
         let oracle = Arc::new(LegacyTrustOracle {
             callback: trust_callback,
@@ -1388,7 +1403,9 @@ impl GossipActor {
         Self::spawn(own_did, Some(oracle))
     }
 
-    /// Spawn with trust graph (legacy signature for compatibility)
+    /// Spawn with trust graph (legacy signature for compatibility).
+    ///
+    /// **DEPRECATED**: Use `GossipActor::spawn()` with a `PolicyOracle` implementation instead.
     pub fn spawn_with_trust_graph(
         own_did: Did,
         trust_callback: TrustLookup,
