@@ -220,7 +220,6 @@ use crate::domain::GovernanceDomainId;
 use crate::Timestamp;
 use icn_federation::SettlementInterval;
 use icn_identity::Did;
-use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -916,8 +915,8 @@ pub enum MembershipAction {
 /// Specifies the obligations and expectations when a cooperative joins a federation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FederationTerms {
-    /// Required trust threshold for federation membership
-    pub min_trust_threshold: TrustScore,
+    /// Required trust threshold for federation membership (0.0-1.0)
+    pub min_trust_threshold: f64,
     /// Whether the cooperative agrees to follow federation governance
     pub governance_binding: bool,
     /// Data sharing level (none, metadata_only, full)
@@ -929,7 +928,7 @@ pub struct FederationTerms {
 impl Default for FederationTerms {
     fn default() -> Self {
         Self {
-            min_trust_threshold: TrustScore::unchecked(0.5),
+            min_trust_threshold: 0.5,
             governance_binding: true,
             data_sharing_level: DataSharingLevel::MetadataOnly,
             dispute_resolution: DisputeResolutionMethod::FederationMediation,
@@ -941,10 +940,16 @@ impl FederationTerms {
     /// Validate the federation terms
     ///
     /// Returns an error message if validation fails.
-    ///
-    /// Note: TrustScore values are already validated at construction time,
-    /// so min_trust_threshold is guaranteed to be in range [0.0, 1.0].
     pub fn validate(&self) -> Result<(), String> {
+        // Validate trust threshold range
+        if !(0.0..=1.0).contains(&self.min_trust_threshold) || !self.min_trust_threshold.is_finite()
+        {
+            return Err(format!(
+                "min_trust_threshold must be between 0.0 and 1.0, got {}",
+                self.min_trust_threshold
+            ));
+        }
+
         // Validate dispute resolution-specific fields
         if let DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id } =
             &self.dispute_resolution
@@ -1077,8 +1082,8 @@ pub enum FederationProposal {
     UpdateFederationPolicy {
         /// New auto-accept threshold for incoming vouches (-1.0 to disable)
         auto_accept_vouch_threshold: Option<f64>,
-        /// New default trust decay factor for attestations
-        trust_decay_factor: Option<TrustScore>,
+        /// New default trust decay factor for attestations (0.0-1.0)
+        trust_decay_factor: Option<f64>,
         /// New maximum attestations per minute (rate limiting)
         max_attestations_per_minute: Option<u32>,
     },
@@ -1197,7 +1202,7 @@ impl FederationProposal {
             }
             FederationProposal::UpdateFederationPolicy {
                 auto_accept_vouch_threshold,
-                trust_decay_factor: _,
+                trust_decay_factor,
                 max_attestations_per_minute,
             } => {
                 if let Some(threshold) = auto_accept_vouch_threshold {
@@ -1208,7 +1213,14 @@ impl FederationProposal {
                         ));
                     }
                 }
-                // trust_decay_factor: TrustScore is already validated at construction
+                // Validate trust_decay_factor if present
+                if let Some(factor) = trust_decay_factor {
+                    if !factor.is_finite() || !(0.0..=1.0).contains(factor) {
+                        return Err(format!(
+                            "trust_decay_factor must be between 0.0 and 1.0, got {factor}"
+                        ));
+                    }
+                }
                 if let Some(rate) = max_attestations_per_minute {
                     if *rate == 0 {
                         return Err(
@@ -1784,7 +1796,7 @@ mod tests {
         let domain_id = GovernanceDomainId::new("test-coop");
 
         let terms = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(0.6),
+            min_trust_threshold: 0.6,
             governance_binding: true,
             data_sharing_level: DataSharingLevel::MetadataOnly,
             dispute_resolution: DisputeResolutionMethod::FederationMediation,
@@ -1980,7 +1992,7 @@ mod tests {
     #[test]
     fn test_federation_terms_default() {
         let terms = FederationTerms::default();
-        assert!((terms.min_trust_threshold.value() - 0.5).abs() < 0.001);
+        assert!((terms.min_trust_threshold - 0.5).abs() < 0.001);
         assert!(terms.governance_binding);
         assert_eq!(terms.data_sharing_level, DataSharingLevel::MetadataOnly);
         assert_eq!(
@@ -1995,20 +2007,29 @@ mod tests {
         let valid_terms = FederationTerms::default();
         assert!(valid_terms.validate().is_ok());
 
-        // TrustScore validates range at construction time, not at validate() time.
-        // Test that TrustScore::new() rejects invalid values:
-        assert!(TrustScore::new(1.5).is_err()); // Too high
-        assert!(TrustScore::new(-0.1).is_err()); // Negative
+        // FederationTerms.validate() now validates range on f64 directly.
+        // Test that validate() rejects invalid values:
+        let invalid_high = FederationTerms {
+            min_trust_threshold: 1.5, // Too high
+            ..Default::default()
+        };
+        assert!(invalid_high.validate().is_err());
+
+        let invalid_negative = FederationTerms {
+            min_trust_threshold: -0.1, // Negative
+            ..Default::default()
+        };
+        assert!(invalid_negative.validate().is_err());
 
         // Edge cases that should be valid
         let edge_zero = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(0.0),
+            min_trust_threshold: 0.0,
             ..Default::default()
         };
         assert!(edge_zero.validate().is_ok());
 
         let edge_one = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(1.0),
+            min_trust_threshold: 1.0,
             ..Default::default()
         };
         assert!(edge_one.validate().is_ok());
@@ -2099,10 +2120,9 @@ mod tests {
             .unwrap_err()
             .contains("max_imbalance"));
 
-        // Valid policy update with -1.0 (disabled)
         let valid_policy = FederationProposal::UpdateFederationPolicy {
             auto_accept_vouch_threshold: Some(-1.0),
-            trust_decay_factor: Some(TrustScore::unchecked(0.5)),
+            trust_decay_factor: Some(0.5),
             max_attestations_per_minute: Some(10),
         };
         assert!(valid_policy.validate().is_ok());
@@ -2162,9 +2182,14 @@ mod tests {
             .unwrap_err()
             .contains("federation_id"));
 
-        // JoinFederation validation - TrustScore validates range at construction time,
-        // not at FederationProposal::validate() time. Test that TrustScore rejects invalid values:
-        assert!(TrustScore::new(1.5).is_err());
+        // FederationTerms.validate() now validates min_trust_threshold as f64.
+        // Invalid values will be rejected by validate()
+        let invalid_threshold = FederationTerms {
+            min_trust_threshold: 1.5, // Too high
+            ..Default::default()
+        };
+        assert!(invalid_threshold.validate().is_err());
+
         // Valid terms should pass validation
         let valid_terms_join = FederationProposal::JoinFederation {
             federation_id: "test-fed".to_string(),
@@ -2269,7 +2294,7 @@ mod tests {
             },
             FederationProposal::UpdateFederationPolicy {
                 auto_accept_vouch_threshold: Some(0.7),
-                trust_decay_factor: Some(TrustScore::unchecked(0.05)),
+                trust_decay_factor: Some(0.05),
                 max_attestations_per_minute: Some(30),
             },
         ];
@@ -2284,7 +2309,7 @@ mod tests {
     #[test]
     fn test_federation_terms_serialization_roundtrip() {
         let terms = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(0.7),
+            min_trust_threshold: 0.7,
             governance_binding: true,
             data_sharing_level: DataSharingLevel::Full,
             dispute_resolution: DisputeResolutionMethod::FederationVote,
@@ -2293,10 +2318,7 @@ mod tests {
         let json = serde_json::to_string(&terms).unwrap();
         let deserialized: FederationTerms = serde_json::from_str(&json).unwrap();
 
-        assert!(
-            (terms.min_trust_threshold.value() - deserialized.min_trust_threshold.value()).abs()
-                < 0.001
-        );
+        assert!((terms.min_trust_threshold - deserialized.min_trust_threshold).abs() < 0.001);
         assert_eq!(terms.governance_binding, deserialized.governance_binding);
         assert_eq!(terms.data_sharing_level, deserialized.data_sharing_level);
         assert_eq!(terms.dispute_resolution, deserialized.dispute_resolution);

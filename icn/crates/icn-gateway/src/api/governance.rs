@@ -28,7 +28,6 @@ use icn_governance::{
     VoteChoice,
 };
 use icn_identity::Did;
-use icn_trust::TrustScore;
 use icn_obs::metrics::{action_items, gateway};
 
 // ============================================================================
@@ -1025,7 +1024,7 @@ pub async fn create_join_federation_proposal(
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.federation_id)?;
-    // TrustScore is already validated during deserialization
+    // Validate trust score (f64 is validated by gateway, not during deserialization)
     let data_sharing_level_str =
         validation::validate_data_sharing_level(&req.terms.data_sharing_level)?;
     let dispute_resolution_str =
@@ -1035,13 +1034,12 @@ pub async fn create_join_federation_proposal(
     let data_sharing_level = parse_data_sharing_level(&data_sharing_level_str)?;
     let dispute_resolution = parse_dispute_resolution(&dispute_resolution_str)?;
 
-    // Validate and convert trust score from f64 to TrustScore
+    // Validate trust score
     validation::validate_trust_score(req.terms.min_trust_threshold)?;
-    let min_trust_threshold = TrustScore::unchecked(req.terms.min_trust_threshold);
 
-    // Build FederationTerms
+    // Build FederationTerms (governance types now use f64 directly)
     let terms = FederationTerms {
-        min_trust_threshold,
+        min_trust_threshold: req.terms.min_trust_threshold,
         governance_binding: req.terms.governance_binding,
         data_sharing_level,
         dispute_resolution,
@@ -1229,14 +1227,10 @@ pub async fn create_update_federation_policy_proposal(
         ));
     }
 
-    // Validate and convert trust_decay_factor if present
-    validation::validate_trust_decay_factor(req.trust_decay_factor)?;
-    let trust_decay_factor = req.trust_decay_factor.map(TrustScore::unchecked);
-
-    // Build FederationProposal
+    // Build FederationProposal (governance types now use f64 directly)
     let fed_proposal = FederationProposal::UpdateFederationPolicy {
         auto_accept_vouch_threshold: req.auto_accept_vouch_threshold,
-        trust_decay_factor,
+        trust_decay_factor: req.trust_decay_factor,
         max_attestations_per_minute: req.max_attestations_per_minute,
     };
 
