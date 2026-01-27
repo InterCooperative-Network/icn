@@ -115,7 +115,7 @@ pub async fn create_trust_attestation(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
     let from = from_did.into_inner();
-    
+
     trust_manager
         .add_edge_with_score(from.clone(), to_did.clone(), req.score, req.memo.clone())
         .await
