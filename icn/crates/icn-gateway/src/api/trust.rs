@@ -1,14 +1,13 @@
 //! Trust API endpoints
 
-use actix_web::{get, post, web, HttpResponse};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use utoipa::ToSchema;
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::trust_mgr::TrustManager;
+use actix_web::{get, post, web, HttpResponse};
 use icn_identity::Did;
-// TrustScore removed
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use utoipa::ToSchema;
 
 /// Trust score response
 #[derive(Debug, Serialize, ToSchema)]
