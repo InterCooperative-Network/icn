@@ -178,6 +178,10 @@ pub fn init_descriptions() {
         "icn_network_blob_registry_entries",
         "Current number of blob location entries in the registry"
     );
+    describe_counter!(
+        "icn_personhood_store_failures_total",
+        "Total number of personhood store lookup failures (Sybil protection degraded)"
+    );
 }
 
 // Simple counters
@@ -550,4 +554,13 @@ pub fn personhood_required_rejections_inc() {
 /// Set the number of unique personhood anchors with active rate limit buckets
 pub fn personhood_anchors_active_set(count: usize) {
     gauge!("icn_personhood_anchors_active").set(count as f64);
+}
+
+/// Increment personhood store failure counter
+///
+/// Called when the personhood store lookup fails, causing rate limiting to
+/// fall back to per-DID limiting only (Sybil protection degraded).
+/// Operators should alert on this metric to detect storage issues.
+pub fn personhood_store_failures_inc() {
+    counter!("icn_personhood_store_failures_total").increment(1);
 }

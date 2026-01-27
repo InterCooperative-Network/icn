@@ -25,8 +25,11 @@ use tracing::{error, warn};
 
 use crate::auth::TokenClaims;
 use crate::error::GatewayError;
-use icn_identity::Did;
+use icn_kernel_api::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_obs::metrics::gateway;
+
+// Local definitions tailored for Gateway needs
+// (IpRateLimiter, VelocityLimiter, etc. are defined below)
 
 /// Endpoint category for differentiated rate limiting
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,6 +146,26 @@ impl TokenBucket {
         self.last_refill = now;
     }
 
+    /// Tolerance for floating point comparison (1e-6 is appropriate for user-configured values)
+    const CONFIG_EPSILON: f64 = 1e-6;
+
+    /// Update bucket configuration with proportional refill
+    fn update_config(&mut self, capacity: f64, refill_rate: f64) {
+        if (self.capacity - capacity).abs() > Self::CONFIG_EPSILON
+            || (self.refill_rate - refill_rate).abs() > Self::CONFIG_EPSILON
+        {
+            // Proportional refill: scale tokens by the capacity ratio to prevent
+            // exploitation via rapid trust cycling (repeatedly getting full buckets)
+            // Token bucket invariant: capacity should never be < 1.0 token
+            const MIN_CAPACITY_FOR_RATIO: f64 = 1.0;
+            let ratio = capacity / self.capacity.max(MIN_CAPACITY_FOR_RATIO);
+            self.tokens = (self.tokens * ratio).min(capacity);
+            self.capacity = capacity;
+            self.refill_rate = refill_rate;
+            self.last_refill = Instant::now();
+        }
+    }
+
     /// Try to consume tokens for a request
     fn try_consume(&mut self, tokens: f64) -> bool {
         self.refill();
@@ -216,6 +239,38 @@ impl RateLimiter {
             warn!(
                 "Rate limit exceeded for DID: {} (available: {:.2}, needed: {:.2})",
                 did, available, self.config.cost_per_request
+            );
+            // Track rate limit exceeded
+            gateway::rate_limit_exceeded_inc(did);
+            Err(GatewayError::RateLimitExceeded(did.to_string()))
+        }
+    }
+
+    /// Check if request should be allowed for a DID with a specific policy
+    pub fn check_rate_limit_with_policy(
+        &self,
+        did: &str,
+        config: &RateLimitConfig,
+    ) -> Result<(), GatewayError> {
+        let mut buckets = self.buckets.write().map_err(|e| {
+            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
+            GatewayError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
+
+        let bucket = buckets
+            .entry(did.to_string())
+            .or_insert_with(|| TokenBucket::new(config.capacity, config.refill_rate));
+
+        // Update bucket config if policy changed (e.g., trust upgrade)
+        bucket.update_config(config.capacity, config.refill_rate);
+
+        if bucket.try_consume(config.cost_per_request) {
+            Ok(())
+        } else {
+            let available = bucket.available();
+            warn!(
+                "Policy rate limit exceeded for DID: {} (available: {:.2}, needed: {:.2})",
+                did, available, config.cost_per_request
             );
             // Track rate limit exceeded
             gateway::rate_limit_exceeded_inc(did);
@@ -351,7 +406,17 @@ impl Default for CategoryRateLimiter {
 }
 
 /// IP-based rate limiter for unauthenticated endpoints (auth endpoints)
-/// Uses more aggressive limits to prevent DoS attacks
+///
+/// Uses more aggressive limits to prevent DoS attacks. This limiter is used
+/// for endpoints that don't have DID-based authentication yet.
+///
+/// # Security Limitation: IP Rotation
+///
+/// **Important**: Attackers can bypass IP-based rate limiting via IP rotation
+/// (e.g., using botnets, cloud instances, or Tor exit nodes). This limiter
+/// provides basic DoS mitigation but should not be relied upon as the sole
+/// defense. For authenticated endpoints, use DID-based rate limiting with
+/// personhood anchors for proper Sybil resistance.
 pub struct IpRateLimiter {
     buckets: Arc<RwLock<HashMap<String, TokenBucket>>>,
     config: RateLimitConfig,
@@ -429,202 +494,44 @@ impl IpRateLimiter {
 // Trust-Gated Rate Limiter (Issue #500)
 // ============================================================================
 
-/// Configuration for trust-gated rate limiting
-#[derive(Debug, Clone)]
-pub struct TrustRateLimitConfig {
-    /// Limits for isolated peers (untrusted, score < 0.1)
-    pub isolated_requests_per_sec: f64,
-    pub isolated_burst: f64,
-
-    /// Limits for known peers (limited trust, score 0.1-0.4)
-    pub known_requests_per_sec: f64,
-    pub known_burst: f64,
-
-    /// Limits for partner peers (trusted, score 0.4-0.7)
-    pub partner_requests_per_sec: f64,
-    pub partner_burst: f64,
-
-    /// Limits for federated peers (highly trusted, score 0.7+)
-    pub federated_requests_per_sec: f64,
-    pub federated_burst: f64,
-}
-
-impl Default for TrustRateLimitConfig {
-    fn default() -> Self {
-        Self {
-            isolated_requests_per_sec: 10.0,
-            isolated_burst: 2.0,
-            known_requests_per_sec: 50.0,
-            known_burst: 10.0,
-            partner_requests_per_sec: 100.0,
-            partner_burst: 20.0,
-            federated_requests_per_sec: 200.0,
-            federated_burst: 50.0,
-        }
-    }
-}
-
-impl TrustRateLimitConfig {
-    /// Get capacity and refill rate for a trust class
-    fn params_for_trust(&self, trust_score: f64) -> (f64, f64) {
-        if trust_score >= 0.7 {
-            (self.federated_burst, self.federated_requests_per_sec)
-        } else if trust_score >= 0.4 {
-            (self.partner_burst, self.partner_requests_per_sec)
-        } else if trust_score >= 0.1 {
-            (self.known_burst, self.known_requests_per_sec)
-        } else {
-            (self.isolated_burst, self.isolated_requests_per_sec)
-        }
-    }
-
-    /// Get trust class name for a score (for metrics)
-    fn trust_class_name(trust_score: f64) -> &'static str {
-        if trust_score >= 0.7 {
-            "federated"
-        } else if trust_score >= 0.4 {
-            "partner"
-        } else if trust_score >= 0.1 {
-            "known"
-        } else {
-            "isolated"
-        }
-    }
-}
-
-/// Trust-aware rate limiter
-///
-/// Applies different rate limits based on peer trust classification.
-/// Supports dynamic trust class changes - if a peer's trust increases,
-/// their rate limit is upgraded immediately.
-pub struct TrustRateLimiter {
-    /// Trust graph for trust score lookups
-    trust_manager: Arc<crate::trust_mgr::TrustManager>,
-
-    /// Token buckets per DID
-    buckets: Arc<RwLock<HashMap<String, (TokenBucket, f64)>>>, // (bucket, last_trust_score)
-
-    /// Configuration
-    config: TrustRateLimitConfig,
-}
-
-impl TrustRateLimiter {
-    /// Create a new trust-gated rate limiter
-    pub fn new(
-        trust_manager: Arc<crate::trust_mgr::TrustManager>,
-        config: TrustRateLimitConfig,
-    ) -> Self {
-        Self {
-            trust_manager,
-            buckets: Arc::new(RwLock::new(HashMap::new())),
-            config,
-        }
-    }
-
-    /// Check if request should be allowed for a DID
-    pub async fn check(&self, did: &str) -> Result<(), GatewayError> {
-        // Handle synthetic anonymous DIDs specially (always Isolated class)
-        // Format: did:icn:anonymous:{ip} - used by middleware for unauthenticated requests
-        let trust_score = if did.starts_with("did:icn:anonymous:") {
-            0.0 // Anonymous users are always Isolated
-        } else {
-            // Parse DID for trust lookup
-            let did_parsed = Did::from_str(did)
-                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {e}")))?;
-
-            // Get trust score for this DID from the node's perspective
-            self.trust_manager
-                .compute_trust_score_for_velocity(&did_parsed)
-                .await
-        };
-
-        // Get appropriate limits for this trust class
-        let (capacity, refill_rate) = self.config.params_for_trust(trust_score);
-        let trust_class = TrustRateLimitConfig::trust_class_name(trust_score);
-
-        // Get or create bucket for this DID
-        let mut buckets = self.buckets.write().map_err(|e| {
-            error!("CRITICAL: Rate limiter lock poisoned - indicates panic in another thread: {e}");
-            GatewayError::InternalError(format!("Lock poisoned: {e}"))
-        })?;
-
-        let (bucket, last_trust) = buckets
-            .entry(did.to_string())
-            .or_insert_with(|| (TokenBucket::new(capacity, refill_rate), trust_score));
-
-        // If trust class changed, update bucket configuration
-        let old_class = TrustRateLimitConfig::trust_class_name(*last_trust);
-        let new_class = TrustRateLimitConfig::trust_class_name(trust_score);
-        if old_class != new_class {
-            // Trust class boundary crossed, reconfigure bucket
-            tracing::debug!(
-                did = %did,
-                old_class = %old_class,
-                new_class = %new_class,
-                old_trust = %*last_trust,
-                new_trust = %trust_score,
-                "Trust class changed, reconfiguring rate limit bucket"
-            );
-            *bucket = TokenBucket::new(capacity, refill_rate);
-            *last_trust = trust_score;
-        }
-
-        // Try to consume a token
-        if bucket.try_consume(1.0) {
-            Ok(())
-        } else {
-            let available = bucket.available();
-            warn!(
-                "Trust-gated rate limit exceeded for DID: {} (trust: {:.2}, class: {}, available: {:.2})",
-                did, trust_score, trust_class, available
-            );
-
-            // Track rate limit exceeded with trust class
-            gateway::trust_rate_limit_exceeded_inc(trust_class);
-
-            Err(GatewayError::RateLimitExceeded(format!(
-                "{did} (trust class: {trust_class})"
-            )))
-        }
-    }
-
-    /// Clean up old buckets to prevent unbounded memory growth
-    pub fn cleanup_inactive_buckets(&self, inactive_duration: Duration) -> usize {
-        let mut buckets = match self.buckets.write() {
-            Ok(b) => b,
-            Err(_) => return 0,
-        };
-
-        let now = Instant::now();
-        let initial_count = buckets.len();
-
-        buckets.retain(|_, (bucket, _)| {
-            let elapsed = now.duration_since(bucket.last_refill);
-            elapsed < inactive_duration
-        });
-
-        initial_count - buckets.len()
-    }
-}
-
 /// Trust-gated rate limiting middleware
 ///
-/// Applies rate limits based on authenticated user's trust class.
-/// Anonymous/unauthenticated requests are treated as Isolated (lowest limits).
+/// Applies policy-based rate limits using the PolicyOracle.
+/// If an oracle is not available, falls back to regular rate limiting.
+/// **Fallback rate limit** when PolicyOracle doesn't supply explicit constraints.
+/// This matches the most restrictive (Isolated) trust class to fail-safe.
+/// In production, oracles should always supply explicit rate_limit constraints.
+const FALLBACK_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
+    capacity: 10.0,   // Matches Isolated class
+    refill_rate: 2.0, // Conservative sustained rate
+    cost_per_request: 1.0,
+};
+
+/// Trust-based rate limiting middleware using PolicyOracle
 ///
-/// When trust rate limiting is not configured, falls back to regular rate limiting
-/// using the standard RateLimiter for consistent protection.
+/// Evaluates policy for each request and applies appropriate rate limits
+/// based on the caller's trust level or constraints returned by the oracle.
 pub async fn trust_rate_limit_middleware(
     req: ServiceRequest,
     next: actix_web::middleware::Next<actix_web::body::BoxBody>,
 ) -> Result<actix_web::dev::ServiceResponse, Error> {
-    // Get trust rate limiter from app data
-    let trust_limiter = req.app_data::<actix_web::web::Data<Arc<TrustRateLimiter>>>();
+    // Get PolicyOracle and RateLimiter from app data
+    let oracle = req.app_data::<actix_web::web::Data<Arc<dyn PolicyOracle>>>();
+    let rate_limiter = req.app_data::<actix_web::web::Data<Arc<RateLimiter>>>();
 
-    // If trust rate limiter not configured, fall back to regular rate limiting
-    let rate_limiter = match trust_limiter {
-        Some(limiter) => limiter.get_ref().clone(),
-        None => return rate_limit_middleware(req, next).await,
+    let (oracle, rate_limiter) = match (oracle, rate_limiter) {
+        (Some(o), Some(rl)) => (o.get_ref().clone(), rl.get_ref().clone()),
+        (None, None) => {
+            // Both missing: fall back to basic rate limiting (dev/test scenario)
+            return rate_limit_middleware(req, next).await;
+        }
+        _ => {
+            // Partial configuration is a server error - fail loudly
+            error!("Rate limit middleware misconfigured: oracle or rate_limiter missing (but not both)");
+            return Err(Error::from(GatewayError::InternalError(
+                "Rate limiter misconfigured".to_string(),
+            )));
+        }
     };
 
     // Get DID from token claims (inserted by jwt_auth middleware)
@@ -637,8 +544,7 @@ pub async fn trust_rate_limit_middleware(
         Some(d) => d,
         None => {
             // No claims means unauthenticated request
-            // Use synthetic anonymous DID with IP suffix (treated as Isolated)
-            // Each IP gets its own bucket to prevent sharing across anonymous users
+            // Use synthetic anonymous DID with IP suffix (treated as Isolated/Default)
             let ip = req
                 .connection_info()
                 .peer_addr()
@@ -648,10 +554,45 @@ pub async fn trust_rate_limit_middleware(
         }
     };
 
-    // Check rate limit
-    match rate_limiter.check(&did).await {
-        Ok(()) => next.call(req).await,
-        Err(e) => Err(Error::from(e)),
+    // Create policy request
+    // We use a custom action "network_access" and the "trust" domain
+    let policy_req = PolicyRequest::new(
+        did.clone(),
+        ActionKind::Custom("network_access".to_string()),
+        Domain::trust(),
+    );
+
+    // Evaluate policy
+    let decision = oracle.evaluate(&policy_req);
+
+    match decision {
+        PolicyDecision::Allow { constraints } => {
+            // Extract rate limit from constraints, using fallback if none specified
+            let config = if let Some(limit) = constraints.rate_limit {
+                RateLimitConfig {
+                    capacity: limit.burst_size as f64,
+                    refill_rate: limit.messages_per_second as f64,
+                    cost_per_request: 1.0,
+                }
+            } else {
+                // Oracle didn't supply rate_limit - use documented fallback
+                tracing::debug!(
+                    did = %did,
+                    "PolicyOracle returned no rate_limit constraints, using FALLBACK_RATE_LIMIT"
+                );
+                FALLBACK_RATE_LIMIT
+            };
+
+            // Enforce rate limit
+            match rate_limiter.check_rate_limit_with_policy(&did, &config) {
+                Ok(()) => next.call(req).await,
+                Err(e) => Err(Error::from(e)),
+            }
+        }
+        PolicyDecision::Deny { reason } => {
+            warn!("Access denied by policy for DID {}: {}", did, reason);
+            Err(Error::from(GatewayError::Forbidden(reason.to_string())))
+        }
     }
 }
 

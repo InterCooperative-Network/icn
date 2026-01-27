@@ -7,11 +7,12 @@
 use crate::bloom::BloomFilter;
 use crate::gossip::GossipActor;
 use crate::types::{
-    BloomFilterData, ContentHash, GossipEntry, GossipMessage, SyncCursor, TrustResourceLimits,
+    BloomFilterData, ContentHash, GossipEntry, GossipMessage, ResourceLimits, SyncCursor,
 };
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyRequest};
 use tracing::{debug, warn};
 
 impl GossipActor {
@@ -87,8 +88,24 @@ impl GossipActor {
         debug!("Detected we're behind - sending PullRequest for all entries");
 
         // Get trust class and limits
-        let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
-        let limits = TrustResourceLimits::for_trust_class(trust_class);
+        // Get trust score and limits
+        // Get trust score and constraints from Oracle
+        let mut _trust_score = 0.0;
+        let mut limits = ResourceLimits::default();
+
+        if let Some(oracle) = &self.oracle {
+            let req = PolicyRequest::new(
+                peer_did.to_string(),
+                ActionKind::Subscribe, // treat pull as subscribe for now? Or generic access
+                Domain::trust(),
+            );
+            if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
+                oracle.evaluate(&req)
+            {
+                _trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                limits = ResourceLimits::from_constraints(&constraints);
+            }
+        }
         let max_bytes = limits.max_pull_bytes;
 
         // Empty want_ids means "send all entries"
@@ -352,9 +369,23 @@ impl GossipActor {
                 icn_obs::metrics::gossip::pull_continuation_received_inc();
 
                 // Get trust-based limits for continuation
-                let trust_class = (self.trust_lookup)(&peer_for_continuation)
-                    .unwrap_or(icn_trust::TrustClass::Isolated);
-                let limits = TrustResourceLimits::for_trust_class(trust_class);
+                // Get trust score and constraints from Oracle
+                let mut _trust_score = 0.0;
+                let mut limits = ResourceLimits::default();
+
+                if let Some(oracle) = &self.oracle {
+                    let req = PolicyRequest::new(
+                        peer_for_continuation.to_string(),
+                        ActionKind::Subscribe,
+                        Domain::trust(),
+                    );
+                    if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
+                        oracle.evaluate(&req)
+                    {
+                        _trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                        limits = ResourceLimits::from_constraints(&constraints);
+                    }
+                }
 
                 // Check backpressure before continuing
                 let can_continue = self

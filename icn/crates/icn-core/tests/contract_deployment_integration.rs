@@ -81,11 +81,7 @@ impl TestNode {
         });
 
         // Spawn gossip actor
-        let gossip_handle = GossipActor::spawn_with_trust_graph(
-            did.clone(),
-            trust_lookup,
-            Some(trust_graph_handle.clone()),
-        );
+        let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
 
         // Initialize ledger
         let ledger_store_path = temp_dir.path().join("ledger");

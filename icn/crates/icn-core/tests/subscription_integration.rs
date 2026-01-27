@@ -45,7 +45,7 @@ impl TestNode {
 
         // Spawn gossip actor
         let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         info!("Gossip actor spawned");
 
@@ -320,14 +320,14 @@ async fn test_subscription_acl_enforcement() -> Result<()> {
 
     // Trust lookup that returns None (no trust)
     let trust_lookup = Arc::new(|_did: &icn_identity::Did| None);
-    let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+    let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
     // Create a topic with TrustClass requirement
     {
         let mut gossip = gossip_handle.write().await;
         let topic = icn_gossip::Topic::new(
             "partner:only".to_string(),
-            icn_gossip::AccessControl::TrustClass(TrustClass::Partner),
+            icn_gossip::AccessControl::MinTrustScore(0.5),
         );
         gossip.create_topic(topic);
     }

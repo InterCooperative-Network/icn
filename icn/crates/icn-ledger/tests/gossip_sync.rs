@@ -3,14 +3,34 @@
 
 use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
+use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_ledger::{
     entry::JournalEntryBuilder, Ledger, LedgerSyncMessage, WitnessConfig, WitnessPolicy,
     WitnessSignature, WitnessedEntry,
 };
 use icn_store::SledStore;
-use icn_trust::TrustClass;
 use std::sync::Arc;
 use tempfile::TempDir;
+
+struct MockPolicyOracle;
+impl PolicyOracle for MockPolicyOracle {
+    fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+        let mut constraints = ConstraintSet::default();
+        // Mimic Partner trust settings
+        constraints = constraints
+            .with_max_subscriptions(500)
+            .with_max_outstanding_requests(3)
+            .with_max_message_size(1024 * 1024);
+        constraints
+            .custom
+            .insert("trust_score".to_string(), 0.5.into());
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
 
 /// Create a test ledger with gossip integration
 async fn create_test_node() -> (Ledger, TempDir, Arc<tokio::sync::RwLock<GossipActor>>) {
@@ -23,15 +43,15 @@ async fn create_test_node() -> (Ledger, TempDir, Arc<tokio::sync::RwLock<GossipA
     let did = keypair.did().clone();
 
     // Create gossip actor
-    let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
-    let gossip = GossipActor::spawn(did.clone(), trust_lookup);
+    let oracle = Arc::new(MockPolicyOracle);
+    let gossip = GossipActor::spawn(did.clone(), Some(oracle));
 
     // Create the ledger topic before use (required with strict access control defaults)
     {
         let mut actor = gossip.write().await;
         let topic = Topic::new(
             "ledger:hours".to_string(),
-            AccessControl::TrustClass(TrustClass::Known),
+            AccessControl::MinTrustScore(0.1),
         );
         actor.create_topic(topic);
     }

@@ -68,7 +68,7 @@ impl TestNode {
         });
 
         // Spawn gossip actor
-        let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         info!("Gossip actor spawned");
 

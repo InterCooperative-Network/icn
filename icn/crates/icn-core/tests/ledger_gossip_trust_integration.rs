@@ -66,7 +66,10 @@ impl TestNode {
             })
         });
 
-        let gossip = Arc::new(RwLock::new(GossipActor::new(did.clone(), trust_lookup)));
+        let gossip = Arc::new(RwLock::new(GossipActor::new_with_legacy_trust(
+            did.clone(),
+            trust_lookup,
+        )));
 
         // Set up keypair for signing
         {

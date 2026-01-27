@@ -9,7 +9,7 @@
 
 use icn_gossip::{AccessControl, BloomFilter, GossipEntry, GossipMessage, Topic, VectorClock};
 use icn_identity::KeyPair;
-use icn_trust::TrustClass;
+
 use sha2::{Digest, Sha256};
 
 // ============================================================================
@@ -288,18 +288,15 @@ fn test_topic_creation() {
 }
 
 #[test]
-fn test_topic_trust_class_access() {
-    let topic = Topic::new(
-        "secure:data".to_string(),
-        AccessControl::TrustClass(TrustClass::Partner),
-    );
+fn test_topic_trust_score_access() {
+    let topic = Topic::new("secure:data".to_string(), AccessControl::MinTrustScore(0.4));
 
     assert_eq!(topic.name, "secure:data");
     match topic.acl {
-        AccessControl::TrustClass(class) => {
-            assert_eq!(class, TrustClass::Partner);
+        AccessControl::MinTrustScore(score) => {
+            assert!((score - 0.4).abs() < f64::EPSILON);
         }
-        _ => panic!("Expected TrustClass access control"),
+        _ => panic!("Expected MinTrustScore access control"),
     }
 }
 
@@ -331,9 +328,9 @@ fn test_access_control_variants() {
     let public = AccessControl::Public;
     assert!(matches!(public, AccessControl::Public));
 
-    // TrustClass
-    let trust_gated = AccessControl::TrustClass(TrustClass::Known);
-    assert!(matches!(trust_gated, AccessControl::TrustClass(_)));
+    // MinTrustScore
+    let trust_gated = AccessControl::MinTrustScore(0.1);
+    assert!(matches!(trust_gated, AccessControl::MinTrustScore(_)));
 
     // Participants
     let participants = AccessControl::Participants(vec![]);
@@ -627,7 +624,7 @@ fn test_multiple_topics_isolation() {
     let topic_a = Topic::new("test:topic-a".to_string(), AccessControl::Public);
     let topic_b = Topic::new(
         "test:topic-b".to_string(),
-        AccessControl::TrustClass(TrustClass::Known),
+        AccessControl::MinTrustScore(0.1),
     );
     let topic_c = Topic::new(
         "secure:topic".to_string(),
@@ -640,7 +637,7 @@ fn test_multiple_topics_isolation() {
 
     // Verify access controls are different
     assert!(matches!(topic_a.acl, AccessControl::Public));
-    assert!(matches!(topic_b.acl, AccessControl::TrustClass(_)));
+    assert!(matches!(topic_b.acl, AccessControl::MinTrustScore(_)));
     assert!(matches!(topic_c.acl, AccessControl::Participants(_)));
 }
 

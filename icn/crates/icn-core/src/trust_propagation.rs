@@ -443,9 +443,26 @@ pub async fn add_edge_and_broadcast(
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+    use icn_kernel_api::authz::{
+        ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
+    };
     use icn_store::SledStore;
-    use icn_trust::{TrustClass, TrustScore};
+    use icn_trust::TrustScore;
     use std::sync::Arc;
+
+    struct MockPolicyOracle;
+    impl PolicyOracle for MockPolicyOracle {
+        fn evaluate(&self, _request: &PolicyRequest) -> PolicyDecision {
+            let mut constraints = ConstraintSet::default();
+            constraints
+                .custom
+                .insert("trust_score".to_string(), 0.5.into());
+            PolicyDecision::Allow { constraints }
+        }
+        fn domain(&self) -> Domain {
+            Domain::trust()
+        }
+    }
 
     #[tokio::test]
     async fn test_broadcast_and_handle_attestation() {
@@ -464,10 +481,10 @@ mod tests {
         let bob_graph = Arc::new(RwLock::new(TrustGraph::new(bob_store, bob.did().clone())));
 
         // Create gossip actors
-        let trust_lookup = Arc::new(|_: &Did| Some(TrustClass::Partner));
+        let oracle = Arc::new(MockPolicyOracle);
         let alice_gossip =
-            icn_gossip::GossipActor::spawn(alice.did().clone(), trust_lookup.clone());
-        let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
+            icn_gossip::GossipActor::spawn(alice.did().clone(), Some(oracle.clone()));
+        let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), Some(oracle));
 
         // Alice trusts Bob
         let edge = TrustEdge::new(

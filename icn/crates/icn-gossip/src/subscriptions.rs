@@ -18,12 +18,11 @@
 //! - [`GossipActor::get_subscriptions`] - List topics a DID is subscribed to
 //! - [`GossipActor::is_subscribed`] - Check if a DID is subscribed to a topic
 
-use crate::gossip::{
-    spawn_violation_recording, topics_per_peer_limit, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC,
-};
-use crate::types::Subscription;
+use crate::gossip::{spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC};
+use crate::types::{ResourceLimits, Subscription};
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyRequest};
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
@@ -33,72 +32,73 @@ impl GossipActor {
     pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Priority 1: Check fine-grained trust threshold (if configured)
-        if let Some(threshold) = topic_obj.min_trust_threshold {
-            if let Some(trust_graph) = &self.trust_graph {
-                // Get trust score from cache or compute it async
-                let trust_score = if let Some(cached) = self.trust_cache.get(&subscriber) {
-                    cached
-                } else {
-                    // Compute async and cache
-                    let graph = trust_graph.read().await;
-                    let score = graph.compute_trust_score(&subscriber).unwrap_or(0.0);
-                    self.trust_cache.insert(&subscriber, score);
-                    score
-                };
+        // 1. Get Trust Score and Constraints from Oracle
+        let mut trust_score = 0.0;
+        let mut limits = ResourceLimits::default();
 
-                // Enforce trust threshold
-                if trust_score < threshold {
-                    warn!(
-                        "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
-                        subscriber, topic, trust_score, threshold
-                    );
+        if let Some(oracle) = &self.oracle {
+            let req = PolicyRequest::new(
+                subscriber.to_string(),
+                ActionKind::Subscribe,
+                Domain::trust(),
+            );
 
-                    // Track rejection metrics
-                    icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
-
-                    // Record misbehavior violation (fire-and-forget, non-blocking)
-                    if let Some(ref detector) = self.misbehavior_detector {
-                        use sha2::{Digest, Sha256};
-                        let mut hasher = Sha256::new();
-                        hasher.update(subscriber.as_str().as_bytes());
-                        hasher.update(topic.as_bytes());
-                        hasher.update(b"unauthorized_subscription");
-                        let evidence = hasher.finalize().to_vec();
-
-                        let violation = icn_security::Violation::ExcessiveResourceUse {
-                            metric: format!("unauthorized_subscription:{topic}"),
-                            observed: 1,
-                            limit: 0,
-                        };
-
-                        spawn_violation_recording(
-                            Arc::clone(detector),
-                            subscriber.clone(),
-                            violation,
-                            evidence,
-                        );
-                    }
-
-                    bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
+            match oracle.evaluate(&req) {
+                PolicyDecision::Allow { constraints } => {
+                    trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                    limits = ResourceLimits::from_constraints(&constraints);
                 }
-
-                info!(
-                    "✅ Subscription authorized: DID {} to topic {} (trust score: {:.3})",
-                    subscriber, topic, trust_score
-                );
-            } else {
-                warn!(
-                    "Topic {} has min_trust_threshold {:.3} but GossipActor has no trust_graph - falling back to ACL check",
-                    topic, threshold
-                );
+                PolicyDecision::Deny { reason } => {
+                    warn!(
+                        "PolicyOracle denied subscription for {}: {}",
+                        subscriber, reason
+                    );
+                    bail!("Subscription denied by policy: {}", reason);
+                }
             }
         }
 
-        // Priority 2: Check AccessControl-based ACL (coarse-grained)
-        let trust_class = (self.trust_lookup)(&subscriber);
-        if !topic_obj.can_subscribe(&subscriber, trust_class) {
-            // Record misbehavior violation (fire-and-forget, non-blocking)
+        // Priority 1: Check fine-grained trust threshold (if configured)
+        if let Some(threshold) = topic_obj.min_trust_threshold {
+            if trust_score < threshold {
+                warn!(
+                    "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
+                    subscriber, topic, trust_score, threshold
+                );
+
+                // Track rejection metrics
+                icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
+
+                // Record misbehavior violation
+                if let Some(ref detector) = self.misbehavior_detector {
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(subscriber.as_str().as_bytes());
+                    hasher.update(topic.as_bytes());
+                    hasher.update(b"unauthorized_subscription");
+                    let evidence = hasher.finalize().to_vec();
+
+                    let violation = icn_security::Violation::ExcessiveResourceUse {
+                        metric: format!("unauthorized_subscription:{topic}"),
+                        observed: 1,
+                        limit: 0,
+                    };
+
+                    spawn_violation_recording(
+                        Arc::clone(detector),
+                        subscriber.clone(),
+                        violation,
+                        evidence,
+                    );
+                }
+
+                bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
+            }
+        }
+
+        // Priority 2: Check AccessControl-based ACL
+        if !topic_obj.can_subscribe(&subscriber, Some(trust_score)) {
+            // Record misbehavior violation
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
@@ -124,12 +124,12 @@ impl GossipActor {
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
-        // Check per-peer subscription limit (trust-weighted)
-        // This prevents a single peer from subscribing to too many topics
+        // Check per-peer subscription limit (blindly enforced from policy constraints)
         let peer_topics = self.get_subscriptions(&subscriber);
-        let peer_limit = topics_per_peer_limit(trust_class);
-        if peer_topics.len() >= peer_limit {
-            // Record misbehavior violation (fire-and-forget, non-blocking)
+        let peer_limit = limits.max_subscriptions;
+
+        if peer_topics.len() as u32 >= peer_limit {
+            // Record misbehavior violation
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
@@ -157,7 +157,7 @@ impl GossipActor {
                 peer_topics.len(),
                 peer_limit
             );
-            icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, 0.0);
+            icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
             bail!(
                 "Peer subscription limit reached: {} subscriptions (max {})",
                 peer_topics.len(),

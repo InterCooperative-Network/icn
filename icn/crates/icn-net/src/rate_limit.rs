@@ -14,10 +14,7 @@ use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
 };
-// TODO(Phase 2.4): Remove this import when deprecated TrustGatedRateLimitConfig is removed.
-// Currently only used by deprecated `for_class()` method for backward compatibility.
-#[allow(deprecated)]
-use icn_trust::TrustClass;
+
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -62,113 +59,6 @@ impl Default for RateLimitConfig {
             burst_capacity: 20,           // Allow bursts of 20 messages
             refill_interval: Duration::from_millis(100), // Refill every 100ms
         }
-    }
-}
-
-/// Trust-gated rate limiting configuration (deprecated)
-#[derive(Clone, Debug)]
-pub struct TrustGatedRateLimitConfig {
-    /// Limits for isolated peers (untrusted, score < 0.1)
-    pub isolated: RateLimitConfig,
-
-    /// Limits for known peers (limited trust, score 0.1-0.4)
-    pub known: RateLimitConfig,
-
-    /// Limits for partner peers (trusted, score 0.4-0.7)
-    pub partner: RateLimitConfig,
-
-    /// Limits for federated peers (highly trusted, score 0.7+)
-    pub federated: RateLimitConfig,
-
-    /// Refill interval (shared across all trust levels)
-    pub refill_interval: Duration,
-
-    /// Minimum trust score required for TLS connections (default: 0.0 = allow all authenticated DIDs)
-    pub min_trust_threshold: f64,
-}
-
-impl Default for TrustGatedRateLimitConfig {
-    fn default() -> Self {
-        let refill_interval = Duration::from_millis(100);
-        TrustGatedRateLimitConfig {
-            isolated: RateLimitConfig {
-                max_messages_per_second: 10,
-                burst_capacity: 2,
-                refill_interval,
-            },
-            known: RateLimitConfig {
-                max_messages_per_second: 50,
-                burst_capacity: 10,
-                refill_interval,
-            },
-            partner: RateLimitConfig {
-                max_messages_per_second: 100,
-                burst_capacity: 20,
-                refill_interval,
-            },
-            federated: RateLimitConfig {
-                max_messages_per_second: 200,
-                burst_capacity: 50,
-                refill_interval,
-            },
-            refill_interval,
-            min_trust_threshold: 0.0,
-        }
-    }
-}
-
-impl TrustGatedRateLimitConfig {
-    /// Get the rate limit config for a specific trust class
-    pub fn for_class(&self, class: TrustClass) -> &RateLimitConfig {
-        match class {
-            TrustClass::Isolated => &self.isolated,
-            TrustClass::Known => &self.known,
-            TrustClass::Partner => &self.partner,
-            TrustClass::Federated => &self.federated,
-        }
-    }
-
-    #[deprecated(note = "Trust-gated configuration will be removed; use PolicyOracle directly")]
-    /// Build a trust-based oracle from this configuration (deprecated).
-    pub fn to_oracle(
-        &self,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-    ) -> Arc<dyn PolicyOracle> {
-        struct TrustGraphOracle {
-            trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-            config: TrustGatedRateLimitConfig,
-        }
-
-        impl PolicyOracle for TrustGraphOracle {
-            fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-                let did = match Did::from_str(request.actor().as_str()) {
-                    Ok(did) => did,
-                    Err(_) => return PolicyDecision::deny("invalid did"),
-                };
-                let class = {
-                    match self.trust_graph.try_read() {
-                        Ok(graph) => graph.trust_class(&did).unwrap_or(TrustClass::Isolated),
-                        Err(_) => TrustClass::Isolated,
-                    }
-                };
-                let limit = self.config.for_class(class);
-                PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(
-                    icn_kernel_api::authz::RateLimit::new(
-                        limit.max_messages_per_second,
-                        limit.burst_capacity,
-                    ),
-                ))
-            }
-
-            fn domain(&self) -> Domain {
-                Domain::new(NETWORK_DOMAIN)
-            }
-        }
-
-        Arc::new(TrustGraphOracle {
-            trust_graph,
-            config: self.clone(),
-        })
     }
 }
 
@@ -260,17 +150,24 @@ impl TokenBucket {
         }
     }
 
-    /// Update bucket configuration
+    /// Tolerance for floating point comparison (1e-6 is appropriate for user-configured values)
+    const CONFIG_EPSILON: f64 = 1e-6;
+
+    /// Update bucket configuration with proportional refill
     fn update_config(&mut self, new_capacity: f64, new_refill_rate: f64) -> bool {
-        // Check if config changed
-        let changed = (self.capacity - new_capacity).abs() > f64::EPSILON
-            || (self.refill_rate - new_refill_rate).abs() > f64::EPSILON;
+        // Check if config changed using appropriate tolerance
+        let changed = (self.capacity - new_capacity).abs() > Self::CONFIG_EPSILON
+            || (self.refill_rate - new_refill_rate).abs() > Self::CONFIG_EPSILON;
 
         if changed {
+            // Proportional refill: scale tokens by the capacity ratio to prevent
+            // exploitation via rapid trust cycling (repeatedly getting full buckets)
+            // Token bucket invariant: capacity should never be < 1.0 token
+            const MIN_CAPACITY_FOR_RATIO: f64 = 1.0;
+            let ratio = new_capacity / self.capacity.max(MIN_CAPACITY_FOR_RATIO);
+            self.tokens = (self.tokens * ratio).min(new_capacity);
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;
-            // Reset to full capacity when config changes
-            self.tokens = new_capacity;
             self.last_refill = Instant::now();
         }
         changed
@@ -389,35 +286,6 @@ impl RateLimiter {
         }
     }
 
-    /// Create a new trust-gated rate limiter (deprecated compatibility shim).
-    #[allow(deprecated)]
-    #[deprecated(note = "Use new_with_oracle or new_with_oracle_and_sybil_resistance")]
-    pub fn new_trust_gated(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-    ) -> Self {
-        let oracle = config.to_oracle(trust_graph);
-        RateLimiter::new_with_oracle(oracle, config.isolated.clone())
-    }
-
-    /// Create a new trust-gated rate limiter with Sybil resistance (deprecated).
-    #[allow(deprecated)]
-    #[deprecated(note = "Use new_with_oracle_and_sybil_resistance")]
-    pub fn new_with_sybil_resistance(
-        config: TrustGatedRateLimitConfig,
-        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
-        personhood_store: Arc<dyn PersonhoodStoreTrait>,
-        anchor_config: AnchorRateLimitConfig,
-    ) -> Self {
-        let oracle = config.to_oracle(trust_graph);
-        RateLimiter::new_with_oracle_and_sybil_resistance(
-            oracle,
-            config.isolated.clone(),
-            personhood_store,
-            anchor_config,
-        )
-    }
-
     /// Convert an oracle decision into a rate limit config (or None if denied).
     fn rate_limit_from_decision(
         fallback_config: &RateLimitConfig,
@@ -496,7 +364,10 @@ impl RateLimiter {
             self.fallback_config.clone()
         };
 
-        // Acquire buckets lock
+        // LOCK ORDER INVARIANT: Always acquire `buckets` before `anchor_buckets`
+        // to prevent deadlocks. Any code path that needs both locks must follow
+        // this order. See also line 485 where anchor_buckets is acquired after
+        // check_rate_limit completes (never holding buckets simultaneously).
         let mut buckets = self.buckets.write().await;
 
         // Perform rate limit check
@@ -600,11 +471,13 @@ impl RateLimiter {
             }
             Err(e) => {
                 // Store lookup failed - graceful degradation
+                // But increment metric so operators know Sybil protection is degraded
                 warn!(
                     did = %peer,
                     error = %e,
                     "Failed to look up personhood anchor, falling back to per-DID limiting"
                 );
+                icn_obs::metrics::network::personhood_store_failures_inc();
                 return true;
             }
         };
@@ -930,27 +803,29 @@ mod tests {
             }
         }
 
+        // RateLimit::new(messages_per_second, burst_size)
+        // burst_size is used as the bucket capacity
         let oracle = Arc::new(MutableOracle {
-            first_limit: RateLimit::new(50, 10),
-            upgraded_limit: RateLimit::new(200, 50),
+            first_limit: RateLimit::new(10, 10),    // capacity=10
+            upgraded_limit: RateLimit::new(50, 50), // capacity=50
             upgraded: std::sync::atomic::AtomicBool::new(false),
         });
         let limiter = RateLimiter::new_with_oracle(oracle.clone(), RateLimitConfig::default());
         let peer = KeyPair::generate().unwrap().did().clone();
 
-        // Consume all tokens for Known class (10)
-        for _ in 0..10 {
+        // Consume 5 out of 10 tokens (leaving 5)
+        for _ in 0..5 {
             assert!(limiter.check_rate_limit(&peer).await);
         }
-        assert!(!limiter.check_rate_limit(&peer).await); // Rate limited
 
+        // Upgrade trust - proportional refill scales tokens: 5 * (50/10) = 25
         oracle
             .upgraded
             .store(true, std::sync::atomic::Ordering::SeqCst);
 
-        // After trust upgrade, should get more capacity
-        // (Note: bucket is recreated with new capacity, starting fresh at 50 tokens)
-        for _ in 0..50 {
+        // After trust upgrade with proportional refill, we should have 25 tokens
+        // (proportional: 5 remaining * (new_capacity / old_capacity) = 5 * 5 = 25)
+        for _ in 0..25 {
             assert!(limiter.check_rate_limit(&peer).await);
         }
         assert!(!limiter.check_rate_limit(&peer).await); // Rate limited at new threshold

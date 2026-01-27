@@ -63,14 +63,7 @@ impl TestNode {
             shutdown_tx.clone(),
             Some(incoming_handler),
             None,
-            Some(
-                icn_net::rate_limit::TrustGatedRateLimitConfig {
-                    min_trust_threshold: 0.0, // TOFU mode - accept all valid DIDs
-                    ..Default::default()
-                }
-                .isolated
-                .clone(),
-            ),
+            None, // Fallback config
             None, // No fallback config
             None, // No topology config
             None, // No STUN servers for tests

@@ -3,7 +3,6 @@
 use crate::vector_clock::VectorClock;
 use icn_identity::Did;
 use icn_store::{StorageChallenge, StorageContentNotFound, StorageProof};
-use icn_trust::TrustClass;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -479,12 +478,12 @@ impl Topic {
     }
 
     /// Check if a DID can publish to this topic
-    pub fn can_publish(&self, did: &Did, trust_class: Option<TrustClass>) -> bool {
+    pub fn can_publish(&self, did: &Did, trust_score: Option<f64>) -> bool {
         match &self.acl {
             AccessControl::Public => true,
-            AccessControl::TrustClass(required_class) => {
-                if let Some(actual_class) = trust_class {
-                    actual_class >= *required_class
+            AccessControl::MinTrustScore(min_score) => {
+                if let Some(actual_score) = trust_score {
+                    actual_score >= *min_score
                 } else {
                     false
                 }
@@ -494,38 +493,28 @@ impl Topic {
     }
 
     /// Check if a DID can subscribe to this topic
-    pub fn can_subscribe(&self, did: &Did, trust_class: Option<TrustClass>) -> bool {
+    pub fn can_subscribe(&self, did: &Did, trust_score: Option<f64>) -> bool {
         // For now, same rules as publish
         // Could be more permissive in the future
-        self.can_publish(did, trust_class)
+        self.can_publish(did, trust_score)
     }
 }
 
-/// Access control for topics
-///
-/// Defaults to the most restrictive access level (Federated trust class)
-/// to ensure security by default. Topics must explicitly opt into
-/// more permissive access.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Access control for topic
+#[derive(Debug, Clone, PartialEq)]
 pub enum AccessControl {
-    /// Anyone can publish/subscribe
+    /// Public access
     Public,
-
-    /// Requires minimum trust class
-    TrustClass(TrustClass),
-
-    /// Only specific participants (e.g., contract members)
+    /// Minimum trust score required (0.0 - 1.0)
+    MinTrustScore(f64),
+    /// Allow list of DIDs
     Participants(Vec<Did>),
 }
 
 impl Default for AccessControl {
-    /// Returns the most restrictive access control by default.
-    ///
-    /// This ensures that undeclared or auto-created topics default to
-    /// requiring Federated-level trust (0.7+), preventing unauthorized
-    /// access or information leakage.
     fn default() -> Self {
-        AccessControl::TrustClass(TrustClass::Federated)
+        // Default to high trust requirement (Federated level)
+        AccessControl::MinTrustScore(0.7)
     }
 }
 
@@ -539,7 +528,7 @@ pub enum TopicAutoCreationPolicy {
     #[default]
     Reject,
 
-    /// Auto-create with strict default access control (TrustClass::Federated)
+    /// Auto-create with strict default access control (MinTrustScore(0.7))
     /// Logs a warning when this happens
     CreateWithStrictDefaults,
 
@@ -548,9 +537,9 @@ pub enum TopicAutoCreationPolicy {
     CreatePublic,
 }
 
-/// Resource limits for a specific trust class
+/// Resource limits for a specific trust score
 #[derive(Debug, Clone)]
-pub struct TrustResourceLimits {
+pub struct ResourceLimits {
     /// Maximum bytes per pull request
     pub max_pull_bytes: u32,
 
@@ -565,40 +554,91 @@ pub struct TrustResourceLimits {
 
     /// Maximum retry backoff in milliseconds
     pub retry_max_ms: u64,
+
+    /// Maximum subscriptions per peer
+    pub max_subscriptions: u32,
 }
 
-impl TrustResourceLimits {
-    /// Get resource limits for a specific trust class
-    pub fn for_trust_class(trust_class: TrustClass) -> Self {
-        match trust_class {
-            TrustClass::Isolated => Self {
-                max_pull_bytes: 64 * 1024, // 64 KB
-                max_push_bytes: 64 * 1024,
-                max_outstanding_reqs: 1,
-                retry_min_ms: 1500,
-                retry_max_ms: 5000,
-            },
-            TrustClass::Known => Self {
-                max_pull_bytes: 256 * 1024, // 256 KB
-                max_push_bytes: 256 * 1024,
-                max_outstanding_reqs: 2,
-                retry_min_ms: 800,
-                retry_max_ms: 2500,
-            },
-            TrustClass::Partner => Self {
+impl ResourceLimits {
+    /// Get resource limits from policy constraints.
+    ///
+    /// This follows the "Meaning Firewall" principle: the kernel blindly enforces
+    /// limits provided by the PolicyOracle without understanding trust semantics.
+    pub fn from_constraints(constraints: &icn_kernel_api::authz::ConstraintSet) -> Self {
+        // Safe u64→u32 conversion: use try_from with fallback to default
+        let max_bytes = constraints
+            .max_message_size
+            .and_then(|s| u32::try_from(s).ok())
+            .unwrap_or(64 * 1024);
+
+        Self {
+            max_pull_bytes: max_bytes,
+            max_push_bytes: max_bytes,
+            max_outstanding_reqs: constraints.max_outstanding_requests.unwrap_or(1),
+            // Time-based limits (using defaults if not in ConstraintSet)
+            retry_min_ms: 1500,
+            retry_max_ms: 5000,
+            max_subscriptions: constraints.max_subscriptions.unwrap_or(10),
+        }
+    }
+
+    /// [DEPRECATED] Get resource limits for a specific trust score.
+    /// Use `from_constraints` instead to avoid hardcoding trust thresholds in the kernel.
+    pub fn for_trust_score(score: f64) -> Self {
+        if score >= 0.7 {
+            // Federated
+            Self {
                 max_pull_bytes: 1024 * 1024, // 1 MB
                 max_push_bytes: 1024 * 1024,
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
                 retry_max_ms: 1200,
-            },
-            TrustClass::Federated => Self {
-                max_pull_bytes: 1024 * 1024, // 1 MB (same as Partner)
+                max_subscriptions: 1000_u32,
+            }
+        } else if score >= 0.4 {
+            // Partner
+            Self {
+                max_pull_bytes: 1024 * 1024, // 1 MB
                 max_push_bytes: 1024 * 1024,
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
                 retry_max_ms: 1200,
-            },
+                max_subscriptions: 500_u32,
+            }
+        } else if score >= 0.1 {
+            // Known
+            Self {
+                max_pull_bytes: 256 * 1024, // 256 KB
+                max_push_bytes: 256 * 1024,
+                max_outstanding_reqs: 2,
+                retry_min_ms: 800,
+                retry_max_ms: 2500,
+                max_subscriptions: 100_u32,
+            }
+        } else {
+            // Isolated
+            Self {
+                max_pull_bytes: 64 * 1024, // 64 KB
+                max_push_bytes: 64 * 1024,
+                max_outstanding_reqs: 1,
+                retry_min_ms: 1500,
+                retry_max_ms: 5000,
+                max_subscriptions: 10_u32,
+            }
+        }
+    }
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        // Default to "Isolated" class limits
+        Self {
+            max_pull_bytes: 64 * 1024,
+            max_push_bytes: 64 * 1024,
+            max_outstanding_reqs: 1,
+            retry_min_ms: 1500,
+            retry_max_ms: 5000,
+            max_subscriptions: 10_u32,
         }
     }
 }
@@ -697,24 +737,24 @@ mod tests {
     }
 
     #[test]
-    fn test_topic_trust_class_access() {
+    fn test_topic_trust_score_access() {
         let topic = Topic::new(
             "test".to_string(),
-            AccessControl::TrustClass(TrustClass::Partner),
+            AccessControl::MinTrustScore(0.4), // Partner level
         );
         let did = KeyPair::generate().unwrap().did().clone();
 
-        // No trust class - denied
+        // No trust score - denied
         assert!(!topic.can_publish(&did, None));
 
-        // Known - denied (lower than Partner)
-        assert!(!topic.can_publish(&did, Some(TrustClass::Known)));
+        // Low score - denied (0.1 < 0.4)
+        assert!(!topic.can_publish(&did, Some(0.1)));
 
-        // Partner - allowed
-        assert!(topic.can_publish(&did, Some(TrustClass::Partner)));
+        // Exact score - allowed
+        assert!(topic.can_publish(&did, Some(0.4)));
 
-        // Federated - allowed (higher than Partner)
-        assert!(topic.can_publish(&did, Some(TrustClass::Federated)));
+        // High score - allowed (0.8 > 0.4)
+        assert!(topic.can_publish(&did, Some(0.8)));
     }
 
     #[test]
@@ -737,12 +777,12 @@ mod tests {
 
     #[test]
     fn test_access_control_default_is_strict() {
-        // Verify default is TrustClass(Federated) - the strictest level
+        // Verify default is MinTrustScore(0.7) - Federated level
         let default_acl = AccessControl::default();
         assert_eq!(
             default_acl,
-            AccessControl::TrustClass(TrustClass::Federated),
-            "Default AccessControl should be TrustClass(Federated) for security"
+            AccessControl::MinTrustScore(0.7),
+            "Default AccessControl should be MinTrustScore(0.7) for security"
         );
     }
 
@@ -757,28 +797,34 @@ mod tests {
             "Default ACL should deny peers with no trust"
         );
 
-        // Isolated - denied
+        // Low trust - denied
         assert!(
-            !topic.can_publish(&did, Some(TrustClass::Isolated)),
-            "Default ACL should deny Isolated trust"
+            !topic.can_publish(&did, Some(0.0)),
+            "Default ACL should deny low trust"
         );
 
-        // Known - denied
+        // Known - denied (0.1 < 0.7)
         assert!(
-            !topic.can_publish(&did, Some(TrustClass::Known)),
-            "Default ACL should deny Known trust"
+            !topic.can_publish(&did, Some(0.1)),
+            "Default ACL should deny Known trust (0.1)"
         );
 
-        // Partner - denied (below Federated)
+        // Partner - denied (0.4 < 0.7)
         assert!(
-            !topic.can_publish(&did, Some(TrustClass::Partner)),
-            "Default ACL should deny Partner trust"
+            !topic.can_publish(&did, Some(0.4)),
+            "Default ACL should deny Partner trust (0.4)"
         );
 
-        // Federated - allowed (matches requirement)
+        // Federated - allowed (0.7 >= 0.7)
         assert!(
-            topic.can_publish(&did, Some(TrustClass::Federated)),
-            "Default ACL should allow Federated trust"
+            topic.can_publish(&did, Some(0.7)),
+            "Default ACL should allow Federated trust (0.7)"
+        );
+
+        // Higher - allowed
+        assert!(
+            topic.can_publish(&did, Some(0.9)),
+            "Default ACL should allow higher trust"
         );
     }
 

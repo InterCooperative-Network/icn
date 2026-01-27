@@ -55,7 +55,7 @@ impl TestNode {
 
         // Create gossip actor
         let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         // Set gossip store
         {

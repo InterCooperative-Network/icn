@@ -26,7 +26,7 @@ fn create_test_gossip_with_partition(
     let did = keypair.did().clone();
     let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
 
-    let mut gossip = GossipActor::new(did, trust_lookup);
+    let mut gossip = GossipActor::new_with_legacy_trust(did, trust_lookup);
 
     // Configure partition detector with short threshold for testing
     let config = PartitionConfig {

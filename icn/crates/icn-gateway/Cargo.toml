@@ -66,6 +66,7 @@ sha2 = "0.10"
 
 # ICN dependencies
 icn-identity = { path = "../icn-identity" }
+icn-net = { path = "../icn-net" }
 icn-kernel-api = { path = "../icn-kernel-api" }
 icn-entity = { path = "../icn-entity" }
 icn-time = { path = "../icn-time" }

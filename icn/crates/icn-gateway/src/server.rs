@@ -33,8 +33,7 @@ use crate::notification_queue::NotificationQueue;
 use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotificationTrigger};
 use crate::notifications::NotificationService;
 use crate::rate_limit::{
-    IpRateLimiter, RateLimitConfig, RateLimiter, TrustRateLimitConfig, TrustRateLimiter,
-    VelocityLimitConfig, VelocityLimiter,
+    IpRateLimiter, RateLimitConfig, RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
@@ -82,8 +81,7 @@ pub struct GatewayServer {
     event_broadcaster: Option<Arc<EventBroadcaster>>,
     security_config: SecurityConfig,
     rate_limit_config: Option<RateLimitConfig>,
-    trust_rate_limit_config: Option<TrustRateLimitConfig>,
-    trust_rate_limit_enabled: bool,
+
     compute_handle: Option<ComputeHandle>,
     coop_handle: Option<icn_coop::CoopHandle>,
     /// Optional handle to daemon's TrustGraph (for actor-backed mode)
@@ -118,8 +116,7 @@ impl GatewayServer {
             event_broadcaster: None,
             security_config: SecurityConfig::development(), // Permissive for tests
             rate_limit_config: None,
-            trust_rate_limit_config: None,
-            trust_rate_limit_enabled: false,
+
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
@@ -148,8 +145,7 @@ impl GatewayServer {
             event_broadcaster: None,
             security_config: SecurityConfig::production(), // Strict for production
             rate_limit_config: None,
-            trust_rate_limit_config: None,
-            trust_rate_limit_enabled: false,
+
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
@@ -179,8 +175,7 @@ impl GatewayServer {
             event_broadcaster: Some(event_broadcaster),
             security_config: SecurityConfig::production(),
             rate_limit_config: None,
-            trust_rate_limit_config: None,
-            trust_rate_limit_enabled: false,
+
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
@@ -311,28 +306,6 @@ impl GatewayServer {
     /// Set custom rate limiting configuration
     pub fn with_rate_limit_config(mut self, config: RateLimitConfig) -> Self {
         self.rate_limit_config = Some(config);
-        self
-    }
-
-    /// Enable trust-gated rate limiting with default configuration
-    ///
-    /// Trust-gated rate limiting applies different rate limits based on peer trust class:
-    /// - Isolated (< 0.1): 10 req/sec, burst 2
-    /// - Known (0.1-0.4): 50 req/sec, burst 10
-    /// - Partner (0.4-0.7): 100 req/sec, burst 20
-    /// - Federated (0.7+): 200 req/sec, burst 50
-    ///
-    /// Requires a trust graph handle to be set via `with_trust_handle()`.
-    pub fn with_trust_rate_limiting(mut self) -> Self {
-        self.trust_rate_limit_enabled = true;
-        self.trust_rate_limit_config = Some(TrustRateLimitConfig::default());
-        self
-    }
-
-    /// Enable trust-gated rate limiting with custom configuration
-    pub fn with_trust_rate_limit_config(mut self, config: TrustRateLimitConfig) -> Self {
-        self.trust_rate_limit_enabled = true;
-        self.trust_rate_limit_config = Some(config);
         self
     }
 
@@ -594,24 +567,6 @@ impl GatewayServer {
         );
         let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
 
-        // Create trust-gated rate limiter if enabled
-        let trust_rate_limiter: Option<Arc<TrustRateLimiter>> = if self.trust_rate_limit_enabled {
-            let config = self.trust_rate_limit_config.unwrap_or_default();
-            info!(
-                "Trust-gated rate limiting enabled: Isolated={}/sec, Known={}/sec, Partner={}/sec, Federated={}/sec",
-                config.isolated_requests_per_sec,
-                config.known_requests_per_sec,
-                config.partner_requests_per_sec,
-                config.federated_requests_per_sec
-            );
-            Some(Arc::new(TrustRateLimiter::new(
-                trust_manager.clone(),
-                config,
-            )))
-        } else {
-            None
-        };
-
         // Create IP-based rate limiter for auth endpoints and interest submissions
         // Used for DoS protection on sensitive endpoints
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
@@ -690,7 +645,7 @@ impl GatewayServer {
         {
             let auth_manager_clone = auth_manager.clone();
             let rate_limiter_clone = rate_limiter.clone();
-            let trust_rate_limiter_clone = trust_rate_limiter.clone();
+
             let ip_rate_limiter_clone = ip_rate_limiter.clone();
             let velocity_limiter_clone = velocity_limiter.clone();
             let event_broadcaster_clone = event_broadcaster.clone();
@@ -715,13 +670,7 @@ impl GatewayServer {
                                 info!("Cleaned up {} inactive rate limiter buckets", removed);
                             }
 
-                            // Clean up trust rate limit buckets if enabled
-                            if let Some(ref trust_limiter) = trust_rate_limiter_clone {
-                                let removed: usize = trust_limiter.cleanup_inactive_buckets(Duration::from_secs(RATE_LIMITER_CLEANUP_INTERVAL_SECS));
-                                if removed > 0 {
-                                    info!("Cleaned up {} inactive trust rate limiter buckets", removed);
-                                }
-                            }
+
 
                             // Clean up inactive IP rate limiter buckets (10 minute inactivity for auth endpoints)
                             let removed = ip_rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(600));
@@ -856,6 +805,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(session_manager.clone()))
                 .app_data(web::Data::new(trust_manager.clone()))
+                .app_data(web::Data::new(trust_manager.as_oracle()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
@@ -878,15 +828,6 @@ impl GatewayServer {
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
-                // Trust rate limiter (conditional - for trust-gated rate limiting)
-                .configure({
-                    let trust_limiter = trust_rate_limiter.clone();
-                    move |cfg| {
-                        if let Some(ref limiter) = trust_limiter {
-                            cfg.app_data(web::Data::new(limiter.clone()));
-                        }
-                    }
-                })
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)
