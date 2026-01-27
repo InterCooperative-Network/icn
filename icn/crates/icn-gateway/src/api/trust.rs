@@ -216,10 +216,11 @@ mod tests {
     use crate::trust_mgr::TrustManager;
     use actix_web::{test, App};
     use icn_identity::KeyPair;
-    use icn_trust::{TrustEdge, TrustScore};
 
     #[actix_web::test]
     async fn test_get_trust_edges() {
+        // Import domain types only where needed (not in main API code)
+        use icn_trust::{TrustEdge, TrustScore};
         let trust_manager = Arc::new(TrustManager::new());
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();

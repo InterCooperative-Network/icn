@@ -260,8 +260,15 @@ impl TrustManager {
 
     /// Add a trust edge from raw parts (f64 score)
     ///
-    /// Validation is performed by `TrustScore::new()` which ensures
-    /// the score is in the valid range [0.0, 1.0].
+    /// # Errors
+    ///
+    /// Returns `Err(String)` if:
+    /// - `score` is outside the valid range [0.0, 1.0]
+    /// - `score` is NaN or infinite
+    /// - The underlying edge storage fails (actor-backed mode only)
+    ///
+    /// These errors should be mapped to HTTP 400 Bad Request at the API layer,
+    /// as they represent invalid user input.
     pub async fn add_edge_with_score(
         &self,
         from: Did,
@@ -908,6 +915,12 @@ impl TrustPolicyOracle {
 /// This difference is intentional: standalone mode prioritizes simplicity and
 /// speed for dev/test scenarios. For production, use actor-backed mode which
 /// provides the full trust computation algorithm.
+///
+/// # TODO(Phase 3)
+///
+/// Consider extracting shared logic if algorithms converge. Currently separate
+/// due to intentional 1-hop vs multi-hop differences. See issue #902 for
+/// discussion of unification options.
 ///
 /// # Parameters
 ///
