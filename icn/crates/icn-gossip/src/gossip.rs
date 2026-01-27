@@ -1288,7 +1288,6 @@ pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
 impl GossipActor {
     /// Spawn a gossip actor and return a handle
-
     pub fn spawn(own_did: Did, oracle: Option<Arc<dyn PolicyOracle>>) -> GossipHandle {
         let actor = GossipActor::new(own_did, oracle);
         Arc::new(RwLock::new(actor))
@@ -1462,6 +1461,30 @@ mod tests {
             constraints
                 .custom
                 .insert("trust_score".to_string(), score.into());
+
+            // Populate standard fields based on score for mock behavior
+            if score >= 0.7 {
+                constraints = constraints
+                    .with_max_subscriptions(1000)
+                    .with_max_outstanding_requests(3)
+                    .with_max_message_size(1024 * 1024);
+            } else if score >= 0.4 {
+                constraints = constraints
+                    .with_max_subscriptions(500)
+                    .with_max_outstanding_requests(3)
+                    .with_max_message_size(1024 * 1024);
+            } else if score >= 0.1 {
+                constraints = constraints
+                    .with_max_subscriptions(100)
+                    .with_max_outstanding_requests(2)
+                    .with_max_message_size(256 * 1024);
+            } else {
+                constraints = constraints
+                    .with_max_subscriptions(10)
+                    .with_max_outstanding_requests(1)
+                    .with_max_message_size(64 * 1024);
+            }
+
             PolicyDecision::Allow { constraints }
         }
 

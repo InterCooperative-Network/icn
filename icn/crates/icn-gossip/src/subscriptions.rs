@@ -22,7 +22,7 @@ use crate::gossip::{spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_
 use crate::types::{ResourceLimits, Subscription};
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
-use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyRequest};
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyRequest};
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
 
@@ -32,8 +32,11 @@ impl GossipActor {
     pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // 1. Get Trust Score from Oracle
-        let trust_score = if let Some(oracle) = &self.oracle {
+        // 1. Get Trust Score and Constraints from Oracle
+        let mut trust_score = 0.0;
+        let mut limits = ResourceLimits::default();
+
+        if let Some(oracle) = &self.oracle {
             let req = PolicyRequest::new(
                 subscriber.to_string(),
                 ActionKind::Subscribe,
@@ -41,27 +44,16 @@ impl GossipActor {
             );
 
             match oracle.evaluate(&req) {
-                PolicyDecision::Allow { constraints } => constraints
-                    .custom
-                    .get("trust_score")
-                    .and_then(|v| match v {
-                        ConstraintValue::Float(f) => Some(f.into_inner()),
-                        _ => None,
-                    })
-                    .unwrap_or(0.0),
+                PolicyDecision::Allow { constraints } => {
+                    trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                    limits = ResourceLimits::from_constraints(&constraints);
+                }
                 PolicyDecision::Deny { reason } => {
-                    warn!(
-                        "PolicyOracle denied subscription for {}: {}",
-                        subscriber, reason
-                    );
-                    // If explicitly denied, score is effectively 0 or we should reject outright?
-                    // If we reject outright based on policy:
+                    warn!("PolicyOracle denied subscription for {}: {}", subscriber, reason);
                     bail!("Subscription denied by policy: {}", reason);
                 }
             }
-        } else {
-            0.0
-        };
+        }
 
         // Priority 1: Check fine-grained trust threshold (if configured)
         if let Some(threshold) = topic_obj.min_trust_threshold {
@@ -129,12 +121,11 @@ impl GossipActor {
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
-        // Check per-peer subscription limit (trust-weighted)
-        // This prevents a single peer from subscribing to too many topics
+        // Check per-peer subscription limit (blindly enforced from policy constraints)
         let peer_topics = self.get_subscriptions(&subscriber);
-        let peer_limit = ResourceLimits::for_trust_score(trust_score).max_subscriptions;
+        let peer_limit = limits.max_subscriptions;
 
-        if peer_topics.len() >= peer_limit {
+        if peer_topics.len() as u32 >= peer_limit {
             // Record misbehavior violation
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};

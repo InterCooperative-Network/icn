@@ -102,6 +102,7 @@ impl TrustPolicyOracle {
             .with_max_connections(max_connections)
             .with_credit_multiplier(score) // Direct multiplier from score
             .with_voting_weight(score) // Direct weight from score
+            .with_custom("trust_score", score.into()) // Expose score for app-specific logic (e.g. gossip ACLs)
     }
 }
 

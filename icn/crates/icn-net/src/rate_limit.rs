@@ -362,7 +362,10 @@ impl RateLimiter {
             self.fallback_config.clone()
         };
 
-        // Acquire buckets lock
+        // LOCK ORDER INVARIANT: Always acquire `buckets` before `anchor_buckets`
+        // to prevent deadlocks. Any code path that needs both locks must follow
+        // this order. See also line 485 where anchor_buckets is acquired after
+        // check_rate_limit completes (never holding buckets simultaneously).
         let mut buckets = self.buckets.write().await;
 
         // Perform rate limit check
@@ -798,27 +801,29 @@ mod tests {
             }
         }
 
+        // RateLimit::new(messages_per_second, burst_size)
+        // burst_size is used as the bucket capacity
         let oracle = Arc::new(MutableOracle {
-            first_limit: RateLimit::new(50, 10),
-            upgraded_limit: RateLimit::new(200, 50),
+            first_limit: RateLimit::new(10, 10), // capacity=10
+            upgraded_limit: RateLimit::new(50, 50), // capacity=50
             upgraded: std::sync::atomic::AtomicBool::new(false),
         });
         let limiter = RateLimiter::new_with_oracle(oracle.clone(), RateLimitConfig::default());
         let peer = KeyPair::generate().unwrap().did().clone();
 
-        // Consume all tokens for Known class (10)
-        for _ in 0..10 {
+        // Consume 5 out of 10 tokens (leaving 5)
+        for _ in 0..5 {
             assert!(limiter.check_rate_limit(&peer).await);
         }
-        assert!(!limiter.check_rate_limit(&peer).await); // Rate limited
 
+        // Upgrade trust - proportional refill scales tokens: 5 * (50/10) = 25
         oracle
             .upgraded
             .store(true, std::sync::atomic::Ordering::SeqCst);
 
-        // After trust upgrade, should get more capacity
-        // (Note: bucket is recreated with new capacity, starting fresh at 50 tokens)
-        for _ in 0..50 {
+        // After trust upgrade with proportional refill, we should have 25 tokens
+        // (proportional: 5 remaining * (new_capacity / old_capacity) = 5 * 5 = 25)
+        for _ in 0..25 {
             assert!(limiter.check_rate_limit(&peer).await);
         }
         assert!(!limiter.check_rate_limit(&peer).await); // Rate limited at new threshold

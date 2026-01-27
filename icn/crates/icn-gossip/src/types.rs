@@ -556,11 +556,29 @@ pub struct ResourceLimits {
     pub retry_max_ms: u64,
 
     /// Maximum subscriptions per peer
-    pub max_subscriptions: usize,
+    pub max_subscriptions: u32,
 }
 
 impl ResourceLimits {
-    /// Get resource limits for a specific trust score
+    /// Get resource limits from policy constraints.
+    ///
+    /// This follows the "Meaning Firewall" principle: the kernel blindly enforces
+    /// limits provided by the PolicyOracle without understanding trust semantics.
+    pub fn from_constraints(constraints: &icn_kernel_api::authz::ConstraintSet) -> Self {
+        Self {
+            // Using max_message_size for both pull and push for now, casting u64 to u32
+            max_pull_bytes: constraints.max_message_size.map(|s| (s as u32)).unwrap_or(64 * 1024_u32),
+            max_push_bytes: constraints.max_message_size.map(|s| (s as u32)).unwrap_or(64 * 1024_u32),
+            max_outstanding_reqs: constraints.max_outstanding_requests.unwrap_or(1),
+            // Time-based limits (using defaults if not in ConstraintSet)
+            retry_min_ms: 1500,
+            retry_max_ms: 5000,
+            max_subscriptions: constraints.max_subscriptions.unwrap_or(10),
+        }
+    }
+
+    /// [DEPRECATED] Get resource limits for a specific trust score.
+    /// Use `from_constraints` instead to avoid hardcoding trust thresholds in the kernel.
     pub fn for_trust_score(score: f64) -> Self {
         if score >= 0.7 {
             // Federated
@@ -570,7 +588,7 @@ impl ResourceLimits {
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
                 retry_max_ms: 1200,
-                max_subscriptions: 1000,
+                max_subscriptions: 1000_u32,
             }
         } else if score >= 0.4 {
             // Partner
@@ -580,7 +598,7 @@ impl ResourceLimits {
                 max_outstanding_reqs: 3,
                 retry_min_ms: 300,
                 retry_max_ms: 1200,
-                max_subscriptions: 500,
+                max_subscriptions: 500_u32,
             }
         } else if score >= 0.1 {
             // Known
@@ -590,7 +608,7 @@ impl ResourceLimits {
                 max_outstanding_reqs: 2,
                 retry_min_ms: 800,
                 retry_max_ms: 2500,
-                max_subscriptions: 100,
+                max_subscriptions: 100_u32,
             }
         } else {
             // Isolated
@@ -600,8 +618,22 @@ impl ResourceLimits {
                 max_outstanding_reqs: 1,
                 retry_min_ms: 1500,
                 retry_max_ms: 5000,
-                max_subscriptions: 10,
+                max_subscriptions: 10_u32,
             }
+        }
+    }
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        // Default to "Isolated" class limits
+        Self {
+            max_pull_bytes: 64 * 1024,
+            max_push_bytes: 64 * 1024,
+            max_outstanding_reqs: 1,
+            retry_min_ms: 1500,
+            retry_max_ms: 5000,
+            max_subscriptions: 10_u32,
         }
     }
 }

@@ -162,6 +162,10 @@ pub struct ConstraintSet {
     pub max_message_size: Option<u64>,
     /// Maximum concurrent connections
     pub max_connections: Option<u32>,
+    /// Maximum subscriptions this actor can have
+    pub max_subscriptions: Option<u32>,
+    /// Maximum outstanding requests
+    pub max_outstanding_requests: Option<u32>,
     /// App-specific constraints (bounded, serializable)
     pub custom: HashMap<String, ConstraintValue>,
 }
@@ -170,6 +174,14 @@ impl ConstraintSet {
     /// Create an empty constraint set.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Get trust score from custom constraints if present.
+    pub fn get_trust_score(&self) -> Option<f64> {
+        self.custom.get("trust_score").and_then(|v| match v {
+            ConstraintValue::Float(f) => Some(f.into_inner()),
+            _ => None,
+        })
     }
 
     /// Set rate limit.
@@ -208,6 +220,18 @@ impl ConstraintSet {
         self
     }
 
+    /// Set max subscriptions.
+    pub fn with_max_subscriptions(mut self, max: u32) -> Self {
+        self.max_subscriptions = Some(max);
+        self
+    }
+
+    /// Set max outstanding requests.
+    pub fn with_max_outstanding_requests(mut self, max: u32) -> Self {
+        self.max_outstanding_requests = Some(max);
+        self
+    }
+
     /// Add a custom constraint.
     pub fn with_custom(mut self, key: impl Into<String>, value: ConstraintValue) -> Self {
         self.custom.insert(key.into(), value);
@@ -233,6 +257,12 @@ impl ConstraintSet {
         }
         if other.max_connections.is_some() {
             self.max_connections = other.max_connections;
+        }
+        if other.max_subscriptions.is_some() {
+            self.max_subscriptions = other.max_subscriptions;
+        }
+        if other.max_outstanding_requests.is_some() {
+            self.max_outstanding_requests = other.max_outstanding_requests;
         }
         for (k, v) in &other.custom {
             self.custom.insert(k.clone(), v.clone());

@@ -12,7 +12,7 @@ use crate::types::{
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
-use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyRequest};
+use icn_kernel_api::authz::{ActionKind, Domain, PolicyRequest};
 use tracing::{debug, warn};
 
 impl GossipActor {
@@ -89,27 +89,21 @@ impl GossipActor {
 
         // Get trust class and limits
         // Get trust score and limits
-        let trust_score = if let Some(oracle) = &self.oracle {
+        // Get trust score and constraints from Oracle
+        let mut _trust_score = 0.0;
+        let mut limits = ResourceLimits::default();
+
+        if let Some(oracle) = &self.oracle {
             let req = PolicyRequest::new(
                 peer_did.to_string(),
                 ActionKind::Subscribe, // treat pull as subscribe for now? Or generic access
                 Domain::trust(),
             );
-            match oracle.evaluate(&req) {
-                icn_kernel_api::authz::PolicyDecision::Allow { constraints } => constraints
-                    .custom
-                    .get("trust_score")
-                    .and_then(|v| match v {
-                        ConstraintValue::Float(f) => Some(f.into_inner()),
-                        _ => None,
-                    })
-                    .unwrap_or(0.0),
-                _ => 0.0,
+            if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } = oracle.evaluate(&req) {
+                _trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                limits = ResourceLimits::from_constraints(&constraints);
             }
-        } else {
-            0.0
-        };
-        let limits = ResourceLimits::for_trust_score(trust_score);
+        }
         let max_bytes = limits.max_pull_bytes;
 
         // Empty want_ids means "send all entries"
@@ -373,28 +367,21 @@ impl GossipActor {
                 icn_obs::metrics::gossip::pull_continuation_received_inc();
 
                 // Get trust-based limits for continuation
-                // Get trust-based limits for continuation
-                let trust_score = if let Some(oracle) = &self.oracle {
+                // Get trust score and constraints from Oracle
+                let mut _trust_score = 0.0;
+                let mut limits = ResourceLimits::default();
+
+                if let Some(oracle) = &self.oracle {
                     let req = PolicyRequest::new(
                         peer_for_continuation.to_string(),
                         ActionKind::Subscribe,
                         Domain::trust(),
                     );
-                    match oracle.evaluate(&req) {
-                        icn_kernel_api::authz::PolicyDecision::Allow { constraints } => constraints
-                            .custom
-                            .get("trust_score")
-                            .and_then(|v| match v {
-                                ConstraintValue::Float(f) => Some(f.into_inner()),
-                                _ => None,
-                            })
-                            .unwrap_or(0.0),
-                        _ => 0.0,
+                    if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } = oracle.evaluate(&req) {
+                        _trust_score = constraints.get_trust_score().unwrap_or(0.0);
+                        limits = ResourceLimits::from_constraints(&constraints);
                     }
-                } else {
-                    0.0
-                };
-                let limits = ResourceLimits::for_trust_score(trust_score);
+                }
 
                 // Check backpressure before continuing
                 let can_continue = self
