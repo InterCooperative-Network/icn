@@ -921,6 +921,7 @@ impl PolicyOracle for TrustPolicyOracle {
                     })
                 } else {
                     debug!("TrustOracle contention: falling back to block_in_place");
+                    metrics::counter!("trust_oracle_block_in_place_total").increment(1);
                     tokio::task::block_in_place(|| {
                         let graph = handle.blocking_read();
                         graph.compute_trust_score(&target_did).unwrap_or_else(|e| {
