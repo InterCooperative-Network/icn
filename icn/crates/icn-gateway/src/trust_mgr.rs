@@ -839,7 +839,7 @@ pub struct TrustPolicyOracle {
 
 impl TrustPolicyOracle {
     /// Compute trust score using local algorithm (helper for standalone mode)
-    fn compute_local(&self, target_did: &String) -> f64 {
+    fn compute_local(&self, target_did: &str) -> f64 {
         let Some(ref own_did) = self.own_did else {
             return DEFAULT_TRUST_SCORE;
         };
@@ -1234,6 +1234,65 @@ mod tests {
         // Wait for all to complete
         for handle in handles {
             handle.await.unwrap();
+        }
+    }
+
+    #[test]
+    fn test_trust_oracle_standalone() {
+        use icn_kernel_api::{ActionKind, ConstraintValue};
+
+        let mut manager = TrustManager::new();
+        // Setup direct trust: Own -> Alice (0.8)
+        // Setup transitive trust: Own -> Alice -> Bob (0.9)
+        // Expected for Bob: 0.7*0 (direct) + 0.3*0.8*0.9 (transitive) = 0.216
+
+        let own = KeyPair::generate().unwrap().did().clone();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Configure manager perspective
+        manager.set_perspective(own.clone());
+
+        // Add edges to underlying storage synchronously
+        let edge1 = TrustEdge::new(own.clone(), alice.clone(), TrustScore::unchecked(0.8));
+        manager.add_edge(edge1).unwrap();
+
+        let edge2 = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9));
+        manager.add_edge(edge2).unwrap();
+
+        // Create oracle
+        let oracle = manager.as_oracle();
+
+        // Check Domain
+        // icn_kernel_api::Did is type alias for String
+        let req = PolicyRequest::new(
+            bob.to_string(),
+            ActionKind::custom("connect"),
+            icn_kernel_api::Domain::trust(),
+        );
+
+        // Evaluate
+        let decision = oracle.evaluate(&req);
+
+        // Verify decision
+        if let PolicyDecision::Allow { constraints } = decision {
+            let score_val = constraints.custom.get("trust_score").unwrap();
+            let score = match score_val {
+                ConstraintValue::Float(f) => f.into_inner(),
+                _ => panic!("Expected Float constraint, got {:?}", score_val),
+            };
+
+            // Calculation:
+            // Direct: 0.0
+            // Transitive: 0.8 * 0.9 = 0.72
+            // Total: 0.0*0.7 + 0.72*0.3 = 0.216
+            assert!(
+                (score - 0.216).abs() < 0.001,
+                "Expected ~0.216, got {}",
+                score
+            );
+        } else {
+            panic!("Should satisfy trust policy");
         }
     }
 }
