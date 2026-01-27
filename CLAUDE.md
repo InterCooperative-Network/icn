@@ -385,7 +385,7 @@ See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issu
 
 **Trust-gated rate limiting** (per trust class):
 - Isolated (< 0.1): 10 msg/sec
-- Known (0.1-0.4): 50 msg/sec
+- Known (0.1-0.4): 20 msg/sec
 - Partner (0.4-0.7): 100 msg/sec
 - Federated (0.7+): 200 msg/sec
 

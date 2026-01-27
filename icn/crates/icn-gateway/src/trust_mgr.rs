@@ -58,6 +58,8 @@ use tracing::{debug, warn};
 /// 2. Running in standalone mode without a configured perspective DID
 /// 3. The target DID has no trust edges (neither direct nor transitive)
 pub const DEFAULT_TRUST_SCORE: f64 = 0.5;
+const DIRECT_TRUST_WEIGHT: f64 = 0.7;
+const TRANSITIVE_TRUST_WEIGHT: f64 = 0.3;
 
 /// Trust edge for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -841,51 +843,54 @@ impl TrustPolicyOracle {
         let Some(ref own_did) = self.own_did else {
             return DEFAULT_TRUST_SCORE;
         };
-
+    
         let Some(ref edges) = self.standalone_edges else {
             return DEFAULT_TRUST_SCORE;
         };
 
-        // Simplified computation reused from TrustManager logic
-        // We can't reuse the method directly because we don't have &self of TrustManager
-        // But the logic is simple enough to duplicate for the standalone/test usage
+        compute_trust_from_edges_map(own_did.as_str(), target_did, edges)
+    }
+}
 
-        // 1. Direct trust
-        let key = format!("{}:{}", own_did.as_str(), target_did);
-        let direct_score = edges.get(&key).map(|e| e.score.value()).unwrap_or(0.0);
 
-        // 2. Transitive trust (1 hop only for simplicity in oracle)
-        let prefix = format!("{}:", own_did.as_str());
-        let outgoing: Vec<_> = edges
-            .iter()
-            .filter(|entry| entry.key().starts_with(&prefix))
-            .map(|entry| entry.value().clone())
-            .collect();
 
-        let mut transitive_sum = 0.0;
-        let mut transitive_count = 0;
+/// Helper to compute trust score from edges map (for standalone mode)
+fn compute_trust_from_edges_map(own_did: &str, target_did: &str, edges: &DashMap<String, TrustEdge>) -> f64 {
+    // 1. Direct trust
+    let key = format!("{}:{}", own_did, target_did);
+    let direct_score = edges.get(&key).map(|e| e.score.value()).unwrap_or(0.0);
 
-        for mid in outgoing {
-            if mid.target.to_string() == *target_did {
-                continue;
-            }
+    // 2. Transitive trust (1 hop only for simplicity in oracle)
+    let prefix = format!("{}:", own_did);
+    let outgoing: Vec<_> = edges
+        .iter()
+        .filter(|entry| entry.key().starts_with(&prefix))
+        .map(|entry| entry.value().clone())
+        .collect();
 
-            let key2 = format!("{}:{}", mid.target, target_did);
-            if let Some(indirect) = edges.get(&key2) {
-                let weight = mid.score.value() * indirect.score.value();
-                transitive_sum += weight;
-                transitive_count += 1;
-            }
+    let mut transitive_sum = 0.0;
+    let mut transitive_count = 0;
+
+    for mid in outgoing {
+        if mid.target.to_string() == *target_did {
+            continue;
         }
 
-        let transitive_score = if transitive_count > 0 {
-            transitive_sum / (transitive_count as f64)
-        } else {
-            0.0
-        };
-
-        (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
+        let key2 = format!("{}:{}", mid.target, target_did);
+        if let Some(indirect) = edges.get(&key2) {
+            let weight = mid.score.value() * indirect.score.value();
+            transitive_sum += weight;
+            transitive_count += 1;
+        }
     }
+
+    let transitive_score = if transitive_count > 0 {
+        transitive_sum / (transitive_count as f64)
+    } else {
+        0.0
+    };
+
+    (direct_score * DIRECT_TRUST_WEIGHT + transitive_score * TRANSITIVE_TRUST_WEIGHT).min(1.0)
 }
 
 impl PolicyOracle for TrustPolicyOracle {
