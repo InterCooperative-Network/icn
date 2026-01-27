@@ -1,15 +1,13 @@
 //! Trust API endpoints
 
+use crate::error::{GatewayError, Result};
+use crate::events::{EventBroadcaster, GatewayEvent};
+use crate::trust_mgr::{TrustManager, TRUST_ISOLATED_MAX, TRUST_KNOWN_MAX, TRUST_PARTNER_MAX};
 use actix_web::{get, post, web, HttpResponse};
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
-
-use crate::error::{GatewayError, Result};
-use crate::events::{EventBroadcaster, GatewayEvent};
-use crate::trust_mgr::TrustManager;
-use icn_identity::Did;
-use icn_trust::{TrustEdge, TrustScore};
 
 /// Trust score response
 #[derive(Debug, Serialize, ToSchema)]
@@ -50,11 +48,12 @@ pub async fn get_trust_score(
         .compute_trust_score_async(&from, &target_did)
         .await;
 
-    let trust_class = if trust_score < 0.1 {
+    // Use centralized threshold constants for trust class determination
+    let trust_class = if trust_score < TRUST_ISOLATED_MAX {
         "Isolated"
-    } else if trust_score < 0.4 {
+    } else if trust_score < TRUST_KNOWN_MAX {
         "Known"
-    } else if trust_score < 0.7 {
+    } else if trust_score < TRUST_PARTNER_MAX {
         "Partner"
     } else {
         "Federated"
@@ -113,22 +112,12 @@ pub async fn create_trust_attestation(
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
-    // Validate score range and create TrustScore
-    let trust_score = TrustScore::new(req.score)
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {e}")))?;
-
     let from = from_did.into_inner();
-    let mut edge = TrustEdge::new(from.clone(), to_did.clone(), trust_score);
-
-    // Add memo as label if provided
-    if let Some(ref memo) = req.memo {
-        edge = edge.with_label(memo.clone());
-    }
 
     trust_manager
-        .add_edge_async(edge)
+        .add_edge_with_score(from.clone(), to_did.clone(), req.score, req.memo.clone())
         .await
-        .map_err(GatewayError::InternalError)?;
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {}", e)))?;
 
     // Broadcast event to target DID (they received a trust attestation)
     // Use target's DID as the "coop_id" for personal notifications
@@ -230,6 +219,8 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_trust_edges() {
+        // Import domain types only where needed (not in main API code)
+        use icn_trust::{TrustEdge, TrustScore};
         let trust_manager = Arc::new(TrustManager::new());
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
