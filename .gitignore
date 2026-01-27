@@ -80,3 +80,4 @@ sims/mutual-credit/*.png
 
 # Kubernetes deployment - now tracked in git
 # deploy/k8s/ is tracked, but secret.yaml is ignored via deploy/k8s/.gitignore
+icn/Cargo.lock

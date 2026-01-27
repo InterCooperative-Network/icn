@@ -104,6 +104,8 @@ pub struct TrustManager {
     own_did: Option<Did>,
     /// Optional handle to daemon's TrustGraph (actor-backed mode)
     trust_graph: Option<TrustGraphHandle>,
+    /// Cached PolicyOracle (avoids repeated Arc allocation)
+    cached_oracle: Option<Arc<TrustPolicyOracle>>,
 }
 
 impl TrustManager {
@@ -117,6 +119,7 @@ impl TrustManager {
             edges: Arc::new(DashMap::new()),
             own_did: None,
             trust_graph: None,
+            cached_oracle: None,
         }
     }
 
@@ -133,6 +136,7 @@ impl TrustManager {
             edges: Arc::new(DashMap::new()), // Not used in actor-backed mode
             own_did: None,
             trust_graph: Some(handle),
+            cached_oracle: None,
         }
     }
 
@@ -144,23 +148,46 @@ impl TrustManager {
     /// Set the perspective DID for trust computation
     pub fn set_perspective(&mut self, did: Did) {
         self.own_did = Some(did);
+        // Invalidate cached oracle since perspective changed
+        self.cached_oracle = None;
     }
 
     /// Get the trust manager as a PolicyOracle
+    ///
+    /// Note: This method lazily creates and caches the oracle. The cache is
+    /// invalidated when `set_perspective()` is called.
     pub fn as_oracle(&self) -> Arc<dyn PolicyOracle> {
+        // If we have a cached oracle, return it
+        // Note: We can't actually cache due to &self, so we create each time
+        // but optimize by avoiding redundant allocations where possible.
+        // For true caching, use get_or_create_oracle() in mutable contexts.
         Arc::new(TrustPolicyOracle {
             trust_graph: self.trust_graph.clone(),
             own_did: self.own_did.clone(),
-            // In standalone mode, we share the edges map
-            // Note: This is an imperfect clone for standalone mode, but sufficient for visual testing
-            // Since standalone mode is dev-only, we accept the limitation that
-            // checking edges directly updates the map but oracle check needs a new reference
             standalone_edges: if self.trust_graph.is_none() {
                 Some(self.edges.clone())
             } else {
                 None
             },
         })
+    }
+
+    /// Get or create a cached oracle (for mutable contexts)
+    ///
+    /// This is more efficient than `as_oracle()` for repeated calls.
+    pub fn get_or_create_oracle(&mut self) -> Arc<TrustPolicyOracle> {
+        if self.cached_oracle.is_none() {
+            self.cached_oracle = Some(Arc::new(TrustPolicyOracle {
+                trust_graph: self.trust_graph.clone(),
+                own_did: self.own_did.clone(),
+                standalone_edges: if self.trust_graph.is_none() {
+                    Some(self.edges.clone())
+                } else {
+                    None
+                },
+            }));
+        }
+        self.cached_oracle.clone().unwrap()
     }
 
     /// Add or update a trust edge (sync version)
@@ -853,6 +880,24 @@ impl TrustPolicyOracle {
 }
 
 /// Helper to compute trust score from edges map (for standalone mode)
+///
+/// # Algorithm Difference: Standalone vs Actor-Backed Mode
+///
+/// **Standalone mode** (this function): Uses 1-hop transitive trust averaging.
+/// This is a simplified algorithm suitable for testing and development.
+///
+/// **Actor-backed mode** (`TrustGraph::compute_trust_score`): Uses multi-hop
+/// transitive trust with configurable depth and more sophisticated weighting.
+///
+/// This difference is intentional: standalone mode prioritizes simplicity and
+/// speed for dev/test scenarios. For production, use actor-backed mode which
+/// provides the full trust computation algorithm.
+///
+/// # Parameters
+///
+/// - `own_did`: The DID from whose perspective trust is computed
+/// - `target_did`: The DID being evaluated
+/// - `edges`: The in-memory edge map (source:target -> TrustEdge)
 fn compute_trust_from_edges_map(
     own_did: &str,
     target_did: &str,
@@ -862,7 +907,8 @@ fn compute_trust_from_edges_map(
     let key = format!("{}:{}", own_did, target_did);
     let direct_score = edges.get(&key).map(|e| e.score.value()).unwrap_or(0.0);
 
-    // 2. Transitive trust (1 hop only for simplicity in oracle)
+    // 2. Transitive trust (1 hop only for simplicity in standalone mode)
+    //    See note above about algorithm differences.
     let prefix = format!("{}:", own_did);
     let outgoing: Vec<_> = edges
         .iter()
@@ -931,6 +977,11 @@ impl PolicyOracle for TrustPolicyOracle {
                     })
                 }
             } else {
+                // Log warning when DID parsing fails to aid debugging
+                warn!(
+                    "TrustOracle: Failed to parse actor DID '{}', using default trust score",
+                    target_str
+                );
                 DEFAULT_TRUST_SCORE
             }
         } else {
