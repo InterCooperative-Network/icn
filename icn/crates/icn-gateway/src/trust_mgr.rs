@@ -843,7 +843,7 @@ impl TrustPolicyOracle {
         let Some(ref own_did) = self.own_did else {
             return DEFAULT_TRUST_SCORE;
         };
-    
+
         let Some(ref edges) = self.standalone_edges else {
             return DEFAULT_TRUST_SCORE;
         };
@@ -852,10 +852,12 @@ impl TrustPolicyOracle {
     }
 }
 
-
-
 /// Helper to compute trust score from edges map (for standalone mode)
-fn compute_trust_from_edges_map(own_did: &str, target_did: &str, edges: &DashMap<String, TrustEdge>) -> f64 {
+fn compute_trust_from_edges_map(
+    own_did: &str,
+    target_did: &str,
+    edges: &DashMap<String, TrustEdge>,
+) -> f64 {
     // 1. Direct trust
     let key = format!("{}:{}", own_did, target_did);
     let direct_score = edges.get(&key).map(|e| e.score.value()).unwrap_or(0.0);
