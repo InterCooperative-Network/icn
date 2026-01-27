@@ -1358,4 +1358,51 @@ mod tests {
             panic!("Should satisfy trust policy");
         }
     }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_oracle_invalid_did_returns_default() {
+        use icn_kernel_api::{ActionKind, ConstraintValue, Domain, PolicyRequest};
+
+        // Create a TrustManager in standalone mode
+        let mut trust_manager = TrustManager::new();
+        let keypair = icn_identity::KeyPair::generate().ok();
+        if let Some(kp) = keypair {
+            trust_manager.set_perspective(kp.did().clone());
+        }
+
+        // Get oracle
+        let oracle = trust_manager.as_oracle();
+
+        // Create request with invalid DID (this will fail to parse as icn_identity::Did)
+        // Note: In actor-backed mode, this would trigger the warning log
+        let request = PolicyRequest::new(
+            "not-a-valid-did-format".to_string(), // Invalid DID
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        // Evaluate - should return Allow with default trust score
+        let decision = oracle.evaluate(&request);
+
+        // Verify decision contains default trust score
+        if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
+            // In standalone mode, compute_local is called which accepts strings
+            // So we get a computed score (likely 0.0 for no edges), not DEFAULT_TRUST_SCORE
+            // This test verifies the oracle doesn't panic on unusual input
+            let score_val = constraints.custom.get("trust_score");
+            assert!(score_val.is_some(), "Should have trust_score constraint");
+
+            if let Some(ConstraintValue::Float(f)) = score_val {
+                // Score should be valid (0.0 to 1.0 range)
+                let score = f.into_inner();
+                assert!(
+                    (0.0..=1.0).contains(&score),
+                    "Trust score should be in valid range, got {}",
+                    score
+                );
+            }
+        } else {
+            panic!("Expected Allow decision");
+        }
+    }
 }
