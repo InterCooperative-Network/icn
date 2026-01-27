@@ -592,3 +592,32 @@ async fn test_http_trust_middleware_fallback_allows_requests() {
         );
     }
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_trust_oracle_abstains_on_wrong_domain() {
+    use icn_kernel_api::{ActionKind, Domain, PolicyDecision, PolicyRequest};
+
+    // Create trust graph with self-DID
+    let (_self_kp, self_did) = create_test_did("self");
+    let trust_graph = Arc::new(RwLock::new(create_test_trust_graph(self_did.clone()).await));
+    let trust_manager = create_trust_manager(trust_graph);
+    let oracle = trust_manager.as_oracle();
+
+    // Create request for "ledger" domain (not "trust")
+    let request = PolicyRequest::new(
+        "did:icn:test".to_string(),
+        ActionKind::Read,
+        Domain::new("ledger"),
+    );
+
+    let decision = oracle.evaluate(&request);
+
+    // Should return Allow with empty constraints (Abstain)
+    match decision {
+        PolicyDecision::Allow { constraints } => {
+            assert!(constraints.custom.is_empty(), "Custom constraints should be empty");
+            assert!(constraints.rate_limit.is_none(), "Rate limit should be None");
+        }
+        _ => panic!("Should allow non-trust domains (abstain), got {:?}", decision),
+    }
+}
