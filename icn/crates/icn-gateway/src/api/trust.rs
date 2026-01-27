@@ -4,13 +4,11 @@ use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
-
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
 // TrustScore removed
-
 
 /// Trust score response
 #[derive(Debug, Serialize, ToSchema)]
