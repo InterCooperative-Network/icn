@@ -61,6 +61,16 @@ pub const DEFAULT_TRUST_SCORE: f64 = 0.5;
 const DIRECT_TRUST_WEIGHT: f64 = 0.7;
 const TRANSITIVE_TRUST_WEIGHT: f64 = 0.3;
 
+// Trust class thresholds (single source of truth)
+// These define the trust score boundaries for rate limiting
+/// Threshold below which a peer is considered "Isolated" (untrusted)
+pub const TRUST_ISOLATED_MAX: f64 = 0.1;
+/// Threshold below which a peer is considered "Known" (recognized but not endorsed)
+pub const TRUST_KNOWN_MAX: f64 = 0.4;
+/// Threshold below which a peer is considered "Partner" (trusted collaborator)
+pub const TRUST_PARTNER_MAX: f64 = 0.7;
+// Above TRUST_PARTNER_MAX = "Federated" (highly trusted)
+
 /// Trust edge for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustEdgeResponse {
@@ -176,18 +186,19 @@ impl TrustManager {
     ///
     /// This is more efficient than `as_oracle()` for repeated calls.
     pub fn get_or_create_oracle(&mut self) -> Arc<TrustPolicyOracle> {
-        if self.cached_oracle.is_none() {
-            self.cached_oracle = Some(Arc::new(TrustPolicyOracle {
-                trust_graph: self.trust_graph.clone(),
-                own_did: self.own_did.clone(),
-                standalone_edges: if self.trust_graph.is_none() {
-                    Some(self.edges.clone())
-                } else {
-                    None
-                },
-            }));
-        }
-        self.cached_oracle.clone().unwrap()
+        self.cached_oracle
+            .get_or_insert_with(|| {
+                Arc::new(TrustPolicyOracle {
+                    trust_graph: self.trust_graph.clone(),
+                    own_did: self.own_did.clone(),
+                    standalone_edges: if self.trust_graph.is_none() {
+                        Some(self.edges.clone())
+                    } else {
+                        None
+                    },
+                })
+            })
+            .clone()
     }
 
     /// Add or update a trust edge (sync version)
@@ -995,16 +1006,16 @@ impl PolicyOracle for TrustPolicyOracle {
         // Add trust score as custom constraint
         constraints = constraints.with_custom("trust_score", score.into());
 
-        // Add rate limiting based on score
-        // - Isolated: < 0.1
-        // - Known: 0.1-0.4
-        // - Partner: 0.4-0.7
-        // - Federated: > 0.7
-        let rate_limit = if score > 0.7 {
+        // Add rate limiting based on score using threshold constants
+        // - Isolated: < TRUST_ISOLATED_MAX (0.1)
+        // - Known: TRUST_ISOLATED_MAX - TRUST_KNOWN_MAX
+        // - Partner: TRUST_KNOWN_MAX - TRUST_PARTNER_MAX
+        // - Federated: > TRUST_PARTNER_MAX
+        let rate_limit = if score > TRUST_PARTNER_MAX {
             icn_kernel_api::RateLimit::new(200, 50) // Federated
-        } else if score > 0.4 {
+        } else if score > TRUST_KNOWN_MAX {
             icn_kernel_api::RateLimit::standard() // Partner (100/25)
-        } else if score > 0.1 {
+        } else if score > TRUST_ISOLATED_MAX {
             icn_kernel_api::RateLimit::throttled() // Known (20/10)
         } else {
             icn_kernel_api::RateLimit::restricted() // Isolated (5/5)
