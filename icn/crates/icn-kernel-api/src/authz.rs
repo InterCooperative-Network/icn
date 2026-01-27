@@ -177,9 +177,21 @@ impl ConstraintSet {
     }
 
     /// Get trust score from custom constraints if present.
+    ///
+    /// Returns `None` if:
+    /// - No `trust_score` key exists in custom constraints
+    /// - The value is not a float
+    /// - The value is outside the valid range [0.0, 1.0]
     pub fn get_trust_score(&self) -> Option<f64> {
         self.custom.get("trust_score").and_then(|v| match v {
-            ConstraintValue::Float(f) => Some(f.into_inner()),
+            ConstraintValue::Float(f) => {
+                let score = f.into_inner();
+                if (0.0..=1.0).contains(&score) {
+                    Some(score)
+                } else {
+                    None
+                }
+            }
             _ => None,
         })
     }
