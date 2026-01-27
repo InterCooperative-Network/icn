@@ -2627,7 +2627,7 @@ impl GovernanceEventHandler {
                     &proposal_id,
                     &registry,
                     auto_accept_vouch_threshold,
-                    trust_decay_factor.map(|s| s.value()),
+                    trust_decay_factor,
                     max_attestations_per_minute,
                 );
             }
