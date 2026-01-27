@@ -162,15 +162,19 @@ impl TrustManager {
         self.cached_oracle = None;
     }
 
-    /// Get the trust manager as a PolicyOracle
+    /// Get the trust manager as a PolicyOracle (creates new instance)
     ///
-    /// Note: This method lazily creates and caches the oracle. The cache is
-    /// invalidated when `set_perspective()` is called.
+    /// This method creates a new `TrustPolicyOracle` wrapped in an `Arc` each time
+    /// it's called. For repeated calls in the same context, prefer using
+    /// `get_or_create_oracle()` which caches the oracle instance.
+    ///
+    /// # When to use which method
+    ///
+    /// - Use `as_oracle()` when you need a `Arc<dyn PolicyOracle>` trait object
+    ///   for passing to kernel APIs or one-off evaluations.
+    /// - Use `get_or_create_oracle()` when you need repeated evaluations and
+    ///   have mutable access to the TrustManager.
     pub fn as_oracle(&self) -> Arc<dyn PolicyOracle> {
-        // If we have a cached oracle, return it
-        // Note: We can't actually cache due to &self, so we create each time
-        // but optimize by avoiding redundant allocations where possible.
-        // For true caching, use get_or_create_oracle() in mutable contexts.
         Arc::new(TrustPolicyOracle {
             trust_graph: self.trust_graph.clone(),
             own_did: self.own_did.clone(),
@@ -255,6 +259,9 @@ impl TrustManager {
     }
 
     /// Add a trust edge from raw parts (f64 score)
+    ///
+    /// Validation is performed by `TrustScore::new()` which ensures
+    /// the score is in the valid range [0.0, 1.0].
     pub async fn add_edge_with_score(
         &self,
         from: Did,
@@ -262,9 +269,7 @@ impl TrustManager {
         score: f64,
         memo: Option<String>,
     ) -> Result<(), String> {
-        // Validate score
-        crate::validation::validate_trust_score(score).map_err(|e| e.to_string())?;
-
+        // TrustScore::new validates the score is in [0.0, 1.0] range
         let trust_score = TrustScore::new(score).map_err(|e| e.to_string())?;
         let mut edge = TrustEdge::new(from, to, trust_score);
 

@@ -2,7 +2,7 @@
 
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
-use crate::trust_mgr::TrustManager;
+use crate::trust_mgr::{TrustManager, TRUST_ISOLATED_MAX, TRUST_KNOWN_MAX, TRUST_PARTNER_MAX};
 use actix_web::{get, post, web, HttpResponse};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
@@ -48,11 +48,12 @@ pub async fn get_trust_score(
         .compute_trust_score_async(&from, &target_did)
         .await;
 
-    let trust_class = if trust_score < 0.1 {
+    // Use centralized threshold constants for trust class determination
+    let trust_class = if trust_score < TRUST_ISOLATED_MAX {
         "Isolated"
-    } else if trust_score < 0.4 {
+    } else if trust_score < TRUST_KNOWN_MAX {
         "Known"
-    } else if trust_score < 0.7 {
+    } else if trust_score < TRUST_PARTNER_MAX {
         "Partner"
     } else {
         "Federated"
