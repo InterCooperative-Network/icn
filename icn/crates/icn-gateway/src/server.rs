@@ -309,8 +309,6 @@ impl GatewayServer {
         self
     }
 
-
-
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
@@ -568,8 +566,6 @@ impl GatewayServer {
             rate_limit_config.capacity, rate_limit_config.refill_rate
         );
         let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
-
-
 
         // Create IP-based rate limiter for auth endpoints and interest submissions
         // Used for DoS protection on sensitive endpoints
@@ -832,7 +828,6 @@ impl GatewayServer {
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
-
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)

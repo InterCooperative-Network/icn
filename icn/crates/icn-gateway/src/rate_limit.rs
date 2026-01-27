@@ -21,14 +21,12 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use actix_web::{dev::ServiceRequest, Error, HttpMessage};
-use tracing::{warn, error};
+use tracing::{error, warn};
 
 use crate::auth::TokenClaims;
 use crate::error::GatewayError;
+use icn_kernel_api::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_obs::metrics::gateway;
-use icn_kernel_api::{
-    ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
-};
 
 // Local definitions tailored for Gateway needs
 // (IpRateLimiter, VelocityLimiter, etc. are defined below)
@@ -150,7 +148,9 @@ impl TokenBucket {
 
     /// Update bucket configuration
     fn update_config(&mut self, capacity: f64, refill_rate: f64) {
-        if (self.capacity - capacity).abs() > f64::EPSILON || (self.refill_rate - refill_rate).abs() > f64::EPSILON {
+        if (self.capacity - capacity).abs() > f64::EPSILON
+            || (self.refill_rate - refill_rate).abs() > f64::EPSILON
+        {
             self.capacity = capacity;
             self.refill_rate = refill_rate;
             // Fill to new capacity? Or just cap?
@@ -482,8 +482,6 @@ impl IpRateLimiter {
 // Trust-Gated Rate Limiter (Issue #500)
 // ============================================================================
 
-
-
 /// Trust-gated rate limiting middleware
 ///
 /// Applies policy-based rate limits using the PolicyOracle.
@@ -559,7 +557,7 @@ pub async fn trust_rate_limit_middleware(
         }
         PolicyDecision::Deny { reason } => {
             warn!("Access denied by policy for DID {}: {}", did, reason);
-             Err(Error::from(GatewayError::Forbidden(reason.to_string())))
+            Err(Error::from(GatewayError::Forbidden(reason.to_string())))
         }
     }
 }

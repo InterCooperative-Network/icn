@@ -54,17 +54,19 @@ impl GossipActor {
                 ActionKind::Read, // Treat general message handling as 'Read' access or basic interaction
                 Domain::trust(),
             );
-            
+
             match oracle.evaluate(&req) {
-                 icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
-                     let score = constraints.custom.get("trust_score")
-                         .and_then(|v| match v {
-                             ConstraintValue::Float(f) => Some(f.into_inner()),
-                             _ => None,
-                         })
-                         .unwrap_or(0.0);
-                     
-                     if score < MIN_TRUST_FOR_MESSAGE {
+                icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
+                    let score = constraints
+                        .custom
+                        .get("trust_score")
+                        .and_then(|v| match v {
+                            ConstraintValue::Float(f) => Some(f.into_inner()),
+                            _ => None,
+                        })
+                        .unwrap_or(0.0);
+
+                    if score < MIN_TRUST_FOR_MESSAGE {
                         warn!(
                             peer_did = %sender,
                             trust_score = score,
@@ -76,18 +78,18 @@ impl GossipActor {
                         anyhow::bail!(
                             "Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
                         );
-                     }
-                 },
-                 icn_kernel_api::authz::PolicyDecision::Deny { reason } => {
-                     warn!(
-                        peer_did = %sender,
-                        reason = %reason,
-                        message_type = message.variant_name(),
-                        "Rejecting message: denied by policy"
-                     );
-                     icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                     anyhow::bail!("Message rejected by policy: {reason}");
-                 }
+                    }
+                }
+                icn_kernel_api::authz::PolicyDecision::Deny { reason } => {
+                    warn!(
+                       peer_did = %sender,
+                       reason = %reason,
+                       message_type = message.variant_name(),
+                       "Rejecting message: denied by policy"
+                    );
+                    icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
+                    anyhow::bail!("Message rejected by policy: {reason}");
+                }
             }
         }
 

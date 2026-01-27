@@ -562,41 +562,45 @@ pub struct ResourceLimits {
 impl ResourceLimits {
     /// Get resource limits for a specific trust score
     pub fn for_trust_score(score: f64) -> Self {
-        if score >= 0.7 { // Federated
+        if score >= 0.7 {
+            // Federated
             Self {
-                 max_pull_bytes: 1024 * 1024, // 1 MB
-                 max_push_bytes: 1024 * 1024,
-                 max_outstanding_reqs: 3,
-                 retry_min_ms: 300,
-                 retry_max_ms: 1200,
-                 max_subscriptions: 1000,
+                max_pull_bytes: 1024 * 1024, // 1 MB
+                max_push_bytes: 1024 * 1024,
+                max_outstanding_reqs: 3,
+                retry_min_ms: 300,
+                retry_max_ms: 1200,
+                max_subscriptions: 1000,
             }
-        } else if score >= 0.4 { // Partner
+        } else if score >= 0.4 {
+            // Partner
             Self {
-                 max_pull_bytes: 1024 * 1024, // 1 MB
-                 max_push_bytes: 1024 * 1024,
-                 max_outstanding_reqs: 3,
-                 retry_min_ms: 300,
-                 retry_max_ms: 1200,
-                 max_subscriptions: 500,
+                max_pull_bytes: 1024 * 1024, // 1 MB
+                max_push_bytes: 1024 * 1024,
+                max_outstanding_reqs: 3,
+                retry_min_ms: 300,
+                retry_max_ms: 1200,
+                max_subscriptions: 500,
             }
-        } else if score >= 0.1 { // Known
+        } else if score >= 0.1 {
+            // Known
             Self {
-                 max_pull_bytes: 256 * 1024, // 256 KB
-                 max_push_bytes: 256 * 1024,
-                 max_outstanding_reqs: 2,
-                 retry_min_ms: 800,
-                 retry_max_ms: 2500,
-                 max_subscriptions: 100,
+                max_pull_bytes: 256 * 1024, // 256 KB
+                max_push_bytes: 256 * 1024,
+                max_outstanding_reqs: 2,
+                retry_min_ms: 800,
+                retry_max_ms: 2500,
+                max_subscriptions: 100,
             }
-        } else { // Isolated
+        } else {
+            // Isolated
             Self {
-                 max_pull_bytes: 64 * 1024, // 64 KB
-                 max_push_bytes: 64 * 1024,
-                 max_outstanding_reqs: 1,
-                 retry_min_ms: 1500,
-                 retry_max_ms: 5000,
-                 max_subscriptions: 10,
+                max_pull_bytes: 64 * 1024, // 64 KB
+                max_push_bytes: 64 * 1024,
+                max_outstanding_reqs: 1,
+                retry_min_ms: 1500,
+                retry_max_ms: 5000,
+                max_subscriptions: 10,
             }
         }
     }

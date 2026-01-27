@@ -18,9 +18,7 @@
 //! - [`GossipActor::get_subscriptions`] - List topics a DID is subscribed to
 //! - [`GossipActor::is_subscribed`] - Check if a DID is subscribed to a topic
 
-use crate::gossip::{
-    spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC,
-};
+use crate::gossip::{spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC};
 use crate::types::{ResourceLimits, Subscription};
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
@@ -45,22 +43,24 @@ impl GossipActor {
                 Domain::trust(),
             );
 
-
             match oracle.evaluate(&req) {
-                 PolicyDecision::Allow { constraints } => {
-                     constraints.custom.get("trust_score")
-                         .and_then(|v| match v {
-                             ConstraintValue::Float(f) => Some(f.into_inner()),
-                             _ => None,
-                         })
-                         .unwrap_or(0.0)
-                 },
-                 PolicyDecision::Deny { reason } => {
-                      warn!("PolicyOracle denied subscription for {}: {}", subscriber, reason);
-                      // If explicitly denied, score is effectively 0 or we should reject outright?
-                      // If we reject outright based on policy:
-                      bail!("Subscription denied by policy: {}", reason);
-                 }
+                PolicyDecision::Allow { constraints } => constraints
+                    .custom
+                    .get("trust_score")
+                    .and_then(|v| match v {
+                        ConstraintValue::Float(f) => Some(f.into_inner()),
+                        _ => None,
+                    })
+                    .unwrap_or(0.0),
+                PolicyDecision::Deny { reason } => {
+                    warn!(
+                        "PolicyOracle denied subscription for {}: {}",
+                        subscriber, reason
+                    );
+                    // If explicitly denied, score is effectively 0 or we should reject outright?
+                    // If we reject outright based on policy:
+                    bail!("Subscription denied by policy: {}", reason);
+                }
             }
         } else {
             0.0
@@ -136,7 +136,7 @@ impl GossipActor {
         // This prevents a single peer from subscribing to too many topics
         let peer_topics = self.get_subscriptions(&subscriber);
         let peer_limit = ResourceLimits::for_trust_score(trust_score).max_subscriptions;
-        
+
         if peer_topics.len() >= peer_limit {
             // Record misbehavior violation
             if let Some(ref detector) = self.misbehavior_detector {

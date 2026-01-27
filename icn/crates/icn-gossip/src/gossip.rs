@@ -7,7 +7,9 @@ use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
 // use icn_trust::TrustClass; // Removed
-use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
+use icn_kernel_api::authz::{
+    ActionKind, ConstraintValue, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
+};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -43,11 +45,6 @@ pub type StorageContentNotFoundCallback =
 
 /// Maximum subscribers per topic to prevent memory exhaustion
 pub const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10000;
-
-
-
-
-
 
 // TrustLookup removed - use PolicyOracle
 // topics_per_peer_limit removed - use PolicyOracle constraints
@@ -776,7 +773,9 @@ impl GossipActor {
                         .custom
                         .get("trust_score")
                         .and_then(|v| match v {
-                            icn_kernel_api::authz::ConstraintValue::Float(f) => Some(f.into_inner()),
+                            icn_kernel_api::authz::ConstraintValue::Float(f) => {
+                                Some(f.into_inner())
+                            }
                             _ => None,
                         })
                         .unwrap_or(0.0)
@@ -1179,7 +1178,10 @@ impl GossipActor {
             let acl = if topic_meta.access_control == "Public" {
                 AccessControl::Public
             } else if topic_meta.access_control.starts_with("MinTrustScore:") {
-                let score_str = topic_meta.access_control.strip_prefix("MinTrustScore:").unwrap_or("0.7");
+                let score_str = topic_meta
+                    .access_control
+                    .strip_prefix("MinTrustScore:")
+                    .unwrap_or("0.7");
                 let score = score_str.parse().unwrap_or(0.7);
                 AccessControl::MinTrustScore(score)
             } else if topic_meta.access_control.starts_with("TrustClass:") {
@@ -1425,7 +1427,9 @@ mod tests {
 
     use super::*;
 
-    use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
+    use icn_kernel_api::authz::{
+        ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
+    };
 
     struct MockPolicyOracle {
         default_score: f64,
@@ -2413,7 +2417,7 @@ mod tests {
         // The test name says `trust_gated_fallback_to_acl`.
         // Prioritizing safety: If you ask for 0.4 trust, and I don't know you, I should reject you.
         // I will change the test to verify REJECTION.
-        
+
         let owner = KeyPair::generate().unwrap().did().clone();
         let alice = KeyPair::generate().unwrap().did().clone();
 
@@ -2454,7 +2458,7 @@ mod tests {
         let topic = Topic::new(
             "test:mixed".to_string(),
             // AccessControl::TrustClass(TrustClass::Partner) -> MinTrustScore(0.4)
-            AccessControl::MinTrustScore(0.4), 
+            AccessControl::MinTrustScore(0.4),
         )
         .with_min_trust_threshold(0.7);
 
@@ -2462,10 +2466,7 @@ mod tests {
 
         // Alice attempts to subscribe - should succeed (has score 0.8 >= 0.7 AND 0.8 >= 0.4)
         let result = gossip.subscribe("test:mixed", alice.clone()).await;
-        assert!(
-            result.is_ok(),
-            "Trust score check should pass"
-        );
+        assert!(result.is_ok(), "Trust score check should pass");
         assert!(gossip.is_subscribed("test:mixed", &alice));
     }
 

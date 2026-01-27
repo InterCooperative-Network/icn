@@ -62,8 +62,6 @@ impl Default for RateLimitConfig {
     }
 }
 
-
-
 /// Enforcement mode for per-person (per-anchor) rate limiting
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum EnforcementMode {
@@ -280,8 +278,6 @@ impl RateLimiter {
             anchor_rate_config: Some(anchor_config),
         }
     }
-
-
 
     /// Convert an oracle decision into a rate limit config (or None if denied).
     fn rate_limit_from_decision(

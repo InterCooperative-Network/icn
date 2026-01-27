@@ -9,10 +9,10 @@ use crate::gossip::GossipActor;
 use crate::types::{
     BloomFilterData, ContentHash, GossipEntry, GossipMessage, ResourceLimits, SyncCursor,
 };
-use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyOracle, PolicyRequest};
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
+use icn_kernel_api::authz::{ActionKind, ConstraintValue, Domain, PolicyOracle, PolicyRequest};
 use tracing::{debug, warn};
 
 impl GossipActor {
@@ -96,15 +96,15 @@ impl GossipActor {
                 Domain::trust(),
             );
             match oracle.evaluate(&req) {
-                 icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
-                     constraints.custom.get("trust_score")
-                         .and_then(|v| match v {
-                             ConstraintValue::Float(f) => Some(f.into_inner()),
-                             _ => None,
-                         })
-                         .unwrap_or(0.0)
-                 },
-                 _ => 0.0,
+                icn_kernel_api::authz::PolicyDecision::Allow { constraints } => constraints
+                    .custom
+                    .get("trust_score")
+                    .and_then(|v| match v {
+                        ConstraintValue::Float(f) => Some(f.into_inner()),
+                        _ => None,
+                    })
+                    .unwrap_or(0.0),
+                _ => 0.0,
             }
         } else {
             0.0
@@ -381,15 +381,15 @@ impl GossipActor {
                         Domain::trust(),
                     );
                     match oracle.evaluate(&req) {
-                         icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
-                             constraints.custom.get("trust_score")
-                                 .and_then(|v| match v {
-                                     ConstraintValue::Float(f) => Some(f.into_inner()),
-                                     _ => None,
-                                 })
-                                 .unwrap_or(0.0)
-                         },
-                         _ => 0.0,
+                        icn_kernel_api::authz::PolicyDecision::Allow { constraints } => constraints
+                            .custom
+                            .get("trust_score")
+                            .and_then(|v| match v {
+                                ConstraintValue::Float(f) => Some(f.into_inner()),
+                                _ => None,
+                            })
+                            .unwrap_or(0.0),
+                        _ => 0.0,
                     }
                 } else {
                     0.0

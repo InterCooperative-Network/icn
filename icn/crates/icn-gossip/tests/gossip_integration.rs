@@ -289,10 +289,7 @@ fn test_topic_creation() {
 
 #[test]
 fn test_topic_trust_score_access() {
-    let topic = Topic::new(
-        "secure:data".to_string(),
-        AccessControl::MinTrustScore(0.4),
-    );
+    let topic = Topic::new("secure:data".to_string(), AccessControl::MinTrustScore(0.4));
 
     assert_eq!(topic.name, "secure:data");
     match topic.acl {
