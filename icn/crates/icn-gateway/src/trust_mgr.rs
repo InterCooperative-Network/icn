@@ -870,7 +870,7 @@ impl TrustPolicyOracle {
                 continue;
             }
 
-            let key2 = format!("{}:{}", mid.target.to_string(), target_did);
+            let key2 = format!("{}:{}", mid.target, target_did);
             if let Some(indirect) = edges.get(&key2) {
                 let weight = mid.score.value() * indirect.score.value();
                 transitive_sum += weight;

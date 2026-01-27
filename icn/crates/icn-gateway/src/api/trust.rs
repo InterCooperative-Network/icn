@@ -116,7 +116,7 @@ pub async fn create_trust_attestation(
     trust_manager
         .add_edge_with_score(from.clone(), to_did.clone(), req.score, req.memo.clone())
         .await
-        .map_err(|e| GatewayError::BadRequest(e))?;
+        .map_err(GatewayError::BadRequest)?;
 
     // Broadcast event to target DID (they received a trust attestation)
     // Use target's DID as the "coop_id" for personal notifications
