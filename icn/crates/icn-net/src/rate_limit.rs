@@ -162,8 +162,9 @@ impl TokenBucket {
         if changed {
             // Proportional refill: scale tokens by the capacity ratio to prevent
             // exploitation via rapid trust cycling (repeatedly getting full buckets)
-            // Use defensive .max(0.01) to prevent extreme ratios from near-zero capacities
-            let ratio = new_capacity / self.capacity.max(0.01);
+            // Token bucket invariant: capacity should never be < 1.0 token
+            const MIN_CAPACITY_FOR_RATIO: f64 = 1.0;
+            let ratio = new_capacity / self.capacity.max(MIN_CAPACITY_FOR_RATIO);
             self.tokens = (self.tokens * ratio).min(new_capacity);
             self.capacity = new_capacity;
             self.refill_rate = new_refill_rate;

@@ -189,6 +189,10 @@ impl ConstraintSet {
                 if (0.0..=1.0).contains(&score) {
                     Some(score)
                 } else {
+                    tracing::warn!(
+                        score,
+                        "Invalid trust_score from PolicyOracle (outside [0.0, 1.0]); ignoring"
+                    );
                     None
                 }
             }

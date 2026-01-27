@@ -156,8 +156,9 @@ impl TokenBucket {
         {
             // Proportional refill: scale tokens by the capacity ratio to prevent
             // exploitation via rapid trust cycling (repeatedly getting full buckets)
-            // Use defensive .max(0.01) to prevent extreme ratios from near-zero capacities
-            let ratio = capacity / self.capacity.max(0.01);
+            // Token bucket invariant: capacity should never be < 1.0 token
+            const MIN_CAPACITY_FOR_RATIO: f64 = 1.0;
+            let ratio = capacity / self.capacity.max(MIN_CAPACITY_FOR_RATIO);
             self.tokens = (self.tokens * ratio).min(capacity);
             self.capacity = capacity;
             self.refill_rate = refill_rate;
@@ -497,18 +498,40 @@ impl IpRateLimiter {
 ///
 /// Applies policy-based rate limits using the PolicyOracle.
 /// If an oracle is not available, falls back to regular rate limiting.
+/// **Fallback rate limit** when PolicyOracle doesn't supply explicit constraints.
+/// This matches the most restrictive (Isolated) trust class to fail-safe.
+/// In production, oracles should always supply explicit rate_limit constraints.
+const FALLBACK_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
+    capacity: 10.0,   // Matches Isolated class
+    refill_rate: 2.0, // Conservative sustained rate
+    cost_per_request: 1.0,
+};
+
+/// Trust-based rate limiting middleware using PolicyOracle
+///
+/// Evaluates policy for each request and applies appropriate rate limits
+/// based on the caller's trust level or constraints returned by the oracle.
 pub async fn trust_rate_limit_middleware(
     req: ServiceRequest,
     next: actix_web::middleware::Next<actix_web::body::BoxBody>,
 ) -> Result<actix_web::dev::ServiceResponse, Error> {
     // Get PolicyOracle and RateLimiter from app data
-    // Note: Use weak dependency on oracle to allow running without it (fallback to standard limits)
     let oracle = req.app_data::<actix_web::web::Data<Arc<dyn PolicyOracle>>>();
     let rate_limiter = req.app_data::<actix_web::web::Data<Arc<RateLimiter>>>();
 
     let (oracle, rate_limiter) = match (oracle, rate_limiter) {
         (Some(o), Some(rl)) => (o.get_ref().clone(), rl.get_ref().clone()),
-        _ => return rate_limit_middleware(req, next).await,
+        (None, None) => {
+            // Both missing: fall back to basic rate limiting (dev/test scenario)
+            return rate_limit_middleware(req, next).await;
+        }
+        _ => {
+            // Partial configuration is a server error - fail loudly
+            error!("Rate limit middleware misconfigured: oracle or rate_limiter missing (but not both)");
+            return Err(Error::from(GatewayError::InternalError(
+                "Rate limiter misconfigured".to_string(),
+            )));
+        }
     };
 
     // Get DID from token claims (inserted by jwt_auth middleware)
@@ -544,7 +567,7 @@ pub async fn trust_rate_limit_middleware(
 
     match decision {
         PolicyDecision::Allow { constraints } => {
-            // Extract rate limit from constraints
+            // Extract rate limit from constraints, using fallback if none specified
             let config = if let Some(limit) = constraints.rate_limit {
                 RateLimitConfig {
                     capacity: limit.burst_size as f64,
@@ -552,12 +575,12 @@ pub async fn trust_rate_limit_middleware(
                     cost_per_request: 1.0,
                 }
             } else {
-                // Default if no specific limit in constraints
-                RateLimitConfig {
-                    capacity: 10.0,
-                    refill_rate: 2.0,
-                    cost_per_request: 1.0,
-                }
+                // Oracle didn't supply rate_limit - use documented fallback
+                tracing::debug!(
+                    did = %did,
+                    "PolicyOracle returned no rate_limit constraints, using FALLBACK_RATE_LIMIT"
+                );
+                FALLBACK_RATE_LIMIT
             };
 
             // Enforce rate limit

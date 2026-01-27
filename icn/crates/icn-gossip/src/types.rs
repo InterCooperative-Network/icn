@@ -565,11 +565,11 @@ impl ResourceLimits {
     /// This follows the "Meaning Firewall" principle: the kernel blindly enforces
     /// limits provided by the PolicyOracle without understanding trust semantics.
     pub fn from_constraints(constraints: &icn_kernel_api::authz::ConstraintSet) -> Self {
-        // Safe u64→u32 cast: clamp to u32::MAX to prevent overflow
+        // Safe u64→u32 conversion: use try_from with fallback to default
         let max_bytes = constraints
             .max_message_size
-            .map(|s| s.min(u32::MAX as u64) as u32)
-            .unwrap_or(64 * 1024_u32);
+            .and_then(|s| u32::try_from(s).ok())
+            .unwrap_or(64 * 1024);
 
         Self {
             max_pull_bytes: max_bytes,
