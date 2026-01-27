@@ -9,7 +9,8 @@ use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
-use icn_trust::{TrustEdge, TrustScore};
+// TrustScore removed
+
 
 /// Trust score response
 #[derive(Debug, Serialize, ToSchema)]
@@ -113,22 +114,12 @@ pub async fn create_trust_attestation(
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
-    // Validate score range and create TrustScore
-    let trust_score = TrustScore::new(req.score)
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {e}")))?;
-
     let from = from_did.into_inner();
-    let mut edge = TrustEdge::new(from.clone(), to_did.clone(), trust_score);
-
-    // Add memo as label if provided
-    if let Some(ref memo) = req.memo {
-        edge = edge.with_label(memo.clone());
-    }
-
+    
     trust_manager
-        .add_edge_async(edge)
+        .add_edge_with_score(from.clone(), to_did.clone(), req.score, req.memo.clone())
         .await
-        .map_err(GatewayError::InternalError)?;
+        .map_err(|e| GatewayError::BadRequest(e))?;
 
     // Broadcast event to target DID (they received a trust attestation)
     // Use target's DID as the "coop_id" for personal notifications
@@ -227,6 +218,7 @@ mod tests {
     use crate::trust_mgr::TrustManager;
     use actix_web::{test, App};
     use icn_identity::KeyPair;
+    use icn_trust::{TrustEdge, TrustScore};
 
     #[actix_web::test]
     async fn test_get_trust_edges() {

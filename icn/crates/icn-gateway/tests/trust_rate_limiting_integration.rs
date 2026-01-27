@@ -35,7 +35,7 @@ async fn create_test_trust_graph(self_did: Did) -> TrustGraph {
     TrustGraph::new(store, self_did)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_isolated_peer() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -86,7 +86,7 @@ async fn test_trust_rate_limiter_isolated_peer() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_known_peer() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -134,7 +134,7 @@ async fn test_trust_rate_limiter_known_peer() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_partner_peer() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -184,7 +184,7 @@ async fn test_trust_rate_limiter_partner_peer() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_federated_peer() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -234,7 +234,7 @@ async fn test_trust_rate_limiter_federated_peer() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_trust_upgrade() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -301,7 +301,7 @@ async fn test_trust_rate_limiter_trust_upgrade() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_anonymous_request() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -347,7 +347,7 @@ async fn test_trust_rate_limiter_anonymous_request() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_cleanup() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
@@ -376,7 +376,7 @@ async fn test_trust_rate_limiter_cleanup() {
     assert_eq!(removed, 0, "Should not clean up recently active buckets");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_config_defaults() {
     let config = TrustRateLimitConfig::default();
 
@@ -391,7 +391,7 @@ async fn test_trust_rate_limiter_config_defaults() {
     assert_eq!(config.federated_burst, 50.0);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_trust_rate_limiter_per_did_isolation() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");

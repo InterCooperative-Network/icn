@@ -30,7 +30,7 @@
 
 use dashmap::DashMap;
 use icn_identity::Did;
-#[cfg(test)]
+use icn_kernel_api::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_trust::TrustScore;
 use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
@@ -144,6 +144,23 @@ impl TrustManager {
         self.own_did = Some(did);
     }
 
+    /// Get the trust manager as a PolicyOracle
+    pub fn as_oracle(&self) -> Arc<dyn PolicyOracle> {
+        Arc::new(TrustPolicyOracle {
+            trust_graph: self.trust_graph.clone(),
+            own_did: self.own_did.clone(),
+            // In standalone mode, we share the edges map
+            // Note: This is an imperfect clone for standalone mode, but sufficient for visual testing
+            // Since standalone mode is dev-only, we accept the limitation that
+            // checking edges directly updates the map but oracle check needs a new reference
+            standalone_edges: if self.trust_graph.is_none() {
+                Some(self.edges.clone())
+            } else {
+                None
+            },
+        })
+    }
+
     /// Add or update a trust edge (sync version)
     ///
     /// In actor-backed mode, this requires acquiring a write lock on the TrustGraph.
@@ -195,6 +212,21 @@ impl TrustManager {
             self.edges.insert(key, edge);
             Ok(())
         }
+    }
+
+    /// Add a trust edge from raw parts (f64 score)
+    pub async fn add_edge_with_score(&self, from: Did, to: Did, score: f64, memo: Option<String>) -> Result<(), String> {
+        // Validate score
+        crate::validation::validate_trust_score(score).map_err(|e| e.to_string())?;
+        
+        let trust_score = TrustScore::new(score).map_err(|e| e.to_string())?;
+        let mut edge = TrustEdge::new(from, to, trust_score);
+        
+        if let Some(memo_str) = memo {
+             edge = edge.with_label(memo_str);
+        }
+
+        self.add_edge_async(edge).await
     }
 
     /// Get a trust edge (sync version)
@@ -475,25 +507,61 @@ impl TrustManager {
     /// The 0.5 default places unknown targets at the Partner threshold,
     /// which is intentionally permissive to avoid blocking legitimate traffic
     /// from new participants while still providing some rate protection.
+    /// Compute trust score for velocity limiting (async version)
+    ///
+    /// This computes the trust score from the node's perspective to the given DID.
+    /// Used for rate limiting based on trust level.
+    ///
+    /// # Trust-Based Rate Limiting
+    ///
+    /// The returned score maps to velocity limits as follows:
+    /// - Isolated (< 0.1): 10 msg/sec - Unknown/untrusted peers
+    /// - Known (0.1-0.4): 50 msg/sec - Recognized but not endorsed
+    /// - Partner (0.4-0.7): 100 msg/sec - Trusted collaborators
+    /// - Federated (> 0.7): 200 msg/sec - Highly trusted federation members
+    ///
+    /// # Default Behavior
+    ///
+    /// Returns [`DEFAULT_TRUST_SCORE`] (0.5) when trust cannot be computed:
+    /// - TrustGraph lookup fails or returns None
+    /// - Running in standalone mode without a configured perspective DID
+    /// - Target has no trust edges in the graph
+    ///
+    /// The 0.5 default places unknown targets at the Partner threshold,
+    /// which is intentionally permissive to avoid blocking legitimate traffic
+    /// from new participants while still providing some rate protection.
     pub async fn compute_trust_score_for_velocity(&self, target: &Did) -> f64 {
-        if let Some(ref handle) = self.trust_graph {
-            // Actor-backed mode: delegate to TrustGraph
-            let graph = handle.read().await;
-            graph.compute_trust_score(target).unwrap_or_else(|e| {
-                warn!(
-                    "Failed to compute trust score for velocity limiting ({}): {e}, using default",
-                    target
-                );
-                DEFAULT_TRUST_SCORE
-            })
-        } else {
-            // Standalone mode: use own_did if set, otherwise return default
-            if let Some(ref own_did) = self.own_did {
-                self.compute_trust_score_local_async(own_did, target).await
-            } else {
-                // No perspective set - see DEFAULT_TRUST_SCORE documentation
+        // Create an oracle request for trust score
+        // We use the "trust" domain and "read" action
+        let request = PolicyRequest::new(
+            target.to_string(),
+            icn_kernel_api::ActionKind::Read,
+            Domain::trust(),
+        );
+        
+        // Add metadata to request specifically the trust score
+        let request = icn_kernel_api::PolicyRequest::with_ext(
+            request.core,
+            icn_kernel_api::PolicyRequestExt::new()
+                .with_resource("trust_score")
+        );
+
+        // Evaluate using our internal oracle implementation
+        let oracle = self.as_oracle();
+        let decision = oracle.evaluate(&request);
+
+        match decision {
+            PolicyDecision::Allow { constraints } => {
+                // Check for custom "trust_score" constraint first
+                if let Some(icn_kernel_api::ConstraintValue::Float(score)) = constraints.custom.get("trust_score") {
+                    return score.into_inner();
+                }
+                
+                // Fallback: check other constraint types that might map to trust
+                // This is relevant if the policy model evolves
                 DEFAULT_TRUST_SCORE
             }
+            PolicyDecision::Deny { .. } => DEFAULT_TRUST_SCORE,
         }
     }
 
@@ -770,6 +838,136 @@ impl TrustManager {
     /// Get count of stored edges
     pub fn edge_count(&self) -> usize {
         self.edges.len()
+    }
+}
+
+/// Trust Policy Oracle implementation
+///
+/// Adapts the `TrustGraph` to the `PolicyOracle` trait, allowing the kernel
+/// to query trust scores without unauthorized access to the graph structure.
+pub struct TrustPolicyOracle {
+    trust_graph: Option<TrustGraphHandle>,
+    own_did: Option<Did>,
+    standalone_edges: Option<Arc<DashMap<String, TrustEdge>>>,
+}
+
+impl TrustPolicyOracle {
+    /// Compute trust score using local algorithm (helper for standalone mode)
+    fn compute_local(&self, target_did: &String) -> f64 {
+        let Some(ref own_did) = self.own_did else {
+            return DEFAULT_TRUST_SCORE;
+        };
+        
+        let Some(ref edges) = self.standalone_edges else {
+            return DEFAULT_TRUST_SCORE;
+        };
+
+        // Simplified computation reused from TrustManager logic
+        // We can't reuse the method directly because we don't have &self of TrustManager
+        // But the logic is simple enough to duplicate for the standalone/test usage
+        
+        // 1. Direct trust
+        let key = format!("{}:{}", own_did.as_str(), target_did);
+        let direct_score = edges
+            .get(&key)
+            .map(|e| e.score.value())
+            .unwrap_or(0.0);
+
+        // 2. Transitive trust (1 hop only for simplicity in oracle)
+        let prefix = format!("{}:", own_did.as_str());
+        let outgoing: Vec<_> = edges
+            .iter()
+            .filter(|entry| entry.key().starts_with(&prefix))
+            .map(|entry| entry.value().clone())
+            .collect();
+            
+        let mut transitive_sum = 0.0;
+        let mut transitive_count = 0;
+
+        for mid in outgoing {
+            if mid.target.to_string() == *target_did { continue; }
+            
+            let key2 = format!("{}:{}", mid.target.to_string(), target_did);
+            if let Some(indirect) = edges.get(&key2) {
+                let weight = mid.score.value() * indirect.score.value();
+                transitive_sum += weight;
+                transitive_count += 1;
+            }
+        }
+
+        let transitive_score = if transitive_count > 0 {
+            transitive_sum / (transitive_count as f64)
+        } else {
+            0.0
+        };
+
+        (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
+    }
+}
+
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        // 1. Check domain
+        if request.domain().as_str() != "trust" {
+            // We don't handle other domains, but we shouldn't deny them either
+            // In a chain, we'd pass through. As a standalone oracle, we return Allow (no constraints)
+            // or Deny based on policy. Here, we deny because we ARE the trust oracle.
+            return PolicyDecision::deny("Wrong domain for TrustOracle");
+        }
+
+        // 2. Compute trust score
+        let target_str = request.actor(); // This is a String (icn_kernel_api::Did)
+        
+        let score = if let Some(ref handle) = self.trust_graph {
+            // Convert String to icn_identity::Did
+            // If parse fails, treat as untrusted (default score)
+            if let Ok(target_did) = target_str.parse::<Did>() {
+                // Actor-backed mode: usage of block_in_place is required because
+                // PolicyOracle::evaluate is synchronous but TrustGraph requires locking.
+                // We try try_read first to avoid block_in_place overhead and support single-threaded runtimes.
+                if let Ok(graph) = handle.try_read() {
+                    graph.compute_trust_score(&target_did).unwrap_or(DEFAULT_TRUST_SCORE)
+                } else {
+                    tokio::task::block_in_place(|| {
+                        let graph = handle.blocking_read();
+                        graph.compute_trust_score(&target_did).unwrap_or(DEFAULT_TRUST_SCORE)
+                    })
+                }
+            } else {
+                DEFAULT_TRUST_SCORE
+            }
+        } else {
+            // Standalone mode - works with Strings mostly
+            self.compute_local(target_str)
+        };
+
+        // 3. Construct constraints
+        let mut constraints = ConstraintSet::new();
+        
+        // Add trust score as custom constraint
+        constraints = constraints.with_custom("trust_score", score.into());
+        
+        // Add rate limiting based on score
+        // - Isolated: < 0.1
+        // - Known: 0.1-0.4
+        // - Partner: 0.4-0.7
+        // - Federated: > 0.7
+        let rate_limit = if score > 0.7 {
+            icn_kernel_api::RateLimit::new(200, 50) // Federated
+        } else if score > 0.4 {
+            icn_kernel_api::RateLimit::standard()   // Partner (100/25)
+        } else if score > 0.1 {
+            icn_kernel_api::RateLimit::throttled()  // Known (20/10)
+        } else {
+            icn_kernel_api::RateLimit::restricted() // Isolated (5/5)
+        };
+        constraints = constraints.with_rate_limit(rate_limit);
+
+        PolicyDecision::allow_with(constraints)
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
     }
 }
 
