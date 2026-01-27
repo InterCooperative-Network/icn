@@ -501,7 +501,7 @@ impl TrustManager {
     ///
     /// The returned score maps to velocity limits as follows:
     /// - Isolated (< 0.1): 10 msg/sec - Unknown/untrusted peers
-    /// - Known (0.1-0.4): 50 msg/sec - Recognized but not endorsed
+    /// - Known (0.1-0.4): 20 msg/sec - Recognized but not endorsed
     /// - Partner (0.4-0.7): 100 msg/sec - Trusted collaborators
     /// - Federated (> 0.7): 200 msg/sec - Highly trusted federation members
     ///
