@@ -91,13 +91,19 @@ fn build_service_registry(
 
         // Create TrustGraph with tokio lock (for icn-core compatibility)
         let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did);
-        let trust_graph = Arc::new(RwLock::new(trust_graph));
+        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
         // Create TrustService from apps/trust
-        let trust_service = icn_trust_app::create_service_tokio(trust_graph);
+        let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle.clone());
         registry = registry.with_trust(trust_service);
 
+        // Also pass raw TrustGraph handle for components that still need direct access
+        // during the transition period (MisbehaviorDetector, ReplicationManager).
+        // This should be removed when those components migrate to use TrustService.
+        registry = registry.with_raw_handle("trust_graph", trust_graph_handle);
+
         tracing::info!("Trust service initialized from apps/trust");
+        tracing::debug!("  - Raw trust_graph handle passed for transition components");
     }
 
     // TODO: Add governance service from apps/governance when available

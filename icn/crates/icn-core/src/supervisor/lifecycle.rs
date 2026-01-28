@@ -62,11 +62,6 @@ pub async fn run_supervisor(
         debug!("No service registry provided, using internal implementations");
     }
 
-    // TODO: Pass service_registry to spawn_actors_with_identity to use
-    // injected services instead of creating internal ones. This will enable
-    // full kernel/app separation.
-    let _ = service_registry; // Suppress unused warning until integrated
-
     // Initialize metrics
     icn_obs::init_metrics()?;
 
@@ -99,6 +94,7 @@ pub async fn run_supervisor(
             &mut gateway_handles,
             &mut event_subscriptions,
             &mut shutdown_handles,
+            service_registry.as_ref(),
         )
         .await?
     } else {
@@ -213,6 +209,7 @@ async fn spawn_actors_with_identity(
     gateway_handles: &mut GatewayActorHandles,
     event_subscriptions: &mut EventSubscriptionHandles,
     shutdown_handles: &mut ShutdownHandles,
+    service_registry: Option<&ServiceRegistry>,
 ) -> Result<CoreActorHandles> {
     info!("Identity bundle available - spawning actors");
 
@@ -236,7 +233,22 @@ async fn spawn_actors_with_identity(
     );
 
     // Initialize trust graph, recovery store, and misbehavior detector
-    let trust_services = super::init_trust::init_trust_services(config, did.clone()).await?;
+    // If service_registry provides a trust_graph handle, use it instead of creating a new one.
+    // This enables proper kernel/app separation where the daemon owns the TrustGraph.
+    let trust_services = if let Some(trust_graph_from_daemon) =
+        service_registry.and_then(|r| r.raw_handle::<RwLock<icn_trust::TrustGraph>>("trust_graph"))
+    {
+        info!("Using TrustGraph from daemon-provided ServiceRegistry");
+        super::init_trust::init_trust_services_with_graph(
+            config,
+            did.clone(),
+            trust_graph_from_daemon,
+        )
+        .await?
+    } else {
+        debug!("No TrustGraph in ServiceRegistry, creating internal one");
+        super::init_trust::init_trust_services(config, did.clone()).await?
+    };
     let trust_graph_handle = trust_services.trust_graph.clone();
     let misbehavior_detector = trust_services.misbehavior_detector.clone();
     let recovery_store = trust_services.recovery_store.clone();

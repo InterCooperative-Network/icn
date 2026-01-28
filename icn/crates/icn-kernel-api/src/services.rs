@@ -264,11 +264,25 @@ pub enum LedgerEvent {
 ///
 /// This allows the daemon to construct services and inject them into the kernel.
 /// The kernel never needs to know about concrete implementations.
+///
+/// # Transition Handles
+///
+/// During the kernel/app separation migration, some components may still need
+/// direct access to domain objects (e.g., TrustGraph for MisbehaviorDetector).
+/// The `raw_handles` field provides type-erased storage for these transition
+/// needs. These should be removed as components are fully migrated.
 pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
     ledger: Option<Arc<dyn LedgerService>>,
+    /// Type-erased handles for transition period
+    ///
+    /// Keys use string identifiers like "trust_graph", "ledger_handle", etc.
+    /// Values are type-erased via Any trait. The supervisor downcasts as needed.
+    ///
+    /// **This is a transition mechanism and should be removed when migration is complete.**
+    raw_handles: std::collections::HashMap<String, Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Default for ServiceRegistry {
@@ -285,6 +299,7 @@ impl ServiceRegistry {
             security: None,
             governance: None,
             ledger: None,
+            raw_handles: std::collections::HashMap::new(),
         }
     }
 
@@ -310,6 +325,39 @@ impl ServiceRegistry {
     pub fn with_ledger(mut self, service: Arc<dyn LedgerService>) -> Self {
         self.ledger = Some(service);
         self
+    }
+
+    /// Register a raw handle for transition period
+    ///
+    /// **This is a transition mechanism.** Use this to pass domain objects
+    /// (like TrustGraph handles) that some components still need directly.
+    /// These should be migrated to use proper service interfaces.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let trust_graph = Arc::new(RwLock::new(TrustGraph::new(...)));
+    /// registry = registry.with_raw_handle("trust_graph", trust_graph);
+    /// ```
+    pub fn with_raw_handle<T: Send + Sync + 'static>(mut self, key: &str, handle: Arc<T>) -> Self {
+        self.raw_handles.insert(key.to_string(), handle);
+        self
+    }
+
+    /// Get a raw handle by key, downcasting to the expected type
+    ///
+    /// **This is a transition mechanism.** Returns None if key doesn't exist
+    /// or type doesn't match.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let trust_graph: Option<Arc<RwLock<TrustGraph>>> = registry.raw_handle("trust_graph");
+    /// ```
+    pub fn raw_handle<T: Send + Sync + 'static>(&self, key: &str) -> Option<Arc<T>> {
+        self.raw_handles
+            .get(key)
+            .and_then(|any| any.clone().downcast::<T>().ok())
     }
 
     /// Get the trust service (if registered)

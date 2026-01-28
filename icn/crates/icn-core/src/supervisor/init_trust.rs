@@ -43,6 +43,33 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
 
     info!("Trust graph initialized at {}", trust_store_path.display());
 
+    init_trust_services_impl(config, did, trust_graph_handle).await
+}
+
+/// Initialize trust services with an externally-provided TrustGraph
+///
+/// This variant is used when the daemon provides a TrustGraph via ServiceRegistry,
+/// enabling proper kernel/app separation where the daemon owns the TrustGraph.
+///
+/// Creates:
+/// - Recovery store for social recovery
+/// - Misbehavior detector with trust penalty callback
+/// - Wires the provided TrustGraph for penalty callbacks
+pub async fn init_trust_services_with_graph(
+    config: &Config,
+    did: Did,
+    trust_graph_handle: Arc<RwLock<TrustGraph>>,
+) -> anyhow::Result<TrustServices> {
+    info!("Using daemon-provided TrustGraph for trust services");
+    init_trust_services_impl(config, did, trust_graph_handle).await
+}
+
+/// Internal implementation for trust service initialization
+async fn init_trust_services_impl(
+    config: &Config,
+    did: Did,
+    trust_graph_handle: Arc<RwLock<TrustGraph>>,
+) -> anyhow::Result<TrustServices> {
     // Create recovery store for social recovery events
     let recovery_store_path = config.store_path().join("recovery");
     let recovery_store: Arc<dyn icn_store::Store> =
