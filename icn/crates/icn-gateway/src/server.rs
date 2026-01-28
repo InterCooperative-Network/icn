@@ -208,8 +208,6 @@ impl GatewayServer {
         self
     }
 
-
-
     /// Set custom security configuration
     pub fn with_security_config(mut self, config: SecurityConfig) -> Self {
         self.security_config = config;

@@ -1475,17 +1475,23 @@ mod tests {
 
         // Request for unknown DID
         let request = PolicyRequest::new(
-            "did:icn:unknown".to_string(), 
+            "did:icn:unknown".to_string(),
             ActionKind::Read,
             Domain::trust(),
         );
 
         let decision = oracle.evaluate(&request);
-         if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
-             let score = constraints.get_trust_score().expect("Should have trust score");
-             assert!((score - 0.8).abs() < f64::EPSILON, "Should use custom default score of 0.8, got {}", score);
-         } else {
-             panic!("Expected Allow decision");
-         }
+        if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
+            let score = constraints
+                .get_trust_score()
+                .expect("Should have trust score");
+            assert!(
+                (score - 0.8).abs() < f64::EPSILON,
+                "Should use custom default score of 0.8, got {}",
+                score
+            );
+        } else {
+            panic!("Expected Allow decision");
+        }
     }
 }

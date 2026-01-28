@@ -309,7 +309,7 @@ pub trait Log: Send + Sync {
 
     /// Read events from the log.
     async fn read(&self, from: Offset, limit: usize) -> Result<Vec<Event>, StateError>;
-    
+
     /// Get current length (offset) of log.
     async fn len(&self) -> u64;
 }
@@ -325,10 +325,10 @@ pub trait Kv: Send + Sync {
 
     /// Delete a value.
     async fn delete(&self, key: &str) -> Result<bool, StateError>;
-    
+
     /// Check if key exists.
     async fn exists(&self, key: &str) -> Result<bool, StateError>;
-    
+
     /// List keys with prefix.
     async fn list(&self, prefix: &str) -> Result<Vec<String>, StateError>;
 }

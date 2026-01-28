@@ -713,7 +713,10 @@ impl Log for LogHandle {
     }
 
     async fn read(&self, from: u64, limit: usize) -> Result<Vec<Event>, state::StateError> {
-        let entries = self.read(from, limit).await.map_err(state::StateError::from)?;
+        let entries = self
+            .read(from, limit)
+            .await
+            .map_err(state::StateError::from)?;
         Ok(entries
             .into_iter()
             .map(|e| Event {
@@ -782,6 +785,7 @@ impl state::AppState for AppState {
     }
 
     fn blob(&self, name: &str) -> Option<Arc<dyn Blob>> {
-        self.blob(name).map(|h| Arc::new(h.clone()) as Arc<dyn Blob>)
+        self.blob(name)
+            .map(|h| Arc::new(h.clone()) as Arc<dyn Blob>)
     }
 }
