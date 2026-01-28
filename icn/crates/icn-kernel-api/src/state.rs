@@ -261,8 +261,6 @@ pub enum StateError {
     Internal(String),
 }
 
-
-
 /// Interface for a single log instance.
 #[async_trait::async_trait]
 pub trait Log: Send + Sync {

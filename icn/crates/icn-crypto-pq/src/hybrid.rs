@@ -249,7 +249,7 @@ impl HybridKeypair {
             .map_err(|_| CryptoError::InvalidKey("Seed slice conversion failed".to_string()))?;
         let classical_signing = SigningKey::from_bytes(&classical_seed);
 
-        // ML-DSA from bytes 32-64 (deterministic via HKDF + ChaCha20Rng)
+        // ML-DSA from bytes 32-64 (deterministic via HKDF + ML-DSA seed)
         let pq_seed = &seed[32..64];
         let pq_keypair = MlDsaKeypair::from_seed(pq_seed)?;
 

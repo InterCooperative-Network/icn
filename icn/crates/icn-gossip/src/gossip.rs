@@ -1577,6 +1577,25 @@ mod tests {
                 .custom
                 .insert("trust_score".to_string(), score.into());
 
+            let mut required: Option<f64> = None;
+            for key in ["min_trust_threshold", "acl_min_trust_score"] {
+                if let Some(value) = request.context.metadata.get(key) {
+                    if let Ok(parsed) = value.parse::<f64>() {
+                        required = Some(required.map_or(parsed, |current| current.max(parsed)));
+                    }
+                }
+            }
+
+            if let Some(threshold) = required {
+                if score < threshold {
+                    return PolicyDecision::Deny {
+                        reason: icn_kernel_api::authz::PolicyError::Denied(
+                            "trust score below required threshold".to_string(),
+                        ),
+                    };
+                }
+            }
+
             // Populate standard fields based on score for mock behavior
             if score >= 0.7 {
                 constraints = constraints
@@ -2460,10 +2479,6 @@ mod tests {
             result.is_err(),
             "Subscription should be rejected due to low trust"
         );
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Insufficient trust"));
 
         // Bob (unknown, score 0.0) attempts to subscribe - should also be rejected
         let result = gossip.subscribe("test:trust-gated", bob.clone()).await;

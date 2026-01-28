@@ -46,8 +46,8 @@ pub mod types;
 // Re-export primary traits for convenience
 pub use authz::{
     ActionKind, AllowAllOracle, CapabilityEngine, ConstraintSet, ConstraintValue, DenyAllOracle,
-    Domain, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest, PolicyRequestCore,
-    PolicyContext, RateLimit,
+    Domain, PolicyContext, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
+    PolicyRequestCore, RateLimit,
 };
 pub use bootstrap::{
     BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,

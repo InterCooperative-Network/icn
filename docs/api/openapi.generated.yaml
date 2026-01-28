@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: ICN Gateway API
   description: |-
@@ -44,15 +44,17 @@ components:
         account_id:
           type: string
         credit:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          nullable: true
         currency:
           type: string
         debit:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          nullable: true
     ActivityEvent:
       type: object
       description: Recent activity event
@@ -157,9 +159,10 @@ components:
           type: string
           description: Unique device identifier (e.g., "phone-1", "laptop-work")
         encryption_public_key:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Optional X25519 encryption public key (hex-encoded)
-          nullable: true
         label:
           type: string
           description: Human-readable label
@@ -249,6 +252,8 @@ components:
           additionalProperties:
             type: integer
             format: int64
+          propertyNames:
+            type: string
         did:
           type: string
     BanMemberRequest:
@@ -260,8 +265,9 @@ components:
       - reason
       properties:
         evidence_summary:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         holder_id:
           type: string
         jurisdiction_id:
@@ -301,8 +307,9 @@ components:
         choice:
           type: string
         comment:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
     ChallengeRequest:
       type: object
       description: Request a challenge for DID-based authentication
@@ -348,8 +355,9 @@ components:
           format: int64
           minimum: 0
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         domain_id:
           type: string
         founders:
@@ -398,8 +406,9 @@ components:
       - status
       properties:
         details:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         status:
           type: string
     CreateCharterRequest:
@@ -415,8 +424,9 @@ components:
           items:
             type: string
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         domain_id:
           type: string
         name:
@@ -478,9 +488,10 @@ components:
         coop_id:
           type: string
         expires_in_seconds:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          nullable: true
           minimum: 0
         role:
           type: string
@@ -502,8 +513,9 @@ components:
         from:
           type: string
         memo:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         to:
           type: string
     CreateProposalRequest:
@@ -604,8 +616,9 @@ components:
           type: boolean
           description: Has valid signature
         role:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         signed_at:
           type: string
           description: Human-readable timestamp
@@ -623,8 +636,9 @@ components:
         did:
           type: string
         role:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         timestamp:
           type: integer
           format: int64
@@ -669,12 +683,15 @@ components:
       properties:
         amendments_breakdown:
           $ref: '#/components/schemas/AmendmentsBreakdown'
+          description: Amendments breakdown
         appeals_breakdown:
           $ref: '#/components/schemas/AppealsBreakdown'
+          description: Appeals breakdown
         charter_id:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Charter ID (hex)
-          nullable: true
         open_appeals:
           type: integer
           description: Open appeals count
@@ -696,10 +713,13 @@ components:
       - version
       properties:
         checks:
-          type: object
+          type:
+          - object
+          - 'null'
           additionalProperties:
             $ref: '#/components/schemas/ComponentHealth'
-          nullable: true
+          propertyNames:
+            type: string
         status:
           type: string
         version:
@@ -730,7 +750,6 @@ components:
           minimum: 0
         data:
           description: Custom data
-          nullable: true
         id:
           type: string
           description: Notification ID
@@ -741,10 +760,11 @@ components:
           type: boolean
           description: Whether the notification has been read
         read_at:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
           description: Read timestamp
-          nullable: true
           minimum: 0
         recipient:
           type: string
@@ -899,9 +919,10 @@ components:
           items:
             type: string
         expires_at:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          nullable: true
           minimum: 0
         holder_did:
           type: string
@@ -950,9 +971,10 @@ components:
       description: Open a proposal for voting
       properties:
         voting_period_seconds:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
-          nullable: true
           minimum: 0
     PaginationInfo:
       type: object
@@ -974,22 +996,26 @@ components:
           description: Limit used for this query
           minimum: 0
         next_cursor:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Cursor for the next page (None if no more items)
-          nullable: true
         offset:
-          type: integer
+          type:
+          - integer
+          - 'null'
           description: Current offset (for backward compatibility)
-          nullable: true
           minimum: 0
         prev_cursor:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Cursor for the previous page (None if at beginning)
-          nullable: true
         total:
-          type: integer
+          type:
+          - integer
+          - 'null'
           description: Total number of items (if known/available)
-          nullable: true
           minimum: 0
     Platform:
       type: string
@@ -1061,8 +1087,6 @@ components:
           value:
             type: string
       description: Proposal payload types (matches icn_governance::ProposalPayload)
-      discriminator:
-        propertyName: type
     RegisterDeviceRequest:
       type: object
       description: Register device request
@@ -1075,6 +1099,7 @@ components:
           description: Device FCM token
         platform:
           $ref: '#/components/schemas/Platform'
+          description: Platform type
     RegisterDeviceResponse:
       type: object
       description: Register device response
@@ -1103,18 +1128,20 @@ components:
           type: string
           description: Governance proposal ID that approved this steward
         jurisdiction:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Optional jurisdiction scope
-          nullable: true
         specializations:
           type: array
           items:
             type: string
           description: Optional specializations (e.g., "identity", "mediation")
         steward_did:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Operational DID for the steward (can be same as holder DID)
-          nullable: true
         term_duration_days:
           type: integer
           format: int64
@@ -1137,8 +1164,9 @@ components:
         jurisdiction_id:
           type: string
         policy_ref:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         reason:
           type: string
     RoleRequest:
@@ -1183,32 +1211,36 @@ components:
       - expires_at
       properties:
         did:
-          type: string
+          type:
+          - string
+          - 'null'
           description: DID that approved the session (only present when status is "approved")
-          nullable: true
         expires_at:
           type: integer
           format: int64
           minimum: 0
         scopes:
-          type: array
+          type:
+          - array
+          - 'null'
           items:
             type: string
           description: Scopes granted (only present when status is "approved")
-          nullable: true
         session_id:
           type: string
         status:
           type: string
         token:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Token for the web session (only present when status is "approved")
-          nullable: true
         token_expires_in:
-          type: integer
+          type:
+          - integer
+          - 'null'
           format: int64
           description: Token expiry in seconds (only present when status is "approved")
-          nullable: true
           minimum: 0
     SignCharterRequest:
       type: object
@@ -1217,8 +1249,9 @@ components:
       - signature
       properties:
         role:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         signature:
           type: string
     StewardDetailResponse:
@@ -1278,8 +1311,9 @@ components:
         is_term_expired:
           type: boolean
         jurisdiction:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         reputation_score:
           type: number
           format: double
@@ -1327,8 +1361,9 @@ components:
         holder_did:
           type: string
         jurisdiction:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         reputation_score:
           type: number
           format: double
@@ -1352,9 +1387,10 @@ components:
       - date_time
       properties:
         actor:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Related actor (DID)
-          nullable: true
         date_time:
           type: string
           description: Human-readable timestamp
@@ -1366,7 +1402,6 @@ components:
           description: Event type
         metadata:
           description: Additional metadata
-          nullable: true
         timestamp:
           type: integer
           format: int64
@@ -1431,6 +1466,7 @@ components:
       properties:
         pagination:
           $ref: '#/components/schemas/PaginationInfo'
+          description: Pagination metadata
         transactions:
           type: array
           items:
@@ -1443,8 +1479,9 @@ components:
       - status
       properties:
         reason:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         status:
           type: string
     UpdateRoleRequest:
@@ -1463,14 +1500,17 @@ components:
       description: Update cooperative settings
       properties:
         credit_policy:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         currency:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         governance_model:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
     UpdateStatusRequest:
       type: object
       description: Update steward status request
@@ -1482,8 +1522,9 @@ components:
           items:
             type: string
         reason:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
         status:
           type: string
     VerifyRequest:
