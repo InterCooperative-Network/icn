@@ -111,6 +111,67 @@ pub enum SecurityViolation {
     },
 }
 
+/// Abstract governance service interface
+///
+/// This trait provides governance-related functionality to the kernel without
+/// exposing proposals, voting mechanisms, or governance rules directly.
+///
+/// # Implementation
+///
+/// Apps that provide governance functionality implement this trait. The kernel
+/// uses it to:
+/// - Get a PolicyOracle for governance authorization decisions
+/// - Query governance parameters (as opaque key-value pairs)
+/// - Record governance events
+///
+/// The kernel NEVER interprets governance rules - it just enforces constraints.
+pub trait GovernanceService: Send + Sync {
+    /// Get the PolicyOracle for governance authorization
+    ///
+    /// The oracle converts governance rules into ConstraintSets that the
+    /// kernel can enforce blindly.
+    fn oracle(&self) -> Arc<dyn PolicyOracle>;
+
+    /// Get a governance parameter value
+    ///
+    /// Parameters are returned as opaque strings. The kernel may use these
+    /// for configuration but NEVER interprets their semantic meaning.
+    fn get_parameter(&self, key: &str) -> Option<String>;
+
+    /// List all governance parameter keys
+    fn list_parameters(&self) -> Vec<String>;
+
+    /// Record a governance event
+    ///
+    /// Called by the kernel when governance-relevant actions occur.
+    fn record_event(&self, event: GovernanceEvent);
+}
+
+/// Governance events that the kernel can report
+///
+/// These are generic event types that don't expose governance semantics.
+/// The governance service interprets them according to its own rules.
+#[derive(Debug, Clone)]
+pub enum GovernanceEvent {
+    /// Parameter was accessed
+    ParameterAccessed {
+        key: String,
+        accessor: Did,
+    },
+    /// Parameter change was requested
+    ParameterChangeRequested {
+        key: String,
+        new_value: String,
+        requestor: Did,
+    },
+    /// Generic governance action
+    Action {
+        action_type: String,
+        actor: Did,
+        metadata: std::collections::HashMap<String, String>,
+    },
+}
+
 /// Builder for creating domain services
 ///
 /// This allows the daemon to construct services and inject them into the kernel.
@@ -118,6 +179,7 @@ pub enum SecurityViolation {
 pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
+    governance: Option<Arc<dyn GovernanceService>>,
 }
 
 impl Default for ServiceRegistry {
@@ -132,6 +194,7 @@ impl ServiceRegistry {
         Self {
             trust: None,
             security: None,
+            governance: None,
         }
     }
 
@@ -147,6 +210,12 @@ impl ServiceRegistry {
         self
     }
 
+    /// Register a governance service
+    pub fn with_governance(mut self, service: Arc<dyn GovernanceService>) -> Self {
+        self.governance = Some(service);
+        self
+    }
+
     /// Get the trust service (if registered)
     pub fn trust(&self) -> Option<&Arc<dyn TrustService>> {
         self.trust.as_ref()
@@ -155,5 +224,10 @@ impl ServiceRegistry {
     /// Get the security service (if registered)
     pub fn security(&self) -> Option<&Arc<dyn SecurityService>> {
         self.security.as_ref()
+    }
+
+    /// Get the governance service (if registered)
+    pub fn governance(&self) -> Option<&Arc<dyn GovernanceService>> {
+        self.governance.as_ref()
     }
 }
