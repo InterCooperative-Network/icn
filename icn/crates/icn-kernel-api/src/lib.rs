@@ -60,8 +60,8 @@ pub use coord::Coordination;
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService};
 pub use services::{
-    GovernanceEvent, GovernanceService, SecurityService, SecurityViolation, ServiceRegistry,
-    TrustEvent, TrustService,
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
+    SecurityViolation, ServiceRegistry, TrustEvent, TrustService,
 };
 pub use state::{BlobService, KvService, LogService};
 pub use time::TimeService;

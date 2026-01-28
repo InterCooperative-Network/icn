@@ -172,6 +172,71 @@ pub enum GovernanceEvent {
     },
 }
 
+/// Abstract ledger service interface
+///
+/// This trait provides ledger-related functionality to the kernel without
+/// exposing account structures, credit policies, or ledger rules directly.
+///
+/// # Implementation
+///
+/// Apps that provide ledger functionality implement this trait. The kernel
+/// uses it to:
+/// - Get a PolicyOracle for transaction authorization decisions
+/// - Query account balances (as opaque values)
+/// - Record ledger events
+///
+/// The kernel NEVER interprets ledger rules - it just enforces constraints.
+pub trait LedgerService: Send + Sync {
+    /// Get the PolicyOracle for ledger authorization
+    ///
+    /// The oracle converts credit policies and account states into ConstraintSets
+    /// that the kernel can enforce blindly.
+    fn oracle(&self) -> Arc<dyn PolicyOracle>;
+
+    /// Get balance for an account (opaque value)
+    ///
+    /// The kernel may use this for routing decisions, but NEVER interprets
+    /// the semantic meaning of the balance.
+    fn balance(&self, account: &Did, currency: &str) -> i64;
+
+    /// Get credit limit for an account (opaque value)
+    fn credit_limit(&self, account: &Did, currency: &str) -> i64;
+
+    /// Record a ledger event
+    ///
+    /// Called by the kernel when ledger-relevant actions occur.
+    fn record_event(&self, event: LedgerEvent);
+}
+
+/// Ledger events that the kernel can report
+///
+/// These are generic event types that don't expose ledger semantics.
+/// The ledger service interprets them according to its own rules.
+#[derive(Debug, Clone)]
+pub enum LedgerEvent {
+    /// Transaction submitted
+    TransactionSubmitted {
+        from: Did,
+        to: Did,
+        amount: i64,
+        currency: String,
+    },
+    /// Transaction completed
+    TransactionCompleted {
+        transaction_id: String,
+    },
+    /// Transaction failed
+    TransactionFailed {
+        transaction_id: String,
+        reason: String,
+    },
+    /// Balance queried
+    BalanceQueried {
+        account: Did,
+        querier: Did,
+    },
+}
+
 /// Builder for creating domain services
 ///
 /// This allows the daemon to construct services and inject them into the kernel.
@@ -180,6 +245,7 @@ pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
+    ledger: Option<Arc<dyn LedgerService>>,
 }
 
 impl Default for ServiceRegistry {
@@ -195,6 +261,7 @@ impl ServiceRegistry {
             trust: None,
             security: None,
             governance: None,
+            ledger: None,
         }
     }
 
@@ -216,6 +283,12 @@ impl ServiceRegistry {
         self
     }
 
+    /// Register a ledger service
+    pub fn with_ledger(mut self, service: Arc<dyn LedgerService>) -> Self {
+        self.ledger = Some(service);
+        self
+    }
+
     /// Get the trust service (if registered)
     pub fn trust(&self) -> Option<&Arc<dyn TrustService>> {
         self.trust.as_ref()
@@ -229,5 +302,10 @@ impl ServiceRegistry {
     /// Get the governance service (if registered)
     pub fn governance(&self) -> Option<&Arc<dyn GovernanceService>> {
         self.governance.as_ref()
+    }
+
+    /// Get the ledger service (if registered)
+    pub fn ledger(&self) -> Option<&Arc<dyn LedgerService>> {
+        self.ledger.as_ref()
     }
 }

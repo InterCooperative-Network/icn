@@ -1,0 +1,36 @@
+[package]
+name = "icn-ledger-app"
+version = "0.1.0"
+edition = "2021"
+description = "Ledger app - provides ledger-based policy decisions for the ICN kernel"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for PolicyOracle trait and types
+icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
+
+# Internal ledger implementation (not exposed to kernel)
+icn-ledger = { path = "../../icn/crates/icn-ledger" }
+
+# Identity types (for Did conversion)
+icn-identity = { path = "../../icn/crates/icn-identity" }
+
+# Storage
+icn-store = { path = "../../icn/crates/icn-store" }
+
+# Sync primitives (for PolicyOracle sync requirement)
+parking_lot = "0.12"
+tokio = { version = "1", features = ["sync"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
