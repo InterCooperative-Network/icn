@@ -3159,6 +3159,7 @@ name = "icn-kernel-api"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
+ "async-trait",
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",
  "serde",
