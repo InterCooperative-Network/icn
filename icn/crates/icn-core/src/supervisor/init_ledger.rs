@@ -44,7 +44,11 @@ pub struct LedgerServices {
 pub struct LedgerDeps {
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
+    /// Trust graph for fallback (deprecated, kept for backward compatibility)
     pub trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Trust service for proper kernel/app separation
+    /// When provided, passed to Ledger.set_trust_service()
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
 }
 
 /// Initialize ledger and contract services
@@ -63,11 +67,19 @@ pub async fn init_ledger_services(
     let store_path = config.store_path().join("ledger");
     let store = Arc::new(SledStore::open(&store_path)?);
 
-    // Initialize ledger with gossip, misbehavior detection, and trust graph
+    // Initialize ledger with gossip, misbehavior detection, and trust
     let mut ledger = Ledger::new(store.clone())?;
     ledger.set_gossip(deps.gossip_handle.clone());
     ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
-    ledger.set_trust_graph(deps.trust_graph.clone());
+
+    // Use TrustService if available (kernel/app separation), else fall back to TrustGraph
+    if let Some(trust_service) = deps.trust_service.clone() {
+        ledger.set_trust_service(trust_service);
+        info!("Ledger initialized with TrustService (kernel/app separated)");
+    } else {
+        ledger.set_trust_graph(deps.trust_graph.clone());
+        info!("Ledger initialized with TrustGraph (deprecated fallback)");
+    }
 
     // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
     let oracle_config = config.ledger.oracle.to_oracle_config();

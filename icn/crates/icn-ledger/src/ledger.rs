@@ -303,7 +303,16 @@ pub struct Ledger {
         Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Trust graph for entry validation (wrapped in RwLock for live updates)
+    ///
+    /// **Deprecated**: Use `trust_service` instead for proper kernel/app separation.
+    /// This field is kept for backward compatibility during migration.
     pub(crate) trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
+
+    /// Trust service for entry validation (kernel/app separated)
+    ///
+    /// When set, takes precedence over `trust_graph` for trust score queries.
+    /// This enables proper separation between kernel (ledger) and domain (trust).
+    pub(crate) trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
 
     /// Minimum trust score for entry acceptance
     min_trust_for_entry: f64,
@@ -377,7 +386,8 @@ impl Ledger {
             fork_resolver: ForkResolver::new(ForkResolutionStrategy::default()), // Hybrid strategy
             misbehavior_detector: None, // Set via set_misbehavior_detector()
             freeze_manager,
-            trust_graph: None,
+            trust_graph: None,   // Deprecated: use trust_service instead
+            trust_service: None, // Set via set_trust_service()
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
             event_emitter: None,             // Set via set_event_emitter()
@@ -438,9 +448,63 @@ impl Ledger {
     }
 
     /// Set the trust graph for trust-weighted fork resolution and entry validation
+    ///
+    /// **Deprecated**: Use `set_trust_service()` instead for proper kernel/app separation.
+    /// This method is kept for backward compatibility during migration.
     pub fn set_trust_graph(&mut self, trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>) {
         self.trust_graph = Some(trust_graph.clone());
         self.fork_resolver.set_trust_graph(trust_graph);
+    }
+
+    /// Set the trust service for entry validation (kernel/app separated)
+    ///
+    /// When set, the ledger uses TrustService for trust score queries instead of
+    /// directly accessing TrustGraph. This enables proper separation between
+    /// kernel components (ledger) and domain components (trust).
+    pub fn set_trust_service(
+        &mut self,
+        trust_service: Arc<dyn icn_kernel_api::services::TrustService>,
+    ) {
+        self.trust_service = Some(trust_service);
+    }
+
+    /// Get trust score for a DID using TrustService (preferred) or TrustGraph (fallback)
+    ///
+    /// Returns 0.0 if no trust source is configured or DID parsing fails.
+    pub(crate) fn get_trust_score(&self, did: &icn_identity::Did) -> f64 {
+        // Prefer TrustService if available (kernel/app separation)
+        if let Some(ref trust_service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(did.to_string());
+            return trust_service.trust_score(&kernel_did);
+        }
+
+        // Fall back to TrustGraph (deprecated path)
+        if let Some(ref trust_graph) = self.trust_graph {
+            if let Ok(graph) = trust_graph.try_read() {
+                return graph.compute_trust_score(did).unwrap_or(0.0);
+            }
+        }
+
+        0.0
+    }
+
+    /// Get trust score for a DID asynchronously (for async contexts)
+    ///
+    /// Returns 0.0 if no trust source is configured or DID parsing fails.
+    pub(crate) async fn get_trust_score_async(&self, did: &icn_identity::Did) -> f64 {
+        // Prefer TrustService if available (kernel/app separation)
+        if let Some(ref trust_service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(did.to_string());
+            return trust_service.trust_score(&kernel_did);
+        }
+
+        // Fall back to TrustGraph (deprecated path)
+        if let Some(ref trust_graph) = self.trust_graph {
+            let graph = trust_graph.read().await;
+            return graph.compute_trust_score(did).unwrap_or(0.0);
+        }
+
+        0.0
     }
 
     /// Set the minimum trust score required for entry acceptance
@@ -564,11 +628,11 @@ impl Ledger {
     /// per (DID, currency) pair by the ledger's transaction validation layer.
     ///
     /// # Warning
-    /// If no trust graph is set, all trust scores will default to 0.0, which
-    /// results in baseline-only credit limits (no trust multiplier bonus).
+    /// If no trust source is set (trust_service or trust_graph), all trust scores
+    /// will default to 0.0, which results in baseline-only credit limits (no trust multiplier bonus).
     pub fn set_dynamic_limit_manager(&mut self, manager: Arc<DynamicCreditLimitManager>) {
-        if self.trust_graph.is_none() {
-            warn!("Dynamic credit limits set without trust graph; all trust scores will be 0.0");
+        if self.trust_service.is_none() && self.trust_graph.is_none() {
+            warn!("Dynamic credit limits set without trust source; all trust scores will be 0.0");
         }
         self.dynamic_limit_manager = Some(manager);
     }
@@ -1302,55 +1366,30 @@ impl Ledger {
             .clone();
 
         // Trust-based entry validation (H5 fix)
-        // Skip trust check if no trust graph configured (allows local-only operation)
-        if let Some(ref trust_graph) = self.trust_graph {
+        // Skip trust check if no trust source configured (allows local-only operation)
+        if self.trust_service.is_some() || self.trust_graph.is_some() {
             let author_did = &entry.author;
             let min_trust = self.min_trust_for_entry;
+            let trust_score = self.get_trust_score_async(author_did).await;
 
-            // Acquire read lock on trust graph using async read
-            let trust_result: Result<f64, anyhow::Error> = {
-                let graph = trust_graph.read().await;
-                graph
-                    .compute_trust_score(author_did)
-                    .map_err(|e| anyhow::anyhow!(e))
-            };
-
-            match trust_result {
-                Ok(trust_score) => {
-                    if trust_score < min_trust {
-                        warn!(
-                            author = %author_did,
-                            trust_score = trust_score,
-                            min_required = min_trust,
-                            entry_hash = %hash,
-                            "Rejecting entry from low-trust author"
-                        );
-                        icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
-                        anyhow::bail!(
-                            "Entry author {author_did} has insufficient trust score ({trust_score:.3} < {min_trust:.3})"
-                        );
-                    }
-                    debug!(
-                        author = %author_did,
-                        trust_score = trust_score,
-                        "Entry author trust validated"
-                    );
-                }
-                Err(e) => {
-                    // If we can't compute trust, treat as unknown/isolated peer
-                    warn!(
-                        author = %author_did,
-                        error = %e,
-                        entry_hash = %hash,
-                        "Cannot compute trust score for entry author, treating as isolated"
-                    );
-                    // For unknown peers, check against minimum threshold
-                    if min_trust > 0.0 {
-                        icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for entry author {author_did}: {e}");
-                    }
-                }
+            if trust_score < min_trust {
+                warn!(
+                    author = %author_did,
+                    trust_score = trust_score,
+                    min_required = min_trust,
+                    entry_hash = %hash,
+                    "Rejecting entry from low-trust author"
+                );
+                icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
+                anyhow::bail!(
+                    "Entry author {author_did} has insufficient trust score ({trust_score:.3} < {min_trust:.3})"
+                );
             }
+            debug!(
+                author = %author_did,
+                trust_score = trust_score,
+                "Entry author trust validated"
+            );
         }
 
         // Charter/policy validation hook (Gap #2 fix)
@@ -1535,23 +1574,9 @@ impl Ledger {
                 .collect();
 
             for (did, currency) in unique_pairs {
-                // Get trust score for the account using try_read() to avoid blocking
-                // Activity recording is non-critical, so we use 0.0 if lock unavailable
-                let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
-                    match trust_graph.try_read() {
-                        Ok(graph) => graph.compute_trust_score(did).unwrap_or(0.0),
-                        Err(_) => {
-                            debug!(
-                                account = %did,
-                                "Trust graph locked during activity recording; using 0.0"
-                            );
-                            0.0
-                        }
-                    }
-                } else {
-                    0.0
-                }
-                .clamp(0.0, 1.0);
+                // Get trust score for the account (uses TrustService if available, else TrustGraph)
+                // Activity recording is non-critical, so we use 0.0 if no trust source
+                let trust_score = self.get_trust_score(did).clamp(0.0, 1.0);
 
                 // Get cleared volume (already updated above for this entry)
                 let cleared_volume = self
@@ -2813,18 +2838,8 @@ impl Ledger {
                 let currency = &delta.currency;
                 let current_balance = self.get_balance(account, currency);
 
-                // Get trust score for the account (or 0.0 if unknown)
-                // SAFETY: Use block_in_place because validate_entry is sync but may be
-                // called from async context (e.g., append_entry_internal).
-                let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
-                    tokio::task::block_in_place(|| {
-                        let graph = trust_graph.blocking_read();
-                        graph.compute_trust_score(account).unwrap_or(0.0)
-                    })
-                } else {
-                    0.0
-                }
-                .clamp(0.0, 1.0);
+                // Get trust score for the account (uses TrustService if available, else TrustGraph)
+                let trust_score = self.get_trust_score(account).clamp(0.0, 1.0);
 
                 // Get cleared volume for history bonus
                 let cleared_volume = self

@@ -282,6 +282,7 @@ async fn spawn_actors_with_identity(
     let loaded_snapshot = gossip_services.loaded_snapshot;
 
     // Initialize ledger and contract services
+    // Pass TrustService for kernel/app separation if available
     let ledger_services = super::init_ledger::init_ledger_services(
         config,
         did.clone(),
@@ -289,6 +290,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service_from_registry.clone(),
         },
     )
     .await?;
