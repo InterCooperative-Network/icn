@@ -96,15 +96,15 @@ pub struct PolicyRequestCore {
     pub domain: Domain,
 }
 
-/// Extended metadata - inspected only on cache miss
-pub struct PolicyRequestExt {
+/// Context metadata - inspected only on cache miss
+pub struct PolicyContext {
     pub metadata: HashMap<String, String>,
     pub capability: Option<Capability>,
 }
 
 pub struct PolicyRequest {
     pub core: PolicyRequestCore,
-    pub ext: PolicyRequestExt,
+    pub context: PolicyContext,
 }
 
 /// Domain identifier for oracle routing

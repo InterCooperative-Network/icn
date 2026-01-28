@@ -587,9 +587,9 @@ impl TrustManager {
         );
 
         // Add metadata to request specifically the trust score
-        let request = icn_kernel_api::PolicyRequest::with_ext(
+        let request = icn_kernel_api::PolicyRequest::with_context(
             request.core,
-            icn_kernel_api::PolicyRequestExt::new().with_resource("trust_score"),
+            icn_kernel_api::PolicyContext::new().with_resource("trust_score"),
         );
 
         // Evaluate using our internal oracle implementation
@@ -1475,7 +1475,12 @@ mod tests {
         let decision = oracle.evaluate(&request);
         if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
             let score = constraints
-                .get_trust_score()
+                .custom
+                .get("trust_score")
+                .and_then(|value| match value {
+                    icn_kernel_api::authz::ConstraintValue::Float(f) => Some(f.into_inner()),
+                    _ => None,
+                })
                 .expect("Should have trust score");
             assert!(
                 (score - 0.8).abs() < f64::EPSILON,

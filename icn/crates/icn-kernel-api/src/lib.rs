@@ -47,7 +47,7 @@ pub mod types;
 pub use authz::{
     ActionKind, AllowAllOracle, CapabilityEngine, ConstraintSet, ConstraintValue, DenyAllOracle,
     Domain, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest, PolicyRequestCore,
-    PolicyRequestExt, RateLimit,
+    PolicyContext, RateLimit,
 };
 pub use bootstrap::{
     BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,

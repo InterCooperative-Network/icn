@@ -100,9 +100,22 @@ impl TrustPolicyOracle {
             .with_rate_limit(rate_limit)
             .with_max_topics(max_topics)
             .with_max_connections(max_connections)
-            .with_credit_multiplier(score) // Direct multiplier from score
-            .with_voting_weight(score) // Direct weight from score
-            .with_custom("trust_score", score.into()) // Expose score for app-specific logic (e.g. gossip ACLs)
+            // App-specific values are opaque to the kernel.
+            .with_custom("credit_multiplier", score.into())
+            .with_custom("voting_weight", score.into())
+            .with_custom("trust_score", score.into())
+    }
+
+    fn required_trust_threshold(request: &PolicyRequest) -> Option<f64> {
+        let mut threshold = None;
+        for key in ["min_trust_threshold", "acl_min_trust_score"] {
+            if let Some(value) = request.context.metadata.get(key) {
+                if let Ok(parsed) = value.parse::<f64>() {
+                    threshold = Some(threshold.map_or(parsed, |current| current.max(parsed)));
+                }
+            }
+        }
+        threshold
     }
 }
 
@@ -140,6 +153,19 @@ impl PolicyOracle for TrustPolicyOracle {
                 0.0
             }
         };
+
+        // Enforce any policy threshold hints from the kernel (topic ACL, etc.).
+        if let Some(required) = Self::required_trust_threshold(request) {
+            if score < required {
+                tracing::warn!(
+                    actor = %request.core.actor,
+                    score = %score,
+                    required = %required,
+                    "Trust oracle denied request due to minimum trust threshold"
+                );
+                return PolicyDecision::deny("trust score below required threshold");
+            }
+        }
 
         // Log for debugging (semantic info stays in app)
         tracing::debug!(
@@ -265,8 +291,14 @@ mod tests {
 
         for score in [0.0, 0.25, 0.5, 0.75, 1.0] {
             let constraints = oracle.score_to_constraints(score, &ActionKind::Write);
-            assert_eq!(constraints.credit_multiplier, Some(score));
-            assert_eq!(constraints.voting_weight, Some(score));
+            assert_eq!(
+                constraints.custom.get("credit_multiplier"),
+                Some(&score.into())
+            );
+            assert_eq!(
+                constraints.custom.get("voting_weight"),
+                Some(&score.into())
+            );
         }
     }
 
@@ -282,8 +314,8 @@ mod tests {
         assert!(constraints.rate_limit.is_some());
         assert!(constraints.max_topics.is_some());
         assert!(constraints.max_connections.is_some());
-        assert!(constraints.credit_multiplier.is_some());
-        assert!(constraints.voting_weight.is_some());
+        assert!(constraints.custom.contains_key("credit_multiplier"));
+        assert!(constraints.custom.contains_key("voting_weight"));
 
         // The ConstraintSet struct has no field for "trust class" or "trust score"
         // The kernel cannot tell WHY these values were chosen

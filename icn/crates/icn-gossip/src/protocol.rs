@@ -51,9 +51,8 @@ impl GossipActor {
                 Domain::trust(),
             );
             match oracle.evaluate(&req) {
-                icn_kernel_api::authz::PolicyDecision::Allow { constraints } => {
-                    let score = constraints.get_trust_score().unwrap_or(0.0);
-                    debug!(peer_did = %sender, trust_score = score, "Processing message from authorized sender");
+                icn_kernel_api::authz::PolicyDecision::Allow { .. } => {
+                    debug!(peer_did = %sender, "Processing message from authorized sender");
                 }
                 icn_kernel_api::authz::PolicyDecision::Deny { reason } => {
                     warn!(

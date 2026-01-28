@@ -6,7 +6,10 @@ use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Topic
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
-use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
+use icn_kernel_api::authz::{
+    ActionKind, Domain, PolicyContext, PolicyDecision, PolicyOracle, PolicyRequest,
+    PolicyRequestCore,
+};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -775,36 +778,29 @@ impl GossipActor {
 
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Check ACL
-        // Use PolicyOracle to get trust score for enforcement
-        let trust_score = if let Some(oracle) = &self.oracle {
-            let req = PolicyRequest::new(
-                self.own_did.to_string(),
-                ActionKind::Publish,
-                Domain::trust(),
-            );
-            match oracle.evaluate(&req) {
-                PolicyDecision::Allow { constraints } => {
-                    // Extract trust score from custom constraints
-                    // This relies on TrustPolicyOracle populating "trust_score"
-                    constraints
-                        .custom
-                        .get("trust_score")
-                        .and_then(|v| match v {
-                            icn_kernel_api::authz::ConstraintValue::Float(f) => {
-                                Some(f.into_inner())
-                            }
-                            _ => None,
-                        })
-                        .unwrap_or(0.0)
-                }
-                _ => 0.0,
+        // Check ACL using policy oracle (domain-blind)
+        if let Some(oracle) = &self.oracle {
+            let mut context = PolicyContext::new();
+            if let Some(min_threshold) = topic_obj.min_trust_threshold {
+                context = context.with_metadata("min_trust_threshold", min_threshold.to_string());
             }
-        } else {
-            0.0 // Default to 0.0 if no oracle
-        };
+            if let AccessControl::MinTrustScore(min_score) = &topic_obj.acl {
+                context = context.with_metadata("acl_min_trust_score", min_score.to_string());
+            }
+            let req = PolicyRequest::with_context(
+                PolicyRequestCore::new(
+                    self.own_did.to_string(),
+                    ActionKind::Publish,
+                    Domain::trust(),
+                ),
+                context,
+            );
+            if let PolicyDecision::Deny { reason } = oracle.evaluate(&req) {
+                bail!("Not authorized to publish to topic: {topic} ({reason})");
+            }
+        }
 
-        if !topic_obj.can_publish(&self.own_did, Some(trust_score)) {
+        if !topic_obj.can_publish(&self.own_did) {
             bail!("Not authorized to publish to topic: {topic}");
         }
 

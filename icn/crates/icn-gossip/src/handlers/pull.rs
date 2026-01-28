@@ -87,10 +87,7 @@ impl GossipActor {
         // We're behind! Send PullRequest with empty want_ids to request ALL entries
         debug!("Detected we're behind - sending PullRequest for all entries");
 
-        // Get trust class and limits
-        // Get trust score and limits
-        // Get trust score and constraints from Oracle
-        let mut _trust_score = 0.0;
+        // Get constraints from Oracle
         let mut limits = ResourceLimits::default();
 
         if let Some(oracle) = &self.oracle {
@@ -102,7 +99,6 @@ impl GossipActor {
             if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
                 oracle.evaluate(&req)
             {
-                _trust_score = constraints.get_trust_score().unwrap_or(0.0);
                 limits = ResourceLimits::from_constraints(&constraints);
             }
         }
@@ -368,9 +364,7 @@ impl GossipActor {
             if let Some(cursor) = next_cursor {
                 icn_obs::metrics::gossip::pull_continuation_received_inc();
 
-                // Get trust-based limits for continuation
-                // Get trust score and constraints from Oracle
-                let mut _trust_score = 0.0;
+                // Get constraints from Oracle for continuation
                 let mut limits = ResourceLimits::default();
 
                 if let Some(oracle) = &self.oracle {
@@ -382,7 +376,6 @@ impl GossipActor {
                     if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
                         oracle.evaluate(&req)
                     {
-                        _trust_score = constraints.get_trust_score().unwrap_or(0.0);
                         limits = ResourceLimits::from_constraints(&constraints);
                     }
                 }
