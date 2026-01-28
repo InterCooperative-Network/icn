@@ -25,38 +25,46 @@
 //! The kernel calls `PolicyOracle::evaluate()` and receives a `PolicyDecision`
 //! with `ConstraintSet`. It enforces these constraints without knowing they
 //! came from trust scores.
+//!
+//! # Service Interface
+//!
+//! For kernel integration, use `TrustServiceImpl` which implements the
+//! `TrustService` trait from `icn-kernel-api`. This provides a clean
+//! abstraction that the kernel can use without domain knowledge.
 
 pub mod oracle;
+pub mod service;
 
-use icn_core::apps::dispatcher::{BoxedReducer, BoxedService};
-use icn_core::apps::runtime::AppRuntime;
 use std::sync::Arc;
 
 pub use oracle::TrustPolicyOracle;
-
-/// Register trust app handlers with the runtime.
-///
-/// Called by the supervisor during app startup.
-#[allow(clippy::type_complexity)]
-pub fn register_handlers(
-    _runtime: &AppRuntime,
-) -> (
-    Vec<(&'static str, BoxedReducer)>,
-    Vec<(&'static str, BoxedService)>,
-) {
-    // TODO: Implement attestation reducer and score query service
-    // For now, return empty - the main value is the PolicyOracle
-    (vec![], vec![])
-}
+pub use service::TrustServiceImpl;
 
 /// Create a TrustPolicyOracle instance.
 ///
 /// This is the main entry point for kernel integration.
 /// The kernel registers this oracle with the OracleRegistry.
+///
+/// # Arguments
+/// * `trust_graph` - The trust graph to use for trust score computation.
+///   The trust graph remains owned by the caller; the oracle holds a reference.
 pub fn create_oracle(
     trust_graph: Arc<parking_lot::RwLock<icn_trust::TrustGraph>>,
 ) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
     Arc::new(TrustPolicyOracle::new(trust_graph))
+}
+
+/// Create a TrustService instance.
+///
+/// This is the preferred entry point for kernel integration as it provides
+/// the full TrustService interface, not just PolicyOracle.
+///
+/// # Arguments
+/// * `trust_graph` - The trust graph to use for trust operations.
+pub fn create_service(
+    trust_graph: Arc<parking_lot::RwLock<icn_trust::TrustGraph>>,
+) -> Arc<dyn icn_kernel_api::services::TrustService> {
+    Arc::new(TrustServiceImpl::new(trust_graph))
 }
 
 #[cfg(test)]

@@ -9,7 +9,6 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle};
 use icn_snapshot::{load_snapshot, save_snapshot, StateSnapshot};
-use icn_trust::TrustClass;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -45,8 +44,7 @@ impl TestNode {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set keypair for signing
         {
@@ -240,8 +238,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     let (shutdown_tx2, _) = tokio::sync::broadcast::channel(16);
 
     // Spawn gossip actor
-    let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-    let gossip_handle2 = GossipActor::spawn_with_legacy_trust(did2.clone(), trust_lookup);
+    let gossip_handle2 = GossipActor::spawn(did2.clone(), None);
 
     // Set keypair
     {
@@ -460,9 +457,7 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     let did1_restart = node1_keypair.did().clone();
     let (shutdown_tx_restart, _) = tokio::sync::broadcast::channel(16);
 
-    let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-    let gossip_handle_restart =
-        GossipActor::spawn_with_legacy_trust(did1_restart.clone(), trust_lookup);
+    let gossip_handle_restart = GossipActor::spawn(did1_restart.clone(), None);
 
     {
         let mut gossip = gossip_handle_restart.write().await;

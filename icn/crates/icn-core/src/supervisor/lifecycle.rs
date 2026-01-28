@@ -214,16 +214,13 @@ async fn spawn_actors_with_identity(
     let snapshot_coordinator = super::init_snapshot::init_snapshot_coordinator(did.clone()).await?;
     info!("Snapshot coordinator initialized");
 
-    // Create trust lookup closure for gossip actor
-    let trust_lookup = super::init_trust::create_trust_lookup(trust_graph_handle.clone());
-
     // Initialize gossip services
+    // Note: GossipActor uses TrustGraphOracle (PolicyOracle) internally for trust-aware behavior
     let gossip_services = super::init_gossip::init_gossip_services(
         config,
         did.clone(),
         super::init_gossip::GossipDeps {
             trust_graph: trust_graph_handle.clone(),
-            trust_lookup,
             misbehavior_detector: misbehavior_detector.clone(),
             identity_bundle: identity_bundle.clone(),
         },

@@ -827,48 +827,6 @@ impl NetworkHandle {
         self.send_message(first_hop, net_msg).await
     }
 
-    /// Select relay nodes for onion routing based on trust scores (deprecated)
-    ///
-    /// Returns an ordered list of relay DIDs suitable for creating an onion circuit.
-    /// Uses the trust graph to select nodes with sufficient trust.
-    ///
-    /// **Note**: This method is deprecated. Trust-based relay selection should use
-    /// PolicyOracle for policy decisions. This method is kept for backward compatibility.
-    ///
-    /// # Arguments
-    /// * `trust_graph` - Trust graph for scoring peers
-    /// * `num_hops` - Number of relay hops desired (typically 2-3)
-    /// * `min_trust` - Minimum trust score for relay selection (e.g., 0.3)
-    ///
-    /// # Returns
-    /// Empty vec if insufficient trusted relays are available.
-    #[deprecated(note = "Use PolicyOracle for trust-based relay selection")]
-    pub async fn select_onion_relays(
-        &self,
-        trust_graph: &Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
-        num_hops: usize,
-        min_trust: f64,
-    ) -> Vec<Did> {
-        // Get connected peers as candidates
-        let candidates: Vec<Did> = if let Some(ref connections) = self.peer_connections {
-            connections.read().await.keys().cloned().collect()
-        } else {
-            return vec![];
-        };
-
-        // Get trust scores
-        let graph = trust_graph.read().await;
-        let mut trust_scores = std::collections::HashMap::new();
-
-        for did in &candidates {
-            if let Ok(score) = graph.compute_trust_score(did) {
-                trust_scores.insert(did.clone(), score);
-            }
-        }
-
-        // Use icn_privacy's relay selection
-        icn_privacy::select_relays(&candidates, &trust_scores, num_hops, min_trust)
-    }
 }
 
 /// Network actor state

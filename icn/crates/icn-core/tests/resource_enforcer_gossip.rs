@@ -16,9 +16,6 @@ use icn_ledger::{AccessModel, AntiSpeculationRules, ResourceAccess};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-type TrustLookup =
-    Arc<dyn Fn(&icn_identity::Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>;
-
 /// Wait time for async gossip publication tasks to complete.
 /// 200ms provides margin for multi-node scenarios where gossip
 /// publication involves actor communication and potential network delays.
@@ -74,13 +71,9 @@ async fn test_revocation_event_gossip_publication() {
     let node2_keypair = KeyPair::generate().unwrap();
     let node2_did = node2_keypair.did();
 
-    let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
+    let node1_gossip = GossipActor::spawn(node1_did.clone(), None);
 
-    let node1_gossip =
-        GossipActor::spawn_with_trust_graph(node1_did.clone(), trust_lookup.clone(), None);
-
-    let node2_gossip =
-        GossipActor::spawn_with_trust_graph(node2_did.clone(), trust_lookup.clone(), None);
+    let node2_gossip = GossipActor::spawn(node2_did.clone(), None);
 
     // Create the revocation topic on both nodes
     {
@@ -165,8 +158,7 @@ async fn test_gossip_store_wrapper_integration() {
     let keypair = KeyPair::generate().unwrap();
     let keypair_clone = keypair.clone();
     let did = keypair_clone.did();
-    let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
-    let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+    let gossip_handle = GossipActor::spawn(did.clone(), None);
 
     // Set keypair for signing
     {

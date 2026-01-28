@@ -18,7 +18,7 @@ use icn_identity::{
 use icn_ledger::{entry::JournalEntryBuilder, Ledger};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_store::{SledStore, Store};
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustGraphType, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustGraphType, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -73,21 +73,8 @@ impl RecoveryTestNode {
         // Create shutdown channel
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
-        // Spawn gossip actor with trust lookup
-        let trust_graph_clone = trust_graph.clone();
-        let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
-            // Use try_read to avoid blocking
-            match trust_graph_clone.try_read() {
-                Ok(trust) => {
-                    match trust.trust_class(peer_did) {
-                        Ok(class) => Some(class),
-                        Err(_) => Some(TrustClass::Known), // Default for testing
-                    }
-                }
-                Err(_) => Some(TrustClass::Known), // Fallback if lock contended
-            }
-        });
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // Spawn gossip actor
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Create and subscribe to recovery topic
         {

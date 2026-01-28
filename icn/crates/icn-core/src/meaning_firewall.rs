@@ -129,9 +129,9 @@ mod tests {
     /// This test should PASS now but will need to be removed after Phase 2.
     #[test]
     fn current_kernel_crates_have_trust_dependencies() {
-        // Explicitly document expected violations for Phase 1
-        const EXPECTED_VIOLATIONS: &[&str] =
-            &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
+        // Explicitly document expected violations for Phase 2
+        // Progress: icn-gossip cleaned in Wave 1A, icn-net cleaned in Wave 1A
+        const EXPECTED_VIOLATIONS: &[&str] = &["icn-net", "icn-gateway", "icn-ledger"];
 
         let mut violations = Vec::new();
 

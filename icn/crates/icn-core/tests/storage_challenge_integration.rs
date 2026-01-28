@@ -54,8 +54,7 @@ impl TestNode {
         let misbehavior_handle = Arc::new(RwLock::new(misbehavior));
 
         // Create gossip actor
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set gossip store
         {

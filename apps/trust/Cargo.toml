@@ -13,25 +13,17 @@ icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
 # Internal trust graph implementation (not exposed to kernel)
 icn-trust = { path = "../../icn/crates/icn-trust" }
 
-# App runtime support
-icn-core = { path = "../../icn/crates/icn-core" }
-
-# Storage for trust state
-icn-store = { path = "../../icn/crates/icn-store" }
-
 # Identity types (for Did conversion)
 icn-identity = { path = "../../icn/crates/icn-identity" }
 
-# Async runtime
-async-trait = "0.1"
-tokio = { version = "1", features = ["sync"] }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# Storage for tests
+icn-store = { path = "../../icn/crates/icn-store" }
 
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
+
+# Error handling
+anyhow = "1.0"
 
 # Logging
 tracing = "0.1"

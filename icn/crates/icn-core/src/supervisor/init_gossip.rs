@@ -18,7 +18,6 @@ use icn_snapshot::StateSnapshot;
 use icn_store::SledStore;
 use icn_trust::TrustGraph;
 
-use super::init_trust::TrustLookup;
 use crate::config::Config;
 use crate::replication::{ReplicationConfig, ReplicationManager};
 
@@ -41,7 +40,6 @@ pub struct GossipServices {
 /// Dependencies for gossip initialization
 pub struct GossipDeps {
     pub trust_graph: Arc<RwLock<TrustGraph>>,
-    pub trust_lookup: TrustLookup,
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
     pub identity_bundle: IdentityBundle,
 }

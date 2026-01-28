@@ -9,7 +9,7 @@ use tracing::{debug, info, warn};
 use icn_identity::Did;
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, TrustPenaltyCallback};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 
 use crate::config::Config;
 
@@ -24,9 +24,6 @@ pub struct TrustServices {
     /// Store for security/reputation state (misbehavior detector persistence)
     pub security_store: Arc<dyn icn_store::Store>,
 }
-
-/// Trust lookup closure type for gossip actor
-pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
 
 /// Initialize trust graph and security services
 ///
@@ -89,24 +86,6 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
         misbehavior_detector,
         recovery_store,
         security_store,
-    })
-}
-
-/// Create trust lookup closure for gossip actor
-///
-/// Returns a closure that can synchronously look up a peer's trust class.
-pub fn create_trust_lookup(trust_graph: Arc<RwLock<TrustGraph>>) -> TrustLookup {
-    Arc::new(move |peer_did: &Did| {
-        // Use a blocking task since we're in a sync context
-        let graph = trust_graph.clone();
-        let peer = peer_did.clone();
-        tokio::task::block_in_place(|| {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                let graph = graph.read().await;
-                graph.trust_class(&peer).ok()
-            })
-        })
     })
 }
 
@@ -181,25 +160,8 @@ mod tests {
         let _detector = services.misbehavior_detector.read().await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_trust_lookup_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
-
-        let services = init_trust_services(&config, did.clone()).await.unwrap();
-        let lookup = create_trust_lookup(services.trust_graph.clone());
-
-        // Unknown peer should return None or Isolated
-        let unknown_did = icn_identity::KeyPair::generate().unwrap().did().clone();
-        let result = lookup(&unknown_did);
-        // Either None or Isolated is acceptable for unknown peers
-        assert!(result.is_none() || result == Some(TrustClass::Isolated));
-    }
+    // test_trust_lookup_creation removed - trust lookup is now handled by TrustGraphOracle
+    // in init_gossip.rs via the PolicyOracle pattern. See TrustGraphOracle for the replacement.
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_misbehavior_updates_trust_graph() {

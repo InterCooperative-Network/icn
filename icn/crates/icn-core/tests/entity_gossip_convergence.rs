@@ -17,7 +17,6 @@ use icn_entity::{
 use icn_gossip::{AccessControl, GossipActor, GossipMessage, Topic};
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
-use icn_trust::TrustClass;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,8 +60,7 @@ impl TestNode {
         let registry = SledEntityRegistry::new(Arc::new(db))?;
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Create entity topic
         {

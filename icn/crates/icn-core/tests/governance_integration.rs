@@ -17,7 +17,6 @@ use icn_governance::{
 };
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor};
-use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -57,8 +56,7 @@ impl TestNode {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         info!("Gossip actor spawned");
 

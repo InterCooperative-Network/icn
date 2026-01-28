@@ -11,7 +11,6 @@ use anyhow::Result;
 use icn_gossip::GossipActor;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
-use icn_trust::TrustClass;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,8 +43,7 @@ impl TestNode {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &icn_identity::Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         info!("Gossip actor spawned");
 
@@ -318,9 +316,8 @@ async fn test_subscription_acl_enforcement() -> Result<()> {
     let did = keypair.did().clone();
     let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
-    // Trust lookup that returns None (no trust)
-    let trust_lookup = Arc::new(|_did: &icn_identity::Did| None);
-    let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+    // Spawn gossip actor
+    let gossip_handle = GossipActor::spawn(did.clone(), None);
 
     // Create a topic with TrustClass requirement
     {

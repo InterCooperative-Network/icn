@@ -20,8 +20,6 @@ icn-crypto-pq = { path = "../icn-crypto-pq", optional = true }
 icn-time = { path = "../icn-time" }
 icn-gossip.workspace = true
 icn-kernel-api = { path = "../icn-kernel-api" }
-icn-trust.workspace = true  # TODO: Remove after Phase 2 migration is complete
-icn-ledger.workspace = true
 icn-store.workspace = true
 icn-obs.workspace = true
 icn-snapshot.workspace = true

@@ -41,20 +41,8 @@ impl TestNode {
         let trust_graph = TrustGraph::new(trust_store, did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
-        // Create gossip actor with trust lookup that consults the trust graph
-        let trust_graph_for_lookup = trust_graph_handle.clone();
-        let trust_lookup = Arc::new(move |peer_did: &Did| {
-            let graph = trust_graph_for_lookup.clone();
-            let peer = peer_did.clone();
-            tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = graph.read().await;
-                    graph.trust_class(&peer).ok()
-                })
-            })
-        });
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // Create gossip actor
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set gossip store
         {

@@ -425,8 +425,8 @@ mod tests {
         let trust_store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
 
         let manager =
             ReplicationManager::new(did.clone(), config, store.clone(), trust_graph, gossip);
@@ -474,8 +474,8 @@ mod tests {
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
 
         let manager =
             ReplicationManager::new(did.clone(), config, store, trust_graph_handle, gossip);
@@ -506,8 +506,8 @@ mod tests {
         let trust_store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
 
         let manager = ReplicationManager::new(did, config.clone(), store, trust_graph, gossip);
 
