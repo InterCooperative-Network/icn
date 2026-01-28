@@ -465,7 +465,9 @@ impl Ledger {
         &mut self,
         trust_service: Arc<dyn icn_kernel_api::services::TrustService>,
     ) {
-        self.trust_service = Some(trust_service);
+        self.trust_service = Some(trust_service.clone());
+        // Also propagate to fork resolver for trust-weighted fork resolution
+        self.fork_resolver.set_trust_service(trust_service);
     }
 
     /// Get trust score for a DID using TrustService (preferred) or TrustGraph (fallback)
