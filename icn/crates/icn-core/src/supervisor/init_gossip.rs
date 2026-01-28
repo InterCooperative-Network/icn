@@ -39,9 +39,15 @@ pub struct GossipServices {
 
 /// Dependencies for gossip initialization
 pub struct GossipDeps {
+    /// Trust graph for replication manager (will be removed when ReplicationManager uses PolicyOracle)
     pub trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Misbehavior detector for Byzantine fault tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
+    /// Identity bundle for signing
     pub identity_bundle: IdentityBundle,
+    /// Optional policy oracle - if provided, used instead of internal TrustGraphOracle.
+    /// This allows the daemon to inject an oracle from apps/trust for proper kernel/app separation.
+    pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
 }
 
 /// Initialize gossip services
@@ -55,7 +61,13 @@ pub struct GossipDeps {
 use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 
 /// Adapter to expose TrustGraph as a PolicyOracle for GossipActor
-pub struct TrustGraphOracle {
+///
+/// **DEPRECATED**: This is a transitional adapter. The daemon should inject
+/// a PolicyOracle from `apps/trust` via `GossipDeps::policy_oracle` instead.
+/// This adapter will be removed when the kernel/app separation is complete.
+///
+/// See: apps/trust/src/oracle.rs for the canonical TrustPolicyOracle implementation.
+struct TrustGraphOracle {
     trust_graph: Arc<RwLock<TrustGraph>>,
 }
 
@@ -148,8 +160,19 @@ pub async fn init_gossip_services(
     did: Did,
     deps: GossipDeps,
 ) -> anyhow::Result<GossipServices> {
-    // Create PolicyOracle adapter for TrustGraph
-    let oracle = Arc::new(TrustGraphOracle::new(deps.trust_graph.clone()));
+    // Use provided PolicyOracle, or create internal TrustGraphOracle as fallback.
+    // The daemon should provide an oracle from apps/trust for proper kernel/app separation.
+    // The internal TrustGraphOracle is kept for backwards compatibility during migration.
+    let oracle: Arc<dyn PolicyOracle> = match deps.policy_oracle {
+        Some(oracle) => {
+            info!("Using provided PolicyOracle for gossip trust evaluation");
+            oracle
+        }
+        None => {
+            debug!("No PolicyOracle provided, using internal TrustGraphOracle (deprecated)");
+            Arc::new(TrustGraphOracle::new(deps.trust_graph.clone()))
+        }
+    };
 
     // Spawn Gossip actor with policy oracle
     let gossip = GossipActor::new(did.clone(), Some(oracle));
