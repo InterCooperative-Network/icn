@@ -94,7 +94,8 @@ jobs:
           FORBIDDEN=("icn-trust" "icn-governance" "icn-ledger" "icn-ccl" "icn-compute" "icn-entity" "icn-community" "icn-federation" "icn-steward")
           ALLOWLIST_FILE="../scripts/forbidden-deps-allowlist.txt"
           if [ -f "$ALLOWLIST_FILE" ]; then
-            mapfile -t ALLOWLIST < "$ALLOWLIST_FILE"
+            # Read allowlist, filtering out comments and empty lines
+            mapfile -t ALLOWLIST < <(grep -v '^\s*#' "$ALLOWLIST_FILE" | grep -v '^\s*$')
           else
             ALLOWLIST=()
           fi
