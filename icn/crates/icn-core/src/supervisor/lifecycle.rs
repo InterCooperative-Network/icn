@@ -547,6 +547,7 @@ async fn spawn_actors_with_identity(
     info!("✓ Policy governance integration active");
 
     // Spawn RPC server
+    // TODO: Inject PolicyOracle from daemon for trust-based rate limiting
     let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config);
     let rpc_compute_handle = super::init_rpc::spawn_rpc_server(
         rpc_config,
@@ -560,6 +561,7 @@ async fn spawn_actors_with_identity(
             trust_graph: trust_graph_handle.clone(),
             dispute_manager: dispute_manager_handle,
             federation_registry: federation_registry_for_rpc,
+            policy_oracle: None, // TODO: Inject from daemon via apps/trust
         },
         background_tasks,
     );
