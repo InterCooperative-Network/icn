@@ -111,6 +111,7 @@ pub async fn run_supervisor(
             coop: gateway_handles.coop,
             community: gateway_handles.community,
             trust_graph: gateway_handles.trust_graph,
+            trust_service: gateway_handles.trust_service,
             governance: gateway_handles.governance,
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
@@ -331,6 +332,7 @@ async fn spawn_actors_with_identity(
     gateway_handles.coop = Some(coop_handle);
     gateway_handles.community = Some(community_services.community_handle);
     gateway_handles.trust_graph = Some(trust_graph_handle.clone());
+    gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
 
     // Spawn Identity actor (provides signing and trust graph access)
