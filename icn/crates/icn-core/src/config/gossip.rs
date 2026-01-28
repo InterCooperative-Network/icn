@@ -141,11 +141,9 @@ fn default_true() -> bool {
 
 impl ReplicationConfig {
     /// Convert to icn-core ReplicationConfig used by ReplicationManager
-    #[allow(deprecated)]
     pub fn to_manager_config(&self) -> crate::replication::ReplicationConfig {
         crate::replication::ReplicationConfig {
             target_replicas: self.target_replicas,
-            min_trust_class: self.min_replica_trust.to_class(), // Deprecated, kept for compatibility
             min_trust_score: self.min_replica_trust.value(),
             health_check_interval_secs: self.health_check_interval_secs,
             stale_threshold_secs: self.stale_threshold_secs,
@@ -260,7 +258,6 @@ silence_threshold_secs = 400
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_replication_config_to_manager_config() {
         let config = ReplicationConfig {
             target_replicas: 5,
@@ -273,10 +270,6 @@ silence_threshold_secs = 400
         let manager_config = config.to_manager_config();
 
         assert_eq!(manager_config.target_replicas, 5);
-        assert_eq!(
-            manager_config.min_trust_class,
-            icn_trust::TrustClass::Federated
-        );
         assert_eq!(manager_config.min_trust_score, 0.7);
         assert_eq!(manager_config.health_check_interval_secs, 90);
         assert_eq!(manager_config.stale_threshold_secs, 450);

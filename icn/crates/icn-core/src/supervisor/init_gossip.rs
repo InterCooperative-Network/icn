@@ -39,8 +39,12 @@ pub struct GossipServices {
 
 /// Dependencies for gossip initialization
 pub struct GossipDeps {
-    /// Trust graph for replication manager (will be removed when ReplicationManager uses PolicyOracle)
+    /// Trust graph for fallback TrustGraphOracle (deprecated, kept for backward compatibility)
+    /// Will be removed when TrustService is always provided via ServiceRegistry.
     pub trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Trust service for ReplicationManager (kernel/app separated)
+    /// If provided, used instead of internal TrustGraph for replica peer selection.
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Misbehavior detector for Byzantine fault tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
     /// Identity bundle for signing
@@ -205,19 +209,25 @@ pub async fn init_gossip_services(
     );
 
     // Spawn ReplicationManager for monitoring and maintaining data durability (Phase 17 Week 3)
-    let replication_config = ReplicationConfig::default();
-    let _replication_handle = ReplicationManager::spawn(
-        did.clone(),
-        replication_config.clone(),
-        gossip_store.clone(),
-        deps.trust_graph.clone(),
-        gossip_handle.clone(),
-    );
+    // Requires TrustService for peer selection. If not provided, skip replication manager.
+    if let Some(trust_service) = deps.trust_service.clone() {
+        let replication_config = ReplicationConfig::default();
+        let _replication_handle = ReplicationManager::spawn(
+            did.clone(),
+            replication_config.clone(),
+            gossip_store.clone(),
+            trust_service,
+            gossip_handle.clone(),
+        );
 
-    info!(
-        "ReplicationManager spawned (target: {} replicas, health check: {}s)",
-        replication_config.target_replicas, replication_config.health_check_interval_secs
-    );
+        info!(
+            "ReplicationManager spawned (target: {} replicas, health check: {}s)",
+            replication_config.target_replicas, replication_config.health_check_interval_secs
+        );
+    } else {
+        warn!("No TrustService provided - ReplicationManager not spawned");
+        warn!("Ensure ServiceRegistry with TrustService is passed to supervisor");
+    }
 
     // Phase 18 Week 3: Initialize PartitionDetector and PartitionHealer
     let partition_config = PartitionConfig::default(); // 5 min threshold, 30s check interval

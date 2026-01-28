@@ -259,17 +259,20 @@ async fn spawn_actors_with_identity(
     info!("Snapshot coordinator initialized");
 
     // Initialize gossip services
-    // Note: GossipActor uses PolicyOracle for trust-aware behavior.
-    // TODO: Inject oracle from apps/trust via daemon for proper kernel/app separation.
-    // Currently using internal TrustGraphOracle fallback (policy_oracle: None).
+    // Get TrustService from ServiceRegistry for ReplicationManager if available.
+    // Also get the PolicyOracle from TrustService for trust-aware gossip behavior.
+    let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
+    let policy_oracle_from_registry = trust_service_from_registry.as_ref().map(|ts| ts.oracle());
+
     let gossip_services = super::init_gossip::init_gossip_services(
         config,
         did.clone(),
         super::init_gossip::GossipDeps {
             trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service_from_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             identity_bundle: identity_bundle.clone(),
-            policy_oracle: None, // TODO: Inject from daemon via apps/trust
+            policy_oracle: policy_oracle_from_registry,
         },
     )
     .await?;
