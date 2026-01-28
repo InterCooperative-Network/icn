@@ -23,7 +23,6 @@ use std::time::Duration;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
-
 /// Test node with full stack
 struct TestNode {
     _keypair: KeyPair,

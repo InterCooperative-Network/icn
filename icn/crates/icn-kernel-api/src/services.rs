@@ -105,10 +105,7 @@ pub enum SecurityViolation {
     /// Unauthorized action attempted
     UnauthorizedAction,
     /// Generic violation with severity
-    Generic {
-        severity: f64,
-        description: String,
-    },
+    Generic { severity: f64, description: String },
 }
 
 /// Abstract governance service interface
@@ -154,10 +151,7 @@ pub trait GovernanceService: Send + Sync {
 #[derive(Debug, Clone)]
 pub enum GovernanceEvent {
     /// Parameter was accessed
-    ParameterAccessed {
-        key: String,
-        accessor: Did,
-    },
+    ParameterAccessed { key: String, accessor: Did },
     /// Parameter change was requested
     ParameterChangeRequested {
         key: String,
@@ -222,19 +216,14 @@ pub enum LedgerEvent {
         currency: String,
     },
     /// Transaction completed
-    TransactionCompleted {
-        transaction_id: String,
-    },
+    TransactionCompleted { transaction_id: String },
     /// Transaction failed
     TransactionFailed {
         transaction_id: String,
         reason: String,
     },
     /// Balance queried
-    BalanceQueried {
-        account: Did,
-        querier: Did,
-    },
+    BalanceQueried { account: Did, querier: Did },
 }
 
 /// Builder for creating domain services

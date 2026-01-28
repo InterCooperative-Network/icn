@@ -826,7 +826,6 @@ impl NetworkHandle {
         // Send to first hop
         self.send_message(first_hop, net_msg).await
     }
-
 }
 
 /// Network actor state

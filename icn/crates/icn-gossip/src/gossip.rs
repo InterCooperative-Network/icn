@@ -1288,7 +1288,6 @@ impl GossipActor {
         let actor = GossipActor::new(own_did, oracle);
         Arc::new(RwLock::new(actor))
     }
-
 }
 
 /// Start periodic digest emission background task
