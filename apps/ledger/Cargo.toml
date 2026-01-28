@@ -21,7 +21,7 @@ icn-store = { path = "../../icn/crates/icn-store" }
 
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "rt"] }
 
 # Error handling
 anyhow = "1.0"

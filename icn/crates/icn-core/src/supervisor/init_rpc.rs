@@ -12,10 +12,10 @@ use tracing::{debug, info, warn};
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_gossip::GossipActor;
+use icn_kernel_api::authz::PolicyOracle;
 use icn_ledger::{DisputeManager, Ledger};
 use icn_net::NetworkHandle;
 use icn_rpc::RpcServer;
-use icn_kernel_api::authz::PolicyOracle;
 use icn_trust::TrustGraph;
 
 use crate::governance::GovernanceHandle;

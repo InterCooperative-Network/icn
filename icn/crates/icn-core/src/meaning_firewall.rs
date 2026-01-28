@@ -130,7 +130,8 @@ mod tests {
     #[test]
     fn current_kernel_crates_have_trust_dependencies() {
         // Explicitly document expected violations for Phase 2
-        // Progress: icn-gossip cleaned in Wave 1A, icn-net cleaned in Wave 1A
+        // Progress: icn-gossip cleaned in Wave 1A
+        // Remaining: icn-net (test-only dep), icn-gateway, icn-ledger
         const EXPECTED_VIOLATIONS: &[&str] = &["icn-net", "icn-gateway", "icn-ledger"];
 
         let mut violations = Vec::new();
