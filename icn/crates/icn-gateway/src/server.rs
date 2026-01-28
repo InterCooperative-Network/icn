@@ -104,6 +104,8 @@ pub struct GatewayServer {
     agreement_manager_handle: Option<icn_federation::agreement::AgreementManagerHandle>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
+    /// Default trust score for unknown peers (overrides DEFAULT_TRUST_SCORE)
+    default_trust_score: Option<f64>,
 }
 
 impl GatewayServer {
@@ -129,6 +131,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             audit_prune_config: None,
+            default_trust_score: None,
         }
     }
 
@@ -158,6 +161,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             audit_prune_config: None,
+            default_trust_score: None,
         }
     }
 
@@ -188,6 +192,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             audit_prune_config: None,
+            default_trust_score: None,
         }
     }
 
@@ -196,6 +201,14 @@ impl GatewayServer {
         self.audit_prune_config = Some(config);
         self
     }
+
+    /// Set default trust score
+    pub fn with_default_trust_score(mut self, score: f64) -> Self {
+        self.default_trust_score = Some(score);
+        self
+    }
+
+
 
     /// Set custom security configuration
     pub fn with_security_config(mut self, config: SecurityConfig) -> Self {
@@ -413,10 +426,20 @@ impl GatewayServer {
         // Create trust manager (uses TrustGraph actor if handle available, otherwise in-memory)
         let trust_manager: Arc<TrustManager> = if let Some(handle) = self.trust_graph_handle {
             info!("Trust manager connected to daemon (using TrustGraph actor)");
-            Arc::new(TrustManager::with_handle(handle))
+            let mut mgr = TrustManager::with_handle(handle);
+            if let Some(score) = self.default_trust_score {
+                info!("Setting custom default trust score: {}", score);
+                mgr = mgr.with_default_score(score);
+            }
+            Arc::new(mgr)
         } else {
             info!("Trust manager running standalone (in-memory only)");
-            Arc::new(TrustManager::new())
+            let mut mgr = TrustManager::new();
+            if let Some(score) = self.default_trust_score {
+                info!("Setting custom default trust score: {}", score);
+                mgr = mgr.with_default_score(score);
+            }
+            Arc::new(mgr)
         };
 
         let compute_manager = if let Some(handle) = self.compute_handle {
