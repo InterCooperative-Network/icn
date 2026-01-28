@@ -132,9 +132,7 @@ pub async fn start_metrics_server(port: u16) -> Result<()> {
             metrics_exporter_prometheus::Matcher::Full(
                 "trust_oracle_evaluation_duration_seconds".to_string(),
             ),
-            &[
-                0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0,
-            ],
+            &[0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
         )
         .context("Failed to set buckets")?;
     builder
