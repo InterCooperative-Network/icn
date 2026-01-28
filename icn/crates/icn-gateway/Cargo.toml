@@ -65,7 +65,7 @@ base64 = "0.22"
 sha2 = "0.10"
 
 # ICN dependencies
-icn-identity = { path = "../icn-identity" }
+icn-identity = { path = "../icn-identity", features = ["utoipa"] }
 icn-net = { path = "../icn-net" }
 icn-kernel-api = { path = "../icn-kernel-api" }
 icn-entity = { path = "../icn-entity" }
@@ -76,13 +76,13 @@ icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }
 icn-compute = { path = "../icn-compute" }
-icn-federation = { path = "../icn-federation" }
+icn-federation = { path = "../icn-federation", features = ["utoipa"] }
 icn-trust = { path = "../icn-trust" }
 icn-ccl = { path = "../icn-ccl" }
-icn-zkp = { path = "../icn-zkp", features = ["stark"] }
+icn-zkp = { path = "../icn-zkp", features = ["stark", "utoipa"] }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
-icn-coop = { path = "../icn-coop" }
+icn-coop = { path = "../icn-coop", features = ["utoipa"] }
 icn-community = { path = "../icn-community" }
 icn-api = { path = "../icn-api" }
 
@@ -94,8 +94,8 @@ dashmap = "6.0"
 metrics = "0.24"
 
 # OpenAPI documentation
-utoipa = { version = "4", features = ["actix_extras"] }
-utoipa-swagger-ui = { version = "6", features = ["actix-web"] }
+utoipa = { version = "5.4.0", features = ["actix_extras"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 
 # HTTP client for FCM
 reqwest = { workspace = true }

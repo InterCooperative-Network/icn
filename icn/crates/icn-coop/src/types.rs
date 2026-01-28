@@ -311,6 +311,7 @@ fn default_min_members() -> usize {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum CoopType {
     Worker,
     Consumer,
@@ -322,6 +323,7 @@ pub enum CoopType {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum CoopStatus {
     Forming,
     Active,
@@ -351,6 +353,7 @@ pub struct Member {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum MemberRole {
     Founder,
     Member,
@@ -362,6 +365,7 @@ pub enum MemberRole {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum MemberStatus {
     Pending,
     Active,

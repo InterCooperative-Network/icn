@@ -12,6 +12,7 @@ use std::sync::{Arc, RwLock};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
+use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 
@@ -27,7 +28,7 @@ pub type CoopId = String;
 ///
 /// For backwards compatibility, the legacy names (Owner/Admin/Member) are
 /// accepted when parsing from JSON or API requests.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub enum MemberRole {
     /// Primary caretaker with full administrative authority (formerly "Owner")
     #[serde(alias = "Owner", alias = "owner")]
@@ -41,7 +42,7 @@ pub enum MemberRole {
 }
 
 /// Cooperative member with role
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CoopMember {
     pub did: Did,
     pub role: MemberRole,
@@ -49,7 +50,7 @@ pub struct CoopMember {
 }
 
 /// Cooperative settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CoopSettings {
     pub governance_model: String, // e.g., "consensus", "majority"
     pub credit_policy: String,    // e.g., "conservative", "permissive"
@@ -67,7 +68,7 @@ impl Default for CoopSettings {
 }
 
 /// Cooperative namespace
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Coop {
     pub id: CoopId,
     pub name: String,

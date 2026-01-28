@@ -116,6 +116,8 @@ pub struct TrustManager {
     trust_graph: Option<TrustGraphHandle>,
     /// Cached PolicyOracle (avoids repeated Arc allocation)
     cached_oracle: Option<Arc<TrustPolicyOracle>>,
+    /// Configurable default trust score
+    default_trust_score: f64,
 }
 
 impl TrustManager {
@@ -130,7 +132,14 @@ impl TrustManager {
             own_did: None,
             trust_graph: None,
             cached_oracle: None,
+            default_trust_score: DEFAULT_TRUST_SCORE,
         }
+    }
+
+    /// Set the default trust score
+    pub fn with_default_score(mut self, score: f64) -> Self {
+        self.default_trust_score = score;
+        self
     }
 
     /// Create a trust manager backed by the daemon's TrustGraph
@@ -147,6 +156,7 @@ impl TrustManager {
             own_did: None,
             trust_graph: Some(handle),
             cached_oracle: None,
+            default_trust_score: DEFAULT_TRUST_SCORE,
         }
     }
 
@@ -183,6 +193,7 @@ impl TrustManager {
             } else {
                 None
             },
+            default_trust_score: self.default_trust_score,
         })
     }
 
@@ -200,6 +211,7 @@ impl TrustManager {
                     } else {
                         None
                     },
+                    default_trust_score: self.default_trust_score,
                 })
             })
             .clone()
@@ -575,9 +587,9 @@ impl TrustManager {
         );
 
         // Add metadata to request specifically the trust score
-        let request = icn_kernel_api::PolicyRequest::with_ext(
+        let request = icn_kernel_api::PolicyRequest::with_context(
             request.core,
-            icn_kernel_api::PolicyRequestExt::new().with_resource("trust_score"),
+            icn_kernel_api::PolicyContext::new().with_resource("trust_score"),
         );
 
         // Evaluate using our internal oracle implementation
@@ -885,17 +897,18 @@ pub struct TrustPolicyOracle {
     trust_graph: Option<TrustGraphHandle>,
     own_did: Option<Did>,
     standalone_edges: Option<Arc<DashMap<String, TrustEdge>>>,
+    default_trust_score: f64,
 }
 
 impl TrustPolicyOracle {
     /// Compute trust score using local algorithm (helper for standalone mode)
     fn compute_local(&self, target_did: &str) -> f64 {
         let Some(ref own_did) = self.own_did else {
-            return DEFAULT_TRUST_SCORE;
+            return self.default_trust_score;
         };
 
         let Some(ref edges) = self.standalone_edges else {
-            return DEFAULT_TRUST_SCORE;
+            return self.default_trust_score;
         };
 
         compute_trust_from_edges_map(own_did.as_str(), target_did, edges)
@@ -972,6 +985,8 @@ fn compute_trust_from_edges_map(
 
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let start = std::time::Instant::now();
+
         // 1. Check domain
         if request.domain().as_str() != "trust" {
             // We don't handle other domains. In a chain-of-responsibility pattern,
@@ -992,7 +1007,7 @@ impl PolicyOracle for TrustPolicyOracle {
                 if let Ok(graph) = handle.try_read() {
                     graph.compute_trust_score(&target_did).unwrap_or_else(|e| {
                         warn!("TrustOracle compute error (try_read): {}", e);
-                        DEFAULT_TRUST_SCORE
+                        self.default_trust_score
                     })
                 } else {
                     debug!("TrustOracle contention: falling back to block_in_place");
@@ -1001,7 +1016,7 @@ impl PolicyOracle for TrustPolicyOracle {
                         let graph = handle.blocking_read();
                         graph.compute_trust_score(&target_did).unwrap_or_else(|e| {
                             warn!("TrustOracle compute error (blocking): {}", e);
-                            DEFAULT_TRUST_SCORE
+                            self.default_trust_score
                         })
                     })
                 }
@@ -1012,7 +1027,7 @@ impl PolicyOracle for TrustPolicyOracle {
                     target_str
                 );
                 metrics::counter!("trust_oracle_did_parse_failures_total").increment(1);
-                DEFAULT_TRUST_SCORE
+                self.default_trust_score
             }
         } else {
             // Standalone mode - works with Strings mostly
@@ -1040,6 +1055,24 @@ impl PolicyOracle for TrustPolicyOracle {
             icn_kernel_api::RateLimit::restricted() // Isolated (5/5)
         };
         constraints = constraints.with_rate_limit(rate_limit);
+
+        // Determine trust tier for metrics
+        let trust_tier = if score > TRUST_PARTNER_MAX {
+            "federated"
+        } else if score > TRUST_KNOWN_MAX {
+            "partner"
+        } else if score > TRUST_ISOLATED_MAX {
+            "known"
+        } else {
+            "isolated"
+        };
+
+        // Record execution duration with tier label
+        metrics::histogram!(
+            "trust_oracle_evaluation_duration_seconds",
+            "trust_tier" => trust_tier
+        )
+        .record(start.elapsed().as_secs_f64());
 
         PolicyDecision::allow_with(constraints)
     }
@@ -1420,6 +1453,40 @@ mod tests {
                     score
                 );
             }
+        } else {
+            panic!("Expected Allow decision");
+        }
+    }
+    #[tokio::test]
+    async fn test_trust_oracle_custom_default_score() {
+        use icn_kernel_api::{ActionKind, Domain, PolicyRequest};
+
+        // Create manager with custom default score of 0.8
+        let mgr = TrustManager::new().with_default_score(0.8);
+        let oracle = mgr.as_oracle();
+
+        // Request for unknown DID
+        let request = PolicyRequest::new(
+            "did:icn:unknown".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate(&request);
+        if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
+            let score = constraints
+                .custom
+                .get("trust_score")
+                .and_then(|value| match value {
+                    icn_kernel_api::authz::ConstraintValue::Float(f) => Some(f.into_inner()),
+                    _ => None,
+                })
+                .expect("Should have trust score");
+            assert!(
+                (score - 0.8).abs() < f64::EPSILON,
+                "Should use custom default score of 0.8, got {}",
+                score
+            );
         } else {
             panic!("Expected Allow decision");
         }

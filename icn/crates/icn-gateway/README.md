@@ -419,6 +419,8 @@ Note: Metrics are instrumented throughout the codebase but don't require additio
 
 ## Architecture
 
+- [TrustPolicyOracle Sequence Diagram](../../docs/trust_policy_oracle_sequence.mermaid)
+
 ```
 icn-gateway/
 ├── src/

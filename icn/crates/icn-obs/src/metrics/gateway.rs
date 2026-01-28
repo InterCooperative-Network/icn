@@ -2,7 +2,7 @@
 //!
 //! Metrics for WebSocket connections, event broadcasting, and backpressure.
 
-use metrics::{counter, describe_counter, describe_gauge, gauge};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge};
 use std::collections::HashSet;
 use std::sync::{Mutex, OnceLock};
 
@@ -84,6 +84,11 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_gateway_fx_clearing_transfers_total",
         "Total number of cross-currency transfers through clearing account"
+    );
+
+    describe_histogram!(
+        "trust_oracle_evaluation_duration_seconds",
+        "Duration of TrustPolicyOracle evaluation in seconds"
     );
 }
 

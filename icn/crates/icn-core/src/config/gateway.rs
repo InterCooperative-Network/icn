@@ -31,6 +31,10 @@ pub struct GatewayConfig {
     /// Audit retention policy configuration
     #[serde(default)]
     pub audit_retention: AuditRetentionConfig,
+
+    /// Default trust score for unknown peers (0.0 to 1.0)
+    #[serde(default)]
+    pub default_trust_score: Option<f64>,
 }
 
 fn default_gateway_bind_addr() -> String {
@@ -54,6 +58,7 @@ impl Default for GatewayConfig {
             challenge_ttl_minutes: default_challenge_ttl_minutes(),
             jwt_secret: String::new(),
             audit_retention: AuditRetentionConfig::default(),
+            default_trust_score: None,
         }
     }
 }

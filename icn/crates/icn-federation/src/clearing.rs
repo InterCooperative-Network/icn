@@ -10,6 +10,7 @@ use crate::types::current_timestamp;
 
 /// A bilateral clearing agreement between two cooperatives
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct BilateralClearingAgreement {
     /// Unique ID for the agreement
     pub agreement_id: String,
@@ -104,6 +105,7 @@ impl BilateralClearingAgreement {
 
 /// How often to settle clearing positions
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum SettlementInterval {
     Daily,
@@ -127,6 +129,7 @@ impl SettlementInterval {
 
 /// Current clearing position between two cooperatives
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ClearingPosition {
     /// The agreement this position is for
     pub agreement_id: String,
@@ -174,6 +177,7 @@ impl ClearingPosition {
 
 /// A cross-cooperative transfer
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CrossCoopTransfer {
     /// Unique transfer ID
     pub id: String,
@@ -255,6 +259,7 @@ impl CrossCoopTransfer {
 
 /// Status of a cross-cooperative transfer
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum TransferStatus {
     /// Transfer proposed but not confirmed by recipient

@@ -148,16 +148,14 @@ impl std::error::Error for PolicyError {}
 /// The kernel does NOT know WHY these values exist.
 /// Apps (trust, governance, ledger) set them via PolicyOracle.
 /// Kernel enforces them blindly.
+///
+/// **Domain-blind rule**: kernel code must not interpret `custom` values.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ConstraintSet {
     /// Rate limiting parameters
     pub rate_limit: Option<RateLimit>,
     /// Maximum topics this actor can subscribe to
     pub max_topics: Option<u32>,
-    /// Credit multiplier for ledger operations (set by trust app)
-    pub credit_multiplier: Option<f64>,
-    /// Voting weight for governance (set by trust/governance app)
-    pub voting_weight: Option<f64>,
     /// Maximum message size in bytes
     pub max_message_size: Option<u64>,
     /// Maximum concurrent connections
@@ -166,7 +164,7 @@ pub struct ConstraintSet {
     pub max_subscriptions: Option<u32>,
     /// Maximum outstanding requests
     pub max_outstanding_requests: Option<u32>,
-    /// App-specific constraints (bounded, serializable)
+    /// App-specific constraints (opaque to the kernel)
     pub custom: HashMap<String, ConstraintValue>,
 }
 
@@ -174,30 +172,6 @@ impl ConstraintSet {
     /// Create an empty constraint set.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Get trust score from custom constraints if present.
-    ///
-    /// Returns `None` if:
-    /// - No `trust_score` key exists in custom constraints
-    /// - The value is not a float
-    /// - The value is outside the valid range [0.0, 1.0]
-    pub fn get_trust_score(&self) -> Option<f64> {
-        self.custom.get("trust_score").and_then(|v| match v {
-            ConstraintValue::Float(f) => {
-                let score = f.into_inner();
-                if (0.0..=1.0).contains(&score) {
-                    Some(score)
-                } else {
-                    tracing::warn!(
-                        score,
-                        "Invalid trust_score from PolicyOracle (outside [0.0, 1.0]); ignoring"
-                    );
-                    None
-                }
-            }
-            _ => None,
-        })
     }
 
     /// Set rate limit.
@@ -209,18 +183,6 @@ impl ConstraintSet {
     /// Set max topics.
     pub fn with_max_topics(mut self, max: u32) -> Self {
         self.max_topics = Some(max);
-        self
-    }
-
-    /// Set credit multiplier.
-    pub fn with_credit_multiplier(mut self, mult: f64) -> Self {
-        self.credit_multiplier = Some(mult);
-        self
-    }
-
-    /// Set voting weight.
-    pub fn with_voting_weight(mut self, weight: f64) -> Self {
-        self.voting_weight = Some(weight);
         self
     }
 
@@ -261,12 +223,6 @@ impl ConstraintSet {
         }
         if other.max_topics.is_some() {
             self.max_topics = other.max_topics;
-        }
-        if other.credit_multiplier.is_some() {
-            self.credit_multiplier = other.credit_multiplier;
-        }
-        if other.voting_weight.is_some() {
-            self.voting_weight = other.voting_weight;
         }
         if other.max_message_size.is_some() {
             self.max_message_size = other.max_message_size;
@@ -468,7 +424,7 @@ pub struct PolicyRequestCore {
     pub actor: Did,
     /// Action being performed
     pub action: ActionKind,
-    /// Domain being accessed
+    /// Policy scope for routing to the correct oracle
     pub domain: Domain,
 }
 
@@ -483,11 +439,12 @@ impl PolicyRequestCore {
     }
 }
 
-/// Extended metadata for policy request.
+/// Context for policy request evaluation.
 ///
 /// Inspected only on cache miss. Not part of cache key.
+/// Values are opaque to the kernel and interpreted only by the oracle.
 #[derive(Clone, Debug, Default)]
-pub struct PolicyRequestExt {
+pub struct PolicyContext {
     /// Resource being accessed (if specific)
     pub resource: Option<String>,
     /// Namespace context
@@ -498,8 +455,8 @@ pub struct PolicyRequestExt {
     pub capability: Option<Capability>,
 }
 
-impl PolicyRequestExt {
-    /// Create empty extension.
+impl PolicyContext {
+    /// Create empty context.
     pub fn new() -> Self {
         Self::default()
     }
@@ -529,13 +486,13 @@ impl PolicyRequestExt {
     }
 }
 
-/// Full policy request combining core and extended data.
+/// Full policy request combining core and context data.
 #[derive(Clone, Debug)]
 pub struct PolicyRequest {
     /// Cacheable core (used as cache key)
     pub core: PolicyRequestCore,
-    /// Extended metadata (inspected on cache miss)
-    pub ext: PolicyRequestExt,
+    /// Context metadata (inspected on cache miss)
+    pub context: PolicyContext,
 }
 
 impl PolicyRequest {
@@ -543,13 +500,13 @@ impl PolicyRequest {
     pub fn new(actor: Did, action: ActionKind, domain: Domain) -> Self {
         Self {
             core: PolicyRequestCore::new(actor, action, domain),
-            ext: PolicyRequestExt::default(),
+            context: PolicyContext::default(),
         }
     }
 
-    /// Create a request with core and extended data.
-    pub fn with_ext(core: PolicyRequestCore, ext: PolicyRequestExt) -> Self {
-        Self { core, ext }
+    /// Create a request with core and context data.
+    pub fn with_context(core: PolicyRequestCore, context: PolicyContext) -> Self {
+        Self { core, context }
     }
 
     /// Get the actor.
@@ -900,19 +857,13 @@ mod tests {
 
     #[test]
     fn test_constraint_set_merge() {
-        let mut base = ConstraintSet::new()
-            .with_max_topics(5)
-            .with_voting_weight(0.5);
+        let mut base = ConstraintSet::new().with_max_topics(5);
 
-        let overlay = ConstraintSet::new()
-            .with_max_topics(10)
-            .with_credit_multiplier(1.5);
+        let overlay = ConstraintSet::new().with_max_topics(10);
 
         base.merge(&overlay);
 
         assert_eq!(base.max_topics, Some(10)); // Overwritten
-        assert_eq!(base.voting_weight, Some(0.5)); // Preserved
-        assert_eq!(base.credit_multiplier, Some(1.5)); // Added
     }
 
     #[test]
@@ -943,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn test_policy_request_with_ext() {
+    fn test_policy_request_with_context() {
         let request = PolicyRequest::new(
             "did:icn:test".to_string(),
             ActionKind::Write,
@@ -951,7 +902,7 @@ mod tests {
         );
 
         assert_eq!(request.actor(), "did:icn:test");
-        assert!(request.ext.resource.is_none());
+        assert!(request.context.resource.is_none());
     }
 
     #[test]

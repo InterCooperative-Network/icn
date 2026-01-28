@@ -469,34 +469,33 @@ impl Topic {
         self
     }
 
-    /// Set minimum trust score threshold for subscription
-    /// This enables fine-grained trust-based access control
-    /// Requires GossipActor to be configured with trust_graph
+    /// Set minimum trust threshold for subscription.
+    ///
+    /// This value is forwarded to the PolicyOracle via request metadata.
+    /// The kernel does not interpret trust scores directly.
     pub fn with_min_trust_threshold(mut self, threshold: f64) -> Self {
         self.min_trust_threshold = Some(threshold);
         self
     }
 
-    /// Check if a DID can publish to this topic
-    pub fn can_publish(&self, did: &Did, trust_score: Option<f64>) -> bool {
+    /// Check if a DID can publish to this topic.
+    ///
+    /// Note: MinTrustScore is enforced by the PolicyOracle, not in-kernel.
+    pub fn can_publish(&self, did: &Did) -> bool {
         match &self.acl {
             AccessControl::Public => true,
-            AccessControl::MinTrustScore(min_score) => {
-                if let Some(actual_score) = trust_score {
-                    actual_score >= *min_score
-                } else {
-                    false
-                }
-            }
+            AccessControl::MinTrustScore(_) => true,
             AccessControl::Participants(allowed) => allowed.contains(did),
         }
     }
 
-    /// Check if a DID can subscribe to this topic
-    pub fn can_subscribe(&self, did: &Did, trust_score: Option<f64>) -> bool {
+    /// Check if a DID can subscribe to this topic.
+    ///
+    /// Note: MinTrustScore is enforced by the PolicyOracle, not in-kernel.
+    pub fn can_subscribe(&self, did: &Did) -> bool {
         // For now, same rules as publish
         // Could be more permissive in the future
-        self.can_publish(did, trust_score)
+        self.can_publish(did)
     }
 }
 
@@ -732,29 +731,20 @@ mod tests {
         let topic = Topic::new("test".to_string(), AccessControl::Public);
         let did = KeyPair::generate().unwrap().did().clone();
 
-        assert!(topic.can_publish(&did, None));
-        assert!(topic.can_subscribe(&did, None));
+        assert!(topic.can_publish(&did));
+        assert!(topic.can_subscribe(&did));
     }
 
     #[test]
-    fn test_topic_trust_score_access() {
+    fn test_topic_min_trust_score_delegated_to_policy() {
         let topic = Topic::new(
             "test".to_string(),
             AccessControl::MinTrustScore(0.4), // Partner level
         );
         let did = KeyPair::generate().unwrap().did().clone();
 
-        // No trust score - denied
-        assert!(!topic.can_publish(&did, None));
-
-        // Low score - denied (0.1 < 0.4)
-        assert!(!topic.can_publish(&did, Some(0.1)));
-
-        // Exact score - allowed
-        assert!(topic.can_publish(&did, Some(0.4)));
-
-        // High score - allowed (0.8 > 0.4)
-        assert!(topic.can_publish(&did, Some(0.8)));
+        // MinTrustScore is enforced by PolicyOracle, not in-kernel.
+        assert!(topic.can_publish(&did));
     }
 
     #[test]
@@ -768,9 +758,9 @@ mod tests {
             AccessControl::Participants(vec![alice.clone(), bob.clone()]),
         );
 
-        assert!(topic.can_publish(&alice, None));
-        assert!(topic.can_publish(&bob, None));
-        assert!(!topic.can_publish(&charlie, None));
+        assert!(topic.can_publish(&alice));
+        assert!(topic.can_publish(&bob));
+        assert!(!topic.can_publish(&charlie));
     }
 
     // Issue #473: Test strict access control defaults
@@ -787,45 +777,12 @@ mod tests {
     }
 
     #[test]
-    fn test_access_control_default_requires_high_trust() {
+    fn test_access_control_default_delegated_to_policy() {
         let topic = Topic::new("test".to_string(), AccessControl::default());
         let did = KeyPair::generate().unwrap().did().clone();
 
-        // No trust - denied
-        assert!(
-            !topic.can_publish(&did, None),
-            "Default ACL should deny peers with no trust"
-        );
-
-        // Low trust - denied
-        assert!(
-            !topic.can_publish(&did, Some(0.0)),
-            "Default ACL should deny low trust"
-        );
-
-        // Known - denied (0.1 < 0.7)
-        assert!(
-            !topic.can_publish(&did, Some(0.1)),
-            "Default ACL should deny Known trust (0.1)"
-        );
-
-        // Partner - denied (0.4 < 0.7)
-        assert!(
-            !topic.can_publish(&did, Some(0.4)),
-            "Default ACL should deny Partner trust (0.4)"
-        );
-
-        // Federated - allowed (0.7 >= 0.7)
-        assert!(
-            topic.can_publish(&did, Some(0.7)),
-            "Default ACL should allow Federated trust (0.7)"
-        );
-
-        // Higher - allowed
-        assert!(
-            topic.can_publish(&did, Some(0.9)),
-            "Default ACL should allow higher trust"
-        );
+        // MinTrustScore is enforced by PolicyOracle, not in-kernel.
+        assert!(topic.can_publish(&did));
     }
 
     #[test]

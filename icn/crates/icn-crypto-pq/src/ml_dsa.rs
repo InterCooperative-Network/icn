@@ -12,7 +12,7 @@
 //! ## Deterministic Key Generation
 //!
 //! This module supports deterministic key generation from a seed using HKDF
-//! and a seeded ChaCha20Rng. This enables key recovery from a master seed.
+//! and ML-DSA's `from_seed` construction. This enables key recovery from a master seed.
 //!
 //! ```rust,ignore
 //! use icn_crypto_pq::ml_dsa::MlDsaKeypair;
@@ -26,13 +26,11 @@
 //! ```
 
 use hkdf::Hkdf;
-use ml_dsa::{KeyGen, MlDsa65};
+use ml_dsa::{KeyGen, MlDsa65, Seed};
 use pqcrypto_mldsa::mldsa65::{
     detached_sign, keypair, verify_detached_signature, DetachedSignature, PublicKey, SecretKey,
 };
 use pqcrypto_traits::sign::{DetachedSignature as _, PublicKey as _, SecretKey as _};
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_256;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -140,8 +138,8 @@ impl MlDsaKeypair {
 
     /// Generate a keypair deterministically from a seed
     ///
-    /// This uses HKDF-SHA3-256 to derive a 32-byte RNG seed, then uses a
-    /// seeded ChaCha20Rng with the pure-Rust ml-dsa crate for key generation.
+    /// This uses HKDF-SHA3-256 to derive a 32-byte seed, then uses the
+    /// pure-Rust ml-dsa crate for deterministic key generation.
     /// The same seed will always produce the same keypair.
     ///
     /// # Arguments
@@ -165,17 +163,17 @@ impl MlDsaKeypair {
         hk.expand(b"ml-dsa-65-keygen", &mut rng_seed)
             .map_err(|_| CryptoError::KeyDerivation("HKDF expansion failed".to_string()))?;
 
-        // Create a deterministically seeded RNG
-        let mut rng = ChaCha20Rng::from_seed(rng_seed);
+        let seed = Seed::from(rng_seed);
 
         // Generate keypair using the pure-Rust ml-dsa crate
-        let kp = MlDsa65::key_gen(&mut rng);
+        let kp = MlDsa65::from_seed(&seed);
 
         // Extract key bytes using encode() methods
         let signing_key = kp.signing_key();
         let verifying_key = kp.verifying_key();
 
-        let sk_encoded = signing_key.encode();
+        #[allow(deprecated)]
+        let sk_encoded = signing_key.to_expanded();
         let pk_encoded = verifying_key.encode();
 
         Ok(Self {

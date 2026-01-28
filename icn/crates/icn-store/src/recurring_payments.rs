@@ -4,6 +4,7 @@ use sled::Db;
 
 /// Payment frequency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum PaymentFrequency {
     /// Execute payment once per day
@@ -18,6 +19,7 @@ pub enum PaymentFrequency {
 
 /// Recurring payment status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum RecurringStatus {
     /// Payment is active and will execute on schedule

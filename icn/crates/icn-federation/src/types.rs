@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// This represents a cooperative's public identity and federation metadata.
 /// Cooperatives announce this information via the `federation:registry` gossip topic.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CooperativeInfo {
     /// Unique identifier for the cooperative (e.g., "food-coop", "tech-coop")
     pub coop_id: String,
@@ -127,6 +128,7 @@ impl CooperativeInfo {
 
 /// Federation policy determining how cooperatives can join
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type")]
 pub enum FederationPolicy {
     /// Any cooperative can federate (no restrictions)
@@ -157,6 +159,7 @@ impl FederationPolicy {
 
 /// Information about a currency supported by a cooperative
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CurrencyInfo {
     /// Currency symbol (e.g., "hours", "USD", "kWh")
     pub symbol: String,
@@ -195,6 +198,7 @@ impl CurrencyInfo {
 /// both individuals and cooperatives. They can join federations through
 /// a representative (typically a steward or designated member).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CommunityInfo {
     /// Unique identifier for the community
     pub community_id: String,
@@ -281,6 +285,7 @@ impl CommunityInfo {
 
 /// Entity type for federation membership
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum EntityType {
     /// A cooperative (economic entity)
     Cooperative,
@@ -290,6 +295,7 @@ pub enum EntityType {
 
 /// A federation member can be either a cooperative or a community
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "member_type")]
 pub enum FederationMember {
     /// A cooperative member
@@ -342,6 +348,7 @@ impl FederationMember {
 
 /// Signing scope for representative authorization
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum SigningScope {
     /// Can sign any agreement
     #[default]
@@ -354,6 +361,7 @@ pub enum SigningScope {
 
 /// Capabilities that can be granted to a representative
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum FederationCapability {
     /// Cast votes on federation proposals with given weight
     Vote { weight: u64 },
@@ -370,6 +378,7 @@ pub enum FederationCapability {
 /// This allows a CommonsHolder (individual with a DID) to act on behalf of
 /// a cooperative or community within a federation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct RepresentativeAuth {
     /// The individual authorized to act
     pub representative_did: Did,
@@ -530,6 +539,7 @@ impl RepresentativeAuth {
 
 /// Gossip messages for federation coordination
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type")]
 pub enum FederationMessage {
     /// Announce cooperative existence and metadata
@@ -579,6 +589,7 @@ pub enum FederationMessage {
 
 /// A vouch from one cooperative for another
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct Vouch {
     /// The cooperative doing the vouching
     pub voucher_coop_id: String,
@@ -690,6 +701,7 @@ impl Vouch {
 
 /// Result of checking federation policy
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum PolicyResult {
     /// Federation allowed
     Allowed,
@@ -713,6 +725,7 @@ impl PolicyResult {
 
 /// Federation status for a cooperative
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct FederationStatus {
     /// Whether federation is enabled
     pub enabled: bool,

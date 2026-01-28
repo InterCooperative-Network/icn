@@ -277,7 +277,9 @@ export interface components {
         };
         /** @description Governance dashboard data */
         GovernanceDashboard: {
+            /** @description Amendments breakdown */
             amendments_breakdown: components["schemas"]["AmendmentsBreakdown"];
+            /** @description Appeals breakdown */
             appeals_breakdown: components["schemas"]["AppealsBreakdown"];
             /** @description Charter ID (hex) */
             charter_id?: string | null;
@@ -459,6 +461,7 @@ export interface components {
         RegisterDeviceRequest: {
             /** @description Device FCM token */
             device_token: string;
+            /** @description Platform type */
             platform: components["schemas"]["Platform"];
         };
         /** @description Register device response */
@@ -621,6 +624,7 @@ export interface components {
         };
         /** @description Paginated transaction history response */
         TransactionHistoryResponse: {
+            /** @description Pagination metadata */
             pagination: components["schemas"]["PaginationInfo"];
             /** @description The transactions on this page */
             transactions: components["schemas"]["TransactionHistoryEntry"][];

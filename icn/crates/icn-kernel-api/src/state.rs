@@ -261,6 +261,74 @@ pub enum StateError {
     Internal(String),
 }
 
+/// Interface for a single log instance.
+#[async_trait::async_trait]
+pub trait Log: Send + Sync {
+    /// Append an event to the log.
+    async fn append(&self, data: Vec<u8>) -> Result<Offset, StateError>;
+
+    /// Read events from the log.
+    async fn read(&self, from: Offset, limit: usize) -> Result<Vec<Event>, StateError>;
+
+    /// Get current length (offset) of log.
+    async fn len(&self) -> u64;
+
+    /// Check if the log is empty.
+    async fn is_empty(&self) -> bool {
+        self.len().await == 0
+    }
+}
+
+/// Interface for a single KV store.
+#[async_trait::async_trait]
+pub trait Kv: Send + Sync {
+    /// Get a value.
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StateError>;
+
+    /// Set a value.
+    async fn set(&self, key: &str, value: Vec<u8>) -> Result<(), StateError>;
+
+    /// Delete a value.
+    async fn delete(&self, key: &str) -> Result<bool, StateError>;
+
+    /// Check if key exists.
+    async fn exists(&self, key: &str) -> Result<bool, StateError>;
+
+    /// List keys with prefix.
+    async fn list(&self, prefix: &str) -> Result<Vec<String>, StateError>;
+}
+
+/// Interface for a single Blob store.
+#[async_trait::async_trait]
+pub trait Blob: Send + Sync {
+    /// Store a blob.
+    async fn put(&self, hash: &str, data: Vec<u8>) -> Result<(), StateError>;
+
+    /// Get a blob.
+    async fn get(&self, hash: &str) -> Result<Option<Vec<u8>>, StateError>;
+
+    /// Check if blob exists.
+    async fn exists(&self, hash: &str) -> Result<bool, StateError>;
+
+    /// Delete a blob.
+    async fn delete(&self, hash: &str) -> Result<bool, StateError>;
+}
+
+/// Abstract interface for application state.
+///
+/// This trait allows applications to access their namespaced state resources
+/// without depending on the concrete kernel implementation.
+pub trait AppState: Send + Sync {
+    /// Get a log handle by name.
+    fn log(&self, name: &str) -> Option<std::sync::Arc<dyn Log>>;
+
+    /// Get a KV handle by name.
+    fn kv(&self, name: &str) -> Option<std::sync::Arc<dyn Kv>>;
+
+    /// Get a blob handle by name.
+    fn blob(&self, name: &str) -> Option<std::sync::Arc<dyn Blob>>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

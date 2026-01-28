@@ -97,6 +97,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let entity_handle = handles.entity;
     let steward_handle = handles.steward;
     let agreement_manager_handle = handles.agreement_manager;
+    let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
     std::thread::spawn(move || {
@@ -154,6 +155,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(handle) = agreement_manager_handle {
                 gateway_server = gateway_server.with_agreement_manager_handle(handle);
+            }
+
+            if let Some(score) = default_trust_score {
+                gateway_server = gateway_server.with_default_trust_score(score);
             }
 
             if let Err(e) = gateway_server.run().await {

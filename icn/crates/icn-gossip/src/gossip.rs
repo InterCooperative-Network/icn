@@ -6,7 +6,10 @@ use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Topic
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
-use icn_kernel_api::authz::{ActionKind, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
+use icn_kernel_api::authz::{
+    ActionKind, Domain, PolicyContext, PolicyDecision, PolicyOracle, PolicyRequest,
+    PolicyRequestCore,
+};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -775,36 +778,29 @@ impl GossipActor {
 
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
-        // Check ACL
-        // Use PolicyOracle to get trust score for enforcement
-        let trust_score = if let Some(oracle) = &self.oracle {
-            let req = PolicyRequest::new(
-                self.own_did.to_string(),
-                ActionKind::Publish,
-                Domain::trust(),
-            );
-            match oracle.evaluate(&req) {
-                PolicyDecision::Allow { constraints } => {
-                    // Extract trust score from custom constraints
-                    // This relies on TrustPolicyOracle populating "trust_score"
-                    constraints
-                        .custom
-                        .get("trust_score")
-                        .and_then(|v| match v {
-                            icn_kernel_api::authz::ConstraintValue::Float(f) => {
-                                Some(f.into_inner())
-                            }
-                            _ => None,
-                        })
-                        .unwrap_or(0.0)
-                }
-                _ => 0.0,
+        // Check ACL using policy oracle (domain-blind)
+        if let Some(oracle) = &self.oracle {
+            let mut context = PolicyContext::new();
+            if let Some(min_threshold) = topic_obj.min_trust_threshold {
+                context = context.with_metadata("min_trust_threshold", min_threshold.to_string());
             }
-        } else {
-            0.0 // Default to 0.0 if no oracle
-        };
+            if let AccessControl::MinTrustScore(min_score) = &topic_obj.acl {
+                context = context.with_metadata("acl_min_trust_score", min_score.to_string());
+            }
+            let req = PolicyRequest::with_context(
+                PolicyRequestCore::new(
+                    self.own_did.to_string(),
+                    ActionKind::Publish,
+                    Domain::trust(),
+                ),
+                context,
+            );
+            if let PolicyDecision::Deny { reason } = oracle.evaluate(&req) {
+                bail!("Not authorized to publish to topic: {topic} ({reason})");
+            }
+        }
 
-        if !topic_obj.can_publish(&self.own_did, Some(trust_score)) {
+        if !topic_obj.can_publish(&self.own_did) {
             bail!("Not authorized to publish to topic: {topic}");
         }
 
@@ -1335,44 +1331,65 @@ impl PolicyOracle for LegacyTrustOracle {
         if let Some(trust_class) = (self.callback)(&did) {
             let mut constraints = icn_kernel_api::authz::ConstraintSet::default();
 
-            match trust_class {
+            // Map trust class to representative score
+            let peer_trust_score = match trust_class {
                 TrustClass::Federated => {
                     constraints = constraints
                         .with_max_subscriptions(1000)
                         .with_max_outstanding_requests(3)
                         .with_max_message_size(1024 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.8.into());
+                    0.8
                 }
                 TrustClass::Partner => {
                     constraints = constraints
                         .with_max_subscriptions(500)
                         .with_max_outstanding_requests(3)
                         .with_max_message_size(1024 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.5.into());
+                    0.5
                 }
                 TrustClass::Known => {
                     constraints = constraints
                         .with_max_subscriptions(100)
                         .with_max_outstanding_requests(2)
                         .with_max_message_size(256 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.2.into());
+                    0.2
                 }
                 TrustClass::Isolated => {
                     constraints = constraints
                         .with_max_subscriptions(10)
                         .with_max_outstanding_requests(1)
                         .with_max_message_size(64 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.05.into());
+                    0.05
+                }
+            };
+
+            constraints
+                .custom
+                .insert("trust_score".to_string(), peer_trust_score.into());
+
+            // Check if minimum trust threshold is required (from context metadata)
+            let mut required_threshold: Option<f64> = None;
+            for key in ["min_trust_threshold", "acl_min_trust_score"] {
+                if let Some(value) = request.context.metadata.get(key) {
+                    if let Ok(parsed) = value.parse::<f64>() {
+                        required_threshold =
+                            Some(required_threshold.map_or(parsed, |current| current.max(parsed)));
+                    }
                 }
             }
+
+            // Deny if trust score is below required threshold
+            if let Some(threshold) = required_threshold {
+                if peer_trust_score < threshold {
+                    return PolicyDecision::Deny {
+                        reason: icn_kernel_api::authz::PolicyError::Denied(format!(
+                            "Insufficient trust: {:.2} < {:.2} required",
+                            peer_trust_score, threshold
+                        )),
+                    };
+                }
+            }
+
             PolicyDecision::Allow { constraints }
         } else {
             PolicyDecision::Deny {
@@ -1580,6 +1597,25 @@ mod tests {
             constraints
                 .custom
                 .insert("trust_score".to_string(), score.into());
+
+            let mut required: Option<f64> = None;
+            for key in ["min_trust_threshold", "acl_min_trust_score"] {
+                if let Some(value) = request.context.metadata.get(key) {
+                    if let Ok(parsed) = value.parse::<f64>() {
+                        required = Some(required.map_or(parsed, |current| current.max(parsed)));
+                    }
+                }
+            }
+
+            if let Some(threshold) = required {
+                if score < threshold {
+                    return PolicyDecision::Deny {
+                        reason: icn_kernel_api::authz::PolicyError::Denied(
+                            "trust score below required threshold".to_string(),
+                        ),
+                    };
+                }
+            }
 
             // Populate standard fields based on score for mock behavior
             if score >= 0.7 {
@@ -2464,10 +2500,6 @@ mod tests {
             result.is_err(),
             "Subscription should be rejected due to low trust"
         );
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Insufficient trust"));
 
         // Bob (unknown, score 0.0) attempts to subscribe - should also be rejected
         let result = gossip.subscribe("test:trust-gated", bob.clone()).await;

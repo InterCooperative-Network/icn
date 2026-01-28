@@ -172,6 +172,8 @@ impl HybridSignatureOrClassical {
 /// - The identifier part is valid multibase (base58btc)
 /// - The decoded bytes are exactly 32 bytes (Ed25519 public key size)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "utoipa", schema(value_type = String, example = "did:icn:z6MkhaXMJznR4sC15gTfA7b6jJ4i7b6jJ4i7b6jJ4i7b"))]
 pub struct Did(String);
 
 // Custom deserializer that validates DIDs on deserialization

@@ -96,7 +96,7 @@ struct CachedDecision {
 /// TTL-based cache for policy decisions.
 ///
 /// Uses PolicyRequestCore as the cache key for fast lookups.
-/// Extended metadata is not cached - only consulted on cache miss.
+/// Context metadata is not cached - only consulted on cache miss.
 pub struct DecisionCache {
     entries: RwLock<HashMap<PolicyRequestCore, CachedDecision>>,
     max_entries: usize,

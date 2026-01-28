@@ -70,6 +70,7 @@ impl StarkProof {
 
 /// Type of proof being requested or generated
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub enum ProofType {
     /// Prove age is at least threshold years
     AgeAtLeast { threshold: u8 },

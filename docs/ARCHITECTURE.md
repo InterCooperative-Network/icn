@@ -111,6 +111,94 @@ Each layer builds on the layers below it, with the distributed compute layer lev
 
 ---
 
+## Kernel/App Separation
+
+**Goal:** Remove direct domain imports from kernel crates (`icn-core`, `icn-net`, `icn-gossip`) by routing all domain knowledge through boundary traits in `icn-kernel-api`, implemented by adapters in `apps/*`.
+
+### Definition
+
+- **Kernel layer** (pure enforcement):
+  - Networking transport, gossip plumbing, actor runtime, constraint enforcement, message validation.
+  - Knows: DIDs, cert bindings, timestamps, constraints, capabilities, resource budgets.
+  - Does **not** know: trust graphs, governance rules, ledger semantics, compute placement rules, community/entity domain objects.
+
+- **App layer** (meaning + policy):
+  - Trust graph, governance, ledger, CCL semantics, compute policy, federation/domain mappings, gateways/RPC.
+  - Implements boundary traits and converts domain state into kernel constraints.
+
+### Core flow
+
+- `transport_auth` authenticates a connection and yields a DID.
+- DID becomes the sole identity handle used by the kernel.
+- Kernel asks `PolicyOracle` for constraints and authorization decisions.
+- Kernel enforces those constraints without knowing why they exist.
+
+```mermaid
+flowchart LR
+  A["transport_auth (TLS/QUIC)"] --> B["DID resolution (IdentityBundle)"]
+  B --> C[PolicyOracle]
+  C --> D[ConstraintSet]
+  D --> E["Kernel enforcement (icn-core/icn-net/icn-gossip)"]
+  C <-->|adapters| F["App layer (apps/* domain state)"]
+```
+
+### Pass 7 invariants as kernel-level contracts
+
+These invariants must remain true regardless of app semantics:
+
+1. **Identity ↔ Transport ↔ Policy**
+   - Transport auth yields a DID bound to the certificate identity.
+   - All policy decisions are made against that DID.
+   - Kernel rejects any mismatch between transport identity and claimed identity.
+
+2. **Misbehavior ↔ Trust ↔ Rate limits**
+   - Kernel records violations + evidence; app converts to reputation/trust updates.
+   - Enforcement is via constraints (quarantine/ban/rate limits), not domain interpretation.
+
+3. **Time validation and replay protection**
+   - Kernel validates timestamps via `ClockSync` windowing.
+   - Replay rejection must preserve liveness during drift events.
+
+4. **Store ↔ Snapshot ↔ Encoding integrity**
+   - Kernel requires versioned, canonical encodings for state transitions/snapshots.
+   - Snapshot boundaries align with transactional store writes.
+   - Unknown versions must fail fast with a documented upgrade path.
+
+5. **Privacy ↔ Observability budget**
+   - Metrics/logging must not leak topic membership or sensitive identifiers.
+   - Observability is an explicit budget with redlines.
+
+6. **ZKP ↔ Revocation ↔ Governance**
+   - Kernel verifies proofs deterministically and versioned.
+   - Issuer roots/revocation state is app-owned but enforced through kernel checks.
+
+7. **PQ dual-stack transition**
+   - During migration, verification must accept old+new per negotiated capability.
+   - Deprecation is governance-controlled, policy-enforced.
+
+### Encoding and versioning policy
+
+- Versioned encodings must be canonical and stable across releases.
+- Snapshot and state payloads must use versioned encodings with explicit negotiation rules.
+- Unknown versions fail fast with a documented upgrade path (no silent fallback).
+
+### Migration principle
+
+**Kernel compiles with zero direct imports of domain crates.**
+All domain dependency crosses the boundary via `icn-kernel-api` traits.
+
+### Boundary map (template)
+
+| Kernel crate/file | Current forbidden import | Why it’s a violation | Replacement boundary trait | Adapter implementation |
+| --- | --- | --- | --- | --- |
+| `icn-core/src/policy.rs` | `icn_trust::*` | kernel reading trust semantics | `PolicyOracle`, `PolicyRequest`, `ConstraintSet` | `apps/trust::oracle` |
+| `icn-core/src/identity.rs` | `icn_trust::*` | identity actor doing trust logic | `PolicyOracle` call with DID | `apps/trust::oracle` |
+| `icn-core/src/supervisor/init_trust.rs` | `icn_trust::*` | kernel creating trust graph | `KernelInitHooks` or injected oracle | `apps/trust::init` |
+| `icn-net/src/tls.rs` | `icn_trust::*` | TLS verifier using trust graph | `PolicyOracle` evaluate(DID, TransportContext) | `apps/trust::oracle` |
+| `icn-gossip/src/gossip.rs` | legacy `TrustClass` | gossip depends on trust semantics | `ConstraintSet` (rate/topic gates) | `apps/trust::constraints` |
+
+**Definition of done:** each row ends with “kernel no longer imports X; only imports `icn-kernel-api` and foundation crates.”
+
 ## 1. Identity & Key Management
 
 Identity is the foundation of all authentication, trust computation, and ledger authorship in ICN. Every node, contract participant, and transaction is tied to a cryptographically verifiable decentralized identifier (DID).

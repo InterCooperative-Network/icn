@@ -488,6 +488,107 @@ pub enum StateError {
     StoreNotFound(String),
 }
 
+// ============================================================================
+// Kernel API Implementation
+// ============================================================================
+
+use icn_kernel_api::state::{self, Blob, Event, Kv, Log};
+
+// Helper for error conversion
+impl From<StateError> for state::StateError {
+    fn from(err: StateError) -> Self {
+        match err {
+            StateError::NamespaceExists(s) => state::StateError::LogAlreadyExists(s),
+            StateError::BlobTooLarge { .. } => state::StateError::QuotaExceeded,
+            StateError::StoreNotFound(s) => state::StateError::LogNotFound(s),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl Log for LogHandle {
+    async fn append(&self, data: Vec<u8>) -> Result<u64, state::StateError> {
+        self.append(data).await.map_err(state::StateError::from)
+    }
+
+    async fn read(&self, from: u64, limit: usize) -> Result<Vec<Event>, state::StateError> {
+        let entries = self
+            .read(from, limit)
+            .await
+            .map_err(state::StateError::from)?;
+        Ok(entries
+            .into_iter()
+            .map(|e| Event {
+                offset: e.offset,
+                data: e.data,
+                timestamp: e.timestamp,
+                schema: None,
+            })
+            .collect())
+    }
+
+    async fn len(&self) -> u64 {
+        self.len().await
+    }
+}
+
+#[async_trait::async_trait]
+impl Kv for KvHandle {
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, state::StateError> {
+        self.get(key).await.map_err(state::StateError::from)
+    }
+
+    async fn set(&self, key: &str, value: Vec<u8>) -> Result<(), state::StateError> {
+        self.set(key, value).await.map_err(state::StateError::from)
+    }
+
+    async fn delete(&self, key: &str) -> Result<bool, state::StateError> {
+        self.delete(key).await.map_err(state::StateError::from)
+    }
+
+    async fn exists(&self, key: &str) -> Result<bool, state::StateError> {
+        self.exists(key).await.map_err(state::StateError::from)
+    }
+
+    async fn list(&self, prefix: &str) -> Result<Vec<String>, state::StateError> {
+        self.list(prefix).await.map_err(state::StateError::from)
+    }
+}
+
+#[async_trait::async_trait]
+impl Blob for BlobHandle {
+    async fn put(&self, hash: &str, data: Vec<u8>) -> Result<(), state::StateError> {
+        self.put(hash, data).await.map_err(state::StateError::from)
+    }
+
+    async fn get(&self, hash: &str) -> Result<Option<Vec<u8>>, state::StateError> {
+        self.get(hash).await.map_err(state::StateError::from)
+    }
+
+    async fn exists(&self, hash: &str) -> Result<bool, state::StateError> {
+        self.exists(hash).await.map_err(state::StateError::from)
+    }
+
+    async fn delete(&self, hash: &str) -> Result<bool, state::StateError> {
+        self.delete(hash).await.map_err(state::StateError::from)
+    }
+}
+
+impl state::AppState for AppState {
+    fn log(&self, name: &str) -> Option<Arc<dyn Log>> {
+        self.log(name).map(|h| Arc::new(h.clone()) as Arc<dyn Log>)
+    }
+
+    fn kv(&self, name: &str) -> Option<Arc<dyn Kv>> {
+        self.kv(name).map(|h| Arc::new(h.clone()) as Arc<dyn Kv>)
+    }
+
+    fn blob(&self, name: &str) -> Option<Arc<dyn Blob>> {
+        self.blob(name)
+            .map(|h| Arc::new(h.clone()) as Arc<dyn Blob>)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
