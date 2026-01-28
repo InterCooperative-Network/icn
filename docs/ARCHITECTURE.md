@@ -176,6 +176,12 @@ These invariants must remain true regardless of app semantics:
    - During migration, verification must accept old+new per negotiated capability.
    - Deprecation is governance-controlled, policy-enforced.
 
+### Encoding and versioning policy
+
+- Versioned encodings must be canonical and stable across releases.
+- Snapshot and state payloads must use versioned encodings with explicit negotiation rules.
+- Unknown versions fail fast with a documented upgrade path (no silent fallback).
+
 ### Migration principle
 
 **Kernel compiles with zero direct imports of domain crates.**

@@ -79,6 +79,29 @@ jobs:
         # Reports violations but doesn't fail CI until Phase 2 is done
         # After Phase 2: remove continue-on-error above to enforce
 
+  kernel-deps:
+    name: Kernel Forbidden Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check kernel crates for forbidden deps
+        run: |
+          set -euo pipefail
+          KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
+          FORBIDDEN=("icn-trust" "icn-governance" "icn-ledger" "icn-ccl" "icn-compute" "icn-entity" "icn-community" "icn-federation" "icn-steward")
+          for crate in "${KERNEL_CRATES[@]}"; do
+            for dep in "${FORBIDDEN[@]}"; do
+              if cargo tree -p "$crate" --edges normal | grep -q "\\b${dep}\\b"; then
+                echo "Forbidden dependency detected: ${crate} -> ${dep}"
+                exit 1
+              fi
+            done
+          done
+        working-directory: ./icn
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
