@@ -41,8 +41,19 @@ impl TestNode {
         let trust_graph = TrustGraph::new(trust_store, did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
-        // Create gossip actor
-        let trust_lookup = Arc::new(|_: &Did| None);
+        // Create gossip actor with trust lookup that consults the trust graph
+        let trust_graph_for_lookup = trust_graph_handle.clone();
+        let trust_lookup = Arc::new(move |peer_did: &Did| {
+            let graph = trust_graph_for_lookup.clone();
+            let peer = peer_did.clone();
+            tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    let graph = graph.read().await;
+                    graph.trust_class(&peer).ok()
+                })
+            })
+        });
         let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
 
         // Set gossip store
@@ -124,7 +135,7 @@ impl TestNode {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_two_node_replication_request() -> Result<()> {
     // Setup: Two nodes, node1 trusts node2 at Partner level
     let config = ReplicationConfig {
@@ -174,7 +185,7 @@ async fn test_two_node_replication_request() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_health_status_transitions() -> Result<()> {
     // Setup: One node with content
     let config = ReplicationConfig::default();
@@ -205,7 +216,7 @@ async fn test_health_status_transitions() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_trust_weighted_selection() -> Result<()> {
     // Setup: One node with multiple peers at different trust levels
     let config = ReplicationConfig {
@@ -261,7 +272,7 @@ async fn test_trust_weighted_selection() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_no_suitable_candidates() -> Result<()> {
     // Setup: Node with no trusted peers
     let config = ReplicationConfig::default();
@@ -283,7 +294,7 @@ async fn test_no_suitable_candidates() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_replication_config_customization() -> Result<()> {
     // Test that custom configuration is respected
     let custom_config = ReplicationConfig {
