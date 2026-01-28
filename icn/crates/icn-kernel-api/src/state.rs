@@ -261,45 +261,7 @@ pub enum StateError {
     Internal(String),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn test_replication_policy() {
-        assert_eq!(ReplicationPolicy::LocalOnly, ReplicationPolicy::LocalOnly);
-        assert_ne!(
-            ReplicationPolicy::ClusterStrong,
-            ReplicationPolicy::FederationEventual
-        );
-    }
-
-    #[test]
-    fn test_log_config_default() {
-        let config = LogConfig::default();
-        assert!(config.schema.is_none());
-        assert_eq!(config.replication, ReplicationPolicy::LocalOnly);
-        assert_eq!(config.max_size, 0);
-        assert_eq!(config.retention_seconds, 0);
-    }
-
-    #[test]
-    fn test_filter_builder() {
-        let filter = Filter::new().with_schema(SchemaRef::new("test", "1.0.0"));
-        assert!(filter.schema.is_some());
-        assert_eq!(filter.schema.as_ref().unwrap().name, "test");
-    }
-
-    #[test]
-    fn test_state_error_display() {
-        let err = StateError::VersionMismatch {
-            expected: 1,
-            actual: 2,
-        };
-        assert!(err.to_string().contains("expected 1"));
-        assert!(err.to_string().contains("got 2"));
-    }
-}
 
 /// Interface for a single log instance.
 #[async_trait::async_trait]
@@ -312,6 +274,11 @@ pub trait Log: Send + Sync {
 
     /// Get current length (offset) of log.
     async fn len(&self) -> u64;
+
+    /// Check if the log is empty.
+    async fn is_empty(&self) -> bool {
+        self.len().await == 0
+    }
 }
 
 /// Interface for a single KV store.
@@ -362,4 +329,44 @@ pub trait AppState: Send + Sync {
 
     /// Get a blob handle by name.
     fn blob(&self, name: &str) -> Option<std::sync::Arc<dyn Blob>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replication_policy() {
+        assert_eq!(ReplicationPolicy::LocalOnly, ReplicationPolicy::LocalOnly);
+        assert_ne!(
+            ReplicationPolicy::ClusterStrong,
+            ReplicationPolicy::FederationEventual
+        );
+    }
+
+    #[test]
+    fn test_log_config_default() {
+        let config = LogConfig::default();
+        assert!(config.schema.is_none());
+        assert_eq!(config.replication, ReplicationPolicy::LocalOnly);
+        assert_eq!(config.max_size, 0);
+        assert_eq!(config.retention_seconds, 0);
+    }
+
+    #[test]
+    fn test_filter_builder() {
+        let filter = Filter::new().with_schema(SchemaRef::new("test", "1.0.0"));
+        assert!(filter.schema.is_some());
+        assert_eq!(filter.schema.as_ref().unwrap().name, "test");
+    }
+
+    #[test]
+    fn test_state_error_display() {
+        let err = StateError::VersionMismatch {
+            expected: 1,
+            actual: 2,
+        };
+        assert!(err.to_string().contains("expected 1"));
+        assert!(err.to_string().contains("got 2"));
+    }
 }

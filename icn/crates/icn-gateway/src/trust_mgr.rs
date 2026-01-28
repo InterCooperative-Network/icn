@@ -983,12 +983,6 @@ fn compute_trust_from_edges_map(
     (direct_score * DIRECT_TRUST_WEIGHT + transitive_score * TRANSITIVE_TRUST_WEIGHT).min(1.0)
 }
 
-/// TrustPolicyOracle struct (move definition here or ensure it matches)
-/// We need to add default_trust_score to the struct definition which might be elsewhere in the file.
-/// I need to find where `pub struct TrustPolicyOracle` is defined. I missed it in previous read.
-/// It was used in `as_oracle` but I didn't see the struct definition.
-/// I will look for it.
-
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         let start = std::time::Instant::now();
@@ -1465,9 +1459,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_trust_oracle_custom_default_score() {
-        use icn_identity::Did;
         use icn_kernel_api::{ActionKind, Domain, PolicyRequest};
-        use std::str::FromStr;
 
         // Create manager with custom default score of 0.8
         let mgr = TrustManager::new().with_default_score(0.8);
