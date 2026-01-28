@@ -1331,44 +1331,65 @@ impl PolicyOracle for LegacyTrustOracle {
         if let Some(trust_class) = (self.callback)(&did) {
             let mut constraints = icn_kernel_api::authz::ConstraintSet::default();
 
-            match trust_class {
+            // Map trust class to representative score
+            let peer_trust_score = match trust_class {
                 TrustClass::Federated => {
                     constraints = constraints
                         .with_max_subscriptions(1000)
                         .with_max_outstanding_requests(3)
                         .with_max_message_size(1024 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.8.into());
+                    0.8
                 }
                 TrustClass::Partner => {
                     constraints = constraints
                         .with_max_subscriptions(500)
                         .with_max_outstanding_requests(3)
                         .with_max_message_size(1024 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.5.into());
+                    0.5
                 }
                 TrustClass::Known => {
                     constraints = constraints
                         .with_max_subscriptions(100)
                         .with_max_outstanding_requests(2)
                         .with_max_message_size(256 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.2.into());
+                    0.2
                 }
                 TrustClass::Isolated => {
                     constraints = constraints
                         .with_max_subscriptions(10)
                         .with_max_outstanding_requests(1)
                         .with_max_message_size(64 * 1024);
-                    constraints
-                        .custom
-                        .insert("trust_score".to_string(), 0.05.into());
+                    0.05
+                }
+            };
+
+            constraints
+                .custom
+                .insert("trust_score".to_string(), peer_trust_score.into());
+
+            // Check if minimum trust threshold is required (from context metadata)
+            let mut required_threshold: Option<f64> = None;
+            for key in ["min_trust_threshold", "acl_min_trust_score"] {
+                if let Some(value) = request.context.metadata.get(key) {
+                    if let Ok(parsed) = value.parse::<f64>() {
+                        required_threshold =
+                            Some(required_threshold.map_or(parsed, |current| current.max(parsed)));
+                    }
                 }
             }
+
+            // Deny if trust score is below required threshold
+            if let Some(threshold) = required_threshold {
+                if peer_trust_score < threshold {
+                    return PolicyDecision::Deny {
+                        reason: icn_kernel_api::authz::PolicyError::Denied(format!(
+                            "Insufficient trust: {:.2} < {:.2} required",
+                            peer_trust_score, threshold
+                        )),
+                    };
+                }
+            }
+
             PolicyDecision::Allow { constraints }
         } else {
             PolicyDecision::Deny {

@@ -65,6 +65,30 @@ impl GossipActor {
                         "PolicyOracle denied subscription for {}: {}",
                         subscriber, reason
                     );
+
+                    // Record misbehavior violation for policy denial
+                    if let Some(ref detector) = self.misbehavior_detector {
+                        use sha2::{Digest, Sha256};
+                        let mut hasher = Sha256::new();
+                        hasher.update(subscriber.as_str().as_bytes());
+                        hasher.update(topic.as_bytes());
+                        hasher.update(b"policy_denial");
+                        let evidence = hasher.finalize().to_vec();
+
+                        let violation = icn_security::Violation::ExcessiveResourceUse {
+                            metric: format!("unauthorized_subscription:{topic}"),
+                            observed: 1,
+                            limit: 0,
+                        };
+
+                        spawn_violation_recording(
+                            Arc::clone(detector),
+                            subscriber.clone(),
+                            violation,
+                            evidence,
+                        );
+                    }
+
                     bail!("Subscription denied by policy: {}", reason);
                 }
             }
