@@ -14,6 +14,30 @@ use crate::authz::PolicyOracle;
 use crate::types::Did;
 use std::sync::Arc;
 
+// ============================================================================
+// Trust Score Thresholds
+// ============================================================================
+//
+// These thresholds map to the trust class boundaries used by apps. The kernel
+// uses these numeric values without understanding the underlying "trust class"
+// semantics. Apps are free to use different thresholds if needed.
+
+/// Minimum trust score threshold for "Known" level (recognized but not endorsed)
+///
+/// Peers below this threshold are considered "Isolated" (untrusted).
+pub const TRUST_THRESHOLD_KNOWN: f64 = 0.1;
+
+/// Minimum trust score threshold for "Partner" level (trusted collaborator)
+///
+/// This is the recommended threshold for peer selection in replication,
+/// relay selection, and other trust-sensitive operations.
+pub const TRUST_THRESHOLD_PARTNER: f64 = 0.4;
+
+/// Minimum trust score threshold for "Federated" level (highly trusted)
+///
+/// Reserved for federation members and established long-term relationships.
+pub const TRUST_THRESHOLD_FEDERATED: f64 = 0.7;
+
 /// Abstract trust service interface
 ///
 /// This trait provides trust-related functionality to the kernel without
@@ -40,6 +64,16 @@ pub trait TrustService: Send + Sync {
     /// The kernel may use this for routing decisions, but NEVER interprets
     /// the semantic meaning of the score.
     fn trust_score(&self, actor: &Did) -> f64;
+
+    /// Check if an actor meets a minimum trust threshold
+    ///
+    /// This is a convenience method for filtering peers by trust level
+    /// without exposing domain-specific trust classes.
+    ///
+    /// Default implementation compares trust_score against threshold.
+    fn meets_trust_threshold(&self, actor: &Did, min_score: f64) -> bool {
+        self.trust_score(actor) >= min_score
+    }
 
     /// Record a trust-affecting event
     ///
