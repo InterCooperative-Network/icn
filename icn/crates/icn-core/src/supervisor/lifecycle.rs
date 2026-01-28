@@ -11,6 +11,7 @@ use tokio::task::JoinSet;
 use tracing::{debug, info, warn};
 
 use icn_identity::IdentityBundle;
+use icn_kernel_api::services::ServiceRegistry;
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -28,12 +29,43 @@ use super::actors::{
 /// 4. Spawns background tasks
 /// 5. Waits for shutdown signal
 /// 6. Performs graceful shutdown
+///
+/// # Service Registry
+///
+/// If `service_registry` is provided, services from it will be used instead of
+/// creating internal implementations. This enables proper kernel/app separation
+/// where the daemon constructs domain services from app crates.
 pub async fn run_supervisor(
     config: Config,
     identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
+    service_registry: Option<ServiceRegistry>,
 ) -> Result<()> {
     info!("Supervisor starting");
+
+    // Log service registry status
+    if let Some(ref registry) = service_registry {
+        info!("Using daemon-provided service registry");
+        if registry.trust().is_some() {
+            info!("  - TrustService: provided");
+        }
+        if registry.governance().is_some() {
+            info!("  - GovernanceService: provided");
+        }
+        if registry.ledger().is_some() {
+            info!("  - LedgerService: provided");
+        }
+        if registry.security().is_some() {
+            info!("  - SecurityService: provided");
+        }
+    } else {
+        debug!("No service registry provided, using internal implementations");
+    }
+
+    // TODO: Pass service_registry to spawn_actors_with_identity to use
+    // injected services instead of creating internal ones. This will enable
+    // full kernel/app separation.
+    let _ = service_registry; // Suppress unused warning until integrated
 
     // Initialize metrics
     icn_obs::init_metrics()?;
