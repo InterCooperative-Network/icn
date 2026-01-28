@@ -19,6 +19,7 @@ use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
+use icn_kernel_api::TRUST_THRESHOLD_PARTNER;
 use icn_store::{ContentHash, ReplicaHealth, Store};
 use icn_trust::{TrustClass, TrustGraph};
 
@@ -30,7 +31,19 @@ pub struct ReplicationConfig {
 
     /// Minimum trust class required to serve as replica
     /// Default: Partner (0.4+)
+    ///
+    /// **Deprecated**: Use `min_trust_score` instead. This field will be removed
+    /// when the kernel/app separation is complete.
+    #[deprecated(since = "0.2.0", note = "Use min_trust_score instead")]
     pub min_trust_class: TrustClass,
+
+    /// Minimum trust score required to serve as replica (0.0-1.0)
+    /// Default: 0.4 (TRUST_THRESHOLD_PARTNER)
+    ///
+    /// This replaces `min_trust_class` for kernel/app separation.
+    /// The kernel should use numeric thresholds instead of domain-specific
+    /// trust classes.
+    pub min_trust_score: f64,
 
     /// Health check interval in seconds
     /// Default: 60 seconds
@@ -46,10 +59,12 @@ pub struct ReplicationConfig {
 }
 
 impl Default for ReplicationConfig {
+    #[allow(deprecated)]
     fn default() -> Self {
         Self {
             target_replicas: 3,
-            min_trust_class: TrustClass::Partner,
+            min_trust_class: TrustClass::Partner, // Deprecated, kept for compatibility
+            min_trust_score: TRUST_THRESHOLD_PARTNER,
             health_check_interval_secs: 60,
             stale_threshold_secs: 300,       // 5 minutes
             unreachable_threshold_secs: 900, // 15 minutes
@@ -323,7 +338,7 @@ impl ReplicationManager {
     /// Select candidate peers for replication using trust-weighted selection
     ///
     /// Strategy:
-    /// 1. Filter peers by minimum trust class
+    /// 1. Filter peers by minimum trust score threshold
     /// 2. Exclude peers already serving as replicas
     /// 3. Sort by trust score (higher is better)
     /// 4. Return top N candidates
@@ -358,13 +373,10 @@ impl ReplicationManager {
                 continue;
             }
 
-            // Check trust class - trust_class returns Result<TrustClass>, not Option
-            if let Ok(trust_class) = trust_graph.trust_class(&peer_did) {
-                if trust_class >= self.config.min_trust_class {
-                    // Get trust score for sorting (compute_trust_score, not trust_score)
-                    if let Ok(score) = trust_graph.compute_trust_score(&peer_did) {
-                        candidates.push((peer_did, score));
-                    }
+            // Check trust score meets minimum threshold
+            if let Ok(score) = trust_graph.compute_trust_score(&peer_did) {
+                if score >= self.config.min_trust_score {
+                    candidates.push((peer_did, score));
                 }
             }
         }
@@ -401,6 +413,7 @@ impl ReplicationHandle {
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Tests use deprecated min_trust_class for backward compatibility testing
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
@@ -411,6 +424,7 @@ mod tests {
         let config = ReplicationConfig::default();
         assert_eq!(config.target_replicas, 3);
         assert_eq!(config.min_trust_class, TrustClass::Partner);
+        assert_eq!(config.min_trust_score, TRUST_THRESHOLD_PARTNER);
         assert_eq!(config.health_check_interval_secs, 60);
     }
 
@@ -513,6 +527,7 @@ mod tests {
 
         assert_eq!(manager.config.target_replicas, 3);
         assert_eq!(manager.config.min_trust_class, TrustClass::Partner);
+        assert_eq!(manager.config.min_trust_score, TRUST_THRESHOLD_PARTNER);
 
         Ok(())
     }

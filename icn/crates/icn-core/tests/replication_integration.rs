@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(deprecated)] // Uses deprecated min_trust_class for backward compatibility testing
 //! Integration tests for Phase 17 Storage Hardening & Replication
 //!
 //! Tests the full replication flow across multiple nodes:
@@ -12,6 +13,7 @@ use anyhow::Result;
 use icn_core::replication::{ReplicationConfig, ReplicationManager};
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::{TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_PARTNER};
 use icn_store::{ReplicaHealth, SledStore, Store};
 use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
@@ -129,6 +131,7 @@ async fn test_two_node_replication_request() -> Result<()> {
     let config = ReplicationConfig {
         target_replicas: 2,
         min_trust_class: TrustClass::Partner,
+        min_trust_score: TRUST_THRESHOLD_PARTNER,
         health_check_interval_secs: 1, // Fast for testing
         stale_threshold_secs: 300,
         unreachable_threshold_secs: 900,
@@ -210,6 +213,7 @@ async fn test_trust_weighted_selection() -> Result<()> {
     let config = ReplicationConfig {
         target_replicas: 3,
         min_trust_class: TrustClass::Partner,
+        min_trust_score: TRUST_THRESHOLD_PARTNER,
         ..Default::default()
     };
     let node = TestNode::new(config).await?;
@@ -288,6 +292,7 @@ async fn test_replication_config_customization() -> Result<()> {
     let custom_config = ReplicationConfig {
         target_replicas: 5,
         min_trust_class: TrustClass::Federated,
+        min_trust_score: TRUST_THRESHOLD_FEDERATED,
         health_check_interval_secs: 30,
         stale_threshold_secs: 600,
         unreachable_threshold_secs: 1800,
@@ -299,6 +304,7 @@ async fn test_replication_config_customization() -> Result<()> {
     let actual_config = node._replication_handle.get_config().await;
     assert_eq!(actual_config.target_replicas, 5);
     assert_eq!(actual_config.min_trust_class, TrustClass::Federated);
+    assert_eq!(actual_config.min_trust_score, TRUST_THRESHOLD_FEDERATED);
     assert_eq!(actual_config.health_check_interval_secs, 30);
 
     Ok(())
