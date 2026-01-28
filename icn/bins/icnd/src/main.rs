@@ -12,8 +12,11 @@ use anyhow::Result;
 use clap::Parser;
 use icn_core::{Config, Runtime};
 use icn_identity::{AgeKeyStore, KeyStore};
+use icn_kernel_api::ServiceRegistry;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
 #[derive(Parser, Debug)]
@@ -63,6 +66,44 @@ struct Args {
     /// Tracing sampling rate (0.0 to 1.0, default: 0.1)
     #[arg(long)]
     tracing_sampling_rate: Option<f64>,
+}
+
+/// Build the service registry with domain app services
+///
+/// This creates the app-level services (trust, governance, ledger) and
+/// packages them in a ServiceRegistry for injection into the kernel.
+/// This is the key point where domain logic is separated from kernel logic.
+fn build_service_registry(
+    config: &Config,
+    identity_bundle: Option<&icn_identity::IdentityBundle>,
+) -> Result<ServiceRegistry> {
+    let mut registry = ServiceRegistry::new();
+
+    // Only create trust service if we have an identity
+    if let Some(bundle) = identity_bundle {
+        let own_did = bundle.did().clone();
+
+        // Open trust store
+        let trust_store_path = config.store_path().join("trust");
+        std::fs::create_dir_all(&trust_store_path)?;
+        let trust_store: Arc<dyn icn_store::Store> =
+            Arc::new(icn_store::SledStore::open(&trust_store_path)?);
+
+        // Create TrustGraph with tokio lock (for icn-core compatibility)
+        let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did);
+        let trust_graph = Arc::new(RwLock::new(trust_graph));
+
+        // Create TrustService from apps/trust
+        let trust_service = icn_trust_app::create_service_tokio(trust_graph);
+        registry = registry.with_trust(trust_service);
+
+        tracing::info!("Trust service initialized from apps/trust");
+    }
+
+    // TODO: Add governance service from apps/governance when available
+    // TODO: Add ledger service from apps/ledger when available
+
+    Ok(registry)
 }
 
 #[tokio::main]
@@ -262,8 +303,12 @@ async fn main() -> Result<()> {
         None
     };
 
-    // Create runtime
-    let runtime = Runtime::new(config.clone(), identity_bundle);
+    // Build service registry with domain app services
+    // This injects app-level services into the kernel for proper separation
+    let service_registry = build_service_registry(&config, identity_bundle.as_ref())?;
+
+    // Create runtime with injected services
+    let runtime = Runtime::new(config.clone(), identity_bundle).with_services(service_registry);
 
     // Get shutdown signal before moving runtime
     let shutdown_tx = runtime.shutdown_tx();

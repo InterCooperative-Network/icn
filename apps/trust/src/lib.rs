@@ -35,12 +35,14 @@
 pub mod oracle;
 pub mod oracle_tokio;
 pub mod service;
+pub mod service_tokio;
 
 use std::sync::Arc;
 
 pub use oracle::TrustPolicyOracle;
 pub use oracle_tokio::TrustPolicyOracleTokio;
 pub use service::TrustServiceImpl;
+pub use service_tokio::TrustServiceImplTokio;
 
 /// Create a TrustPolicyOracle instance.
 ///
@@ -83,6 +85,22 @@ pub fn create_service(
     trust_graph: Arc<parking_lot::RwLock<icn_trust::TrustGraph>>,
 ) -> Arc<dyn icn_kernel_api::services::TrustService> {
     Arc::new(TrustServiceImpl::new(trust_graph))
+}
+
+/// Create a TrustService instance from a tokio RwLock.
+///
+/// Use this when integrating with icn-core which uses tokio locks.
+/// The service uses `tokio::task::block_in_place` internally.
+///
+/// # Arguments
+/// * `trust_graph` - The trust graph with tokio RwLock wrapper.
+///
+/// # Panics
+/// If called outside of a tokio multi-threaded runtime context.
+pub fn create_service_tokio(
+    trust_graph: Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
+) -> Arc<dyn icn_kernel_api::services::TrustService> {
+    Arc::new(TrustServiceImplTokio::new(trust_graph))
 }
 
 #[cfg(test)]

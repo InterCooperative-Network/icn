@@ -3508,6 +3508,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-trust-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-store",
+ "icn-trust",
+ "parking_lot 0.12.5",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-zkp"
 version = "0.1.0"
 dependencies = [
@@ -3595,12 +3609,14 @@ dependencies = [
  "icn-core",
  "icn-gossip",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-net",
  "icn-obs",
  "icn-rpc",
  "icn-store",
  "icn-trust",
+ "icn-trust-app",
  "rpassword",
  "rustls",
  "tokio",

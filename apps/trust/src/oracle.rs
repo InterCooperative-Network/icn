@@ -295,10 +295,7 @@ mod tests {
                 constraints.custom.get("credit_multiplier"),
                 Some(&score.into())
             );
-            assert_eq!(
-                constraints.custom.get("voting_weight"),
-                Some(&score.into())
-            );
+            assert_eq!(constraints.custom.get("voting_weight"), Some(&score.into()));
         }
     }
 
