@@ -254,7 +254,7 @@ pub struct GenerateProofRequest {
 }
 
 /// Proof type from client request
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProofTypeRequest {
     Age {

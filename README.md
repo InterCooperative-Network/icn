@@ -7,6 +7,10 @@
 
 A substrate daemon for the cooperative internet.
 
+> 📖 **[Read the Vision: Institution-in-a-Box](VISION.md)**
+>
+> "Spin up a community. Give it rules. Give it money flows. Give it governance. Make it interoperable. Make it accountable."
+
 ---
 
 ## 🚀 Quick Start

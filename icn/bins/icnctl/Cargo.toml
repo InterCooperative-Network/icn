@@ -57,7 +57,7 @@ icn-steward.workspace = true
 icn-gateway.workspace = true
 
 # OpenAPI
-utoipa = { version = "4", features = ["yaml"] }
+utoipa = { version = "5.4.0", features = ["yaml"] }
 
 [dev-dependencies]
 tempfile = "3.24"

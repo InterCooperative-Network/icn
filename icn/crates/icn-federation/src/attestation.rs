@@ -12,6 +12,7 @@ use crate::types::current_timestamp;
 
 /// Federated trust attestation from one cooperative about a member
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct FederatedTrustAttestation {
     /// ID of the cooperative issuing the attestation
     pub source_coop_id: String,
@@ -43,6 +44,7 @@ pub struct FederatedTrustAttestation {
 
 /// Context for a trust score
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum TrustContext {
     /// Economic behavior (payment history, credit behavior)
@@ -68,6 +70,7 @@ impl TrustContext {
 
 /// Summary of evidence supporting an attestation
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct EvidenceSummary {
     /// Type of evidence (e.g., "transaction_count", "dispute_count")
     pub kind: String,

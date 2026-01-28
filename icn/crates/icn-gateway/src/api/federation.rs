@@ -12,7 +12,7 @@ use crate::federation_mgr::FederationManager;
 use crate::middleware::{get_claims, require_scope};
 use icn_federation::{
     BilateralClearingAgreement, CooperativeInfo, FederatedTrustAttestation, FederationPolicy,
-    SettlementInterval, TrustContext, Vouch,
+    SettlementInterval, SettlementReport, TrustContext, Vouch,
 };
 use icn_identity::Did;
 

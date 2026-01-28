@@ -609,6 +609,7 @@ impl ClearingManager {
 
 /// Report generated after a settlement
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct SettlementReport {
     pub agreement_id: String,
     pub coop_a_owed: i64,

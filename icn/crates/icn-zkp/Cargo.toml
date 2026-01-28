@@ -43,6 +43,7 @@ anyhow = "1.0"
 
 # Security
 zeroize = { version = "1.7", features = ["derive"] }
+utoipa = { version = "5.4.0", optional = true }
 
 # Logging
 tracing = "0.1"
@@ -61,6 +62,7 @@ stark = ["winterfell", "winter-air", "winter-math", "winter-utils"]
 # WARNING: Simulated proofs provide NO cryptographic security!
 # This feature is disabled in release builds by default.
 simulated = []
+utoipa = ["dep:utoipa"]
 
 # Uncomment when benchmarks are implemented
 # [[bench]]

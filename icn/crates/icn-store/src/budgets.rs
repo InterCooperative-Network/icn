@@ -4,6 +4,7 @@ use sled::Db;
 
 /// Budget period
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum BudgetPeriod {
     /// Daily budget period
@@ -18,6 +19,7 @@ pub enum BudgetPeriod {
 
 /// Budget status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum BudgetStatus {
     /// Budget is active and tracking spending
@@ -32,6 +34,7 @@ pub enum BudgetStatus {
 
 /// Budget limit
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct Budget {
     /// Unique ID
     pub id: String,
