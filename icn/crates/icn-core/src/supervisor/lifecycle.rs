@@ -268,7 +268,6 @@ async fn spawn_actors_with_identity(
         config,
         did.clone(),
         super::init_gossip::GossipDeps {
-            trust_graph: trust_graph_handle.clone(),
             trust_service: trust_service_from_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             identity_bundle: identity_bundle.clone(),
