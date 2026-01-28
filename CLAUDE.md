@@ -440,6 +440,61 @@ impl PolicyOracle for TrustPolicyOracle {
 }
 ```
 
+### TrustPolicyOracle Flow
+
+The following diagram shows the complete request flow through the TrustPolicyOracle:
+
+```mermaid
+sequenceDiagram
+    participant API as API Request
+    participant Oracle as TrustPolicyOracle
+    participant Check as Domain Check
+    participant Compute as Trust Computation
+    participant Firewall as Meaning Firewall
+    participant Kernel as Kernel
+
+    API->>Oracle: evaluate(PolicyRequest)
+    
+    Oracle->>Check: Check domain == "trust"
+    alt domain != "trust"
+        Check-->>Oracle: Abstain (Allow with empty constraints)
+        Oracle-->>API: PolicyDecision::Allow
+    else domain == "trust"
+        Check-->>Oracle: Continue
+    end
+    
+    Oracle->>Compute: Parse actor DID
+    alt Invalid DID format
+        Compute-->>Oracle: Return minimal trust (0.0)
+    else Valid DID
+        Compute->>Compute: graph.compute_trust_score(actor)
+        Note over Compute: Try try_read() first
+        alt Lock available
+            Compute-->>Oracle: trust_score (f64)
+        else Lock contention
+            Compute->>Compute: block_in_place()
+            Note over Compute: Increment counter metric
+            Compute-->>Oracle: trust_score (f64)
+        end
+    end
+    
+    Oracle->>Firewall: score_to_constraints(score)
+    Note over Firewall: ═══ MEANING FIREWALL ═══
+    Note over Firewall: Trust semantics END here
+    Firewall-->>Oracle: ConstraintSet
+    Note over Oracle: rate_limit, credit_multiplier,<br/>max_topics, trust_score custom field
+    
+    Oracle-->>API: PolicyDecision::Allow { constraints }
+    API->>Kernel: Enforce constraints blindly
+    Note over Kernel: Kernel never sees "trust score"<br/>or "trust class" - only limits
+```
+
+**Key Points**:
+- The **Meaning Firewall** boundary is where trust semantics (scores, classes) are converted to generic constraints
+- The kernel enforces rate limits without knowing they came from trust scores
+- Lock contention is tracked via `trust_oracle_block_in_place_total` metric
+
+
 ### App Lifecycle
 
 ```

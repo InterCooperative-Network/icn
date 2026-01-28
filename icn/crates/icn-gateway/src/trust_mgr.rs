@@ -972,6 +972,8 @@ fn compute_trust_from_edges_map(
 
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let start = std::time::Instant::now();
+
         // 1. Check domain
         if request.domain().as_str() != "trust" {
             // We don't handle other domains. In a chain-of-responsibility pattern,
@@ -1040,6 +1042,10 @@ impl PolicyOracle for TrustPolicyOracle {
             icn_kernel_api::RateLimit::restricted() // Isolated (5/5)
         };
         constraints = constraints.with_rate_limit(rate_limit);
+
+        // Record execution duration
+        metrics::histogram!("trust_oracle_evaluation_duration_seconds")
+            .record(start.elapsed().as_secs_f64());
 
         PolicyDecision::allow_with(constraints)
     }
