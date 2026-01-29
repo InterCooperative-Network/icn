@@ -227,15 +227,9 @@ jobs:
           echo "Additional disk cleanup for coverage job..."
           
           # Remove cargo caches to free space (tarpaulin downloads what it needs)
+          # These are safe to remove - they're user-level caches, not system files
           rm -rf ~/.cargo/registry/cache || true
           rm -rf ~/.cargo/git/db || true
-          
-          # Clear any remaining large directories on the runner
-          sudo rm -rf /usr/local/games || true
-          sudo rm -rf /usr/games || true
-          sudo rm -rf /usr/share/icons || true
-          sudo rm -rf /usr/share/fonts || true
-          sudo rm -rf /opt/hostedtoolcache/cargo-* || true
           
           # Show remaining space
           echo "Disk space before tarpaulin:"
