@@ -14,8 +14,28 @@ use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use crate::config::Config;
 
 /// Services initialized during trust setup
+///
+/// # Kernel/App Separation
+///
+/// This struct exposes `trust_graph` for app-layer operations (mutations like
+/// adding/removing trust edges). Kernel components should NOT use `trust_graph`
+/// directly - they should use `TrustService` from the `ServiceRegistry` instead.
+///
+/// The `trust_graph` field is exposed here because:
+/// - `IdentityActor` needs it for trust mutations (add_edge, remove_edge)
+/// - RPC handlers need it for trust API endpoints
+/// - `MisbehaviorDetector` callbacks need it for trust penalties
+///
+/// For read-only trust queries in kernel components, use:
+/// ```ignore
+/// let trust_service = service_registry.trust();
+/// let score = trust_service.trust_score(&did);
+/// ```
 pub struct TrustServices {
-    /// The trust graph for tracking peer relationships
+    /// The trust graph for app-layer mutations (add/remove edges)
+    ///
+    /// **Note**: Kernel data-path components should use `TrustService` from
+    /// `ServiceRegistry` instead of accessing this directly.
     pub trust_graph: Arc<RwLock<TrustGraph>>,
     /// Byzantine fault detector for misbehavior tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,

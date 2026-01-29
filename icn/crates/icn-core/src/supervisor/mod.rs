@@ -34,7 +34,6 @@ pub mod init_steward;
 pub mod init_trust;
 pub mod lifecycle;
 pub mod nat_dial;
-pub mod registry;
 pub mod shutdown;
 pub mod version_tracker;
 
