@@ -17,6 +17,8 @@ parking_lot = "0.12"
 ordered-float = { version = "5.1", features = ["serde"] }
 tracing = "0.1"
 async-trait = "0.1"
+blake3 = "1.8"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full", "test-util"] }
+serde_json = "1.0"

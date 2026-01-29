@@ -11,6 +11,7 @@
 //! - The kernel enforces constraints without understanding their origin
 
 use crate::authz::PolicyOracle;
+use crate::scope::{CellId, ScopeLevel};
 use crate::types::Did;
 use std::sync::Arc;
 
@@ -334,6 +335,59 @@ pub enum LedgerEvent {
     BalanceQueried { account: Did, querier: Did },
 }
 
+// ============================================================================
+// Cell Service
+// ============================================================================
+
+/// Abstract cell management service.
+///
+/// The kernel uses this to query cell membership and scope topology
+/// without knowing the organizational semantics behind cells.
+///
+/// A "cell" is an HA clustering envelope — a named group of nodes that
+/// share identity, state, and capacity. The kernel treats `CellId` as
+/// an opaque identifier and `ScopeLevel` as an ordered integer.
+///
+/// Apps implement this trait to provide cell lifecycle management with
+/// their own organizational semantics.
+pub trait CellService: Send + Sync {
+    /// Get the cell this node belongs to (if any).
+    ///
+    /// Returns `None` if the node is not a member of any cell
+    /// (e.g., an independent commons participant).
+    fn local_cell(&self) -> Option<CellId>;
+
+    /// Get the scope level of a given cell.
+    ///
+    /// Returns `None` if the cell is unknown.
+    fn cell_scope(&self, cell_id: &CellId) -> Option<ScopeLevel>;
+
+    /// List DIDs of all members in a cell.
+    ///
+    /// Returns an empty vec if the cell is unknown.
+    fn cell_members(&self, cell_id: &CellId) -> Vec<Did>;
+
+    /// Check if a DID is in the same cell as the local node.
+    ///
+    /// Returns `false` if the local node has no cell or the peer is unknown.
+    fn is_cell_peer(&self, did: &Did) -> bool;
+
+    /// Check if a DID is in the same organization (any cell in the org).
+    ///
+    /// Returns `false` if the local node has no org or the peer is unknown.
+    fn is_org_peer(&self, did: &Did) -> bool;
+
+    /// Get the scope relationship between the local node and a peer.
+    ///
+    /// Returns the narrowest scope that contains both the local node and
+    /// the peer. If the peer is completely unknown, returns `Commons`.
+    fn peer_scope(&self, did: &Did) -> ScopeLevel;
+}
+
+// ============================================================================
+// Service Registry
+// ============================================================================
+
 /// Builder for creating domain services
 ///
 /// This allows the daemon to construct services and inject them into the kernel.
@@ -350,6 +404,7 @@ pub struct ServiceRegistry {
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
     ledger: Option<Arc<dyn LedgerService>>,
+    cell: Option<Arc<dyn CellService>>,
     /// Type-erased handles for transition period
     ///
     /// Keys use string identifiers like "trust_graph", "ledger_handle", etc.
@@ -373,6 +428,7 @@ impl ServiceRegistry {
             security: None,
             governance: None,
             ledger: None,
+            cell: None,
             raw_handles: std::collections::HashMap::new(),
         }
     }
@@ -398,6 +454,12 @@ impl ServiceRegistry {
     /// Register a ledger service
     pub fn with_ledger(mut self, service: Arc<dyn LedgerService>) -> Self {
         self.ledger = Some(service);
+        self
+    }
+
+    /// Register a cell service
+    pub fn with_cell(mut self, service: Arc<dyn CellService>) -> Self {
+        self.cell = Some(service);
         self
     }
 
@@ -452,5 +514,10 @@ impl ServiceRegistry {
     /// Get the ledger service (if registered)
     pub fn ledger(&self) -> Option<&Arc<dyn LedgerService>> {
         self.ledger.as_ref()
+    }
+
+    /// Get the cell service (if registered)
+    pub fn cell(&self) -> Option<&Arc<dyn CellService>> {
+        self.cell.as_ref()
     }
 }

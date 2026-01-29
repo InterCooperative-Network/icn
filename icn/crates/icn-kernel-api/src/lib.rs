@@ -39,6 +39,7 @@ pub mod compute;
 pub mod coord;
 pub mod identity;
 pub mod naming;
+pub mod scope;
 pub mod services;
 pub mod state;
 pub mod time;
@@ -59,8 +60,9 @@ pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService};
+pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
-    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
+    CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
     SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
     TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
