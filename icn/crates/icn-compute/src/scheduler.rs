@@ -735,12 +735,20 @@ impl CapacityBudget {
     ///
     /// Prevents complete starvation of any scope, ensuring every scope
     /// retains at least minimal capacity for burst traffic.
+    ///
+    /// **Security**: Without this bound, an attacker could submit sustained
+    /// high-demand tasks in one scope to drive other scopes' budgets to zero
+    /// via the demand feedback loop, effectively denying service to those scopes.
     const MIN_SCOPE_FRACTION: f64 = 0.01;
 
     /// Maximum fraction per scope during demand adjustment.
     ///
     /// Prevents any single scope from monopolizing capacity, leaving
     /// headroom for other scopes even under sustained high demand.
+    ///
+    /// **Security**: Without this bound, a single dominant scope could absorb
+    /// nearly all capacity, leaving other scopes unable to schedule tasks
+    /// even when legitimate demand arises.
     const MAX_SCOPE_FRACTION: f64 = 0.80;
 
     /// Adjust budget based on observed demand.
@@ -790,7 +798,8 @@ impl CapacityBudget {
         let avg_util = if count > 0 {
             total_util / count as f64
         } else {
-            return; // No data, no adjustment
+            tracing::trace!("adjust_from_demand: no utilization data, skipping adjustment");
+            return;
         };
 
         // Shift capacity: over-utilized scopes gain, under-utilized lose
@@ -2355,5 +2364,79 @@ mod tests {
         // Local (high demand) should gain, Commons (low demand) should lose
         assert!(budget.local_reserve > original.local_reserve);
         assert!(budget.commons_share < original.commons_share);
+    }
+
+    #[test]
+    fn test_scope_budget_exhaustion() {
+        let policy = DefaultPlacementPolicy::default();
+        let profile = ResourceProfile::minimal();
+
+        // Node with 8 cores, default budget gives Cell 25% → 2.0 CPU for Cell
+        // At 0.1 CPU/task (DEFAULT_CPU_PER_TASK) → 20 task slots for Cell scope
+        let node_state = NodeState {
+            did: "did:icn:executor".into(),
+            capacity: NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 6.0,
+                memory_mb_total: 16384,
+                memory_mb_available: 12288,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: 1000,
+            },
+            executing_tasks: HashMap::new(),
+            queue_depth: 0,
+            scope_queue_depths: HashMap::new(),
+        };
+        let task_hash = [0u8; 32];
+        let empty_locality = LocalityContext::empty();
+        let request = PlacementRequest {
+            task_hash,
+            resource_profile: profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: None,
+            cell_affinity: None,
+        };
+
+        // Cell scope with queue under budget → accepted
+        let cell_ctx_low = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        let mut under_budget_state = node_state.clone();
+        under_budget_state
+            .scope_queue_depths
+            .insert(ScopeLevel::Cell, 10);
+        let offer = policy.score_task(
+            &request,
+            "did:icn:alice",
+            &under_budget_state,
+            0.8,
+            &empty_locality,
+            &cell_ctx_low,
+        );
+        assert!(offer.is_some(), "Should accept when queue is under budget");
+
+        // Cell scope with queue over budget → rejected
+        let mut over_budget_state = node_state.clone();
+        over_budget_state
+            .scope_queue_depths
+            .insert(ScopeLevel::Cell, 25);
+        let offer = policy.score_task(
+            &request,
+            "did:icn:alice",
+            &over_budget_state,
+            0.8,
+            &empty_locality,
+            &cell_ctx_low,
+        );
+        assert!(
+            offer.is_none(),
+            "Should reject when scope queue exceeds budget"
+        );
     }
 }
