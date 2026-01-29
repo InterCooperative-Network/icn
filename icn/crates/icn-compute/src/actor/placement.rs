@@ -311,7 +311,10 @@ impl ComputeActor {
             }
         }
 
-        // Build scope context (default to Commons until CellService integration)
+        // TODO(icn-compute#921): Integrate CellService to populate scope context.
+        // Once CellService is wired into ComputeActor, use it to determine
+        // peer_scope (via cell_service.peer_scope(&submitter)) and executor_cell
+        // (via cell_service.local_cell()) instead of defaulting to Commons.
         let scope_ctx = crate::scheduler::ScopeContext::empty();
 
         // Build a PlacementRequest for the scoring call

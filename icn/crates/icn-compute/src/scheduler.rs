@@ -716,12 +716,26 @@ impl CapacityBudget {
         }
 
         let sum: f64 = fractions.iter().sum();
-        if sum > 1.0 + f64::EPSILON {
+        // Use a practical tolerance for floating-point accumulation across
+        // multiple adjustment rounds (f64::EPSILON is too tight).
+        if sum > 1.0 + 1e-9 {
             return Err("Fractions must sum to at most 1.0");
         }
 
         Ok(())
     }
+
+    /// Minimum fraction per scope during demand adjustment.
+    ///
+    /// Prevents complete starvation of any scope, ensuring every scope
+    /// retains at least minimal capacity for burst traffic.
+    const MIN_SCOPE_FRACTION: f64 = 0.01;
+
+    /// Maximum fraction per scope during demand adjustment.
+    ///
+    /// Prevents any single scope from monopolizing capacity, leaving
+    /// headroom for other scopes even under sustained high demand.
+    const MAX_SCOPE_FRACTION: f64 = 0.80;
 
     /// Adjust budget based on observed demand.
     ///
@@ -750,7 +764,7 @@ impl CapacityBudget {
 
         // Calculate average utilization
         let mut total_util = 0.0;
-        let mut count = 0;
+        let mut count = 0usize;
         for &scope in &scopes {
             if let Some(&u) = utilization.get(&scope) {
                 total_util += u;
@@ -772,9 +786,10 @@ impl CapacityBudget {
             }
         }
 
-        // Apply deltas, clamping each fraction to [0.01, 0.80]
+        // Apply deltas, clamping to prevent starvation and monopolization
         for i in 0..5 {
-            fractions[i] = (fractions[i] + deltas[i]).clamp(0.01, 0.80);
+            fractions[i] = (fractions[i] + deltas[i])
+                .clamp(Self::MIN_SCOPE_FRACTION, Self::MAX_SCOPE_FRACTION);
         }
 
         // Normalize so sum stays the same as before
@@ -788,10 +803,10 @@ impl CapacityBudget {
         .iter()
         .sum();
         let new_sum: f64 = fractions.iter().sum();
-        if new_sum > 0.0 {
+        if new_sum > f64::EPSILON {
             let scale = original_sum / new_sum;
             for f in &mut fractions {
-                *f *= scale;
+                *f = (*f * scale).clamp(0.0, 1.0);
             }
         }
 
@@ -1164,6 +1179,13 @@ pub struct DefaultPlacementPolicy {
     pub load_multiplier: f64,
 }
 
+impl DefaultPlacementPolicy {
+    /// Default assumed CPU cores per task when the profile doesn't specify.
+    ///
+    /// Used for scope budget estimation (queue depth limit calculation).
+    const DEFAULT_CPU_PER_TASK: f64 = 0.1;
+}
+
 impl Default for DefaultPlacementPolicy {
     fn default() -> Self {
         Self {
@@ -1205,15 +1227,25 @@ impl PlacementPolicy for DefaultPlacementPolicy {
             return None;
         }
 
-        // Scope-aware capacity check: ensure scope budget isn't exhausted
+        // Scope-aware capacity check: ensure scope budget isn't exhausted.
+        //
+        // We estimate the max number of tasks allowed per scope based on total
+        // CPU cores and the scope's budget fraction. Uses a conservative estimate
+        // of CPU per task (the profile's requested cores, or a default if unset).
         let scope_queue = node_state
             .scope_queue_depths
             .get(&scope_ctx.peer_scope)
             .copied()
             .unwrap_or(0);
         let scope_fraction = scope_ctx.capacity_budget.fraction_for(scope_ctx.peer_scope);
-        let total_queue_budget =
-            (node_state.capacity.cpu_cores_total / 0.1 * scope_fraction) as usize;
+        let cpu_per_task = profile
+            .cpu_cores
+            .unwrap_or(DefaultPlacementPolicy::DEFAULT_CPU_PER_TASK);
+        let total_queue_budget = if scope_fraction > f64::EPSILON && cpu_per_task > f64::EPSILON {
+            (node_state.capacity.cpu_cores_total * scope_fraction / cpu_per_task).max(1.0) as usize
+        } else {
+            0
+        };
         if total_queue_budget > 0 && scope_queue >= total_queue_budget {
             return None; // Scope budget exhausted
         }
@@ -2196,5 +2228,97 @@ mod tests {
             local_avg > commons_avg + 0.10,
             "Local avg ({local_avg:.4}) should be > Commons avg ({commons_avg:.4}) + 0.10"
         );
+    }
+
+    #[test]
+    fn test_demand_adjustment_all_saturated() {
+        let mut budget = CapacityBudget::default();
+        let original = budget.clone();
+
+        // All scopes at 100% utilization — all equal, so no shift
+        let mut utilization = HashMap::new();
+        for &scope in &ScopeLevel::ALL {
+            utilization.insert(scope, 1.0);
+        }
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Fractions should remain approximately unchanged (all at same util)
+        assert!((budget.local_reserve - original.local_reserve).abs() < 0.001);
+        assert!((budget.commons_share - original.commons_share).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_demand_adjustment_one_hot() {
+        let mut budget = CapacityBudget::default();
+
+        // Only Local at 100%, rest at 0%
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 1.0);
+        utilization.insert(ScopeLevel::Cell, 0.0);
+        utilization.insert(ScopeLevel::Org, 0.0);
+        utilization.insert(ScopeLevel::Federation, 0.0);
+        utilization.insert(ScopeLevel::Commons, 0.0);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Local should have gained, others should have shrunk
+        assert!(budget.local_reserve > 0.30);
+        assert!(budget.cell_share < 0.25);
+        assert!(budget.org_share < 0.20);
+        assert!(budget.federation_share < 0.15);
+        assert!(budget.commons_share < 0.10);
+
+        // All fractions still within bounds
+        assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_demand_adjustment_convergence() {
+        let mut budget = CapacityBudget::default();
+
+        // Simulate 50 rounds of adjustment with stable demand pattern
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 0.90);
+        utilization.insert(ScopeLevel::Cell, 0.70);
+        utilization.insert(ScopeLevel::Org, 0.30);
+        utilization.insert(ScopeLevel::Federation, 0.10);
+        utilization.insert(ScopeLevel::Commons, 0.05);
+
+        let original_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+
+        for _ in 0..50 {
+            budget.adjust_from_demand(&utilization, 0.05);
+        }
+
+        // Sum should be preserved after many rounds
+        let final_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+        assert!(
+            (final_sum - original_sum).abs() < 0.01,
+            "Sum should be preserved: original={original_sum}, final={final_sum}"
+        );
+
+        // Ordering should reflect demand: Local > Cell > Org > Fed > Commons
+        assert!(budget.local_reserve > budget.cell_share);
+        assert!(budget.cell_share > budget.org_share);
+
+        // All fractions should remain valid
+        assert!(budget.validate().is_ok());
     }
 }
