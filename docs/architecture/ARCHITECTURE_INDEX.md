@@ -50,6 +50,17 @@ This architecture review produced three comprehensive documents:
 
 **Read this for:** Design philosophy and technical deep-dives
 
+### 4. **KERNEL_APP_SEPARATION.md** (NEW - 2026-01)
+**The Meaning Firewall Architecture**
+- Kernel/app separation principles
+- PolicyOracle and TrustService abstractions
+- ServiceRegistry dependency injection
+- Migration patterns and status
+- Implementation guide
+- Request flow diagrams
+
+**Read this for:** Understanding how kernel enforces constraints without domain knowledge
+
 ---
 
 ## 🏗️ System Summary
@@ -373,6 +384,7 @@ icn/
 - [ARCHITECTURE_MAP.md](./ARCHITECTURE_MAP.md) - Complete system map (51KB)
 - [ARCHITECTURE_VISUAL.md](./ARCHITECTURE_VISUAL.md) - Visual diagrams (38KB)
 - [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Design rationale (69KB)
+- [KERNEL_APP_SEPARATION.md](./KERNEL_APP_SEPARATION.md) - Meaning Firewall architecture (NEW)
 
 ### Getting Started
 - [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) - New contributor guide
@@ -455,6 +467,7 @@ MIT OR Apache-2.0 (dual-licensed)
 | **ARCHITECTURE_MAP.md** | 51KB | Complete system inventory | Understanding all components |
 | **ARCHITECTURE_VISUAL.md** | 38KB | Diagrams & flow charts | Visual learners, quick reference |
 | **docs/ARCHITECTURE.md** | 69KB | Design rationale & decisions | Deep technical understanding |
+| **KERNEL_APP_SEPARATION.md** | 25KB | Meaning Firewall, PolicyOracle | Kernel/app boundary work |
 | **ARCHITECTURE_INDEX.md** | This file | Navigation & summary | Starting point, quick overview |
 
 ---
