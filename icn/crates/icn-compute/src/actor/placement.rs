@@ -153,6 +153,7 @@ impl ComputeActor {
                 .get(&self.own_did)
                 .map(|i| i.tasks_executing)
                 .unwrap_or(0),
+            scope_queue_depths: HashMap::new(),
         };
         drop(registry);
 
@@ -310,6 +311,20 @@ impl ComputeActor {
             }
         }
 
+        // Build scope context (default to Commons until CellService integration)
+        let scope_ctx = crate::scheduler::ScopeContext::empty();
+
+        // Build a PlacementRequest for the scoring call
+        let placement_request = crate::scheduler::PlacementRequest {
+            task_hash,
+            resource_profile: resource_profile.clone(),
+            locality_hints: locality_hints.clone(),
+            max_cost: _max_cost,
+            requested_at,
+            max_scope: None,
+            cell_affinity: None,
+        };
+
         // Score the task
         let offer = match policy.score_task(
             &task_hash,
@@ -319,6 +334,8 @@ impl ComputeActor {
             our_trust,
             &locality_hints,
             &locality_ctx,
+            &scope_ctx,
+            &placement_request,
         ) {
             Some(o) => o,
             None => {

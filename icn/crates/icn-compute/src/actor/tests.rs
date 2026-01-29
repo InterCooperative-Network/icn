@@ -422,7 +422,7 @@ async fn test_placement_negotiation_multi_executor() {
 async fn test_locality_aware_placement_scoring() {
     use crate::scheduler::{
         DefaultPlacementPolicy, LocalityContext, LocalityHint, NodeCapacity, NodeState,
-        PlacementPolicy, ResourceProfile,
+        PlacementPolicy, PlacementRequest, ResourceProfile, ScopeContext,
     };
 
     // Create task requiring compute resources
@@ -442,12 +442,24 @@ async fn test_locality_aware_placement_scoring() {
         updated_at: 0,
     };
 
+    let scope_ctx = ScopeContext::empty();
+    let request = PlacementRequest {
+        task_hash,
+        resource_profile: profile.clone(),
+        locality_hints: vec![],
+        max_cost: None,
+        requested_at: 0,
+        max_scope: None,
+        cell_affinity: None,
+    };
+
     // Executor A: High trust (0.8), no locality information
     let node_a = NodeState {
         did: "did:icn:executor-a".to_string(),
         capacity: capacity.clone(),
         executing_tasks: std::collections::HashMap::new(),
         queue_depth: 0,
+        scope_queue_depths: std::collections::HashMap::new(),
     };
     let locality_a = LocalityContext::empty();
 
@@ -457,6 +469,7 @@ async fn test_locality_aware_placement_scoring() {
         capacity: capacity.clone(),
         executing_tasks: std::collections::HashMap::new(),
         queue_depth: 0,
+        scope_queue_depths: std::collections::HashMap::new(),
     };
     let locality_b = LocalityContext {
         submitter_rtt_ms: Some(10), // 10ms RTT
@@ -472,6 +485,7 @@ async fn test_locality_aware_placement_scoring() {
         capacity: capacity.clone(),
         executing_tasks: std::collections::HashMap::new(),
         queue_depth: 0,
+        scope_queue_depths: std::collections::HashMap::new(),
     };
     let locality_c = LocalityContext {
         submitter_rtt_ms: None,
@@ -487,6 +501,7 @@ async fn test_locality_aware_placement_scoring() {
         capacity: capacity.clone(),
         executing_tasks: std::collections::HashMap::new(),
         queue_depth: 0,
+        scope_queue_depths: std::collections::HashMap::new(),
     };
     let locality_d = LocalityContext {
         submitter_rtt_ms: Some(15), // 15ms RTT
@@ -508,6 +523,8 @@ async fn test_locality_aware_placement_scoring() {
             0.8,
             &no_hints,
             &locality_a,
+            &scope_ctx,
+            &request,
         )
         .unwrap();
 
@@ -520,6 +537,8 @@ async fn test_locality_aware_placement_scoring() {
             0.6,
             &no_hints,
             &locality_b,
+            &scope_ctx,
+            &request,
         )
         .unwrap();
 
@@ -532,6 +551,8 @@ async fn test_locality_aware_placement_scoring() {
             0.6,
             &no_hints,
             &locality_c,
+            &scope_ctx,
+            &request,
         )
         .unwrap();
 
@@ -544,6 +565,8 @@ async fn test_locality_aware_placement_scoring() {
             0.4,
             &no_hints,
             &locality_d,
+            &scope_ctx,
+            &request,
         )
         .unwrap();
 
@@ -565,20 +588,22 @@ async fn test_locality_aware_placement_scoring() {
         offer_d.score
     );
 
-    // Analysis: With rebalanced weights (Phase 16C Week 3):
-    // - Trust: 25% (was 40%)
-    // - Capacity: 20%
-    // - Queue: 15%
-    // - RTT: 15% (NEW)
-    // - Data locality: 15% (NEW)
-    // - Hints: 10% (NEW)
+    // Analysis: With scope-aware weights:
+    // - Trust: 20%
+    // - Capacity: 15%
+    // - Queue: 10%
+    // - RTT: 10%
+    // - Data locality: 10%
+    // - Scope affinity: 15% (all Commons = 0.00 here)
+    // - Cell affinity: 5%
+    // - Hints: 5%
     // - Jitter: 10%
 
-    // Expected scoring breakdown (approximate, excluding jitter):
-    // Executor A: trust(0.20) + capacity(0.20) + queue(0.15) = 0.55
-    // Executor B: trust(0.15) + capacity(0.20) + queue(0.15) + rtt(0.148) = 0.648
-    // Executor C: trust(0.15) + capacity(0.20) + queue(0.15) + data(0.15) = 0.65
-    // Executor D: trust(0.10) + capacity(0.20) + queue(0.15) + rtt(0.145) + data(0.15) = 0.745
+    // Expected scoring breakdown (approximate, excluding jitter, all Commons scope):
+    // Executor A: trust(0.16) + capacity(0.15) + queue(0.10) + scope(0.00) = 0.41
+    // Executor B: trust(0.12) + capacity(0.15) + queue(0.10) + rtt(0.098) + scope(0.00) = 0.468
+    // Executor C: trust(0.12) + capacity(0.15) + queue(0.10) + data(0.10) + scope(0.00) = 0.47
+    // Executor D: trust(0.08) + capacity(0.15) + queue(0.10) + rtt(0.097) + data(0.10) + scope(0.00) = 0.527
 
     // Verify that locality factors make a significant difference
     // Executor B (good RTT) should beat A (higher trust but no locality)

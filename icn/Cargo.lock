@@ -2841,6 +2841,7 @@ dependencies = [
  "icn-encoding",
  "icn-federation",
  "icn-identity",
+ "icn-kernel-api",
  "icn-obs",
  "icn-security",
  "icn-time",

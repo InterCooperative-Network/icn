@@ -118,11 +118,22 @@ fn demo_gpu_placement() {
             capacity,
             executing_tasks: HashMap::new(),
             queue_depth,
+            scope_queue_depths: HashMap::new(),
         };
 
         // Empty locality hints and context for demo
         let empty_hints: Vec<icn_compute::LocalityHint> = vec![];
         let empty_ctx = icn_compute::LocalityContext::empty();
+        let scope_ctx = icn_compute::ScopeContext::empty();
+        let request = icn_compute::PlacementRequest {
+            task_hash,
+            resource_profile: task_profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 0,
+            max_scope: None,
+            cell_affinity: None,
+        };
 
         match policy.score_task(
             &task_hash,
@@ -132,6 +143,8 @@ fn demo_gpu_placement() {
             trust,
             &empty_hints,
             &empty_ctx,
+            &scope_ctx,
+            &request,
         ) {
             Some(offer) => {
                 println!("  {}: score = {:.3}", did, offer.score);
