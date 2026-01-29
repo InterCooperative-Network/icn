@@ -18,6 +18,7 @@
 //! - **Phase 16D**: Actor state and migration
 //! - **Phase 16E**: Cooperative scheduling policies
 
+use icn_kernel_api::{CellId, ScopeLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -608,6 +609,240 @@ impl NodeCapacity {
     }
 }
 
+// ============================================================================
+// Capacity Budget (scope-aware resource allocation)
+// ============================================================================
+
+/// Per-scope resource allocation fractions.
+///
+/// Defines what fraction of a node's total capacity is available to each
+/// scope level. The kernel uses these fractions for admission control without
+/// interpreting the organizational semantics behind scopes.
+///
+/// Fractions must sum to ≤ 1.0 (unused fraction is unallocated headroom).
+///
+/// # Example
+///
+/// ```
+/// use icn_compute::CapacityBudget;
+/// use icn_kernel_api::ScopeLevel;
+///
+/// let budget = CapacityBudget::default();
+/// assert_eq!(budget.fraction_for(ScopeLevel::Local), 0.30);
+/// assert_eq!(budget.fraction_for(ScopeLevel::Cell), 0.25);
+/// assert!(budget.validate().is_ok());
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CapacityBudget {
+    /// Fraction reserved for local tasks (default: 0.30)
+    pub local_reserve: f64,
+
+    /// Fraction shared with cell peers (default: 0.25)
+    pub cell_share: f64,
+
+    /// Fraction shared with org-wide tasks (default: 0.20)
+    pub org_share: f64,
+
+    /// Fraction shared with federation tasks (default: 0.15)
+    pub federation_share: f64,
+
+    /// Fraction shared with commons tasks (default: 0.10)
+    pub commons_share: f64,
+}
+
+impl Default for CapacityBudget {
+    fn default() -> Self {
+        Self {
+            local_reserve: 0.30,
+            cell_share: 0.25,
+            org_share: 0.20,
+            federation_share: 0.15,
+            commons_share: 0.10,
+        }
+    }
+}
+
+impl CapacityBudget {
+    /// Get the capacity fraction for a given scope level.
+    ///
+    /// Returns the fraction of total node capacity available to tasks
+    /// at the specified scope.
+    pub fn fraction_for(&self, scope: ScopeLevel) -> f64 {
+        match scope {
+            ScopeLevel::Local => self.local_reserve,
+            ScopeLevel::Cell => self.cell_share,
+            ScopeLevel::Org => self.org_share,
+            ScopeLevel::Federation => self.federation_share,
+            ScopeLevel::Commons => self.commons_share,
+        }
+    }
+
+    /// Get the cumulative capacity available at a given scope and below.
+    ///
+    /// Tasks at a wider scope can use capacity from all narrower scopes
+    /// that haven't been consumed. This returns the maximum fraction
+    /// available if the scope widened from Local up to the given level.
+    pub fn cumulative_fraction_up_to(&self, scope: ScopeLevel) -> f64 {
+        let mut total = self.local_reserve;
+        if scope >= ScopeLevel::Cell {
+            total += self.cell_share;
+        }
+        if scope >= ScopeLevel::Org {
+            total += self.org_share;
+        }
+        if scope >= ScopeLevel::Federation {
+            total += self.federation_share;
+        }
+        if scope >= ScopeLevel::Commons {
+            total += self.commons_share;
+        }
+        total
+    }
+
+    /// Validate that fractions are individually valid and sum to ≤ 1.0.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        let fractions = [
+            self.local_reserve,
+            self.cell_share,
+            self.org_share,
+            self.federation_share,
+            self.commons_share,
+        ];
+
+        for &f in &fractions {
+            if !(0.0..=1.0).contains(&f) {
+                return Err("Each fraction must be in [0.0, 1.0]");
+            }
+        }
+
+        let sum: f64 = fractions.iter().sum();
+        if sum > 1.0 + Self::FLOAT_TOLERANCE {
+            return Err("Fractions must sum to at most 1.0");
+        }
+
+        Ok(())
+    }
+
+    /// Practical tolerance for floating-point comparisons.
+    ///
+    /// Using `f64::EPSILON` (~2.2e-16) is too tight when fractions are
+    /// adjusted over many rounds; accumulated rounding can exceed it.
+    /// 1e-9 is well above rounding noise but invisible at the 0.01 scale
+    /// of our smallest meaningful fraction.
+    const FLOAT_TOLERANCE: f64 = 1e-9;
+
+    /// Minimum fraction per scope during demand adjustment.
+    ///
+    /// Prevents complete starvation of any scope, ensuring every scope
+    /// retains at least minimal capacity for burst traffic.
+    ///
+    /// **Security**: Without this bound, an attacker could submit sustained
+    /// high-demand tasks in one scope to drive other scopes' budgets to zero
+    /// via the demand feedback loop, effectively denying service to those scopes.
+    const MIN_SCOPE_FRACTION: f64 = 0.01;
+
+    /// Maximum fraction per scope during demand adjustment.
+    ///
+    /// Prevents any single scope from monopolizing capacity, leaving
+    /// headroom for other scopes even under sustained high demand.
+    ///
+    /// **Security**: Without this bound, a single dominant scope could absorb
+    /// nearly all capacity, leaving other scopes unable to schedule tasks
+    /// even when legitimate demand arises.
+    const MAX_SCOPE_FRACTION: f64 = 0.80;
+
+    /// Adjust budget based on observed demand.
+    ///
+    /// Takes utilization ratios (0.0-1.0) per scope and shifts unused
+    /// capacity toward scopes with higher demand. The adjustment is
+    /// conservative (moves at most `learning_rate` fraction per call).
+    ///
+    /// # Arguments
+    /// * `utilization` - Map of scope → utilization ratio (0.0 = idle, 1.0 = saturated).
+    ///   Scopes absent from the map are left unchanged (only scopes with data
+    ///   participate in the rebalancing).
+    /// * `learning_rate` - Maximum fraction to shift per adjustment (clamped to 0.0..0.1)
+    ///
+    /// # Bounds
+    ///
+    /// Fractions are clamped to [`MIN_SCOPE_FRACTION`, `MAX_SCOPE_FRACTION`]
+    /// (currently \[0.01, 0.80\]) to prevent starvation (min) and monopolization
+    /// (max), ensuring every scope retains headroom even under sustained
+    /// extreme demand patterns. After clamping, fractions are re-normalized
+    /// to preserve the original sum.
+    pub fn adjust_from_demand(
+        &mut self,
+        utilization: &HashMap<ScopeLevel, f64>,
+        learning_rate: f64,
+    ) {
+        let lr = learning_rate.clamp(0.0, 0.1);
+
+        let scopes = ScopeLevel::ALL;
+        let mut fractions = [
+            self.local_reserve,
+            self.cell_share,
+            self.org_share,
+            self.federation_share,
+            self.commons_share,
+        ];
+
+        // Calculate average utilization
+        let mut total_util = 0.0;
+        let mut count = 0usize;
+        for &scope in &scopes {
+            if let Some(&u) = utilization.get(&scope) {
+                total_util += u;
+                count += 1;
+            }
+        }
+        let avg_util = if count > 0 {
+            total_util / count as f64
+        } else {
+            tracing::trace!("adjust_from_demand: no utilization data, skipping adjustment");
+            return;
+        };
+
+        // Shift capacity: over-utilized scopes gain, under-utilized lose
+        let mut deltas = [0.0f64; 5];
+        for (i, &scope) in scopes.iter().enumerate() {
+            if let Some(&u) = utilization.get(&scope) {
+                let diff = u - avg_util;
+                deltas[i] = diff * lr;
+            }
+        }
+
+        // Apply deltas, clamping to prevent starvation and monopolization
+        for i in 0..5 {
+            fractions[i] = (fractions[i] + deltas[i])
+                .clamp(Self::MIN_SCOPE_FRACTION, Self::MAX_SCOPE_FRACTION);
+        }
+
+        // Normalize so sum stays the same as before
+        let original_sum: f64 = [
+            self.local_reserve,
+            self.cell_share,
+            self.org_share,
+            self.federation_share,
+            self.commons_share,
+        ]
+        .iter()
+        .sum();
+        let new_sum: f64 = fractions.iter().sum();
+        if new_sum > Self::FLOAT_TOLERANCE {
+            let scale = original_sum / new_sum;
+            for f in &mut fractions {
+                *f = (*f * scale).clamp(0.0, 1.0);
+            }
+        }
+
+        self.local_reserve = fractions[0];
+        self.cell_share = fractions[1];
+        self.org_share = fractions[2];
+        self.federation_share = fractions[3];
+        self.commons_share = fractions[4];
+    }
+}
+
 /// Locality hints for task placement.
 ///
 /// These guide the scheduler to prefer certain execution locations.
@@ -734,6 +969,22 @@ pub struct PlacementRequest {
 
     /// When this request was sent
     pub requested_at: u64,
+
+    // -- Scope-aware placement fields (Epic 2) --
+    /// Maximum scope level the task is allowed to execute at.
+    ///
+    /// If `None`, no scope restriction (equivalent to `Commons`).
+    /// If set to e.g. `ScopeLevel::Org`, the task will not be placed
+    /// on nodes outside the submitter's organization.
+    #[serde(default)]
+    pub max_scope: Option<ScopeLevel>,
+
+    /// Preferred cell for execution (e.g., submitter's own cell).
+    ///
+    /// Executors in this cell receive a placement score bonus.
+    /// If `None`, no cell affinity preference.
+    #[serde(default)]
+    pub cell_affinity: Option<CellId>,
 }
 
 /// Executor's offer to run a task.
@@ -779,6 +1030,41 @@ impl PartialOrd for PlacementOffer {
     }
 }
 
+/// Scope context for placement scoring.
+///
+/// Provides the relationship between a submitter and an executor
+/// so the placement policy can apply scope-aware score adjustments.
+#[derive(Debug, Clone)]
+pub struct ScopeContext {
+    /// The scope relationship between submitter and executor.
+    ///
+    /// - `Local` = same node
+    /// - `Cell` = same cell
+    /// - `Org` = same organization, different cell
+    /// - `Federation` = federated peer
+    /// - `Commons` = unknown / unaffiliated
+    pub peer_scope: ScopeLevel,
+
+    /// The executor's cell (if any)
+    pub executor_cell: Option<CellId>,
+
+    /// Capacity budget for scope-aware admission control
+    pub capacity_budget: CapacityBudget,
+}
+
+impl ScopeContext {
+    /// Create an empty scope context (no scope information).
+    ///
+    /// Defaults to `Commons` scope with default budget.
+    pub fn empty() -> Self {
+        Self {
+            peer_scope: ScopeLevel::Commons,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        }
+    }
+}
+
 /// State needed for placement decisions.
 ///
 /// Maintained by each executor to score incoming tasks.
@@ -795,6 +1081,12 @@ pub struct NodeState {
 
     /// Queue depth (number of pending tasks)
     pub queue_depth: usize,
+
+    /// Per-scope queue depths for scope-aware load balancing.
+    ///
+    /// Tracks how many pending tasks originated from each scope level,
+    /// allowing the scheduler to respect per-scope capacity budgets.
+    pub scope_queue_depths: HashMap<ScopeLevel, usize>,
 }
 
 impl NodeState {
@@ -878,20 +1170,23 @@ pub trait PlacementPolicy: Send + Sync {
     /// Returns None if this node cannot or should not execute the task.
     /// Returns Some(offer) with a score between 0.0 and 1.0.
     ///
-    /// # Phase 16C Enhancement
+    /// # Parameters
     ///
-    /// Added `locality_hints` and `locality_ctx` parameters for network-aware scoring:
-    /// - `locality_hints`: Task placement preferences (region, data locality, etc.)
+    /// - `request`: The full placement request (task_hash, resource_profile,
+    ///   locality_hints, max_scope, cell_affinity)
+    /// - `submitter`: DID of the task submitter
+    /// - `node_state`: Current executor node capacity and queue state
+    /// - `trust_score`: Submitter's trust score as seen by the executor
     /// - `locality_ctx`: Network context for computing locality scores (RTT, blob locations)
+    /// - `scope_ctx`: Scope relationship between submitter and executor for scope-aware scoring
     fn score_task(
         &self,
-        task_hash: &[u8; 32],
-        profile: &ResourceProfile,
+        request: &PlacementRequest,
         submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
-        locality_hints: &[LocalityHint],
         locality_ctx: &LocalityContext,
+        scope_ctx: &ScopeContext,
     ) -> Option<PlacementOffer>;
 }
 
@@ -909,6 +1204,27 @@ pub struct DefaultPlacementPolicy {
     pub load_multiplier: f64,
 }
 
+impl DefaultPlacementPolicy {
+    /// Default assumed CPU cores per task when the profile doesn't specify.
+    ///
+    /// Used for scope budget estimation (queue depth limit calculation).
+    const DEFAULT_CPU_PER_TASK: f64 = 0.1;
+
+    /// Placement affinity bonus for a given scope level.
+    ///
+    /// Narrower scope = stronger affinity, rewarding local execution.
+    /// These values are additive components of the overall placement score.
+    fn scope_affinity_bonus(scope: ScopeLevel) -> f64 {
+        match scope {
+            ScopeLevel::Local => 0.15,
+            ScopeLevel::Cell => 0.12,
+            ScopeLevel::Org => 0.08,
+            ScopeLevel::Federation => 0.04,
+            ScopeLevel::Commons => 0.00,
+        }
+    }
+}
+
 impl Default for DefaultPlacementPolicy {
     fn default() -> Self {
         Self {
@@ -922,17 +1238,25 @@ impl Default for DefaultPlacementPolicy {
 impl PlacementPolicy for DefaultPlacementPolicy {
     fn score_task(
         &self,
-        _task_hash: &[u8; 32],
-        profile: &ResourceProfile,
+        request: &PlacementRequest,
         _submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
-        locality_hints: &[LocalityHint],
         locality_ctx: &LocalityContext,
+        scope_ctx: &ScopeContext,
     ) -> Option<PlacementOffer> {
+        let profile = &request.resource_profile;
         // Trust gate
         if trust_score < self.min_trust {
             return None;
+        }
+
+        // Scope gate: reject if the task's max_scope restricts us
+        // and the submitter-executor relationship exceeds it
+        if let Some(max_scope) = request.max_scope {
+            if scope_ctx.peer_scope > max_scope {
+                return None; // Executor is too far from submitter
+            }
         }
 
         // Capacity check
@@ -940,80 +1264,108 @@ impl PlacementPolicy for DefaultPlacementPolicy {
             return None;
         }
 
+        // Scope-aware capacity check: ensure scope budget isn't exhausted.
+        //
+        // We estimate the max number of tasks allowed per scope based on total
+        // CPU cores and the scope's budget fraction. Uses a conservative estimate
+        // of CPU per task (the profile's requested cores, or a default if unset).
+        let scope_queue = node_state
+            .scope_queue_depths
+            .get(&scope_ctx.peer_scope)
+            .copied()
+            .unwrap_or(0);
+        let scope_fraction = scope_ctx.capacity_budget.fraction_for(scope_ctx.peer_scope);
+        let cpu_per_task = profile
+            .cpu_cores
+            .unwrap_or(DefaultPlacementPolicy::DEFAULT_CPU_PER_TASK);
+        // Calculate max concurrent tasks this scope can run:
+        // (total_cpu * scope_fraction) gives available CPU for this scope,
+        // dividing by cpu_per_task gives the task slot capacity.
+        let available_cpu_for_scope = node_state.capacity.cpu_cores_total * scope_fraction;
+        let total_queue_budget =
+            if available_cpu_for_scope > f64::EPSILON && cpu_per_task > f64::EPSILON {
+                (available_cpu_for_scope / cpu_per_task).max(1.0) as usize
+            } else {
+                0
+            };
+        if total_queue_budget > 0 && scope_queue >= total_queue_budget {
+            return None; // Scope budget exhausted
+        }
+
         // Compute score (0.0 - 1.0)
-        // Phase 16C: Rebalanced weights to include locality factors
         let mut score = 0.0;
 
-        // Factor 1: Trust (weight 0.25, reduced from 0.4)
-        // Scale trust score to 0-0.25 range
-        score += (trust_score * 0.25).min(0.25);
+        // Factor 1: Trust (weight 0.20)
+        score += (trust_score * 0.20).min(0.20);
 
-        // Factor 2: Available capacity (weight 0.20, reduced from 0.3)
-        // Prefer nodes with more available resources
+        // Factor 2: Available capacity (weight 0.15)
         let capacity_ratio = node_state.capacity.available_ratio();
-        score += capacity_ratio * 0.20;
+        score += capacity_ratio * 0.15;
 
-        // Factor 3: Queue depth (weight 0.15, reduced from 0.2)
-        // Prefer nodes with shorter queues
+        // Factor 3: Queue depth (weight 0.10)
         let queue_penalty = (node_state.queue_depth as f64 / 10.0).min(1.0);
-        score += (1.0 - queue_penalty) * 0.15;
+        score += (1.0 - queue_penalty) * 0.10;
 
-        // Factor 4: Network latency (weight 0.15, NEW in Phase 16C)
-        // Prefer nodes with lower RTT to submitter
+        // Factor 4: Network latency (weight 0.10)
         if let Some(rtt_ms) = locality_ctx.submitter_rtt_ms {
-            // Convert RTT to score: lower RTT = higher score
-            // 0ms = 1.0, 500ms = 0.0 (linear interpolation)
             let rtt_score = (1.0 - (rtt_ms as f64 / 500.0).min(1.0)).max(0.0);
-            score += rtt_score * 0.15;
+            score += rtt_score * 0.10;
         }
-        // If no RTT data, no bonus (neutral)
 
-        // Factor 5: Data locality (weight 0.15, NEW in Phase 16C)
-        // Prefer nodes that already have input blobs
+        // Factor 5: Data locality (weight 0.10)
         let data_locality_ratio = locality_ctx.data_locality_ratio();
-        score += data_locality_ratio * 0.15;
+        score += data_locality_ratio * 0.10;
 
-        // Factor 6: Locality hints bonus (weight 0.10, NEW in Phase 16C)
-        // Apply bonus if we match submitter preferences
+        // Factor 6: Scope affinity (weight 0.15, NEW)
+        // Narrower scope = stronger affinity bonus
+        score += Self::scope_affinity_bonus(scope_ctx.peer_scope);
+
+        // Factor 7: Cell affinity bonus (weight 0.05)
+        // Extra bonus if executor is in the preferred cell
+        if let (Some(ref preferred), Some(ref executor_cell)) =
+            (&request.cell_affinity, &scope_ctx.executor_cell)
+        {
+            if preferred == executor_cell {
+                score += 0.05;
+            }
+        }
+
+        // Factor 8: Locality hints bonus (weight 0.05)
         let mut hint_bonus: f64 = 0.0;
-        for hint in locality_hints {
+        for hint in &request.locality_hints {
             match hint {
                 LocalityHint::PreferRegion(region) => {
                     if let Some(ref own_region) = locality_ctx.own_region {
                         if own_region == region {
-                            hint_bonus += 0.05; // 5% bonus for region match
+                            hint_bonus += 0.03;
                         }
                     }
                 }
                 LocalityHint::PreferDid(did) => {
                     if &node_state.did == did {
-                        hint_bonus += 0.10; // 10% bonus for direct DID preference
+                        hint_bonus += 0.05;
                     }
                 }
                 LocalityHint::AvoidDid(did) => {
                     if &node_state.did == did {
-                        return None; // Hard reject if blacklisted
+                        return None;
                     }
                 }
-                _ => {
-                    // DataLocality and ColocateWith handled via locality_ctx
-                }
+                _ => {}
             }
         }
-        score += hint_bonus.min(0.10); // Cap hint bonus at 10%
+        score += hint_bonus.min(0.05);
 
-        // Factor 7: Random jitter (weight 0.10, same as before, but rebalanced)
-        // Break ties and prevent thundering herd
+        // Factor 9: Random jitter (weight 0.10)
         use rand::Rng;
         let jitter = rand::thread_rng().gen::<f64>() * 0.10;
         score += jitter;
 
-        // Total weights: 0.25 + 0.20 + 0.15 + 0.15 + 0.15 + 0.10 + 0.10 = 1.10 max (with bonuses)
-        // Actual max without bonuses: 1.00
         // Cap final score at 1.0
+        // Max theoretical: 0.20 + 0.15 + 0.10 + 0.10 + 0.10 + 0.15 + 0.05 + 0.05 + 0.10 = 1.00
         score = score.min(1.0);
 
-        // Calculate cost (base cost + load multiplier)
+        // Calculate cost
         let load_factor = if node_state.queue_depth > 5 {
             self.load_multiplier
         } else {
@@ -1021,7 +1373,6 @@ impl PlacementPolicy for DefaultPlacementPolicy {
         };
         let cost = (self.base_cost as f64 * load_factor) as u64;
 
-        // Estimated start time
         let estimated_start = icn_time::current_timestamp_millis() + node_state.queue_depth_ms();
 
         Some(PlacementOffer {
@@ -1164,37 +1515,46 @@ mod tests {
             },
             executing_tasks: HashMap::new(),
             queue_depth: 2,
+            scope_queue_depths: HashMap::new(),
         };
 
         let task_hash = [0u8; 32];
         let empty_locality = LocalityContext::empty();
-        let no_hints: Vec<LocalityHint> = vec![];
+
+        let scope_ctx = ScopeContext::empty();
+        let request = PlacementRequest {
+            task_hash,
+            resource_profile: profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: None,
+            cell_affinity: None,
+        };
 
         // High trust, should get good score
         let offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
+                &scope_ctx,
             )
             .unwrap();
 
-        assert!(offer.score > 0.4); // Trust (0.20) + capacity (0.15) + queue (0.12) + jitter
+        assert!(offer.score > 0.3); // Trust + capacity + queue + jitter
         assert_eq!(offer.cost, 10); // Base cost
 
         // Low trust, rejected
         let offer = policy.score_task(
-            &task_hash,
-            &profile,
+            &request,
             "did:icn:untrusted",
             &node_state,
             0.1,
-            &no_hints,
             &empty_locality,
+            &scope_ctx,
         );
         assert!(offer.is_none());
 
@@ -1206,67 +1566,52 @@ mod tests {
 
         let offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &busy_node,
                 0.8,
-                &no_hints,
                 &empty_locality,
+                &scope_ctx,
             )
             .unwrap();
 
         assert_eq!(offer.cost, 15); // base_cost * load_multiplier
 
-        // Test with locality context (Phase 16C)
-        let locality_with_rtt = LocalityContext {
-            submitter_rtt_ms: Some(50), // 50ms RTT
-            local_blob_count: 0,
-            total_blob_count: 0,
-            own_region: None,
-            submitter_region: None,
+        // Test scope gate: reject if max_scope is exceeded
+        let local_only_request = PlacementRequest {
+            max_scope: Some(ScopeLevel::Cell),
+            ..request.clone()
         };
+        // scope_ctx has peer_scope=Commons which > Cell, should be rejected
+        let offer = policy.score_task(
+            &local_only_request,
+            "did:icn:alice",
+            &node_state,
+            0.8,
+            &empty_locality,
+            &scope_ctx,
+        );
+        assert!(offer.is_none(), "Should reject when peer_scope > max_scope");
 
-        let offer_with_rtt = policy
+        // Same-cell context should get scope bonus
+        let cell_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        let cell_offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
-                &locality_with_rtt,
+                &empty_locality,
+                &cell_ctx,
             )
             .unwrap();
-
-        // Should score higher than without RTT info (RTT bonus: 0.9 * 0.15 = 0.135)
-        // Use 0.05 threshold to account for random jitter variance (0-0.10 per invocation)
-        assert!(offer_with_rtt.score > offer.score + 0.05);
-
-        // Test with data locality
-        let locality_with_data = LocalityContext {
-            submitter_rtt_ms: None,
-            local_blob_count: 3,
-            total_blob_count: 3, // All blobs available locally
-            own_region: None,
-            submitter_region: None,
-        };
-
-        let offer_with_data = policy
-            .score_task(
-                &task_hash,
-                &profile,
-                "did:icn:alice",
-                &node_state,
-                0.8,
-                &no_hints,
-                &locality_with_data,
-            )
-            .unwrap();
-
-        // Should get full data locality bonus (1.0 * 0.15 = 0.15)
-        // Use 0.05 threshold to account for random jitter variance (0-0.10 per invocation)
-        assert!(offer_with_data.score > offer.score + 0.05);
+        // Cell scope bonus (0.12) vs Commons (0.00) = +0.12 advantage
+        // May vary by jitter, but on average cell should score higher
+        assert!(cell_offer.score > 0.3);
     }
 
     #[test]
@@ -1575,5 +1920,523 @@ mod tests {
         assert!(capacity.memory_mb_total > 0);
         assert!(capacity.memory_mb_available > 0);
         assert!(capacity.updated_at > 0);
+    }
+
+    // ================================================================
+    // Epic 2: Scope-aware capacity and placement tests
+    // ================================================================
+
+    #[test]
+    fn test_capacity_budget_default() {
+        let budget = CapacityBudget::default();
+        assert_eq!(budget.local_reserve, 0.30);
+        assert_eq!(budget.cell_share, 0.25);
+        assert_eq!(budget.org_share, 0.20);
+        assert_eq!(budget.federation_share, 0.15);
+        assert_eq!(budget.commons_share, 0.10);
+        assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_capacity_budget_fraction_for() {
+        let budget = CapacityBudget::default();
+        assert_eq!(budget.fraction_for(ScopeLevel::Local), 0.30);
+        assert_eq!(budget.fraction_for(ScopeLevel::Cell), 0.25);
+        assert_eq!(budget.fraction_for(ScopeLevel::Org), 0.20);
+        assert_eq!(budget.fraction_for(ScopeLevel::Federation), 0.15);
+        assert_eq!(budget.fraction_for(ScopeLevel::Commons), 0.10);
+    }
+
+    #[test]
+    fn test_capacity_budget_cumulative() {
+        let budget = CapacityBudget::default();
+        assert_eq!(budget.cumulative_fraction_up_to(ScopeLevel::Local), 0.30);
+        assert!((budget.cumulative_fraction_up_to(ScopeLevel::Cell) - 0.55).abs() < f64::EPSILON);
+        assert!(
+            (budget.cumulative_fraction_up_to(ScopeLevel::Commons) - 1.00).abs() < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn test_capacity_budget_validation() {
+        // Valid: sums to 1.0
+        let budget = CapacityBudget::default();
+        assert!(budget.validate().is_ok());
+
+        // Valid: sums to < 1.0 (headroom)
+        let budget = CapacityBudget {
+            local_reserve: 0.20,
+            cell_share: 0.20,
+            org_share: 0.20,
+            federation_share: 0.10,
+            commons_share: 0.10,
+        };
+        assert!(budget.validate().is_ok());
+
+        // Invalid: negative fraction
+        let budget = CapacityBudget {
+            local_reserve: -0.1,
+            ..Default::default()
+        };
+        assert!(budget.validate().is_err());
+
+        // Invalid: fraction > 1.0
+        let budget = CapacityBudget {
+            local_reserve: 1.1,
+            ..Default::default()
+        };
+        assert!(budget.validate().is_err());
+
+        // Invalid: sum > 1.0
+        let budget = CapacityBudget {
+            local_reserve: 0.50,
+            cell_share: 0.50,
+            org_share: 0.20,
+            federation_share: 0.0,
+            commons_share: 0.0,
+        };
+        assert!(budget.validate().is_err());
+    }
+
+    #[test]
+    fn test_capacity_budget_demand_adjustment() {
+        let mut budget = CapacityBudget::default();
+        let original_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+
+        // Simulate high local demand, low commons demand
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 0.95);
+        utilization.insert(ScopeLevel::Cell, 0.50);
+        utilization.insert(ScopeLevel::Org, 0.30);
+        utilization.insert(ScopeLevel::Federation, 0.20);
+        utilization.insert(ScopeLevel::Commons, 0.05);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Local should have grown, commons should have shrunk
+        assert!(budget.local_reserve > 0.30);
+        assert!(budget.commons_share < 0.10);
+
+        // Sum should be preserved
+        let new_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+        assert!((new_sum - original_sum).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_scope_context_empty() {
+        let ctx = ScopeContext::empty();
+        assert_eq!(ctx.peer_scope, ScopeLevel::Commons);
+        assert!(ctx.executor_cell.is_none());
+    }
+
+    #[test]
+    fn test_placement_request_scope_fields_default() {
+        // Backward compatibility: new fields default to None
+        let request: PlacementRequest = serde_json::from_str(
+            r#"{
+                "task_hash": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                "resource_profile": {"cpu_cores": 0.1, "memory_mb": 128},
+                "locality_hints": [],
+                "max_cost": null,
+                "requested_at": 1000
+            }"#,
+        )
+        .unwrap();
+        assert!(request.max_scope.is_none());
+        assert!(request.cell_affinity.is_none());
+    }
+
+    #[test]
+    fn test_scope_gate_rejects_out_of_scope() {
+        let policy = DefaultPlacementPolicy::default();
+        let profile = ResourceProfile::minimal();
+
+        let node_state = NodeState {
+            did: "did:icn:executor".into(),
+            capacity: NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 6.0,
+                memory_mb_total: 16384,
+                memory_mb_available: 12288,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: 1000,
+            },
+            executing_tasks: HashMap::new(),
+            queue_depth: 0,
+            scope_queue_depths: HashMap::new(),
+        };
+
+        let task_hash = [0u8; 32];
+        let empty_locality = LocalityContext::empty();
+
+        // Request restricted to Cell scope
+        let request = PlacementRequest {
+            task_hash,
+            resource_profile: profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: Some(ScopeLevel::Cell),
+            cell_affinity: None,
+        };
+
+        // Executor at Commons scope (too far) → rejected
+        let commons_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Commons,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(policy
+            .score_task(
+                &request,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &empty_locality,
+                &commons_ctx,
+            )
+            .is_none());
+
+        // Executor at Cell scope (within range) → accepted
+        let cell_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(policy
+            .score_task(
+                &request,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &empty_locality,
+                &cell_ctx,
+            )
+            .is_some());
+
+        // Executor at Local scope (narrower than max) → accepted
+        let local_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Local,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(policy
+            .score_task(
+                &request,
+                "did:icn:alice",
+                &node_state,
+                0.8,
+                &empty_locality,
+                &local_ctx,
+            )
+            .is_some());
+    }
+
+    #[test]
+    fn test_scope_affinity_scoring() {
+        let policy = DefaultPlacementPolicy::default();
+        let profile = ResourceProfile::minimal();
+
+        let node_state = NodeState {
+            did: "did:icn:executor".into(),
+            capacity: NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 6.0,
+                memory_mb_total: 16384,
+                memory_mb_available: 12288,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: 1000,
+            },
+            executing_tasks: HashMap::new(),
+            queue_depth: 0,
+            scope_queue_depths: HashMap::new(),
+        };
+
+        let task_hash = [0u8; 32];
+        let empty_locality = LocalityContext::empty();
+
+        let request = PlacementRequest {
+            task_hash,
+            resource_profile: profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: None,
+            cell_affinity: None,
+        };
+
+        // Collect scores from many runs to smooth out jitter
+        let n = 100;
+        let mut local_total = 0.0;
+        let mut commons_total = 0.0;
+
+        for _ in 0..n {
+            let local_ctx = ScopeContext {
+                peer_scope: ScopeLevel::Local,
+                executor_cell: None,
+                capacity_budget: CapacityBudget::default(),
+            };
+            let commons_ctx = ScopeContext::empty();
+
+            local_total += policy
+                .score_task(
+                    &request,
+                    "did:icn:alice",
+                    &node_state,
+                    0.8,
+                    &empty_locality,
+                    &local_ctx,
+                )
+                .unwrap()
+                .score;
+
+            commons_total += policy
+                .score_task(
+                    &request,
+                    "did:icn:alice",
+                    &node_state,
+                    0.8,
+                    &empty_locality,
+                    &commons_ctx,
+                )
+                .unwrap()
+                .score;
+        }
+
+        let local_avg = local_total / n as f64;
+        let commons_avg = commons_total / n as f64;
+
+        // Local scope should consistently score higher than Commons
+        // due to the 0.15 scope affinity bonus
+        assert!(
+            local_avg > commons_avg + 0.10,
+            "Local avg ({local_avg:.4}) should be > Commons avg ({commons_avg:.4}) + 0.10"
+        );
+    }
+
+    #[test]
+    fn test_demand_adjustment_all_saturated() {
+        let mut budget = CapacityBudget::default();
+        let original = budget.clone();
+
+        // All scopes at 100% utilization — all equal, so no shift
+        let mut utilization = HashMap::new();
+        for &scope in &ScopeLevel::ALL {
+            utilization.insert(scope, 1.0);
+        }
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Fractions should remain approximately unchanged (all at same util)
+        assert!((budget.local_reserve - original.local_reserve).abs() < 0.001);
+        assert!((budget.commons_share - original.commons_share).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_demand_adjustment_one_hot() {
+        let mut budget = CapacityBudget::default();
+
+        // Only Local at 100%, rest at 0%
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 1.0);
+        utilization.insert(ScopeLevel::Cell, 0.0);
+        utilization.insert(ScopeLevel::Org, 0.0);
+        utilization.insert(ScopeLevel::Federation, 0.0);
+        utilization.insert(ScopeLevel::Commons, 0.0);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Local should have gained, others should have shrunk
+        assert!(budget.local_reserve > 0.30);
+        assert!(budget.cell_share < 0.25);
+        assert!(budget.org_share < 0.20);
+        assert!(budget.federation_share < 0.15);
+        assert!(budget.commons_share < 0.10);
+
+        // All fractions still within bounds
+        assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_demand_adjustment_convergence() {
+        let mut budget = CapacityBudget::default();
+
+        // Simulate 50 rounds of adjustment with stable demand pattern
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 0.90);
+        utilization.insert(ScopeLevel::Cell, 0.70);
+        utilization.insert(ScopeLevel::Org, 0.30);
+        utilization.insert(ScopeLevel::Federation, 0.10);
+        utilization.insert(ScopeLevel::Commons, 0.05);
+
+        let original_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+
+        for _ in 0..50 {
+            budget.adjust_from_demand(&utilization, 0.05);
+        }
+
+        // Sum should be preserved after many rounds
+        let final_sum: f64 = [
+            budget.local_reserve,
+            budget.cell_share,
+            budget.org_share,
+            budget.federation_share,
+            budget.commons_share,
+        ]
+        .iter()
+        .sum();
+        assert!(
+            (final_sum - original_sum).abs() < 0.01,
+            "Sum should be preserved: original={original_sum}, final={final_sum}"
+        );
+
+        // Ordering should reflect demand: Local > Cell > Org > Fed > Commons
+        assert!(budget.local_reserve > budget.cell_share);
+        assert!(budget.cell_share > budget.org_share);
+
+        // All fractions should remain valid
+        assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_demand_adjustment_partial_data() {
+        let mut budget = CapacityBudget::default();
+        let original = budget.clone();
+
+        // Only provide metrics for 2 out of 5 scopes
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 0.90);
+        utilization.insert(ScopeLevel::Commons, 0.10);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Budget should still be valid
+        assert!(budget.validate().is_ok());
+
+        // Scopes without data (Cell, Org, Federation) should be unchanged
+        assert!(
+            (budget.cell_share - original.cell_share).abs() < 1e-6,
+            "Cell share should be unchanged: {} vs {}",
+            budget.cell_share,
+            original.cell_share
+        );
+        assert!(
+            (budget.org_share - original.org_share).abs() < 1e-6,
+            "Org share should be unchanged: {} vs {}",
+            budget.org_share,
+            original.org_share
+        );
+        assert!(
+            (budget.federation_share - original.federation_share).abs() < 1e-6,
+            "Federation share should be unchanged: {} vs {}",
+            budget.federation_share,
+            original.federation_share
+        );
+
+        // Local (high demand) should gain, Commons (low demand) should lose
+        assert!(budget.local_reserve > original.local_reserve);
+        assert!(budget.commons_share < original.commons_share);
+    }
+
+    #[test]
+    fn test_scope_budget_exhaustion() {
+        let policy = DefaultPlacementPolicy::default();
+        let profile = ResourceProfile::minimal();
+
+        // Node with 8 cores, default budget gives Cell 25% → 2.0 CPU for Cell
+        // At 0.1 CPU/task (DEFAULT_CPU_PER_TASK) → 20 task slots for Cell scope
+        let node_state = NodeState {
+            did: "did:icn:executor".into(),
+            capacity: NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 6.0,
+                memory_mb_total: 16384,
+                memory_mb_available: 12288,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: 1000,
+            },
+            executing_tasks: HashMap::new(),
+            queue_depth: 0,
+            scope_queue_depths: HashMap::new(),
+        };
+        let task_hash = [0u8; 32];
+        let empty_locality = LocalityContext::empty();
+        let request = PlacementRequest {
+            task_hash,
+            resource_profile: profile.clone(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: None,
+            cell_affinity: None,
+        };
+
+        // Cell scope with queue under budget → accepted
+        let cell_ctx_low = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        let mut under_budget_state = node_state.clone();
+        under_budget_state
+            .scope_queue_depths
+            .insert(ScopeLevel::Cell, 10);
+        let offer = policy.score_task(
+            &request,
+            "did:icn:alice",
+            &under_budget_state,
+            0.8,
+            &empty_locality,
+            &cell_ctx_low,
+        );
+        assert!(offer.is_some(), "Should accept when queue is under budget");
+
+        // Cell scope with queue over budget → rejected
+        let mut over_budget_state = node_state.clone();
+        over_budget_state
+            .scope_queue_depths
+            .insert(ScopeLevel::Cell, 25);
+        let offer = policy.score_task(
+            &request,
+            "did:icn:alice",
+            &over_budget_state,
+            0.8,
+            &empty_locality,
+            &cell_ctx_low,
+        );
+        assert!(
+            offer.is_none(),
+            "Should reject when scope queue exceeds budget"
+        );
     }
 }

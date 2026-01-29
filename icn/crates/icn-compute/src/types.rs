@@ -385,6 +385,14 @@ pub enum ComputeMessage {
         locality_hints: Vec<crate::scheduler::LocalityHint>,
         max_cost: Option<u64>,
         requested_at: u64,
+        /// Maximum scope level for placement (Epic 2).
+        /// Backward-compatible: defaults to None (no restriction).
+        #[serde(default)]
+        max_scope: Option<icn_kernel_api::ScopeLevel>,
+        /// Preferred cell for placement (Epic 2).
+        /// Backward-compatible: defaults to None.
+        #[serde(default)]
+        cell_affinity: Option<icn_kernel_api::CellId>,
     },
     /// Executor offers to execute a task (Phase 16B)
     PlacementOffer {

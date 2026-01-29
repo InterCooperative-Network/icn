@@ -1144,6 +1144,8 @@ impl ComputeActor {
                     locality_hints: vec![],      // Future enhancement
                     max_cost: task.payment_rate, // Use payment_rate as max cost
                     requested_at: now,
+                    max_scope: None,     // TODO: populate from task constraints
+                    cell_affinity: None, // TODO: populate from task constraints
                 });
             } else {
                 // Phase 15: Legacy immediate claiming

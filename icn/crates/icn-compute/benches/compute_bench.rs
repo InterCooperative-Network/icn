@@ -167,6 +167,7 @@ fn bench_placement_scoring(c: &mut Criterion) {
                     },
                     executing_tasks: HashMap::new(),
                     queue_depth: i,
+                    scope_queue_depths: HashMap::new(),
                 };
                 (did, state)
             })

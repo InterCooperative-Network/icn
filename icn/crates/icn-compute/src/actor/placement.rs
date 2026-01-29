@@ -100,6 +100,8 @@ impl ComputeActor {
         locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
         requested_at: u64,
+        max_scope: Option<icn_kernel_api::ScopeLevel>,
+        cell_affinity: Option<icn_kernel_api::CellId>,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -153,6 +155,7 @@ impl ComputeActor {
                 .get(&self.own_did)
                 .map(|i| i.tasks_executing)
                 .unwrap_or(0),
+            scope_queue_depths: HashMap::new(),
         };
         drop(registry);
 
@@ -310,15 +313,31 @@ impl ComputeActor {
             }
         }
 
+        // TODO(icn-compute#921): Integrate CellService to populate scope context.
+        // Once CellService is wired into ComputeActor, use it to determine
+        // peer_scope (via cell_service.peer_scope(&submitter)) and executor_cell
+        // (via cell_service.local_cell()) instead of defaulting to Commons.
+        let scope_ctx = crate::scheduler::ScopeContext::empty();
+
+        // Build a PlacementRequest for the scoring call
+        let placement_request = crate::scheduler::PlacementRequest {
+            task_hash,
+            resource_profile: resource_profile.clone(),
+            locality_hints: locality_hints.clone(),
+            max_cost: _max_cost,
+            requested_at,
+            max_scope,
+            cell_affinity,
+        };
+
         // Score the task
         let offer = match policy.score_task(
-            &task_hash,
-            &resource_profile,
+            &placement_request,
             &submitter,
             &node_state,
             our_trust,
-            &locality_hints,
             &locality_ctx,
+            &scope_ctx,
         ) {
             Some(o) => o,
             None => {
@@ -942,6 +961,8 @@ impl ComputeActor {
                 locality_hints: vec![],
                 max_cost: Some(payment.amount),
                 requested_at,
+                max_scope: None,     // TODO: populate from federated task constraints
+                cell_affinity: None, // TODO: populate from federated task constraints
             });
         }
 

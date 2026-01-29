@@ -676,6 +676,8 @@ impl ComputeActor {
                 locality_hints,
                 max_cost,
                 requested_at,
+                max_scope,
+                cell_affinity,
             } => {
                 self.on_placement_request(
                     task_hash,
@@ -684,6 +686,8 @@ impl ComputeActor {
                     locality_hints,
                     max_cost,
                     requested_at,
+                    max_scope,
+                    cell_affinity,
                 )
                 .await
             }

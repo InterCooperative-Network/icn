@@ -82,9 +82,10 @@ pub use result_quorum::{
     MAX_CONCURRENT_VERIFICATIONS,
 };
 pub use scheduler::{
-    DefaultPlacementPolicy, FederatedPlacementConstraints, FederationPolicy, GpuDevice, GpuSpec,
-    LocalityContext, LocalityHint, NodeCapacity, NodeState, PlacementOffer, PlacementPolicy,
-    PlacementRequest, ResourceChangeType, ResourceProfile, ResourceRefreshConfig,
+    CapacityBudget, DefaultPlacementPolicy, FederatedPlacementConstraints, FederationPolicy,
+    GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity, NodeState, PlacementOffer,
+    PlacementPolicy, PlacementRequest, ResourceChangeType, ResourceProfile, ResourceRefreshConfig,
+    ScopeContext,
 };
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
