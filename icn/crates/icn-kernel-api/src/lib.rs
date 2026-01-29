@@ -60,7 +60,7 @@ pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService};
-pub use scope::{CellId, ScopeLevel};
+pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
     SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,

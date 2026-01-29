@@ -245,7 +245,10 @@ impl CellId {
     /// - `genesis_salt`: 32-byte random value from cell creation
     pub fn derive(scope_id: &[u8], cell_name: &str, genesis_salt: &[u8; 32]) -> Self {
         let mut hasher = blake3::Hasher::new();
+        // Domain separation: prefix with lengths to prevent ambiguous concatenation
+        hasher.update(&(scope_id.len() as u32).to_le_bytes());
         hasher.update(scope_id);
+        hasher.update(&(cell_name.len() as u32).to_le_bytes());
         hasher.update(cell_name.as_bytes());
         hasher.update(genesis_salt);
         CellId(*hasher.finalize().as_bytes())
@@ -254,7 +257,12 @@ impl CellId {
 
 impl std::fmt::Display for CellId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "cell:{}", bs58::encode(&self.0).into_string())
+        // Full 32 bytes as hex — fixed-width, no truncation ambiguity
+        write!(f, "cell:")?;
+        for byte in &self.0 {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
     }
 }
 ```

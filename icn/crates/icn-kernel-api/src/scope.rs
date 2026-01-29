@@ -44,6 +44,9 @@ use serde::{Deserialize, Serialize};
 #[repr(u8)]
 pub enum ScopeLevel {
     /// This node only — no network involvement.
+    ///
+    /// This is the default scope level. Defaulting to the narrowest scope
+    /// prevents accidental data or request leakage to wider audiences.
     #[default]
     Local = 0,
     /// Nodes within the same cell (HA cluster).
@@ -142,7 +145,9 @@ impl std::fmt::Display for ScopeLevel {
 ///
 /// # Display Format
 ///
-/// `CellId` displays as `cell:<hex-encoded-first-16-bytes>` for human readability.
+/// `CellId` displays as `cell:<64-hex-chars>` (full 32 bytes).
+/// Using hex rather than base58 to avoid an additional dependency in the
+/// kernel crate and to provide consistent, fixed-width output for logging.
 ///
 /// # Examples
 ///
@@ -189,12 +194,101 @@ impl std::fmt::Debug for CellId {
 
 impl std::fmt::Display for CellId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Show first 16 bytes as hex for human readability
+        // Full 32 bytes as hex — fixed-width, no truncation ambiguity
         write!(f, "cell:")?;
-        for byte in &self.0[..16] {
+        for byte in &self.0 {
             write!(f, "{:02x}", byte)?;
         }
         Ok(())
+    }
+}
+
+// ============================================================================
+// Mock Implementation (for testing)
+// ============================================================================
+
+/// A simple in-memory [`CellService`](crate::services::CellService) implementation for use in tests.
+///
+/// # Examples
+///
+/// ```
+/// use icn_kernel_api::scope::{CellId, MockCellService, ScopeLevel};
+/// use icn_kernel_api::CellService;
+///
+/// let cell_id = CellId::derive(b"org", "test", &[0u8; 32]);
+/// let svc = MockCellService::new(Some(cell_id));
+/// assert_eq!(svc.local_cell(), Some(cell_id));
+/// ```
+#[derive(Debug, Clone)]
+pub struct MockCellService {
+    /// The cell this "node" belongs to, if any.
+    pub local_cell_id: Option<CellId>,
+    /// Members of the local cell.
+    pub members: Vec<crate::types::Did>,
+    /// DIDs considered to be in the same org (but possibly different cell).
+    pub org_peers: Vec<crate::types::Did>,
+}
+
+impl MockCellService {
+    /// Create a new mock with an optional local cell.
+    pub fn new(local_cell_id: Option<CellId>) -> Self {
+        Self {
+            local_cell_id,
+            members: Vec::new(),
+            org_peers: Vec::new(),
+        }
+    }
+
+    /// Add a cell member.
+    pub fn with_member(mut self, did: crate::types::Did) -> Self {
+        self.members.push(did);
+        self
+    }
+
+    /// Add an org peer (same org, possibly different cell).
+    pub fn with_org_peer(mut self, did: crate::types::Did) -> Self {
+        self.org_peers.push(did);
+        self
+    }
+}
+
+impl crate::services::CellService for MockCellService {
+    fn local_cell(&self) -> Option<CellId> {
+        self.local_cell_id
+    }
+
+    fn cell_scope(&self, cell_id: &CellId) -> Option<ScopeLevel> {
+        if self.local_cell_id.as_ref() == Some(cell_id) {
+            Some(ScopeLevel::Cell)
+        } else {
+            None
+        }
+    }
+
+    fn cell_members(&self, cell_id: &CellId) -> Vec<crate::types::Did> {
+        if self.local_cell_id.as_ref() == Some(cell_id) {
+            self.members.clone()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn is_cell_peer(&self, did: &crate::types::Did) -> bool {
+        self.members.iter().any(|m| m == did)
+    }
+
+    fn is_org_peer(&self, did: &crate::types::Did) -> bool {
+        self.members.iter().any(|m| m == did) || self.org_peers.iter().any(|p| p == did)
+    }
+
+    fn peer_scope(&self, did: &crate::types::Did) -> ScopeLevel {
+        if self.members.iter().any(|m| m == did) {
+            ScopeLevel::Cell
+        } else if self.org_peers.iter().any(|p| p == did) {
+            ScopeLevel::Org
+        } else {
+            ScopeLevel::Commons
+        }
     }
 }
 
@@ -372,8 +466,8 @@ mod tests {
         let id = CellId::derive(b"test", "test", &salt);
         let display = id.to_string();
         assert!(display.starts_with("cell:"));
-        // "cell:" + 32 hex chars (16 bytes)
-        assert_eq!(display.len(), 5 + 32);
+        // "cell:" + 64 hex chars (32 bytes, full hash, no truncation)
+        assert_eq!(display.len(), 5 + 64);
     }
 
     #[test]
@@ -399,5 +493,53 @@ mod tests {
         let id = CellId::derive(b"test", "test", &salt);
         assert_eq!(id.as_bytes().len(), 32);
         assert_eq!(id.as_bytes(), &id.0);
+    }
+
+    // --- MockCellService ---
+
+    #[test]
+    fn test_mock_cell_service_no_cell() {
+        use crate::services::CellService;
+
+        let svc = MockCellService::new(None);
+        assert_eq!(svc.local_cell(), None);
+
+        let did: crate::types::Did = "did:icn:alice".into();
+        assert!(!svc.is_cell_peer(&did));
+        assert!(!svc.is_org_peer(&did));
+        assert_eq!(svc.peer_scope(&did), ScopeLevel::Commons);
+    }
+
+    #[test]
+    fn test_mock_cell_service_with_members() {
+        use crate::services::CellService;
+
+        let cell_id = CellId::derive(b"org", "test", &[0u8; 32]);
+        let alice: crate::types::Did = "did:icn:alice".into();
+        let bob: crate::types::Did = "did:icn:bob".into();
+        let carol: crate::types::Did = "did:icn:carol".into();
+
+        let svc = MockCellService::new(Some(cell_id))
+            .with_member(alice.clone())
+            .with_org_peer(bob.clone());
+
+        assert_eq!(svc.local_cell(), Some(cell_id));
+        assert!(svc.is_cell_peer(&alice));
+        assert!(!svc.is_cell_peer(&bob)); // org peer, not cell peer
+        assert!(svc.is_org_peer(&alice)); // cell peers are also org peers
+        assert!(svc.is_org_peer(&bob));
+        assert!(!svc.is_org_peer(&carol));
+
+        assert_eq!(svc.peer_scope(&alice), ScopeLevel::Cell);
+        assert_eq!(svc.peer_scope(&bob), ScopeLevel::Org);
+        assert_eq!(svc.peer_scope(&carol), ScopeLevel::Commons);
+
+        assert_eq!(svc.cell_members(&cell_id), vec![alice]);
+
+        // Unknown cell returns empty members
+        let other_cell = CellId::derive(b"other", "cell", &[1u8; 32]);
+        assert!(svc.cell_members(&other_cell).is_empty());
+        assert_eq!(svc.cell_scope(&other_cell), None);
+        assert_eq!(svc.cell_scope(&cell_id), Some(ScopeLevel::Cell));
     }
 }
