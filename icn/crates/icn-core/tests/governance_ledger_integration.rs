@@ -14,10 +14,9 @@ use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceParams, GovernanceProfileId, MembershipConfig,
     Proposal, ProposalPayload, StaticMembershipResolver,
 };
-use icn_identity::{Did, KeyPair};
+use icn_identity::KeyPair;
 use icn_ledger::Ledger;
 use icn_store::{SledStore, Store};
-use icn_trust::TrustClass;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -48,8 +47,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
     info!("Created ledger");
 
     // 3. Create gossip actor (required for governance)
-    let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-    let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+    let gossip_handle = GossipActor::spawn(did.clone(), None);
 
     info!("Created gossip actor");
 

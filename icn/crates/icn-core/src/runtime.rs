@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use icn_identity::IdentityBundle;
+use icn_kernel_api::services::ServiceRegistry;
 use tokio::sync::broadcast;
 use tracing::info;
 
@@ -16,6 +17,12 @@ pub struct Runtime {
     config: Config,
     identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
+    /// Optional pre-configured service registry from the daemon
+    ///
+    /// When provided, the supervisor will use these services instead of
+    /// creating its own. This enables proper kernel/app separation where
+    /// the daemon constructs domain services from app crates.
+    service_registry: Option<ServiceRegistry>,
 }
 
 impl Runtime {
@@ -27,7 +34,27 @@ impl Runtime {
             config,
             identity_bundle,
             shutdown_tx,
+            service_registry: None,
         }
+    }
+
+    /// Set a pre-configured service registry
+    ///
+    /// When provided, the supervisor will use these services instead of
+    /// creating its own internal implementations. This enables proper
+    /// kernel/app separation:
+    ///
+    /// ```ignore
+    /// // In icnd (daemon):
+    /// let trust_service = apps_trust::create_service(graph);
+    /// let registry = ServiceRegistry::new()
+    ///     .with_trust(trust_service);
+    /// let runtime = Runtime::new(config, identity)
+    ///     .with_services(registry);
+    /// ```
+    pub fn with_services(mut self, registry: ServiceRegistry) -> Self {
+        self.service_registry = Some(registry);
+        self
     }
 
     /// Get a shutdown receiver for actors
@@ -54,6 +81,7 @@ impl Runtime {
             self.config.clone(),
             self.identity_bundle,
             self.shutdown_tx.clone(),
+            self.service_registry,
         );
 
         // Run supervisor

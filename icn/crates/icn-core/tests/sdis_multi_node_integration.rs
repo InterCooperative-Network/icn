@@ -13,7 +13,7 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{IdentityBundle, KeyPair, RecoveryAttestation};
 use icn_steward::{StewardConfig, StewardHandle};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -43,18 +43,7 @@ impl SdisTestNode {
 
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
-        let trust_graph_clone = trust_graph.clone();
-        let trust_lookup =
-            Arc::new(
-                move |peer_did: &icn_identity::Did| match trust_graph_clone.try_read() {
-                    Ok(trust) => match trust.trust_class(peer_did) {
-                        Ok(class) => Some(class),
-                        Err(_) => Some(TrustClass::Known),
-                    },
-                    Err(_) => Some(TrustClass::Known),
-                },
-            );
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         {
             let mut gossip = gossip_handle.write().await;

@@ -154,10 +154,6 @@ impl ResourceAccessStore for GossipResourceAccessStore {
 mod tests {
     use super::*;
     use icn_entity::EntityId;
-    // use icn_gossip::gossip::TrustLookup;
-    type TrustLookup = std::sync::Arc<
-        dyn Fn(&icn_identity::Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static,
-    >;
     use icn_identity::KeyPair;
     use icn_ledger::{AccessModel, ResourceAccess};
     use std::collections::HashMap;
@@ -296,11 +292,10 @@ mod tests {
             }
         }
 
-        // Create gossip actor
+        // Create gossip actor - no oracle needed, test only verifies gossip publication
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did();
-        let trust_lookup: TrustLookup = Arc::new(move |_did| Some(icn_trust::TrustClass::Known));
-        let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set keypair for signing and create the revocation topic
         {

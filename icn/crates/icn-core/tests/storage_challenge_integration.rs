@@ -54,8 +54,7 @@ impl TestNode {
         let misbehavior_handle = Arc::new(RwLock::new(misbehavior));
 
         // Create gossip actor
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set gossip store
         {
@@ -67,12 +66,13 @@ impl TestNode {
         let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
 
         // Spawn challenge scheduler
+        // Note: Passing None for TrustService - tests don't need trust-gated challenge frequency
         let challenge_handle = ChallengeScheduler::spawn(
             did.clone(),
             keypair.clone(),
             config,
             store.clone(),
-            trust_graph_handle.clone(),
+            None, // TrustService not needed for integration tests
             gossip_handle.clone(),
             misbehavior_handle.clone(),
             shutdown_rx,

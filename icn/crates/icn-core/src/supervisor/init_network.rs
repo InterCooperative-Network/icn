@@ -331,13 +331,11 @@ mod tests {
     #[test]
     fn test_message_handler_deps_clone() {
         // Verify MessageHandlerDeps is Clone (required for closure capture)
-        // Create a no-op trust lookup for testing
-        let trust_lookup = Arc::new(|_: &icn_identity::Did| None);
-
+        // No oracle needed - test only verifies Clone trait
         let deps = MessageHandlerDeps {
-            gossip_handle: Arc::new(RwLock::new(icn_gossip::GossipActor::new_with_legacy_trust(
+            gossip_handle: Arc::new(RwLock::new(icn_gossip::GossipActor::new(
                 icn_identity::KeyPair::generate().unwrap().did().clone(),
-                trust_lookup,
+                None,
             ))),
             network_handle_holder: Arc::new(RwLock::new(None)),
             own_did: icn_identity::KeyPair::generate().unwrap().did().clone(),

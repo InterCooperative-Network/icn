@@ -19,8 +19,9 @@ use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
+use icn_kernel_api::services::TrustService;
+use icn_kernel_api::TRUST_THRESHOLD_PARTNER;
 use icn_store::{ContentHash, ReplicaHealth, Store};
-use icn_trust::{TrustClass, TrustGraph};
 
 /// Replication configuration
 #[derive(Clone, Debug)]
@@ -28,9 +29,12 @@ pub struct ReplicationConfig {
     /// Target number of replicas per content hash
     pub target_replicas: usize,
 
-    /// Minimum trust class required to serve as replica
-    /// Default: Partner (0.4+)
-    pub min_trust_class: TrustClass,
+    /// Minimum trust score required to serve as replica (0.0-1.0)
+    /// Default: 0.4 (TRUST_THRESHOLD_PARTNER)
+    ///
+    /// The kernel uses numeric thresholds instead of domain-specific
+    /// trust classes for proper kernel/app separation.
+    pub min_trust_score: f64,
 
     /// Health check interval in seconds
     /// Default: 60 seconds
@@ -49,7 +53,7 @@ impl Default for ReplicationConfig {
     fn default() -> Self {
         Self {
             target_replicas: 3,
-            min_trust_class: TrustClass::Partner,
+            min_trust_score: TRUST_THRESHOLD_PARTNER,
             health_check_interval_secs: 60,
             stale_threshold_secs: 300,       // 5 minutes
             unreachable_threshold_secs: 900, // 15 minutes
@@ -68,8 +72,11 @@ pub struct ReplicationManager {
     /// Store for replica metadata
     store: Arc<dyn Store>,
 
-    /// Trust graph for peer selection
-    trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Trust service for peer selection (kernel/app separated)
+    ///
+    /// The manager uses TrustService to query trust scores without
+    /// depending on the concrete TrustGraph implementation.
+    trust_service: Arc<dyn TrustService>,
 
     /// Gossip actor for sending replica requests
     gossip: Arc<RwLock<GossipActor>>,
@@ -84,14 +91,14 @@ impl ReplicationManager {
         own_did: Did,
         config: ReplicationConfig,
         store: Arc<dyn Store>,
-        trust_graph: Arc<RwLock<TrustGraph>>,
+        trust_service: Arc<dyn TrustService>,
         gossip: Arc<RwLock<GossipActor>>,
     ) -> Self {
         Self {
             own_did,
             config,
             store,
-            trust_graph,
+            trust_service,
             gossip,
             recent_requests: HashMap::new(),
         }
@@ -102,10 +109,10 @@ impl ReplicationManager {
         own_did: Did,
         config: ReplicationConfig,
         store: Arc<dyn Store>,
-        trust_graph: Arc<RwLock<TrustGraph>>,
+        trust_service: Arc<dyn TrustService>,
         gossip: Arc<RwLock<GossipActor>>,
     ) -> ReplicationHandle {
-        let manager = Self::new(own_did, config.clone(), store, trust_graph, gossip);
+        let manager = Self::new(own_did, config.clone(), store, trust_service, gossip);
         let handle = Arc::new(RwLock::new(manager));
 
         // Spawn background health monitoring loop
@@ -323,7 +330,7 @@ impl ReplicationManager {
     /// Select candidate peers for replication using trust-weighted selection
     ///
     /// Strategy:
-    /// 1. Filter peers by minimum trust class
+    /// 1. Filter peers by minimum trust score threshold
     /// 2. Exclude peers already serving as replicas
     /// 3. Sort by trust score (higher is better)
     /// 4. Return top N candidates
@@ -331,7 +338,6 @@ impl ReplicationManager {
         &self,
         metadata: &icn_store::ReplicaMetadata,
     ) -> Result<Vec<Did>> {
-        let trust_graph = self.trust_graph.read().await;
         let gossip = self.gossip.read().await;
 
         // Get all peers we know about through gossip (subscribers, vector clock)
@@ -358,14 +364,14 @@ impl ReplicationManager {
                 continue;
             }
 
-            // Check trust class - trust_class returns Result<TrustClass>, not Option
-            if let Ok(trust_class) = trust_graph.trust_class(&peer_did) {
-                if trust_class >= self.config.min_trust_class {
-                    // Get trust score for sorting (compute_trust_score, not trust_score)
-                    if let Ok(score) = trust_graph.compute_trust_score(&peer_did) {
-                        candidates.push((peer_did, score));
-                    }
-                }
+            // Get trust score via TrustService (kernel/app separated)
+            // Convert identity DID to kernel-api DID type
+            let kernel_did = icn_kernel_api::types::Did::from(peer_did.to_string());
+            let score = self.trust_service.trust_score(&kernel_did);
+
+            // Check trust score meets minimum threshold
+            if score >= self.config.min_trust_score {
+                candidates.push((peer_did, score));
             }
         }
 
@@ -404,13 +410,61 @@ impl ReplicationHandle {
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+    use icn_kernel_api::authz::PolicyOracle;
+    use icn_kernel_api::services::TrustEvent;
     use icn_store::SledStore;
+    use std::collections::HashMap as StdHashMap;
+    use std::sync::Mutex;
+
+    /// Mock TrustService for testing
+    struct MockTrustService {
+        /// Map of DID string -> trust score
+        scores: Mutex<StdHashMap<String, f64>>,
+    }
+
+    impl MockTrustService {
+        fn new() -> Self {
+            Self {
+                scores: Mutex::new(StdHashMap::new()),
+            }
+        }
+
+        fn set_score(&self, did: &str, score: f64) {
+            self.scores
+                .lock()
+                .expect("lock poisoned")
+                .insert(did.to_string(), score);
+        }
+    }
+
+    impl TrustService for MockTrustService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            Arc::new(icn_kernel_api::AllowAllOracle::default())
+        }
+
+        fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+            self.scores
+                .lock()
+                .expect("lock poisoned")
+                .get(&actor.to_string())
+                .copied()
+                .unwrap_or(0.0)
+        }
+
+        fn record_event(&self, _actor: &icn_kernel_api::types::Did, _event: TrustEvent) {
+            // No-op for tests
+        }
+    }
+
+    fn create_mock_trust_service() -> Arc<dyn TrustService> {
+        Arc::new(MockTrustService::new())
+    }
 
     #[tokio::test]
     async fn test_replication_config_default() {
         let config = ReplicationConfig::default();
         assert_eq!(config.target_replicas, 3);
-        assert_eq!(config.min_trust_class, TrustClass::Partner);
+        assert_eq!(config.min_trust_score, TRUST_THRESHOLD_PARTNER);
         assert_eq!(config.health_check_interval_secs, 60);
     }
 
@@ -422,14 +476,13 @@ mod tests {
         let config = ReplicationConfig::default();
 
         let store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let trust_store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
+        let trust_service = create_mock_trust_service();
 
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
 
         let manager =
-            ReplicationManager::new(did.clone(), config, store.clone(), trust_graph, gossip);
+            ReplicationManager::new(did.clone(), config, store.clone(), trust_service, gossip);
 
         // Create test metadata with old timestamp
         let hash = [0u8; 32];
@@ -459,26 +512,23 @@ mod tests {
         let config = ReplicationConfig::default();
 
         let store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let trust_store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let mut trust_graph = TrustGraph::new(trust_store.clone(), did.clone());
 
-        // Add a peer with Partner trust (0.4-0.7 range)
+        // Create mock trust service with a peer at Partner trust level
         let peer_keypair = KeyPair::generate()?;
         let peer_did = peer_keypair.did().clone();
-        let edge = icn_trust::TrustEdge::new(
+        let trust_service = Arc::new(MockTrustService::new());
+        trust_service.set_score(&peer_did.to_string(), 0.5);
+
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
+
+        let manager = ReplicationManager::new(
             did.clone(),
-            peer_did.clone(),
-            icn_trust::TrustScore::unchecked(0.5),
+            config,
+            store,
+            trust_service as Arc<dyn TrustService>,
+            gossip,
         );
-        trust_graph.add_edge(edge)?;
-
-        let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
-
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
-
-        let manager =
-            ReplicationManager::new(did.clone(), config, store, trust_graph_handle, gossip);
 
         // Create metadata with peer already as replica
         let hash = [0u8; 32];
@@ -503,16 +553,15 @@ mod tests {
         let config = ReplicationConfig::default();
 
         let store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let trust_store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
+        let trust_service = create_mock_trust_service();
 
-        let trust_lookup = Arc::new(|_: &Did| None);
-        let gossip = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // No oracle - tests don't need trust-aware behavior
+        let gossip = GossipActor::spawn(did.clone(), None);
 
-        let manager = ReplicationManager::new(did, config.clone(), store, trust_graph, gossip);
+        let manager = ReplicationManager::new(did, config.clone(), store, trust_service, gossip);
 
         assert_eq!(manager.config.target_replicas, 3);
-        assert_eq!(manager.config.min_trust_class, TrustClass::Partner);
+        assert_eq!(manager.config.min_trust_score, TRUST_THRESHOLD_PARTNER);
 
         Ok(())
     }

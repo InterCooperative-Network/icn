@@ -34,12 +34,12 @@ pub mod init_steward;
 pub mod init_trust;
 pub mod lifecycle;
 pub mod nat_dial;
-pub mod registry;
 pub mod shutdown;
 pub mod version_tracker;
 
 use anyhow::Result;
 use icn_identity::IdentityBundle;
+use icn_kernel_api::services::ServiceRegistry;
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -49,6 +49,11 @@ pub struct Supervisor {
     config: Config,
     identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
+    /// Optional service registry from daemon
+    ///
+    /// When provided, services from this registry are used instead of
+    /// creating internal implementations. This enables kernel/app separation.
+    service_registry: Option<ServiceRegistry>,
 }
 
 impl Supervisor {
@@ -57,16 +62,24 @@ impl Supervisor {
         config: Config,
         identity_bundle: Option<IdentityBundle>,
         shutdown_tx: ShutdownTx,
+        service_registry: Option<ServiceRegistry>,
     ) -> Self {
         Supervisor {
             config,
             identity_bundle,
             shutdown_tx,
+            service_registry,
         }
     }
 
     /// Run the supervisor
     pub async fn run(self) -> Result<()> {
-        lifecycle::run_supervisor(self.config, self.identity_bundle, self.shutdown_tx).await
+        lifecycle::run_supervisor(
+            self.config,
+            self.identity_bundle,
+            self.shutdown_tx,
+            self.service_registry,
+        )
+        .await
     }
 }

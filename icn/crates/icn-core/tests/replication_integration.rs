@@ -12,11 +12,50 @@ use anyhow::Result;
 use icn_core::replication::{ReplicationConfig, ReplicationManager};
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::authz::PolicyOracle;
+use icn_kernel_api::services::{TrustEvent, TrustService};
+use icn_kernel_api::{TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_PARTNER};
 use icn_store::{ReplicaHealth, SledStore, Store};
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+
+/// Test TrustService that wraps a TrustGraph for integration testing
+struct TestTrustService {
+    graph: Arc<RwLock<TrustGraph>>,
+}
+
+impl TestTrustService {
+    fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
+        Self { graph }
+    }
+}
+
+impl TrustService for TestTrustService {
+    fn oracle(&self) -> Arc<dyn PolicyOracle> {
+        Arc::new(icn_kernel_api::AllowAllOracle::default())
+    }
+
+    fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        // Use block_in_place to access tokio lock from sync context
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.graph.read().await;
+                if let Ok(identity_did) = actor.to_string().parse::<icn_identity::Did>() {
+                    graph.compute_trust_score(&identity_did).unwrap_or(0.0)
+                } else {
+                    0.0
+                }
+            })
+        })
+    }
+
+    fn record_event(&self, _actor: &icn_kernel_api::types::Did, _event: TrustEvent) {
+        // No-op for tests
+    }
+}
 
 /// Test helper to create a node with gossip, trust graph, and replication manager
 struct TestNode {
@@ -37,24 +76,14 @@ impl TestNode {
         let store: Arc<dyn Store> = Arc::new(SledStore::temporary()?);
         let trust_store: Arc<dyn Store> = Arc::new(SledStore::temporary()?);
 
-        // Create trust graph
+        // Create trust graph and TrustService wrapper
         let trust_graph = TrustGraph::new(trust_store, did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
+        let trust_service: Arc<dyn TrustService> =
+            Arc::new(TestTrustService::new(trust_graph_handle.clone()));
 
-        // Create gossip actor with trust lookup that consults the trust graph
-        let trust_graph_for_lookup = trust_graph_handle.clone();
-        let trust_lookup = Arc::new(move |peer_did: &Did| {
-            let graph = trust_graph_for_lookup.clone();
-            let peer = peer_did.clone();
-            tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = graph.read().await;
-                    graph.trust_class(&peer).ok()
-                })
-            })
-        });
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        // Create gossip actor
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set gossip store
         {
@@ -62,12 +91,12 @@ impl TestNode {
             gossip.set_store(store.clone());
         }
 
-        // Spawn replication manager
+        // Spawn replication manager with TrustService
         let replication_handle = ReplicationManager::spawn(
             did.clone(),
             config,
             store.clone(),
-            trust_graph_handle.clone(),
+            trust_service,
             gossip_handle.clone(),
         );
 
@@ -140,7 +169,7 @@ async fn test_two_node_replication_request() -> Result<()> {
     // Setup: Two nodes, node1 trusts node2 at Partner level
     let config = ReplicationConfig {
         target_replicas: 2,
-        min_trust_class: TrustClass::Partner,
+        min_trust_score: TRUST_THRESHOLD_PARTNER,
         health_check_interval_secs: 1, // Fast for testing
         stale_threshold_secs: 300,
         unreachable_threshold_secs: 900,
@@ -221,7 +250,7 @@ async fn test_trust_weighted_selection() -> Result<()> {
     // Setup: One node with multiple peers at different trust levels
     let config = ReplicationConfig {
         target_replicas: 3,
-        min_trust_class: TrustClass::Partner,
+        min_trust_score: TRUST_THRESHOLD_PARTNER,
         ..Default::default()
     };
     let node = TestNode::new(config).await?;
@@ -299,7 +328,7 @@ async fn test_replication_config_customization() -> Result<()> {
     // Test that custom configuration is respected
     let custom_config = ReplicationConfig {
         target_replicas: 5,
-        min_trust_class: TrustClass::Federated,
+        min_trust_score: TRUST_THRESHOLD_FEDERATED,
         health_check_interval_secs: 30,
         stale_threshold_secs: 600,
         unreachable_threshold_secs: 1800,
@@ -310,7 +339,7 @@ async fn test_replication_config_customization() -> Result<()> {
     // Verify config was applied
     let actual_config = node._replication_handle.get_config().await;
     assert_eq!(actual_config.target_replicas, 5);
-    assert_eq!(actual_config.min_trust_class, TrustClass::Federated);
+    assert_eq!(actual_config.min_trust_score, TRUST_THRESHOLD_FEDERATED);
     assert_eq!(actual_config.health_check_interval_secs, 30);
 
     Ok(())

@@ -11,6 +11,7 @@ use tokio::task::JoinSet;
 use tracing::{debug, info, warn};
 
 use icn_identity::IdentityBundle;
+use icn_kernel_api::services::ServiceRegistry;
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -28,12 +29,38 @@ use super::actors::{
 /// 4. Spawns background tasks
 /// 5. Waits for shutdown signal
 /// 6. Performs graceful shutdown
+///
+/// # Service Registry
+///
+/// If `service_registry` is provided, services from it will be used instead of
+/// creating internal implementations. This enables proper kernel/app separation
+/// where the daemon constructs domain services from app crates.
 pub async fn run_supervisor(
     config: Config,
     identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
+    service_registry: Option<ServiceRegistry>,
 ) -> Result<()> {
     info!("Supervisor starting");
+
+    // Log service registry status
+    if let Some(ref registry) = service_registry {
+        info!("Using daemon-provided service registry");
+        if registry.trust().is_some() {
+            info!("  - TrustService: provided");
+        }
+        if registry.governance().is_some() {
+            info!("  - GovernanceService: provided");
+        }
+        if registry.ledger().is_some() {
+            info!("  - LedgerService: provided");
+        }
+        if registry.security().is_some() {
+            info!("  - SecurityService: provided");
+        }
+    } else {
+        debug!("No service registry provided, using internal implementations");
+    }
 
     // Initialize metrics
     icn_obs::init_metrics()?;
@@ -67,6 +94,7 @@ pub async fn run_supervisor(
             &mut gateway_handles,
             &mut event_subscriptions,
             &mut shutdown_handles,
+            service_registry.as_ref(),
         )
         .await?
     } else {
@@ -83,6 +111,7 @@ pub async fn run_supervisor(
             coop: gateway_handles.coop,
             community: gateway_handles.community,
             trust_graph: gateway_handles.trust_graph,
+            trust_service: gateway_handles.trust_service,
             governance: gateway_handles.governance,
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
@@ -181,6 +210,7 @@ async fn spawn_actors_with_identity(
     gateway_handles: &mut GatewayActorHandles,
     event_subscriptions: &mut EventSubscriptionHandles,
     shutdown_handles: &mut ShutdownHandles,
+    service_registry: Option<&ServiceRegistry>,
 ) -> Result<CoreActorHandles> {
     info!("Identity bundle available - spawning actors");
 
@@ -204,7 +234,22 @@ async fn spawn_actors_with_identity(
     );
 
     // Initialize trust graph, recovery store, and misbehavior detector
-    let trust_services = super::init_trust::init_trust_services(config, did.clone()).await?;
+    // If service_registry provides a trust_graph handle, use it instead of creating a new one.
+    // This enables proper kernel/app separation where the daemon owns the TrustGraph.
+    let trust_services = if let Some(trust_graph_from_daemon) =
+        service_registry.and_then(|r| r.raw_handle::<RwLock<icn_trust::TrustGraph>>("trust_graph"))
+    {
+        info!("Using TrustGraph from daemon-provided ServiceRegistry");
+        super::init_trust::init_trust_services_with_graph(
+            config,
+            did.clone(),
+            trust_graph_from_daemon,
+        )
+        .await?
+    } else {
+        debug!("No TrustGraph in ServiceRegistry, creating internal one");
+        super::init_trust::init_trust_services(config, did.clone()).await?
+    };
     let trust_graph_handle = trust_services.trust_graph.clone();
     let misbehavior_detector = trust_services.misbehavior_detector.clone();
     let recovery_store = trust_services.recovery_store.clone();
@@ -214,18 +259,20 @@ async fn spawn_actors_with_identity(
     let snapshot_coordinator = super::init_snapshot::init_snapshot_coordinator(did.clone()).await?;
     info!("Snapshot coordinator initialized");
 
-    // Create trust lookup closure for gossip actor
-    let trust_lookup = super::init_trust::create_trust_lookup(trust_graph_handle.clone());
-
     // Initialize gossip services
+    // Get TrustService from ServiceRegistry for ReplicationManager if available.
+    // Also get the PolicyOracle from TrustService for trust-aware gossip behavior.
+    let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
+    let policy_oracle_from_registry = trust_service_from_registry.as_ref().map(|ts| ts.oracle());
+
     let gossip_services = super::init_gossip::init_gossip_services(
         config,
         did.clone(),
         super::init_gossip::GossipDeps {
-            trust_graph: trust_graph_handle.clone(),
-            trust_lookup,
+            trust_service: trust_service_from_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             identity_bundle: identity_bundle.clone(),
+            policy_oracle: policy_oracle_from_registry,
         },
     )
     .await?;
@@ -236,6 +283,7 @@ async fn spawn_actors_with_identity(
     let loaded_snapshot = gossip_services.loaded_snapshot;
 
     // Initialize ledger and contract services
+    // Pass TrustService for kernel/app separation if available
     let ledger_services = super::init_ledger::init_ledger_services(
         config,
         did.clone(),
@@ -243,6 +291,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service_from_registry.clone(),
         },
     )
     .await?;
@@ -283,6 +332,7 @@ async fn spawn_actors_with_identity(
     gateway_handles.coop = Some(coop_handle);
     gateway_handles.community = Some(community_services.community_handle);
     gateway_handles.trust_graph = Some(trust_graph_handle.clone());
+    gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
 
     // Spawn Identity actor (provides signing and trust graph access)
@@ -406,7 +456,7 @@ async fn spawn_actors_with_identity(
         &did,
         identity_bundle,
         &gossip_store,
-        &trust_graph_handle,
+        trust_service_from_registry.clone(),
         &gossip_handle,
         &misbehavior_detector,
         shutdown_tx,
@@ -547,6 +597,7 @@ async fn spawn_actors_with_identity(
     info!("✓ Policy governance integration active");
 
     // Spawn RPC server
+    // TODO: Inject PolicyOracle from daemon for trust-based rate limiting
     let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config);
     let rpc_compute_handle = super::init_rpc::spawn_rpc_server(
         rpc_config,
@@ -560,6 +611,7 @@ async fn spawn_actors_with_identity(
             trust_graph: trust_graph_handle.clone(),
             dispute_manager: dispute_manager_handle,
             federation_registry: federation_registry_for_rpc,
+            policy_oracle: None, // TODO: Inject from daemon via apps/trust
         },
         background_tasks,
     );
@@ -896,7 +948,7 @@ fn spawn_storage_challenge_scheduler(
     did: &icn_identity::Did,
     identity_bundle: &IdentityBundle,
     gossip_store: &Arc<dyn icn_store::Store>,
-    trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
+    trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
     misbehavior_detector: &Arc<RwLock<icn_security::MisbehaviorDetector>>,
     shutdown_tx: &ShutdownTx,
@@ -914,7 +966,7 @@ fn spawn_storage_challenge_scheduler(
         Arc::new(keypair),
         icn_store::ChallengeConfig::default(),
         gossip_store.clone(),
-        trust_graph_handle.clone(),
+        trust_service,
         gossip_handle.clone(),
         misbehavior_detector.clone(),
         shutdown_tx.subscribe(),

@@ -104,16 +104,20 @@ pub type TrustGraphHandle = Arc<RwLock<TrustGraph>>;
 ///
 /// Provides a simplified interface to the trust graph for API endpoints.
 ///
-/// Supports two modes:
+/// Supports three modes:
 /// - **Standalone mode** (`new()`): In-memory storage, for testing only
 /// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's TrustGraph
+/// - **TrustService mode** (`with_trust_service()`): Uses kernel-api TrustService
+///   for proper kernel/app separation
 pub struct TrustManager {
     /// In-memory trust edges (source:target -> edge) - used in standalone mode
     edges: Arc<DashMap<String, TrustEdge>>,
     /// Own DID (for trust computation perspective)
     own_did: Option<Did>,
-    /// Optional handle to daemon's TrustGraph (actor-backed mode)
+    /// Optional handle to daemon's TrustGraph (actor-backed mode, deprecated)
     trust_graph: Option<TrustGraphHandle>,
+    /// Optional TrustService for kernel/app separation (preferred mode)
+    trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Cached PolicyOracle (avoids repeated Arc allocation)
     cached_oracle: Option<Arc<TrustPolicyOracle>>,
     /// Configurable default trust score
@@ -131,6 +135,7 @@ impl TrustManager {
             edges: Arc::new(DashMap::new()),
             own_did: None,
             trust_graph: None,
+            trust_service: None,
             cached_oracle: None,
             default_trust_score: DEFAULT_TRUST_SCORE,
         }
@@ -144,17 +149,34 @@ impl TrustManager {
 
     /// Create a trust manager backed by the daemon's TrustGraph
     ///
-    /// This is the recommended mode for production. All operations delegate
-    /// to the daemon's TrustGraph actor, ensuring:
-    /// - Persistence across restarts
-    /// - Gossip synchronization
-    /// - Single source of truth
+    /// **Deprecated**: Use `with_trust_service()` instead for proper kernel/app separation.
+    /// This mode is kept for backward compatibility.
     pub fn with_handle(handle: TrustGraphHandle) -> Self {
-        debug!("TrustManager created with daemon TrustGraph handle");
+        debug!("TrustManager created with daemon TrustGraph handle (deprecated)");
         Self {
             edges: Arc::new(DashMap::new()), // Not used in actor-backed mode
             own_did: None,
             trust_graph: Some(handle),
+            trust_service: None,
+            cached_oracle: None,
+            default_trust_score: DEFAULT_TRUST_SCORE,
+        }
+    }
+
+    /// Create a trust manager backed by a TrustService (kernel/app separated)
+    ///
+    /// This is the recommended mode for production with proper kernel/app separation.
+    /// Trust score queries are delegated to the TrustService, which abstracts
+    /// the underlying TrustGraph implementation.
+    pub fn with_trust_service(
+        trust_service: Arc<dyn icn_kernel_api::services::TrustService>,
+    ) -> Self {
+        debug!("TrustManager created with TrustService (kernel/app separated)");
+        Self {
+            edges: Arc::new(DashMap::new()),
+            own_did: None,
+            trust_graph: None,
+            trust_service: Some(trust_service),
             cached_oracle: None,
             default_trust_score: DEFAULT_TRUST_SCORE,
         }
@@ -162,7 +184,7 @@ impl TrustManager {
 
     /// Check if running in actor-backed mode
     pub fn is_actor_backed(&self) -> bool {
-        self.trust_graph.is_some()
+        self.trust_graph.is_some() || self.trust_service.is_some()
     }
 
     /// Set the perspective DID for trust computation
@@ -507,6 +529,13 @@ impl TrustManager {
         note = "Use compute_trust_score_async for async contexts to avoid blocking worker threads"
     )]
     pub fn compute_trust_score(&self, from: &Did, to: &Did) -> f64 {
+        // Prefer TrustService if available (kernel/app separation)
+        if let Some(ref trust_service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(to.to_string());
+            return trust_service.trust_score(&kernel_did);
+        }
+
+        // Fall back to TrustGraph (deprecated)
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
             // Use block_in_place to properly isolate blocking I/O
@@ -537,6 +566,13 @@ impl TrustManager {
     /// Prefer this over the sync version when calling from async context
     /// to avoid blocking the Tokio runtime.
     pub async fn compute_trust_score_async(&self, from: &Did, to: &Did) -> f64 {
+        // Prefer TrustService if available (kernel/app separation)
+        if let Some(ref trust_service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(to.to_string());
+            return trust_service.trust_score(&kernel_did);
+        }
+
+        // Fall back to TrustGraph (deprecated)
         if let Some(ref handle) = self.trust_graph {
             let graph = handle.read().await;
             if graph.own_did() == from {

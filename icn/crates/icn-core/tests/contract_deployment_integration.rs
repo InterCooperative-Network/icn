@@ -66,22 +66,8 @@ impl TestNode {
         let trust_graph = TrustGraph::new(trust_store, did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
-        // Create trust lookup for gossip
-        let trust_graph_for_gossip = trust_graph_handle.clone();
-        let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
-            let graph = trust_graph_for_gossip.clone();
-            let peer = peer_did.clone();
-            tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = graph.read().await;
-                    graph.trust_class(&peer).ok()
-                })
-            })
-        });
-
         // Spawn gossip actor
-        let gossip_handle = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Initialize ledger
         let ledger_store_path = temp_dir.path().join("ledger");

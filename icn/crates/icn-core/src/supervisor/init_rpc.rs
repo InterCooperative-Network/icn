@@ -12,6 +12,7 @@ use tracing::{debug, info, warn};
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_gossip::GossipActor;
+use icn_kernel_api::authz::PolicyOracle;
 use icn_ledger::{DisputeManager, Ledger};
 use icn_net::NetworkHandle;
 use icn_rpc::RpcServer;
@@ -27,9 +28,14 @@ pub struct RpcDeps {
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub governance_handle: GovernanceHandle,
     pub compute_handle: ComputeHandle,
+    /// Trust graph for trust-based operations (deprecated: use policy_oracle instead)
     pub trust_graph: Arc<RwLock<TrustGraph>>,
     pub dispute_manager: Arc<RwLock<DisputeManager>>,
     pub federation_registry: Option<Arc<icn_federation::CooperativeRegistry>>,
+    /// Optional policy oracle for trust-based rate limiting.
+    /// When provided, this should be used instead of trust_graph for policy decisions.
+    /// This enables proper kernel/app separation (trust semantics stay in apps/trust).
+    pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
 }
 
 /// Configuration for RPC server
@@ -101,8 +107,13 @@ pub fn spawn_rpc_server(
 
     // Enable trust-based rate limiting for API requests (C8)
     // TODO(Phase 2.3): Replace with PolicyOracle-based rate limiting
+    // When policy_oracle is available, use it instead of direct trust_graph access.
     #[allow(deprecated)]
     if config.enable_trust_rate_limiting {
+        if deps.policy_oracle.is_some() {
+            info!("PolicyOracle available for RPC rate limiting (migration in progress)");
+            // TODO: rpc_server.set_policy_oracle(deps.policy_oracle.unwrap());
+        }
         rpc_server.enable_trust_rate_limiting();
     }
 

@@ -107,11 +107,11 @@ impl TrustPolicyOracle {
     }
 
     fn required_trust_threshold(request: &PolicyRequest) -> Option<f64> {
-        let mut threshold = None;
+        let mut threshold: Option<f64> = None;
         for key in ["min_trust_threshold", "acl_min_trust_score"] {
             if let Some(value) = request.context.metadata.get(key) {
                 if let Ok(parsed) = value.parse::<f64>() {
-                    threshold = Some(threshold.map_or(parsed, |current| current.max(parsed)));
+                    threshold = Some(threshold.map_or(parsed, |current: f64| current.max(parsed)));
                 }
             }
         }
@@ -295,10 +295,7 @@ mod tests {
                 constraints.custom.get("credit_multiplier"),
                 Some(&score.into())
             );
-            assert_eq!(
-                constraints.custom.get("voting_weight"),
-                Some(&score.into())
-            );
+            assert_eq!(constraints.custom.get("voting_weight"), Some(&score.into()));
         }
     }
 

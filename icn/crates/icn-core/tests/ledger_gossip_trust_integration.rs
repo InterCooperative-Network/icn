@@ -53,23 +53,8 @@ impl TestNode {
         let trust_store = Arc::new(SledStore::open(&trust_path)?);
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
-        // Create gossip actor with trust lookup
-        let trust_graph_clone = trust_graph.clone();
-        let trust_lookup = Arc::new(move |peer_did: &Did| {
-            let graph = trust_graph_clone.clone();
-            let peer = peer_did.clone();
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let graph = graph.read().await;
-                    graph.trust_class(&peer).ok()
-                })
-            })
-        });
-
-        let gossip = Arc::new(RwLock::new(GossipActor::new_with_legacy_trust(
-            did.clone(),
-            trust_lookup,
-        )));
+        // Create gossip actor
+        let gossip = Arc::new(RwLock::new(GossipActor::new(did.clone(), None)));
 
         // Set up keypair for signing
         {

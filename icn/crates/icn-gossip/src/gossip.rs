@@ -46,19 +46,9 @@ pub type StorageContentNotFoundCallback =
 /// Maximum subscribers per topic to prevent memory exhaustion
 pub const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10000;
 
-/// Legacy trust lookup callback type.
-///
-/// **DEPRECATED**: This type exists for backward compatibility with code using closure-based
-/// trust lookups. New code should use `PolicyOracle` directly.
-///
-/// Migration path:
-/// 1. Replace `TrustLookup` closures with `PolicyOracle` implementations
-/// 2. Use `GossipActor::spawn()` instead of `spawn_with_legacy_trust()`
-/// 3. See `apps/trust/src/oracle.rs` for the canonical `TrustPolicyOracle` implementation
-pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<icn_trust::TrustClass> + Send + Sync + 'static>;
-
 // topics_per_peer_limit removed - use PolicyOracle constraints
 // TrustScoreCache removed - use PolicyOracle
+// TrustLookup removed - use PolicyOracle directly
 
 /// Spawn a violation recording task without blocking
 /// This is fire-and-forget - we don't wait for the result
@@ -156,17 +146,6 @@ pub struct GossipActor {
 }
 
 impl GossipActor {
-    /// Create a new gossip actor with legacy trust callback.
-    ///
-    /// **DEPRECATED**: Use `GossipActor::new()` with a `PolicyOracle` implementation instead.
-    /// See `TrustPolicyOracle` in `apps/trust/src/oracle.rs` for the migration target.
-    pub fn new_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> Self {
-        let oracle = Arc::new(LegacyTrustOracle {
-            callback: trust_callback,
-        });
-        Self::new(own_did, Some(oracle))
-    }
-
     /// Create a new gossip actor
     pub fn new(own_did: Did, oracle: Option<Arc<dyn PolicyOracle>>) -> Self {
         let mut gossip = GossipActor {
@@ -1303,132 +1282,11 @@ impl GossipActor {
 /// Shared gossip actor handle
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
-/// Legacy adapter for trust lookup closures.
-///
-/// **DEPRECATED**: This is an internal adapter for legacy code.
-/// New code should use `PolicyOracle` directly.
-struct LegacyTrustOracle {
-    callback: TrustLookup,
-}
-
-impl PolicyOracle for LegacyTrustOracle {
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        use icn_trust::TrustClass;
-
-        let did_str = &request.core.actor;
-        let did = match did_str.parse::<Did>() {
-            Ok(d) => d,
-            Err(_) => {
-                return PolicyDecision::Deny {
-                    reason: icn_kernel_api::authz::PolicyError::Denied(format!(
-                        "Invalid DID: {}",
-                        did_str
-                    )),
-                }
-            }
-        };
-
-        if let Some(trust_class) = (self.callback)(&did) {
-            let mut constraints = icn_kernel_api::authz::ConstraintSet::default();
-
-            // Map trust class to representative score
-            let peer_trust_score = match trust_class {
-                TrustClass::Federated => {
-                    constraints = constraints
-                        .with_max_subscriptions(1000)
-                        .with_max_outstanding_requests(3)
-                        .with_max_message_size(1024 * 1024);
-                    0.8
-                }
-                TrustClass::Partner => {
-                    constraints = constraints
-                        .with_max_subscriptions(500)
-                        .with_max_outstanding_requests(3)
-                        .with_max_message_size(1024 * 1024);
-                    0.5
-                }
-                TrustClass::Known => {
-                    constraints = constraints
-                        .with_max_subscriptions(100)
-                        .with_max_outstanding_requests(2)
-                        .with_max_message_size(256 * 1024);
-                    0.2
-                }
-                TrustClass::Isolated => {
-                    constraints = constraints
-                        .with_max_subscriptions(10)
-                        .with_max_outstanding_requests(1)
-                        .with_max_message_size(64 * 1024);
-                    0.05
-                }
-            };
-
-            constraints
-                .custom
-                .insert("trust_score".to_string(), peer_trust_score.into());
-
-            // Check if minimum trust threshold is required (from context metadata)
-            let mut required_threshold: Option<f64> = None;
-            for key in ["min_trust_threshold", "acl_min_trust_score"] {
-                if let Some(value) = request.context.metadata.get(key) {
-                    if let Ok(parsed) = value.parse::<f64>() {
-                        required_threshold =
-                            Some(required_threshold.map_or(parsed, |current| current.max(parsed)));
-                    }
-                }
-            }
-
-            // Deny if trust score is below required threshold
-            if let Some(threshold) = required_threshold {
-                if peer_trust_score < threshold {
-                    return PolicyDecision::Deny {
-                        reason: icn_kernel_api::authz::PolicyError::Denied(format!(
-                            "Insufficient trust: {:.2} < {:.2} required",
-                            peer_trust_score, threshold
-                        )),
-                    };
-                }
-            }
-
-            PolicyDecision::Allow { constraints }
-        } else {
-            PolicyDecision::Deny {
-                reason: icn_kernel_api::authz::PolicyError::Denied("Untrusted".to_string()),
-            }
-        }
-    }
-
-    fn domain(&self) -> Domain {
-        Domain::trust()
-    }
-}
-
 impl GossipActor {
     /// Spawn a gossip actor and return a handle
     pub fn spawn(own_did: Did, oracle: Option<Arc<dyn PolicyOracle>>) -> GossipHandle {
         let actor = GossipActor::new(own_did, oracle);
         Arc::new(RwLock::new(actor))
-    }
-
-    /// Spawn a gossip actor with a legacy trust callback.
-    ///
-    /// **DEPRECATED**: Use `GossipActor::spawn()` with a `PolicyOracle` implementation instead.
-    pub fn spawn_with_legacy_trust(own_did: Did, trust_callback: TrustLookup) -> GossipHandle {
-        let oracle = Arc::new(LegacyTrustOracle {
-            callback: trust_callback,
-        });
-        Self::spawn(own_did, Some(oracle))
-    }
-
-    /// Spawn with trust graph (legacy signature for compatibility).
-    ///
-    /// **DEPRECATED**: Use `GossipActor::spawn()` with a `PolicyOracle` implementation instead.
-    pub fn spawn_with_trust_graph(
-        own_did: Did,
-        trust_callback: TrustLookup,
-        _store: Option<Arc<icn_store::SledStore>>,
-    ) -> GossipHandle {
-        Self::spawn_with_legacy_trust(own_did, trust_callback)
     }
 }
 

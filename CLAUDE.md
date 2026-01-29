@@ -401,6 +401,8 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete de
 
 ## Kernel/App Separation Architecture
 
+> **Detailed Documentation**: See [docs/architecture/KERNEL_APP_SEPARATION.md](docs/architecture/KERNEL_APP_SEPARATION.md) for comprehensive documentation including migration guides, implementation patterns, and request flow diagrams.
+
 ### The Meaning Firewall
 
 The kernel enforces constraints WITHOUT understanding their semantic origin. This is the core architectural principle.

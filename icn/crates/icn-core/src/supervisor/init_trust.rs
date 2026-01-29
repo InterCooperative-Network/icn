@@ -9,13 +9,33 @@ use tracing::{debug, info, warn};
 use icn_identity::Did;
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, TrustPenaltyCallback};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 
 use crate::config::Config;
 
 /// Services initialized during trust setup
+///
+/// # Kernel/App Separation
+///
+/// This struct exposes `trust_graph` for app-layer operations (mutations like
+/// adding/removing trust edges). Kernel components should NOT use `trust_graph`
+/// directly - they should use `TrustService` from the `ServiceRegistry` instead.
+///
+/// The `trust_graph` field is exposed here because:
+/// - `IdentityActor` needs it for trust mutations (add_edge, remove_edge)
+/// - RPC handlers need it for trust API endpoints
+/// - `MisbehaviorDetector` callbacks need it for trust penalties
+///
+/// For read-only trust queries in kernel components, use:
+/// ```ignore
+/// let trust_service = service_registry.trust();
+/// let score = trust_service.trust_score(&did);
+/// ```
 pub struct TrustServices {
-    /// The trust graph for tracking peer relationships
+    /// The trust graph for app-layer mutations (add/remove edges)
+    ///
+    /// **Note**: Kernel data-path components should use `TrustService` from
+    /// `ServiceRegistry` instead of accessing this directly.
     pub trust_graph: Arc<RwLock<TrustGraph>>,
     /// Byzantine fault detector for misbehavior tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
@@ -24,9 +44,6 @@ pub struct TrustServices {
     /// Store for security/reputation state (misbehavior detector persistence)
     pub security_store: Arc<dyn icn_store::Store>,
 }
-
-/// Trust lookup closure type for gossip actor
-pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
 
 /// Initialize trust graph and security services
 ///
@@ -46,6 +63,33 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
 
     info!("Trust graph initialized at {}", trust_store_path.display());
 
+    init_trust_services_impl(config, did, trust_graph_handle).await
+}
+
+/// Initialize trust services with an externally-provided TrustGraph
+///
+/// This variant is used when the daemon provides a TrustGraph via ServiceRegistry,
+/// enabling proper kernel/app separation where the daemon owns the TrustGraph.
+///
+/// Creates:
+/// - Recovery store for social recovery
+/// - Misbehavior detector with trust penalty callback
+/// - Wires the provided TrustGraph for penalty callbacks
+pub async fn init_trust_services_with_graph(
+    config: &Config,
+    did: Did,
+    trust_graph_handle: Arc<RwLock<TrustGraph>>,
+) -> anyhow::Result<TrustServices> {
+    info!("Using daemon-provided TrustGraph for trust services");
+    init_trust_services_impl(config, did, trust_graph_handle).await
+}
+
+/// Internal implementation for trust service initialization
+async fn init_trust_services_impl(
+    config: &Config,
+    did: Did,
+    trust_graph_handle: Arc<RwLock<TrustGraph>>,
+) -> anyhow::Result<TrustServices> {
     // Create recovery store for social recovery events
     let recovery_store_path = config.store_path().join("recovery");
     let recovery_store: Arc<dyn icn_store::Store> =
@@ -89,24 +133,6 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
         misbehavior_detector,
         recovery_store,
         security_store,
-    })
-}
-
-/// Create trust lookup closure for gossip actor
-///
-/// Returns a closure that can synchronously look up a peer's trust class.
-pub fn create_trust_lookup(trust_graph: Arc<RwLock<TrustGraph>>) -> TrustLookup {
-    Arc::new(move |peer_did: &Did| {
-        // Use a blocking task since we're in a sync context
-        let graph = trust_graph.clone();
-        let peer = peer_did.clone();
-        tokio::task::block_in_place(|| {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                let graph = graph.read().await;
-                graph.trust_class(&peer).ok()
-            })
-        })
     })
 }
 
@@ -181,25 +207,8 @@ mod tests {
         let _detector = services.misbehavior_detector.read().await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_trust_lookup_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
-
-        let services = init_trust_services(&config, did.clone()).await.unwrap();
-        let lookup = create_trust_lookup(services.trust_graph.clone());
-
-        // Unknown peer should return None or Isolated
-        let unknown_did = icn_identity::KeyPair::generate().unwrap().did().clone();
-        let result = lookup(&unknown_did);
-        // Either None or Isolated is acceptable for unknown peers
-        assert!(result.is_none() || result == Some(TrustClass::Isolated));
-    }
+    // test_trust_lookup_creation removed - trust lookup is now handled by TrustGraphOracle
+    // in init_gossip.rs via the PolicyOracle pattern. See TrustGraphOracle for the replacement.
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_misbehavior_updates_trust_graph() {

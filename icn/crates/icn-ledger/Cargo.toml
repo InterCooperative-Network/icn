@@ -12,6 +12,7 @@ icn-time = { path = "../icn-time" }
 icn-store.workspace = true
 icn-gossip.workspace = true
 icn-trust.workspace = true
+icn-kernel-api.workspace = true
 icn-obs.workspace = true
 icn-security.workspace = true
 async-trait = "0.1"

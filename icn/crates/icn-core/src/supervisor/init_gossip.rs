@@ -13,12 +13,12 @@ use tracing::{debug, info, warn};
 
 use icn_gossip::{GossipActor, PartitionConfig, PartitionDetector, PartitionHealer, VectorClock};
 use icn_identity::{Did, IdentityBundle};
+use icn_kernel_api::authz::PolicyOracle;
+use icn_kernel_api::AllowAllOracle;
 use icn_security::MisbehaviorDetector;
 use icn_snapshot::StateSnapshot;
 use icn_store::SledStore;
-use icn_trust::TrustGraph;
 
-use super::init_trust::TrustLookup;
 use crate::config::Config;
 use crate::replication::{ReplicationConfig, ReplicationManager};
 
@@ -39,102 +39,24 @@ pub struct GossipServices {
 }
 
 /// Dependencies for gossip initialization
-pub struct GossipDeps {
-    pub trust_graph: Arc<RwLock<TrustGraph>>,
-    pub trust_lookup: TrustLookup,
-    pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
-    pub identity_bundle: IdentityBundle,
-}
-
-/// Initialize gossip services
 ///
-/// Creates:
-/// - GossipActor with trust-gated subscriptions
-/// - Restores state from snapshot if available
-/// - Sets up partition detection and healing
-/// - Initializes storage quota management
-/// - Spawns replication manager
-use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
-
-/// Adapter to expose TrustGraph as a PolicyOracle for GossipActor
-pub struct TrustGraphOracle {
-    trust_graph: Arc<RwLock<TrustGraph>>,
-}
-
-impl TrustGraphOracle {
-    pub fn new(trust_graph: Arc<RwLock<TrustGraph>>) -> Self {
-        Self { trust_graph }
-    }
-}
-
-impl PolicyOracle for TrustGraphOracle {
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        // Use try_read() to avoid blocking the Tokio runtime.
-        // If the lock is unavailable, return restricted constraints.
-        // This follows the "fail-safe" principle: when trust can't be verified,
-        // apply the most restrictive policy.
-        //
-        // NOTE: For high-throughput scenarios, consider Issue #874 (async PolicyOracle)
-        // or pre-computing trust scores in a background task.
-        let trust_score = match self.trust_graph.try_read() {
-            Ok(graph) => {
-                let subject_did_str = &request.core.actor;
-                if let Ok(subject_did) = subject_did_str.parse::<icn_identity::Did>() {
-                    graph.compute_trust_score(&subject_did).unwrap_or(0.0)
-                } else {
-                    tracing::warn!(
-                        actor = %subject_did_str,
-                        "Failed to parse DID in PolicyOracle, using default trust score 0.0"
-                    );
-                    0.0
-                }
-            }
-            Err(_) => {
-                // Lock is held by another task - use default restrictive score.
-                // This is a performance trade-off to avoid blocking.
-                tracing::debug!(
-                    actor = %request.core.actor,
-                    "TrustGraph lock unavailable, using default trust score 0.0"
-                );
-                0.0
-            }
-        };
-
-        let mut constraints = ConstraintSet::default();
-        constraints
-            .custom
-            .insert("trust_score".to_string(), trust_score.into());
-
-        // Populate standard fields based on trust score (matches MockPolicyOracle in tests)
-        // This ensures resource limits are applied correctly by the kernel
-        if trust_score >= 0.7 {
-            constraints = constraints
-                .with_max_subscriptions(1000)
-                .with_max_outstanding_requests(3)
-                .with_max_message_size(1024 * 1024);
-        } else if trust_score >= 0.4 {
-            constraints = constraints
-                .with_max_subscriptions(500)
-                .with_max_outstanding_requests(3)
-                .with_max_message_size(1024 * 1024);
-        } else if trust_score >= 0.1 {
-            constraints = constraints
-                .with_max_subscriptions(100)
-                .with_max_outstanding_requests(2)
-                .with_max_message_size(256 * 1024);
-        } else {
-            constraints = constraints
-                .with_max_subscriptions(10)
-                .with_max_outstanding_requests(1)
-                .with_max_message_size(64 * 1024);
-        }
-
-        PolicyDecision::Allow { constraints }
-    }
-
-    fn domain(&self) -> Domain {
-        Domain::trust()
-    }
+/// All domain-specific services (trust, policy) must be provided by the daemon
+/// via `ServiceRegistry`. This ensures proper kernel/app separation.
+pub struct GossipDeps {
+    /// Trust service for ReplicationManager peer selection
+    ///
+    /// Required for ReplicationManager to select trusted peers for data replication.
+    /// If not provided, ReplicationManager will not be spawned.
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    /// Misbehavior detector for Byzantine fault tracking
+    pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
+    /// Identity bundle for signing
+    pub identity_bundle: IdentityBundle,
+    /// Policy oracle for trust-gated gossip subscriptions
+    ///
+    /// Required for GossipActor to evaluate trust levels for subscription requests.
+    /// If not provided, AllowAllOracle is used (allows all subscriptions).
+    pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
 }
 
 /// Initialize gossip services
@@ -150,8 +72,22 @@ pub async fn init_gossip_services(
     did: Did,
     deps: GossipDeps,
 ) -> anyhow::Result<GossipServices> {
-    // Create PolicyOracle adapter for TrustGraph
-    let oracle = Arc::new(TrustGraphOracle::new(deps.trust_graph.clone()));
+    // Use provided PolicyOracle for trust evaluation.
+    // If not provided, use AllowAllOracle (allows all subscriptions).
+    // The daemon should provide an oracle from apps/trust for proper kernel/app separation.
+    let oracle: Arc<dyn PolicyOracle> = match deps.policy_oracle {
+        Some(oracle) => {
+            info!("Using provided PolicyOracle for gossip trust evaluation");
+            oracle
+        }
+        None => {
+            warn!("No PolicyOracle provided - using AllowAllOracle (all subscriptions allowed)");
+            warn!(
+                "Ensure ServiceRegistry with TrustService is passed to supervisor for production"
+            );
+            Arc::new(AllowAllOracle::default())
+        }
+    };
 
     // Spawn Gossip actor with policy oracle
     let gossip = GossipActor::new(did.clone(), Some(oracle));
@@ -184,19 +120,25 @@ pub async fn init_gossip_services(
     );
 
     // Spawn ReplicationManager for monitoring and maintaining data durability (Phase 17 Week 3)
-    let replication_config = ReplicationConfig::default();
-    let _replication_handle = ReplicationManager::spawn(
-        did.clone(),
-        replication_config.clone(),
-        gossip_store.clone(),
-        deps.trust_graph.clone(),
-        gossip_handle.clone(),
-    );
+    // Requires TrustService for peer selection. If not provided, skip replication manager.
+    if let Some(trust_service) = deps.trust_service.clone() {
+        let replication_config = ReplicationConfig::default();
+        let _replication_handle = ReplicationManager::spawn(
+            did.clone(),
+            replication_config.clone(),
+            gossip_store.clone(),
+            trust_service,
+            gossip_handle.clone(),
+        );
 
-    info!(
-        "ReplicationManager spawned (target: {} replicas, health check: {}s)",
-        replication_config.target_replicas, replication_config.health_check_interval_secs
-    );
+        info!(
+            "ReplicationManager spawned (target: {} replicas, health check: {}s)",
+            replication_config.target_replicas, replication_config.health_check_interval_secs
+        );
+    } else {
+        warn!("No TrustService provided - ReplicationManager not spawned");
+        warn!("Ensure ServiceRegistry with TrustService is passed to supervisor");
+    }
 
     // Phase 18 Week 3: Initialize PartitionDetector and PartitionHealer
     let partition_config = PartitionConfig::default(); // 5 min threshold, 30s check interval

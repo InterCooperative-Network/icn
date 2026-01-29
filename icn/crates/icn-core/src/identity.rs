@@ -8,6 +8,7 @@
 
 use anyhow::{Context, Result};
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::TrustClass;
 use icn_trust::TrustGraph;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -50,7 +51,7 @@ pub enum IdentityMsg {
     /// Get trust class for a DID
     GetTrustClass {
         did: Did,
-        response: oneshot::Sender<Result<icn_trust::TrustClass>>,
+        response: oneshot::Sender<Result<TrustClass>>,
     },
 }
 
@@ -102,7 +103,7 @@ impl IdentityHandle {
     }
 
     /// Get trust class for a DID
-    pub async fn get_trust_class(&self, did: Did) -> Result<icn_trust::TrustClass> {
+    pub async fn get_trust_class(&self, did: Did) -> Result<TrustClass> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(IdentityMsg::GetTrustClass { did, response: tx })
@@ -230,7 +231,8 @@ impl IdentityActor {
 
             IdentityMsg::GetTrustClass { did, response } => {
                 let graph = self.trust_graph.read().await;
-                let result = graph.trust_class(&did);
+                // Get trust score and convert to kernel-api TrustClass
+                let result = graph.compute_trust_score(&did).map(TrustClass::from_score);
                 let _ = response.send(result);
             }
 
@@ -345,7 +347,7 @@ mod tests {
 
         // Get trust class (0.56 is in Partner range: 0.4-0.7)
         let class = handle.get_trust_class(target_did.clone()).await.unwrap();
-        assert_eq!(class, icn_trust::TrustClass::Partner);
+        assert_eq!(class, TrustClass::Partner);
 
         // Remove trust edge
         handle.remove_trust_edge(target_did.clone()).await.unwrap();

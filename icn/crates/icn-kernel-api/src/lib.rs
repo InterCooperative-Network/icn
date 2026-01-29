@@ -39,6 +39,7 @@ pub mod compute;
 pub mod coord;
 pub mod identity;
 pub mod naming;
+pub mod services;
 pub mod state;
 pub mod time;
 pub mod types;
@@ -58,6 +59,11 @@ pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService};
+pub use services::{
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
+    SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
+    TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
+};
 pub use state::{BlobService, KvService, LogService};
 pub use time::TimeService;
 

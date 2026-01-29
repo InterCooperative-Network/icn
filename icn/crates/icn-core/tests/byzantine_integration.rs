@@ -9,6 +9,9 @@
 use anyhow::Result;
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::authz::{
+    ConstraintSet, Domain, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
+};
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, Violation};
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph, TrustScore};
@@ -17,6 +20,68 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
+
+/// Test PolicyOracle that wraps TrustGraph for trust-aware gossip tests
+struct TestTrustOracle {
+    trust_graph: Arc<RwLock<TrustGraph>>,
+}
+
+impl PolicyOracle for TestTrustOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        // Parse actor DID
+        let actor_did = match icn_identity::Did::from_str(&request.core.actor) {
+            Ok(did) => did,
+            Err(_) => {
+                return PolicyDecision::Deny {
+                    reason: PolicyError::Denied("Invalid DID".to_string()),
+                };
+            }
+        };
+
+        // Get trust score from graph (use blocking since we're in sync context)
+        let score = tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.trust_graph.read().await;
+                graph.compute_trust_score(&actor_did).unwrap_or(0.0)
+            })
+        });
+
+        // Check if min trust threshold is required
+        let mut required_threshold: Option<f64> = None;
+        for key in ["min_trust_threshold", "acl_min_trust_score"] {
+            if let Some(value) = request.context.metadata.get(key) {
+                if let Ok(parsed) = value.parse::<f64>() {
+                    required_threshold =
+                        Some(required_threshold.map_or(parsed, |current| current.max(parsed)));
+                }
+            }
+        }
+
+        // Deny if trust score is below required threshold
+        if let Some(threshold) = required_threshold {
+            if score < threshold {
+                return PolicyDecision::Deny {
+                    reason: PolicyError::Denied(format!(
+                        "Insufficient trust: {:.2} < {:.2} required",
+                        score, threshold
+                    )),
+                };
+            }
+        }
+
+        // Allow with constraints
+        let mut constraints = ConstraintSet::default();
+        constraints
+            .custom
+            .insert("trust_score".to_string(), score.into());
+        PolicyDecision::Allow { constraints }
+    }
+
+    fn domain(&self) -> Domain {
+        Domain::trust()
+    }
+}
 
 /// Helper to create test node with Byzantine detection enabled
 struct TestNode {
@@ -44,21 +109,13 @@ impl TestNode {
             MisbehaviorThresholds::default(),
         )));
 
-        // Create gossip actor with trust lookup
-        let trust_graph_clone = trust_graph.clone();
-        let trust_lookup = Arc::new(move |peer_did: &Did| {
-            let graph = trust_graph_clone.clone();
-            let peer = peer_did.clone();
-            tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = graph.read().await;
-                    graph.trust_class(&peer).ok()
-                })
-            })
+        // Create trust-aware policy oracle for tests
+        let oracle = Arc::new(TestTrustOracle {
+            trust_graph: trust_graph.clone(),
         });
 
-        let gossip = GossipActor::spawn_with_trust_graph(did.clone(), trust_lookup, None);
+        // Create gossip actor with trust oracle
+        let gossip = GossipActor::spawn(did.clone(), Some(oracle));
 
         // Set keypair for signing
         {

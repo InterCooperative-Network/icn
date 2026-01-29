@@ -12,7 +12,6 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle};
 use icn_snapshot::{load_snapshot, save_snapshot, StateSnapshot};
-use icn_trust::TrustClass;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -42,8 +41,7 @@ impl TestNode {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         // Set keypair for signing
         {
@@ -160,8 +158,7 @@ impl TestNode {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(16);
 
         // Spawn gossip actor
-        let trust_lookup = Arc::new(|_did: &Did| Some(TrustClass::Partner));
-        let gossip_handle = GossipActor::spawn_with_legacy_trust(did.clone(), trust_lookup);
+        let gossip_handle = GossipActor::spawn(did.clone(), None);
 
         {
             let mut gossip = gossip_handle.write().await;

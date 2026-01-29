@@ -39,9 +39,9 @@ use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::services::TrustService;
 use icn_security::{MisbehaviorDetector, StorageFailureReason, Violation};
 use icn_store::{ChallengeConfig, ContentChunkTree, ContentHash, StorageChallenge, Store};
-use icn_trust::TrustGraph;
 
 /// Callback function type for triggering re-replication
 ///
@@ -173,8 +173,11 @@ pub struct ChallengeScheduler {
     /// Store for accessing replica metadata and content
     store: Arc<dyn Store>,
 
-    /// Trust graph for peer scoring (used for trust-gated challenge frequency)
-    trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Trust service for peer scoring (used for trust-gated challenge frequency)
+    ///
+    /// Uses TrustService for kernel/app separation - the scheduler queries trust
+    /// scores without depending on the concrete TrustGraph implementation.
+    trust_service: Option<Arc<dyn TrustService>>,
 
     /// Gossip actor for sending challenges
     gossip: Arc<RwLock<GossipActor>>,
@@ -210,7 +213,7 @@ impl ChallengeScheduler {
         keypair: Arc<KeyPair>,
         config: ChallengeConfig,
         store: Arc<dyn Store>,
-        trust_graph: Arc<RwLock<TrustGraph>>,
+        trust_service: Option<Arc<dyn TrustService>>,
         gossip: Arc<RwLock<GossipActor>>,
         misbehavior: Arc<RwLock<MisbehaviorDetector>>,
     ) -> Self {
@@ -219,7 +222,7 @@ impl ChallengeScheduler {
             keypair,
             config,
             store,
-            trust_graph,
+            trust_service,
             gossip,
             misbehavior,
             pending: HashMap::new(),
@@ -299,14 +302,14 @@ impl ChallengeScheduler {
                     *cached_score
                 } else {
                     // Cache expired - recompute
-                    let score = self.compute_trust_score(peer_did).await;
+                    let score = self.compute_trust_score(peer_did);
                     self.trust_score_cache
                         .insert(peer_did.to_string(), (score, now));
                     score
                 }
             } else {
                 // Cache miss - compute and cache
-                let score = self.compute_trust_score(peer_did).await;
+                let score = self.compute_trust_score(peer_did);
                 self.trust_score_cache
                     .insert(peer_did.to_string(), (score, now));
                 score
@@ -324,13 +327,13 @@ impl ChallengeScheduler {
         adjusted.min(1.0)
     }
 
-    /// Compute trust score for a peer (expensive operation - use caching)
-    async fn compute_trust_score(&self, peer_did: &str) -> f64 {
-        if let Ok(did) = Did::from_str(peer_did) {
-            let trust_graph = self.trust_graph.read().await;
-            trust_graph.compute_trust_score(&did).unwrap_or(0.0)
+    /// Compute trust score for a peer (uses TrustService if available)
+    fn compute_trust_score(&self, peer_did: &str) -> f64 {
+        if let Some(ref trust_service) = self.trust_service {
+            let kernel_did = icn_kernel_api::types::Did::from(peer_did.to_string());
+            trust_service.trust_score(&kernel_did)
         } else {
-            0.0 // Unknown peer, treat as untrusted
+            0.0 // No trust service, treat as untrusted
         }
     }
 
@@ -395,7 +398,7 @@ impl ChallengeScheduler {
         keypair: Arc<KeyPair>,
         config: ChallengeConfig,
         store: Arc<dyn Store>,
-        trust_graph: Arc<RwLock<TrustGraph>>,
+        trust_service: Option<Arc<dyn TrustService>>,
         gossip: Arc<RwLock<GossipActor>>,
         misbehavior: Arc<RwLock<MisbehaviorDetector>>,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
@@ -405,7 +408,7 @@ impl ChallengeScheduler {
             keypair,
             config.clone(),
             store,
-            trust_graph,
+            trust_service,
             gossip,
             misbehavior,
         );
