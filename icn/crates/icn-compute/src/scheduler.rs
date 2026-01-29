@@ -716,14 +716,20 @@ impl CapacityBudget {
         }
 
         let sum: f64 = fractions.iter().sum();
-        // Use a practical tolerance for floating-point accumulation across
-        // multiple adjustment rounds (f64::EPSILON is too tight).
-        if sum > 1.0 + 1e-9 {
+        if sum > 1.0 + Self::FLOAT_TOLERANCE {
             return Err("Fractions must sum to at most 1.0");
         }
 
         Ok(())
     }
+
+    /// Practical tolerance for floating-point comparisons.
+    ///
+    /// Using `f64::EPSILON` (~2.2e-16) is too tight when fractions are
+    /// adjusted over many rounds; accumulated rounding can exceed it.
+    /// 1e-9 is well above rounding noise but invisible at the 0.01 scale
+    /// of our smallest meaningful fraction.
+    const FLOAT_TOLERANCE: f64 = 1e-9;
 
     /// Minimum fraction per scope during demand adjustment.
     ///
@@ -744,8 +750,18 @@ impl CapacityBudget {
     /// conservative (moves at most `learning_rate` fraction per call).
     ///
     /// # Arguments
-    /// * `utilization` - Map of scope → utilization ratio (0.0 = idle, 1.0 = saturated)
-    /// * `learning_rate` - Maximum fraction to shift per adjustment (e.g., 0.05)
+    /// * `utilization` - Map of scope → utilization ratio (0.0 = idle, 1.0 = saturated).
+    ///   Scopes absent from the map are left unchanged (only scopes with data
+    ///   participate in the rebalancing).
+    /// * `learning_rate` - Maximum fraction to shift per adjustment (clamped to 0.0..0.1)
+    ///
+    /// # Bounds
+    ///
+    /// Fractions are clamped to [`MIN_SCOPE_FRACTION`, `MAX_SCOPE_FRACTION`]
+    /// (currently \[0.01, 0.80\]) to prevent starvation (min) and monopolization
+    /// (max), ensuring every scope retains headroom even under sustained
+    /// extreme demand patterns. After clamping, fractions are re-normalized
+    /// to preserve the original sum.
     pub fn adjust_from_demand(
         &mut self,
         utilization: &HashMap<ScopeLevel, f64>,
@@ -803,7 +819,7 @@ impl CapacityBudget {
         .iter()
         .sum();
         let new_sum: f64 = fractions.iter().sum();
-        if new_sum > f64::EPSILON {
+        if new_sum > Self::FLOAT_TOLERANCE {
             let scale = original_sum / new_sum;
             for f in &mut fractions {
                 *f = (*f * scale).clamp(0.0, 1.0);
@@ -1184,6 +1200,20 @@ impl DefaultPlacementPolicy {
     ///
     /// Used for scope budget estimation (queue depth limit calculation).
     const DEFAULT_CPU_PER_TASK: f64 = 0.1;
+
+    /// Placement affinity bonus for a given scope level.
+    ///
+    /// Narrower scope = stronger affinity, rewarding local execution.
+    /// These values are additive components of the overall placement score.
+    fn scope_affinity_bonus(scope: ScopeLevel) -> f64 {
+        match scope {
+            ScopeLevel::Local => 0.15,
+            ScopeLevel::Cell => 0.12,
+            ScopeLevel::Org => 0.08,
+            ScopeLevel::Federation => 0.04,
+            ScopeLevel::Commons => 0.00,
+        }
+    }
 }
 
 impl Default for DefaultPlacementPolicy {
@@ -1239,11 +1269,16 @@ impl PlacementPolicy for DefaultPlacementPolicy {
         let cpu_per_task = profile
             .cpu_cores
             .unwrap_or(DefaultPlacementPolicy::DEFAULT_CPU_PER_TASK);
-        let total_queue_budget = if scope_fraction > f64::EPSILON && cpu_per_task > f64::EPSILON {
-            (node_state.capacity.cpu_cores_total * scope_fraction / cpu_per_task).max(1.0) as usize
-        } else {
-            0
-        };
+        // Calculate max concurrent tasks this scope can run:
+        // (total_cpu * scope_fraction) gives available CPU for this scope,
+        // dividing by cpu_per_task gives the task slot capacity.
+        let available_cpu_for_scope = node_state.capacity.cpu_cores_total * scope_fraction;
+        let total_queue_budget =
+            if available_cpu_for_scope > f64::EPSILON && cpu_per_task > f64::EPSILON {
+                (available_cpu_for_scope / cpu_per_task).max(1.0) as usize
+            } else {
+                0
+            };
         if total_queue_budget > 0 && scope_queue >= total_queue_budget {
             return None; // Scope budget exhausted
         }
@@ -1274,14 +1309,7 @@ impl PlacementPolicy for DefaultPlacementPolicy {
 
         // Factor 6: Scope affinity (weight 0.15, NEW)
         // Narrower scope = stronger affinity bonus
-        let scope_bonus = match scope_ctx.peer_scope {
-            ScopeLevel::Local => 0.15,
-            ScopeLevel::Cell => 0.12,
-            ScopeLevel::Org => 0.08,
-            ScopeLevel::Federation => 0.04,
-            ScopeLevel::Commons => 0.00,
-        };
-        score += scope_bonus;
+        score += Self::scope_affinity_bonus(scope_ctx.peer_scope);
 
         // Factor 7: Cell affinity bonus (weight 0.05)
         // Extra bonus if executor is in the preferred cell
@@ -2287,5 +2315,45 @@ mod tests {
 
         // All fractions should remain valid
         assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_demand_adjustment_partial_data() {
+        let mut budget = CapacityBudget::default();
+        let original = budget.clone();
+
+        // Only provide metrics for 2 out of 5 scopes
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 0.90);
+        utilization.insert(ScopeLevel::Commons, 0.10);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        // Budget should still be valid
+        assert!(budget.validate().is_ok());
+
+        // Scopes without data (Cell, Org, Federation) should be unchanged
+        assert!(
+            (budget.cell_share - original.cell_share).abs() < 1e-6,
+            "Cell share should be unchanged: {} vs {}",
+            budget.cell_share,
+            original.cell_share
+        );
+        assert!(
+            (budget.org_share - original.org_share).abs() < 1e-6,
+            "Org share should be unchanged: {} vs {}",
+            budget.org_share,
+            original.org_share
+        );
+        assert!(
+            (budget.federation_share - original.federation_share).abs() < 1e-6,
+            "Federation share should be unchanged: {} vs {}",
+            budget.federation_share,
+            original.federation_share
+        );
+
+        // Local (high demand) should gain, Commons (low demand) should lose
+        assert!(budget.local_reserve > original.local_reserve);
+        assert!(budget.commons_share < original.commons_share);
     }
 }
