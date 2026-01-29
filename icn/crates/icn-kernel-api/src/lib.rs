@@ -61,8 +61,8 @@ pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService};
 pub use services::{
     GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
-    SecurityViolation, ServiceRegistry, TrustEvent, TrustService, TRUST_THRESHOLD_FEDERATED,
-    TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
+    SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
+    TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
 pub use state::{BlobService, KvService, LogService};
 pub use time::TimeService;

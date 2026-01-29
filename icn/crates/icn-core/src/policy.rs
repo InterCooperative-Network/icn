@@ -39,7 +39,8 @@
 //! ```
 
 use icn_identity::Did;
-use icn_trust::{TrustClass, TrustGraph};
+use icn_kernel_api::TrustClass;
+use icn_trust::TrustGraph;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -290,7 +291,9 @@ impl DefaultPolicySource {
 impl PolicySource for DefaultPolicySource {
     async fn policy_for(&self, did: &Did) -> TrustPolicy {
         let trust_graph = self.trust_graph.read().await;
-        let class = trust_graph.trust_class(did).unwrap_or(TrustClass::Isolated);
+        // Get trust score and convert to kernel-api TrustClass
+        let score = trust_graph.compute_trust_score(did).unwrap_or(0.0);
+        let class = TrustClass::from_score(score);
 
         TrustPolicy::for_trust_class(class)
     }

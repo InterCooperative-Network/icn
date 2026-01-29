@@ -38,6 +38,75 @@ pub const TRUST_THRESHOLD_PARTNER: f64 = 0.4;
 /// Reserved for federation members and established long-term relationships.
 pub const TRUST_THRESHOLD_FEDERATED: f64 = 0.7;
 
+/// Trust classification for policy decisions
+///
+/// This enum provides a kernel-level abstraction for trust classification.
+/// It mirrors the semantics of `icn_trust::TrustClass` but is defined in
+/// kernel-api to avoid domain crate dependencies.
+///
+/// Kernel components should use this enum for policy decisions. Apps
+/// translate their domain-specific trust models to these classes.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub enum TrustClass {
+    /// Not yet evaluated or untrusted (score < 0.1)
+    Isolated = 0,
+    /// Known but not trusted (score 0.1-0.4)
+    Known = 1,
+    /// Trusted partner (score 0.4-0.7)
+    Partner = 2,
+    /// Federated peer (score >= 0.7)
+    Federated = 3,
+}
+
+impl TrustClass {
+    /// Convert a trust score to a trust class
+    pub fn from_score(score: f64) -> Self {
+        if score >= TRUST_THRESHOLD_FEDERATED {
+            TrustClass::Federated
+        } else if score >= TRUST_THRESHOLD_PARTNER {
+            TrustClass::Partner
+        } else if score >= TRUST_THRESHOLD_KNOWN {
+            TrustClass::Known
+        } else {
+            TrustClass::Isolated
+        }
+    }
+
+    /// Get the minimum score for this class
+    pub fn min_score(&self) -> f64 {
+        match self {
+            TrustClass::Isolated => 0.0,
+            TrustClass::Known => TRUST_THRESHOLD_KNOWN,
+            TrustClass::Partner => TRUST_THRESHOLD_PARTNER,
+            TrustClass::Federated => TRUST_THRESHOLD_FEDERATED,
+        }
+    }
+
+    /// Check if a score meets or exceeds this trust class
+    pub fn meets(&self, score: f64) -> bool {
+        score >= self.min_score()
+    }
+}
+
+impl Default for TrustClass {
+    fn default() -> Self {
+        TrustClass::Isolated
+    }
+}
+
+impl std::fmt::Display for TrustClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrustClass::Isolated => write!(f, "Isolated"),
+            TrustClass::Known => write!(f, "Known"),
+            TrustClass::Partner => write!(f, "Partner"),
+            TrustClass::Federated => write!(f, "Federated"),
+        }
+    }
+}
+
 /// Abstract trust service interface
 ///
 /// This trait provides trust-related functionality to the kernel without
