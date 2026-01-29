@@ -44,6 +44,7 @@ pub mod labor_shares;
 pub mod partition;
 #[allow(missing_docs)]
 pub mod scalability;
+pub mod service_discovery;
 pub mod sync;
 #[allow(missing_docs)]
 pub mod types;
@@ -76,6 +77,12 @@ pub use vector_clock::VectorClock;
 // Labor share gossip messages (Issue #391)
 pub use labor_shares::{
     topics as labor_share_topics, BondMessage, BondPaymentType, LaborShareMessage,
+};
+
+// Service discovery gossip messages (Epic 3, Issue #935)
+pub use service_discovery::{
+    sign_service_endpoint, topics as service_discovery_topics, verify_service_endpoint,
+    ServiceDiscoveryMessage,
 };
 
 // Key rotation gossip messages (Issue #469)

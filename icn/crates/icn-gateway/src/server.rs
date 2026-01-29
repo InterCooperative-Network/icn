@@ -486,6 +486,15 @@ impl GatewayServer {
                 None
             };
 
+        // Create service discovery manager
+        let service_discovery_manager =
+            Arc::new(crate::service_discovery_mgr::ServiceDiscoveryManager::new());
+        info!("Service discovery manager initialized");
+
+        // Start background expiry task for service endpoints (every 5 minutes)
+        let _service_expiry_handle =
+            crate::service_discovery_mgr::start_expiry_task(service_discovery_manager.clone(), 300);
+
         let federation_manager = Arc::new(FederationManager::new());
         let commons_manager = Arc::new(CommonsManager::new());
 
@@ -880,6 +889,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)
                 .app_data(web::Data::new(agreement_manager.clone()))
+                // Service discovery manager
+                .app_data(web::Data::new(service_discovery_manager.clone()))
                 // Listings manager for cooperative exchange
                 .app_data(web::Data::new(listings_manager.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
@@ -1081,6 +1092,15 @@ impl GatewayServer {
                             web::scope("/compute")
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Service discovery endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/services")
+                                .configure(api::services::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

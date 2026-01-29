@@ -21,9 +21,11 @@
 //! - Dispute resolution (just enforces signatures)
 //! - Global namespace (scoped by design)
 
+use crate::scope::ScopeLevel;
 use crate::types::{
     Did, Duration, Endpoint, Hash, Name, Namespace, Scope, Signature, Subscription,
 };
+use serde::{Deserialize, Serialize};
 
 /// Target that a name resolves to.
 #[derive(Clone, Debug)]
@@ -117,7 +119,7 @@ impl ResolveOptions {
 }
 
 /// Service type for discovery.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServiceType {
     /// Service type name (e.g., "ledger", "governance")
     pub name: String,
@@ -138,6 +140,122 @@ pub struct ServiceAnnouncement {
     pub ttl: Duration,
     /// Service capabilities/metadata
     pub capabilities: Vec<String>,
+}
+
+/// Unique identifier for a service endpoint registration.
+pub type ServiceEndpointId = String;
+
+/// Service endpoint with signing, scope awareness, and multi-endpoint support.
+///
+/// Complements the existing `ServiceAnnouncement` with:
+/// - Ed25519 signature for authenticity
+/// - `ScopeLevel` for hierarchical visibility
+/// - Multiple endpoints per service
+/// - TTL-based expiry
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ServiceEndpoint {
+    /// Unique identifier for this service registration
+    pub service_id: ServiceEndpointId,
+    /// DID of the service provider
+    pub provider: Did,
+    /// Type of service being provided
+    pub service_type: ServiceType,
+    /// Network endpoints where the service is reachable
+    pub endpoints: Vec<Endpoint>,
+    /// Capabilities offered by this service
+    pub capabilities: Vec<String>,
+    /// Minimum trust score required to access this service
+    pub trust_threshold: f64,
+    /// Scope at which this service is visible
+    pub scope_visibility: ScopeLevel,
+    /// Time-to-live in seconds
+    pub ttl_secs: u64,
+    /// Ed25519 signature over the signing payload
+    pub signature: Signature,
+    /// Unix timestamp of creation
+    pub created_at: u64,
+}
+
+impl ServiceEndpoint {
+    /// Compute deterministic signing payload.
+    ///
+    /// The payload is a byte concatenation of all fields except the signature,
+    /// following the `ComputeResult` pattern for canonical signing.
+    pub fn signing_payload(&self) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(self.service_id.as_bytes());
+        payload.extend_from_slice(self.provider.as_bytes());
+        payload.extend_from_slice(self.service_type.name.as_bytes());
+        payload.extend_from_slice(self.service_type.version.as_bytes());
+        // Endpoints: encode count then each endpoint
+        payload.extend_from_slice(&(self.endpoints.len() as u32).to_le_bytes());
+        for ep in &self.endpoints {
+            payload.extend_from_slice(ep.protocol.as_bytes());
+            payload.extend_from_slice(ep.host.as_bytes());
+            payload.extend_from_slice(&ep.port.to_le_bytes());
+            if let Some(ref path) = ep.path {
+                payload.push(1);
+                payload.extend_from_slice(path.as_bytes());
+            } else {
+                payload.push(0);
+            }
+        }
+        // Capabilities: sorted for determinism
+        let mut sorted_caps = self.capabilities.clone();
+        sorted_caps.sort();
+        payload.extend_from_slice(&(sorted_caps.len() as u32).to_le_bytes());
+        for cap in &sorted_caps {
+            payload.extend_from_slice(cap.as_bytes());
+        }
+        payload.extend_from_slice(&self.trust_threshold.to_le_bytes());
+        payload.push(self.scope_visibility.as_u8());
+        payload.extend_from_slice(&self.ttl_secs.to_le_bytes());
+        payload.extend_from_slice(&self.created_at.to_le_bytes());
+        payload
+    }
+
+    /// Check if this endpoint registration has expired.
+    pub fn is_expired(&self) -> bool {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        now > self.created_at + self.ttl_secs
+    }
+}
+
+/// Scope-aware service discovery using `ScopeLevel`.
+///
+/// Complements the existing `Discovery` trait with 5-level scope support.
+/// Does not replace `Discovery` — both can coexist.
+pub trait ScopedDiscovery: Send + Sync {
+    /// Announce a service endpoint.
+    fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError>;
+
+    /// Withdraw a service endpoint.
+    fn withdraw_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+        provider: &Did,
+    ) -> Result<(), NamingError>;
+
+    /// Discover service endpoints at a given scope level and type.
+    fn discover_endpoints(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+    ) -> Result<Vec<ServiceEndpoint>, NamingError>;
+
+    /// Discover service endpoints with capability filtering.
+    fn discover_endpoints_filtered(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+        required_capabilities: &[String],
+    ) -> Result<Vec<ServiceEndpoint>, NamingError>;
+
+    /// Get a specific service endpoint by ID.
+    fn get_endpoint(&self, service_id: &ServiceEndpointId) -> Result<ServiceEndpoint, NamingError>;
 }
 
 /// Naming service for name registration and resolution.
@@ -330,6 +448,108 @@ mod tests {
         };
         assert_eq!(st.name, "ledger");
         assert_eq!(st.version, "1.0");
+    }
+
+    #[test]
+    fn test_service_endpoint_signing_payload_deterministic() {
+        let ep = ServiceEndpoint {
+            service_id: "svc-1".to_string(),
+            provider: "did:icn:alice".to_string(),
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![Endpoint::new("https", "example.com", 8080)],
+            capabilities: vec!["read".to_string(), "write".to_string()],
+            trust_threshold: 0.1,
+            scope_visibility: ScopeLevel::Org,
+            ttl_secs: 3600,
+            signature: Signature::new(vec![0; 64]),
+            created_at: 1700000000,
+        };
+
+        let payload1 = ep.signing_payload();
+        let payload2 = ep.signing_payload();
+        assert_eq!(payload1, payload2);
+        assert!(!payload1.is_empty());
+    }
+
+    #[test]
+    fn test_service_endpoint_signing_payload_caps_sorted() {
+        let make_ep = |caps: Vec<String>| ServiceEndpoint {
+            service_id: "svc-1".to_string(),
+            provider: "did:icn:alice".to_string(),
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            capabilities: caps,
+            trust_threshold: 0.0,
+            scope_visibility: ScopeLevel::Local,
+            ttl_secs: 60,
+            signature: Signature::new(vec![]),
+            created_at: 0,
+        };
+
+        let ep1 = make_ep(vec!["b".to_string(), "a".to_string()]);
+        let ep2 = make_ep(vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(ep1.signing_payload(), ep2.signing_payload());
+    }
+
+    #[test]
+    fn test_service_endpoint_is_expired() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let fresh = ServiceEndpoint {
+            service_id: "svc-1".to_string(),
+            provider: "did:icn:alice".to_string(),
+            service_type: ServiceType {
+                name: "test".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            capabilities: vec![],
+            trust_threshold: 0.0,
+            scope_visibility: ScopeLevel::Local,
+            ttl_secs: 3600,
+            signature: Signature::new(vec![]),
+            created_at: now,
+        };
+        assert!(!fresh.is_expired());
+
+        let expired = ServiceEndpoint {
+            created_at: now - 7200,
+            ttl_secs: 3600,
+            ..fresh.clone()
+        };
+        assert!(expired.is_expired());
+    }
+
+    #[test]
+    fn test_service_endpoint_serde_roundtrip() {
+        let ep = ServiceEndpoint {
+            service_id: "svc-1".to_string(),
+            provider: "did:icn:alice".to_string(),
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![Endpoint::new("https", "example.com", 443)],
+            capabilities: vec!["read".to_string()],
+            trust_threshold: 0.5,
+            scope_visibility: ScopeLevel::Federation,
+            ttl_secs: 1800,
+            signature: Signature::new(vec![1, 2, 3]),
+            created_at: 1700000000,
+        };
+
+        let json = serde_json::to_string(&ep).unwrap();
+        let parsed: ServiceEndpoint = serde_json::from_str(&json).unwrap();
+        assert_eq!(ep, parsed);
     }
 
     #[test]
