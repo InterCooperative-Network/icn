@@ -47,10 +47,21 @@ pub const TRUST_THRESHOLD_FEDERATED: f64 = 0.7;
 /// Kernel components should use this enum for policy decisions. Apps
 /// translate their domain-specific trust models to these classes.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum TrustClass {
     /// Not yet evaluated or untrusted (score < 0.1)
+    #[default]
     Isolated = 0,
     /// Known but not trusted (score 0.1-0.4)
     Known = 1,
@@ -87,12 +98,6 @@ impl TrustClass {
     /// Check if a score meets or exceeds this trust class
     pub fn meets(&self, score: f64) -> bool {
         score >= self.min_score()
-    }
-}
-
-impl Default for TrustClass {
-    fn default() -> Self {
-        TrustClass::Isolated
     }
 }
 
