@@ -100,6 +100,8 @@ impl ComputeActor {
         locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
         requested_at: u64,
+        max_scope: Option<icn_kernel_api::ScopeLevel>,
+        cell_affinity: Option<icn_kernel_api::CellId>,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -324,21 +326,18 @@ impl ComputeActor {
             locality_hints: locality_hints.clone(),
             max_cost: _max_cost,
             requested_at,
-            max_scope: None,
-            cell_affinity: None,
+            max_scope,
+            cell_affinity,
         };
 
         // Score the task
         let offer = match policy.score_task(
-            &task_hash,
-            &resource_profile,
+            &placement_request,
             &submitter,
             &node_state,
             our_trust,
-            &locality_hints,
             &locality_ctx,
             &scope_ctx,
-            &placement_request,
         ) {
             Some(o) => o,
             None => {
@@ -962,6 +961,8 @@ impl ComputeActor {
                 locality_hints: vec![],
                 max_cost: Some(payment.amount),
                 requested_at,
+                max_scope: None,     // TODO: populate from federated task constraints
+                cell_affinity: None, // TODO: populate from federated task constraints
             });
         }
 

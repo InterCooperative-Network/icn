@@ -122,7 +122,6 @@ fn demo_gpu_placement() {
         };
 
         // Empty locality hints and context for demo
-        let empty_hints: Vec<icn_compute::LocalityHint> = vec![];
         let empty_ctx = icn_compute::LocalityContext::empty();
         let scope_ctx = icn_compute::ScopeContext::empty();
         let request = icn_compute::PlacementRequest {
@@ -136,15 +135,12 @@ fn demo_gpu_placement() {
         };
 
         match policy.score_task(
-            &task_hash,
-            &task_profile,
+            &request,
             "did:icn:submitter",
             &node_state,
             trust,
-            &empty_hints,
             &empty_ctx,
             &scope_ctx,
-            &request,
         ) {
             Some(offer) => {
                 println!("  {}: score = {:.3}", did, offer.score);

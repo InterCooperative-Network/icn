@@ -1147,21 +1147,21 @@ pub trait PlacementPolicy: Send + Sync {
     ///
     /// # Parameters
     ///
-    /// - `locality_hints`: Task placement preferences (region, data locality, etc.)
+    /// - `request`: The full placement request (task_hash, resource_profile,
+    ///   locality_hints, max_scope, cell_affinity)
+    /// - `submitter`: DID of the task submitter
+    /// - `node_state`: Current executor node capacity and queue state
+    /// - `trust_score`: Submitter's trust score as seen by the executor
     /// - `locality_ctx`: Network context for computing locality scores (RTT, blob locations)
     /// - `scope_ctx`: Scope relationship between submitter and executor for scope-aware scoring
-    /// - `request`: The full placement request (includes max_scope, cell_affinity)
     fn score_task(
         &self,
-        task_hash: &[u8; 32],
-        profile: &ResourceProfile,
+        request: &PlacementRequest,
         submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
-        locality_hints: &[LocalityHint],
         locality_ctx: &LocalityContext,
         scope_ctx: &ScopeContext,
-        request: &PlacementRequest,
     ) -> Option<PlacementOffer>;
 }
 
@@ -1199,16 +1199,14 @@ impl Default for DefaultPlacementPolicy {
 impl PlacementPolicy for DefaultPlacementPolicy {
     fn score_task(
         &self,
-        _task_hash: &[u8; 32],
-        profile: &ResourceProfile,
+        request: &PlacementRequest,
         _submitter: &str,
         node_state: &NodeState,
         trust_score: f64,
-        locality_hints: &[LocalityHint],
         locality_ctx: &LocalityContext,
         scope_ctx: &ScopeContext,
-        request: &PlacementRequest,
     ) -> Option<PlacementOffer> {
+        let profile = &request.resource_profile;
         // Trust gate
         if trust_score < self.min_trust {
             return None;
@@ -1297,7 +1295,7 @@ impl PlacementPolicy for DefaultPlacementPolicy {
 
         // Factor 8: Locality hints bonus (weight 0.05)
         let mut hint_bonus: f64 = 0.0;
-        for hint in locality_hints {
+        for hint in &request.locality_hints {
             match hint {
                 LocalityHint::PreferRegion(region) => {
                     if let Some(ref own_region) = locality_ctx.own_region {
@@ -1485,7 +1483,7 @@ mod tests {
 
         let task_hash = [0u8; 32];
         let empty_locality = LocalityContext::empty();
-        let no_hints: Vec<LocalityHint> = vec![];
+
         let scope_ctx = ScopeContext::empty();
         let request = PlacementRequest {
             task_hash,
@@ -1500,15 +1498,12 @@ mod tests {
         // High trust, should get good score
         let offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &scope_ctx,
-                &request,
             )
             .unwrap();
 
@@ -1517,15 +1512,12 @@ mod tests {
 
         // Low trust, rejected
         let offer = policy.score_task(
-            &task_hash,
-            &profile,
+            &request,
             "did:icn:untrusted",
             &node_state,
             0.1,
-            &no_hints,
             &empty_locality,
             &scope_ctx,
-            &request,
         );
         assert!(offer.is_none());
 
@@ -1537,15 +1529,12 @@ mod tests {
 
         let offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &busy_node,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &scope_ctx,
-                &request,
             )
             .unwrap();
 
@@ -1558,15 +1547,12 @@ mod tests {
         };
         // scope_ctx has peer_scope=Commons which > Cell, should be rejected
         let offer = policy.score_task(
-            &task_hash,
-            &profile,
+            &local_only_request,
             "did:icn:alice",
             &node_state,
             0.8,
-            &no_hints,
             &empty_locality,
             &scope_ctx,
-            &local_only_request,
         );
         assert!(offer.is_none(), "Should reject when peer_scope > max_scope");
 
@@ -1578,15 +1564,12 @@ mod tests {
         };
         let cell_offer = policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &cell_ctx,
-                &request,
             )
             .unwrap();
         // Cell scope bonus (0.12) vs Commons (0.00) = +0.12 advantage
@@ -2066,7 +2049,6 @@ mod tests {
 
         let task_hash = [0u8; 32];
         let empty_locality = LocalityContext::empty();
-        let no_hints: Vec<LocalityHint> = vec![];
 
         // Request restricted to Cell scope
         let request = PlacementRequest {
@@ -2087,15 +2069,12 @@ mod tests {
         };
         assert!(policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &commons_ctx,
-                &request,
             )
             .is_none());
 
@@ -2107,15 +2086,12 @@ mod tests {
         };
         assert!(policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &cell_ctx,
-                &request,
             )
             .is_some());
 
@@ -2127,15 +2103,12 @@ mod tests {
         };
         assert!(policy
             .score_task(
-                &task_hash,
-                &profile,
+                &request,
                 "did:icn:alice",
                 &node_state,
                 0.8,
-                &no_hints,
                 &empty_locality,
                 &local_ctx,
-                &request,
             )
             .is_some());
     }
@@ -2164,7 +2137,7 @@ mod tests {
 
         let task_hash = [0u8; 32];
         let empty_locality = LocalityContext::empty();
-        let no_hints: Vec<LocalityHint> = vec![];
+
         let request = PlacementRequest {
             task_hash,
             resource_profile: profile.clone(),
@@ -2190,30 +2163,24 @@ mod tests {
 
             local_total += policy
                 .score_task(
-                    &task_hash,
-                    &profile,
+                    &request,
                     "did:icn:alice",
                     &node_state,
                     0.8,
-                    &no_hints,
                     &empty_locality,
                     &local_ctx,
-                    &request,
                 )
                 .unwrap()
                 .score;
 
             commons_total += policy
                 .score_task(
-                    &task_hash,
-                    &profile,
+                    &request,
                     "did:icn:alice",
                     &node_state,
                     0.8,
-                    &no_hints,
                     &empty_locality,
                     &commons_ctx,
-                    &request,
                 )
                 .unwrap()
                 .score;

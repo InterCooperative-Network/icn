@@ -330,6 +330,8 @@ async fn test_placement_negotiation_multi_executor() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
+        max_scope: None,
+        cell_affinity: None,
     };
 
     tracing::info!("Broadcasting PlacementRequest to all executors");
@@ -421,8 +423,8 @@ async fn test_placement_negotiation_multi_executor() {
 #[tokio::test]
 async fn test_locality_aware_placement_scoring() {
     use crate::scheduler::{
-        DefaultPlacementPolicy, LocalityContext, LocalityHint, NodeCapacity, NodeState,
-        PlacementPolicy, PlacementRequest, ResourceProfile, ScopeContext,
+        DefaultPlacementPolicy, LocalityContext, NodeCapacity, NodeState, PlacementPolicy,
+        PlacementRequest, ResourceProfile, ScopeContext,
     };
 
     // Create task requiring compute resources
@@ -511,63 +513,21 @@ async fn test_locality_aware_placement_scoring() {
         submitter_region: None,
     };
 
-    let no_hints: Vec<LocalityHint> = vec![];
-
     // Score all executors
     let offer_a = policy
-        .score_task(
-            &task_hash,
-            &profile,
-            "submitter",
-            &node_a,
-            0.8,
-            &no_hints,
-            &locality_a,
-            &scope_ctx,
-            &request,
-        )
+        .score_task(&request, "submitter", &node_a, 0.8, &locality_a, &scope_ctx)
         .unwrap();
 
     let offer_b = policy
-        .score_task(
-            &task_hash,
-            &profile,
-            "submitter",
-            &node_b,
-            0.6,
-            &no_hints,
-            &locality_b,
-            &scope_ctx,
-            &request,
-        )
+        .score_task(&request, "submitter", &node_b, 0.6, &locality_b, &scope_ctx)
         .unwrap();
 
     let offer_c = policy
-        .score_task(
-            &task_hash,
-            &profile,
-            "submitter",
-            &node_c,
-            0.6,
-            &no_hints,
-            &locality_c,
-            &scope_ctx,
-            &request,
-        )
+        .score_task(&request, "submitter", &node_c, 0.6, &locality_c, &scope_ctx)
         .unwrap();
 
     let offer_d = policy
-        .score_task(
-            &task_hash,
-            &profile,
-            "submitter",
-            &node_d,
-            0.4,
-            &no_hints,
-            &locality_d,
-            &scope_ctx,
-            &request,
-        )
+        .score_task(&request, "submitter", &node_d, 0.4, &locality_d, &scope_ctx)
         .unwrap();
 
     tracing::info!("=== Phase 16C Locality-Aware Placement Scoring ===");
