@@ -1899,9 +1899,7 @@ mod tests {
     fn test_capacity_budget_cumulative() {
         let budget = CapacityBudget::default();
         assert_eq!(budget.cumulative_fraction_up_to(ScopeLevel::Local), 0.30);
-        assert!(
-            (budget.cumulative_fraction_up_to(ScopeLevel::Cell) - 0.55).abs() < f64::EPSILON
-        );
+        assert!((budget.cumulative_fraction_up_to(ScopeLevel::Cell) - 0.55).abs() < f64::EPSILON);
         assert!(
             (budget.cumulative_fraction_up_to(ScopeLevel::Commons) - 1.00).abs() < f64::EPSILON
         );
