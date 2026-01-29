@@ -216,21 +216,29 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "icn -> target"
+      # NOTE: No rust-cache for coverage job - tarpaulin needs fresh instrumented
+      # builds anyway, and the cache just wastes disk space
 
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin --locked
 
       - name: Pre-tarpaulin cleanup
         run: |
-          echo "Cleaning build artifacts before tarpaulin..."
-          # Remove debug artifacts from cache - tarpaulin needs fresh instrumented builds
-          rm -rf ./icn/target/debug/deps || true
-          rm -rf ./icn/target/debug/build || true
-          rm -rf ./icn/target/debug/.fingerprint || true
+          echo "Additional disk cleanup for coverage job..."
+          
+          # Remove cargo caches to free space (tarpaulin downloads what it needs)
+          rm -rf ~/.cargo/registry/cache || true
+          rm -rf ~/.cargo/git/db || true
+          
+          # Clear any remaining large directories on the runner
+          sudo rm -rf /usr/local/games || true
+          sudo rm -rf /usr/games || true
+          sudo rm -rf /usr/share/icons || true
+          sudo rm -rf /usr/share/fonts || true
+          sudo rm -rf /opt/hostedtoolcache/cargo-* || true
+          
           # Show remaining space
+          echo "Disk space before tarpaulin:"
           df -h /
 
       - name: Generate coverage
