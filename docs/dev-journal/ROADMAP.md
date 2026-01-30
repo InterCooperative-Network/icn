@@ -83,7 +83,7 @@ Prerequisites for Phase 6 (Crate Consolidation):
 - ~~[#912](https://github.com/InterCooperative-Network/icn/issues/912): Remove icn-trust from icn-core~~ ✅ PR #972
 - [#913](https://github.com/InterCooperative-Network/icn/issues/913): Remove icn-governance from icn-core
 - [#914](https://github.com/InterCooperative-Network/icn/issues/914): Remove icn-ledger from icn-core
-- [#915](https://github.com/InterCooperative-Network/icn/issues/915): Remove icn-trust dev-dep from icn-net (PR #973 open)
+- ~~[#915](https://github.com/InterCooperative-Network/icn/issues/915): Remove icn-trust dev-dep from icn-net~~ ✅ PR #973
 - ~~[#916](https://github.com/InterCooperative-Network/icn/issues/916): Enable strict Meaning Firewall CI~~ ✅ PR #974
 - [#911](https://github.com/InterCooperative-Network/icn/issues/911): Remove raw_handles transition mechanism
 - [#918](https://github.com/InterCooperative-Network/icn/issues/918): Move supervisor init_*.rs to app crates
