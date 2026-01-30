@@ -705,11 +705,12 @@ impl MisbehaviorDetector {
             }));
 
             if let Err(e) = result {
-                warn!(
-                    "TrustService::record_event panicked for {}: {:?}",
-                    did,
-                    e.downcast_ref::<&str>().unwrap_or(&"unknown panic")
-                );
+                let msg = e
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| e.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "unknown panic".to_string());
+                warn!("TrustService::record_event panicked for {}: {}", did, msg);
             }
             return;
         }
@@ -726,11 +727,12 @@ impl MisbehaviorDetector {
                 }));
 
                 if let Err(e) = result {
-                    warn!(
-                        "Trust penalty callback panicked for {}: {:?}",
-                        did,
-                        e.downcast_ref::<&str>().unwrap_or(&"unknown panic")
-                    );
+                    let msg = e
+                        .downcast_ref::<&str>()
+                        .map(|s| s.to_string())
+                        .or_else(|| e.downcast_ref::<String>().cloned())
+                        .unwrap_or_else(|| "unknown panic".to_string());
+                    warn!("Trust penalty callback panicked for {}: {}", did, msg);
                 }
             }
         }

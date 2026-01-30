@@ -73,7 +73,16 @@ impl TrustService for TrustServiceImpl {
                 let penalty = severity * 0.25;
                 let current = {
                     let graph = self.graph.read();
-                    graph.compute_trust_score(&identity_did).unwrap_or(1.0)
+                    match graph.compute_trust_score(&identity_did) {
+                        Ok(score) => score,
+                        Err(e) => {
+                            tracing::warn!(
+                                actor = %actor,
+                                "Failed to read trust score, skipping penalty: {e}"
+                            );
+                            return;
+                        }
+                    }
                 };
                 let new_score = (current - penalty).max(0.0);
                 let trust_score = icn_trust::TrustScore::unchecked(new_score);

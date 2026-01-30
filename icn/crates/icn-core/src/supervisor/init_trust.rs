@@ -79,7 +79,7 @@ pub async fn init_trust_services(
 /// Creates:
 /// - Recovery store for social recovery
 /// - Misbehavior detector with TrustService integration
-/// - Wires the provided TrustGraph for penalty callbacks
+/// - Wires the provided TrustGraph for app-layer trust mutations via TrustService
 pub async fn init_trust_services_with_graph(
     config: &Config,
     trust_graph_handle: Arc<RwLock<TrustGraph>>,

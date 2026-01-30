@@ -258,7 +258,12 @@ async fn spawn_actors_with_identity(
         .await?
     } else {
         debug!("No TrustGraph in ServiceRegistry, creating internal one");
-        super::init_trust::init_trust_services(config, did.clone(), trust_service_from_registry.clone()).await?
+        super::init_trust::init_trust_services(
+            config,
+            did.clone(),
+            trust_service_from_registry.clone(),
+        )
+        .await?
     };
     let trust_graph_handle = trust_services.trust_graph.clone();
     let misbehavior_detector = trust_services.misbehavior_detector.clone();
