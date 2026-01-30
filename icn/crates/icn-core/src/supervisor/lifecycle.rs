@@ -274,10 +274,34 @@ async fn spawn_actors_with_identity(
     let snapshot_coordinator = super::init_snapshot::init_snapshot_coordinator(did.clone()).await?;
     info!("Snapshot coordinator initialized");
 
-    // Initialize gossip services
-    // Use TrustService extracted earlier for ReplicationManager and gossip behavior.
-    let policy_oracle_from_registry = trust_service_from_registry.as_ref().map(|ts| ts.oracle());
+    // Initialize OracleRegistry for centralized policy authorization.
+    // The registry routes policy requests to domain-specific oracles and manages
+    // bootstrap phases (Genesis → CoreApps → Running).
+    let oracle_registry = Arc::new(icn_kernel_api::OracleRegistry::new());
 
+    // Get TrustService from ServiceRegistry for ReplicationManager and oracle registration.
+    let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
+
+    // Register trust PolicyOracle with OracleRegistry if available.
+    // This replaces the direct PolicyOracle passing and provides phase-aware authorization.
+    if let Some(ref trust_service) = trust_service_from_registry {
+        let trust_oracle = trust_service.oracle();
+        let trust_domain = trust_oracle.domain();
+        oracle_registry.register(trust_domain.clone(), trust_oracle);
+        info!("Registered TrustPolicyOracle with OracleRegistry for domain '{}'", trust_domain);
+    }
+
+    // Transition to CoreApps phase: first-party oracles are registered.
+    oracle_registry.set_phase(icn_kernel_api::bootstrap::BootstrapPhase::CoreApps);
+    info!("OracleRegistry phase: CoreApps");
+
+    // Use OracleRegistry as the PolicyOracle for all kernel components.
+    // OracleRegistry implements PolicyOracle, so it can be passed wherever
+    // a PolicyOracle is expected, providing domain routing and caching.
+    let oracle_for_components: Arc<dyn icn_kernel_api::authz::PolicyOracle> =
+        oracle_registry.clone();
+
+    // Initialize gossip services with OracleRegistry as the policy oracle.
     let gossip_services = super::init_gossip::init_gossip_services(
         config,
         did.clone(),
@@ -285,7 +309,7 @@ async fn spawn_actors_with_identity(
             trust_service: trust_service_from_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
             identity_bundle: identity_bundle.clone(),
-            policy_oracle: policy_oracle_from_registry,
+            policy_oracle: Some(oracle_for_components.clone()),
         },
     )
     .await?;
@@ -358,7 +382,7 @@ async fn spawn_actors_with_identity(
 
     info!("Identity actor spawned with DID: {}", identity_handle.did());
 
-    // Spawn Network actor
+    // Spawn Network actor with OracleRegistry for trust-based rate limiting
     let network_handle = spawn_network_actor(
         config,
         identity_bundle,
@@ -367,6 +391,7 @@ async fn spawn_actors_with_identity(
         &trust_graph_handle,
         &misbehavior_detector,
         shutdown_tx,
+        &oracle_for_components,
     )
     .await?;
 
@@ -623,8 +648,7 @@ async fn spawn_actors_with_identity(
 
     info!("✓ Policy governance integration active");
 
-    // Spawn RPC server
-    // TODO: Inject PolicyOracle from daemon for trust-based rate limiting
+    // Spawn RPC server with OracleRegistry-backed trust-based rate limiting
     let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config);
     let rpc_compute_handle = super::init_rpc::spawn_rpc_server(
         rpc_config,
@@ -638,7 +662,7 @@ async fn spawn_actors_with_identity(
             trust_graph: trust_graph_handle.clone(),
             dispute_manager: dispute_manager_handle,
             federation_registry: federation_registry_for_rpc,
-            policy_oracle: None, // TODO: Inject from daemon via apps/trust
+            policy_oracle: Some(oracle_for_components.clone()),
         },
         background_tasks,
     );
@@ -685,6 +709,15 @@ async fn spawn_actors_with_identity(
 
     // Store broadcaster for gateway
     gateway_handles.event_broadcaster = Some(broadcaster);
+
+    // Transition OracleRegistry to Running phase.
+    // All first-party apps are loaded and oracles registered.
+    // From this point, unknown domains are denied by default (security).
+    oracle_registry.set_phase(icn_kernel_api::bootstrap::BootstrapPhase::Running);
+    info!(
+        "OracleRegistry phase: Running (registered domains: {:?})",
+        oracle_registry.domains()
+    );
 
     // Store shutdown handles
     shutdown_handles.misbehavior_detector = Some(misbehavior_detector);
@@ -742,6 +775,7 @@ async fn spawn_network_actor(
     _trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
     misbehavior_detector: &Arc<RwLock<icn_security::MisbehaviorDetector>>,
     shutdown_tx: &ShutdownTx,
+    policy_oracle: &Arc<dyn icn_kernel_api::authz::PolicyOracle>,
 ) -> Result<icn_net::NetworkHandle> {
     let listen_addr: std::net::SocketAddr = config.network.listen_addr.parse()?;
     let federation_enabled = config.federation.enabled;
@@ -757,11 +791,12 @@ async fn spawn_network_actor(
             federation_enabled,
         });
 
-    // Prepare rate limiting configuration
-    // TODO(Phase 2.3): Wire up PolicyOracle from trust app instead of using fallback
+    // Prepare rate limiting configuration with OracleRegistry-backed PolicyOracle.
+    // The oracle provides trust-based rate limits via the OracleRegistry.
+    // Fallback config is still provided for cases where the oracle returns no constraints.
     let (oracle, fallback_config) = if config.rate_limiting.enabled {
         (
-            None, // TODO: Create oracle from apps/trust
+            Some(policy_oracle.clone()),
             Some(config.rate_limiting.to_fallback_config()),
         )
     } else {

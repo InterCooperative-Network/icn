@@ -23,6 +23,7 @@ ICN's kernel/app separation architecture enforces a strict boundary—the **Mean
    - [TrustService](#32-trustservice)
    - [ServiceRegistry](#33-serviceregistry)
    - [ConstraintSet](#34-constraintset)
+   - [OracleRegistry](#35-oracleregistry)
 4. [Request Flow](#4-request-flow)
 5. [Implementation Guide](#5-implementation-guide)
 6. [Migration Status](#6-migration-status)
@@ -431,6 +432,41 @@ pub enum ConstraintValue {
 
 The kernel enforces these without knowing whether they came from trust scores, governance rules, or membership status.
 
+### 3.5 OracleRegistry
+
+The `OracleRegistry` is the centralized authorization gateway that routes policy requests to domain-specific oracles. It implements `PolicyOracle` so kernel components (GossipActor, NetworkActor, RPC server) can use it as their single authorization endpoint.
+
+**Key features:**
+- **Per-domain routing**: Requests are dispatched to the oracle registered for the request's domain (e.g., `trust`, `ledger`, `governance`)
+- **Bootstrap phases**: Genesis (allow all) → CoreApps (allow all) → Running (deny unknown domains)
+- **Decision caching**: TTL-based cache with automatic invalidation on oracle swap
+- **Atomic oracle replacement**: Uses `ArcSwap` for lock-free reads during hot path evaluation
+
+**Supervisor lifecycle integration:**
+
+```
+1. Supervisor creates OracleRegistry (Genesis phase - AllowAll)
+2. Daemon registers TrustPolicyOracle for "trust" domain
+3. Registry transitions to CoreApps phase
+4. All actors initialize with OracleRegistry as their PolicyOracle
+5. Registry transitions to Running phase (deny-by-default for unknown domains)
+```
+
+**Usage in kernel components:**
+
+```rust
+// The supervisor passes OracleRegistry as Arc<dyn PolicyOracle>
+let oracle_registry = Arc::new(OracleRegistry::new());
+oracle_registry.register(Domain::trust(), trust_oracle);
+oracle_registry.set_phase(BootstrapPhase::Running);
+
+// Kernel components receive it as a generic PolicyOracle
+let oracle: Arc<dyn PolicyOracle> = oracle_registry;
+let gossip = GossipActor::new(did, Some(oracle));
+```
+
+**Location**: `icn-kernel-api/src/bootstrap.rs`
+
 ---
 
 ## 4. Request Flow
@@ -672,15 +708,22 @@ fn check_access(&self, score: f64) -> bool {
 | GossipDeps → PolicyOracle | 2026-01-27 | Removed TrustGraphOracle fallback |
 | GovernanceService wired in icnd | 2026-01-30 | Daemon owns SledParameterStore lifecycle |
 | LedgerService wired in icnd | 2026-01-30 | Daemon owns Ledger + SledStore lifecycle |
+| MisbehaviorDetector → TrustService | 2026-01-30 | Full migration (#910) |
+| Ledger → TrustService (no TrustGraph) | 2026-01-30 | icn-trust moved to dev-dep (#867) |
+| OracleRegistry wired in supervisor | 2026-01-30 | Bootstrap phases, domain routing (#869) |
+| Network rate limiting → OracleRegistry | 2026-01-30 | Replaced TODO stub (#869) |
+| RPC PolicyOracle → OracleRegistry | 2026-01-30 | Replaced TODO stub (#869) |
+| AllowAllOracle fallback removed | 2026-01-30 | Gossip uses OracleRegistry (#869) |
 
 ### 6.2 Remaining Work
 
 | Component | Location | Status | Notes |
 |-----------|----------|--------|-------|
-| MisbehaviorDetector | icn-core/security | Needs TrustService | Uses TrustGraph directly |
 | GatewayServer trust routes | icn-gateway | Partial | Some endpoints still use TrustGraph |
-| init_trust.rs cleanup | icn-core/supervisor | Done | Documentation added |
 | ContractActor | icn-ccl | Needs TrustService | Still accepts `Option<Arc<RwLock<TrustGraph>>>` |
+| icn-trust dep in icn-core | icn-core/Cargo.toml | #912 | Kernel crate still imports domain crate |
+| icn-governance dep in icn-core | icn-core/Cargo.toml | #913 | Kernel crate still imports domain crate |
+| icn-ledger dep in icn-core | icn-core/Cargo.toml | #914 | Kernel crate still imports domain crate |
 
 ### 6.3 Transition Handles
 

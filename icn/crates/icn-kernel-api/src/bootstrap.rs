@@ -382,6 +382,32 @@ impl Default for OracleRegistry {
     }
 }
 
+/// OracleRegistry implements PolicyOracle so it can be passed to kernel components
+/// (e.g., GossipActor, NetworkActor) that expect a single PolicyOracle.
+///
+/// The registry delegates to domain-specific oracles internally, handling:
+/// - Per-domain routing
+/// - TTL-based caching
+/// - Phase-aware fallback (allow during bootstrap, deny in running)
+impl PolicyOracle for OracleRegistry {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        // Delegate to the registry's own evaluate() which handles
+        // domain routing, caching, and bootstrap phase semantics.
+        OracleRegistry::evaluate(self, request)
+    }
+
+    fn cache_ttl(&self) -> Duration {
+        // Return zero: OracleRegistry manages its own cache internally.
+        // External caching would cause stale decisions after oracle swaps.
+        Duration::ZERO
+    }
+
+    fn domain(&self) -> Domain {
+        // OracleRegistry handles all domains via internal routing.
+        Domain::new("*")
+    }
+}
+
 /// Cache statistics.
 #[derive(Clone, Debug)]
 pub struct CacheStats {
@@ -1011,5 +1037,131 @@ mod tests {
             matches!(result, Err(AuthzError::GenesisExpired)),
             "Expected GenesisExpired error after expiration"
         );
+    }
+
+    // ========================================================================
+    // OracleRegistry as PolicyOracle integration tests
+    // ========================================================================
+
+    /// Mock trust oracle that returns Allow with constraints for known actors.
+    struct MockTrustOracle;
+
+    impl PolicyOracle for MockTrustOracle {
+        fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+            // Known trusted actor gets Allow with rate limit
+            if request.core.actor == "did:icn:trusted" {
+                PolicyDecision::Allow {
+                    constraints: crate::authz::ConstraintSet {
+                        rate_limit: Some(crate::authz::RateLimit {
+                            messages_per_second: 100,
+                            burst_size: 200,
+                        }),
+                        max_topics: Some(50),
+                        ..Default::default()
+                    },
+                }
+            } else {
+                // Unknown actors get denied
+                PolicyDecision::deny("untrusted actor")
+            }
+        }
+
+        fn domain(&self) -> Domain {
+            Domain::trust()
+        }
+    }
+
+    #[test]
+    fn test_oracle_registry_as_policy_oracle_trait() {
+        // Verify OracleRegistry can be used as a dyn PolicyOracle
+        let registry = Arc::new(OracleRegistry::new());
+
+        // Register trust oracle
+        registry.register(Domain::trust(), Arc::new(MockTrustOracle));
+        registry.set_phase(BootstrapPhase::CoreApps);
+        registry.set_phase(BootstrapPhase::Running);
+
+        // Use as dyn PolicyOracle (same way GossipActor uses it)
+        let oracle: Arc<dyn PolicyOracle> = registry;
+
+        // Trust domain: trusted actor should be allowed with constraints
+        let trusted_request = PolicyRequest::new(
+            "did:icn:trusted".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let decision = oracle.evaluate(&trusted_request);
+        assert!(decision.is_allowed());
+
+        // Trust domain: unknown actor should be denied
+        let untrusted_request = PolicyRequest::new(
+            "did:icn:unknown".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let decision = oracle.evaluate(&untrusted_request);
+        assert!(!decision.is_allowed());
+
+        // Unknown domain in Running phase: should be denied (security by default)
+        let ledger_request = PolicyRequest::new(
+            "did:icn:trusted".to_string(),
+            ActionKind::Write,
+            Domain::ledger(),
+        );
+        let decision = oracle.evaluate(&ledger_request);
+        assert!(!decision.is_allowed());
+    }
+
+    #[test]
+    fn test_oracle_registry_bootstrap_phase_transition() {
+        let registry = Arc::new(OracleRegistry::new());
+        let oracle: Arc<dyn PolicyOracle> = registry.clone();
+
+        // Genesis phase: unknown domains are allowed (bootstrap flexibility)
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::ledger(),
+        );
+        assert!(oracle.evaluate(&request).is_allowed());
+
+        // Register trust oracle and transition to CoreApps
+        registry.register(Domain::trust(), Arc::new(MockTrustOracle));
+        registry.set_phase(BootstrapPhase::CoreApps);
+
+        // CoreApps: unknown domains still allowed
+        assert!(oracle.evaluate(&request).is_allowed());
+
+        // Transition to Running
+        registry.set_phase(BootstrapPhase::Running);
+
+        // Running: unknown domains denied
+        assert!(!oracle.evaluate(&request).is_allowed());
+
+        // Trust domain still works
+        let trust_request = PolicyRequest::new(
+            "did:icn:trusted".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        assert!(oracle.evaluate(&trust_request).is_allowed());
+    }
+
+    #[test]
+    fn test_oracle_registry_cache_ttl_zero() {
+        let registry = OracleRegistry::new();
+        let oracle: &dyn PolicyOracle = &registry;
+
+        // OracleRegistry manages its own cache, so cache_ttl should be zero
+        assert_eq!(oracle.cache_ttl(), Duration::ZERO);
+    }
+
+    #[test]
+    fn test_oracle_registry_wildcard_domain() {
+        let registry = OracleRegistry::new();
+        let oracle: &dyn PolicyOracle = &registry;
+
+        // OracleRegistry handles all domains
+        assert_eq!(oracle.domain(), Domain::new("*"));
     }
 }
