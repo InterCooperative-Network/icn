@@ -50,6 +50,9 @@ impl TrustService for TestTrustService {
     }
 
     fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        // Uses block_in_place because the TrustGraph is behind a tokio::sync::RwLock
+        // (shared with async test code). A std::sync::RwLock would be simpler but
+        // would require a separate lock type from the rest of the test infrastructure.
         let graph = self.graph.clone();
         let actor_str = actor.clone();
         tokio::task::block_in_place(|| {
@@ -65,7 +68,12 @@ impl TrustService for TestTrustService {
         })
     }
 
-    fn record_event(&self, _actor: &icn_kernel_api::types::Did, _event: icn_kernel_api::services::TrustEvent) {}
+    fn record_event(
+        &self,
+        _actor: &icn_kernel_api::types::Did,
+        _event: icn_kernel_api::services::TrustEvent,
+    ) {
+    }
 }
 
 /// Test node with ledger and trust service
@@ -483,8 +491,7 @@ async fn test_fork_resolution_trust_weighted() -> Result<()> {
     // Set up trust edges: Alice trusts Bob highly, Charlie less
     // Note: In real system this would be through trust_graph.add_edge()
 
-    let trust_service: Arc<dyn TrustService> =
-        Arc::new(TestTrustService::new(trust_graph));
+    let trust_service: Arc<dyn TrustService> = Arc::new(TestTrustService::new(trust_graph));
     let mut resolver = ForkResolver::new(ForkResolutionStrategy::TrustWeighted);
     resolver.set_trust_service(trust_service);
 
