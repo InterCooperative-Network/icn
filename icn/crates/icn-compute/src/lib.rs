@@ -36,6 +36,7 @@ mod federation;
 mod migration_manager;
 mod migration_policy;
 mod policy;
+pub mod receipt;
 mod result_quorum;
 mod scheduler;
 mod task;
@@ -76,6 +77,7 @@ pub use policy::{
     CoopSchedulingPolicy, EnforcementMode, MemberQuota, PlacementConstraints, PolicyDecision,
     PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
 };
+pub use receipt::{ExecutionReceipt, ReceiptHash, SettlementMessage, SignatureBytes};
 pub use result_quorum::{
     CollectedResult, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
     TaskVerification, VerificationConfig, CLOCK_SKEW_TOLERANCE_MS, DEFAULT_COLLECTION_WINDOW_MS,
@@ -121,6 +123,12 @@ pub const TOPIC_DISPUTE: &str = "compute:dispute";
 
 /// Gossip topic for cross-cooperative federation (Phase 21)
 pub const TOPIC_FEDERATION: &str = "compute:federation";
+
+/// Gossip topic for settlement receipts (Epic 4)
+pub const TOPIC_SETTLEMENT_RECEIPT: &str = "settlement:receipt";
+
+/// Gossip topic for settlement disputes (Epic 4)
+pub const TOPIC_SETTLEMENT_DISPUTE: &str = "settlement:dispute";
 
 /// Minimum trust score to submit tasks (0.0 - 1.0)
 pub const MIN_TRUST_SUBMIT: f64 = 0.1;
