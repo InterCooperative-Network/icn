@@ -113,8 +113,7 @@ impl GovernanceService for GovernanceServiceImpl {
 mod tests {
     use super::*;
     use icn_governance::{
-        ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter,
-        SledParameterStore,
+        ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter, SledParameterStore,
     };
     use icn_kernel_api::types::Did;
 

@@ -109,8 +109,7 @@ impl PolicyOracle for GovernancePolicyOracle {
 mod tests {
     use super::*;
     use icn_governance::{
-        ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter,
-        SledParameterStore,
+        ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter, SledParameterStore,
     };
     use icn_kernel_api::authz::ActionKind;
     use icn_kernel_api::types::Did;
