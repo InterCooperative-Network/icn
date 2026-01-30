@@ -81,14 +81,17 @@ pub fn build_earn_entry(contributor: &Did, amount: i64) -> Result<JournalEntry> 
 
     let mint_did = COMMONS_MINT_DID.clone();
 
-    JournalEntryBuilder::new(mint_did.clone())
+    let entry = JournalEntryBuilder::new(mint_did.clone())
         .debit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount)
         .credit(
             contributor.clone(),
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
         )
-        .build()
+        .build()?;
+
+    icn_obs::metrics::compute::commons_credits_earned_add(amount as u64);
+    Ok(entry)
 }
 
 /// Build a double-entry journal entry debiting the consumer.
@@ -103,14 +106,17 @@ pub fn build_spend_entry(consumer: &Did, amount: i64) -> Result<JournalEntry> {
 
     let mint_did = COMMONS_MINT_DID.clone();
 
-    JournalEntryBuilder::new(consumer.clone())
+    let entry = JournalEntryBuilder::new(consumer.clone())
         .debit(
             consumer.clone(),
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
         )
         .credit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount)
-        .build()
+        .build()?;
+
+    icn_obs::metrics::compute::commons_credits_spent_add(amount as u64);
+    Ok(entry)
 }
 
 /// Check if the balance is sufficient for a required amount.

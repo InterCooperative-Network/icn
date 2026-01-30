@@ -3750,6 +3750,32 @@ pub mod compute {
     pub fn commons_pool_memory_mb_set(value: f64) {
         gauge!("icn_compute_commons_pool_memory_mb").set(value);
     }
+
+    /// Set the aggregate commons-weighted storage (MB) across all pool participants.
+    pub fn commons_pool_storage_mb_set(value: f64) {
+        gauge!("icn_compute_commons_pool_storage_mb").set(value);
+    }
+
+    /// Record a commons pool membership change (add or remove).
+    pub fn commons_pool_updates_inc(operation: &str) {
+        counter!(
+            "icn_compute_commons_pool_updates_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
+    }
+
+    // === Commons Credit Accounting Metrics (Epic 6 #925) ===
+
+    /// Record commons credits earned by a contributor.
+    pub fn commons_credits_earned_add(amount: u64) {
+        counter!("icn_compute_commons_credits_earned_total").increment(amount);
+    }
+
+    /// Record commons credits spent by a consumer.
+    pub fn commons_credits_spent_add(amount: u64) {
+        counter!("icn_compute_commons_credits_spent_total").increment(amount);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

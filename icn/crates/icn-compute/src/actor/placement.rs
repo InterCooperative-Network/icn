@@ -768,9 +768,11 @@ impl ComputeActor {
             let count = pool.participant_count();
             let agg = pool.total_commons_capacity();
             drop(pool);
+            icn_obs::metrics::compute::commons_pool_updates_inc("add");
             icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
             icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
             icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
+            icn_obs::metrics::compute::commons_pool_storage_mb_set(agg.storage_mb as f64);
             tracing::debug!(
                 executor = %executor,
                 commons_share,
@@ -783,9 +785,11 @@ impl ComputeActor {
             let count = pool.participant_count();
             let agg = pool.total_commons_capacity();
             drop(pool);
+            icn_obs::metrics::compute::commons_pool_updates_inc("remove");
             icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
             icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
             icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
+            icn_obs::metrics::compute::commons_pool_storage_mb_set(agg.storage_mb as f64);
             tracing::debug!(
                 executor = %executor,
                 "Removed node from commons pool (zero commons share)"

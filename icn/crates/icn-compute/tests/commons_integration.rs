@@ -129,7 +129,27 @@ fn test_insufficient_credits_rejected() {
     assert_eq!(err.required, 200);
 }
 
-/// Test 5: Pool participant lifecycle — add, aggregate, remove, re-aggregate.
+/// Test 5: Scheduling enforcement rejects tasks when credits are insufficient.
+///
+/// This test documents the intended integration point for credit enforcement
+/// at scheduling time. Currently deferred — Epic 6 is accounting only.
+#[test]
+#[ignore = "enforcement not yet implemented — Epic 6 is accounting infrastructure only"]
+fn test_scheduling_enforces_credits() {
+    // When integrated with the scheduler, this should look like:
+    //
+    //   let result = schedule_task_on_commons(task, submitter_did);
+    //   assert!(matches!(
+    //       result,
+    //       Err(icn_compute::ComputeError::InsufficientCommonsCredits { .. })
+    //   ));
+    //
+    // The InsufficientCommonsCredits error variant is defined in
+    // icn-compute/src/error.rs but not yet emitted in any code path.
+    unimplemented!("credit enforcement at scheduling time is deferred to a future epic");
+}
+
+/// Test 6: Pool participant lifecycle — add, aggregate, remove, re-aggregate.
 #[test]
 fn test_pool_participant_lifecycle() {
     let mut pool = CommonsPool::new();
