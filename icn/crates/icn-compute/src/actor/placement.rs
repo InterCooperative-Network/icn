@@ -751,6 +751,10 @@ impl ComputeActor {
         };
 
         // Lock discipline: acquire write lock, mutate, release immediately.
+        //
+        // SECURITY NOTE: Unaffiliated nodes (cell_id=None) are granted full commons
+        // participation without Sybil resistance. This is intentional for the pilot
+        // phase but requires governance intervention before production scale.
         let commons_share = effective_budget.commons_share;
         if commons_share > 0.0 {
             let participant = crate::commons_pool::CommonsParticipant {
@@ -762,7 +766,11 @@ impl ComputeActor {
             let mut pool = self.commons_pool.write().await;
             pool.add_participant(participant);
             let count = pool.participant_count();
+            let agg = pool.total_commons_capacity();
             drop(pool);
+            icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
+            icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
+            icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
             tracing::debug!(
                 executor = %executor,
                 commons_share,
@@ -772,7 +780,12 @@ impl ComputeActor {
         } else {
             let mut pool = self.commons_pool.write().await;
             pool.remove_participant(&executor);
+            let count = pool.participant_count();
+            let agg = pool.total_commons_capacity();
             drop(pool);
+            icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
+            icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
+            icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
             tracing::debug!(
                 executor = %executor,
                 "Removed node from commons pool (zero commons share)"

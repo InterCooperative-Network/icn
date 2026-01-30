@@ -26,6 +26,8 @@ pub struct CommonsParticipant {
     /// When we last heard from this node. In-memory only — not serialized,
     /// not sent over the wire. Enables future stale-participant expiry
     /// without migration.
+    // TODO(#925): Implement stale participant expiry using last_announce.
+    // Nodes not announcing for >5 minutes should be removed from the pool.
     pub last_announce: Instant,
 }
 
@@ -96,6 +98,13 @@ impl CommonsPool {
     /// Compute the total commons-weighted capacity across all participants.
     ///
     /// Each node's capacity is weighted by its `budget.commons_share`.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method takes `&self` and iterates over the participants map.
+    /// Callers are responsible for ensuring exclusive access — in practice
+    /// this is always called while holding an `RwLock` (read or write)
+    /// on the `CommonsPool`.
     pub fn total_commons_capacity(&self) -> AggregateCapacity {
         let mut cpu_cores: f64 = 0.0;
         let mut memory_mb: u128 = 0;
@@ -110,7 +119,7 @@ impl CommonsPool {
 
         AggregateCapacity {
             cpu_cores,
-            // Clamp u128 → u64 with saturation
+            // Saturate u128 → u64: values above u64::MAX are clamped.
             memory_mb: memory_mb.min(u64::MAX as u128) as u64,
             storage_mb: storage_mb.min(u64::MAX as u128) as u64,
             node_count: self.participants.len(),

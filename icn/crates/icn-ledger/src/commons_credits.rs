@@ -21,6 +21,17 @@ use std::sync::LazyLock;
 /// Currency identifier for commons credits.
 pub const COMMONS_CREDIT_CURRENCY: &str = "commons-credits";
 
+// --- Credit formula weights (subject to governance adjustment) ---
+// TODO(governance): These constants should be configurable via CCL governance
+// parameters once governance hooks are available (Phase 29).
+
+/// Divisor for memory contribution (MB-millis → credits).
+const MEMORY_DIVISOR: u128 = 1_000;
+/// Divisor for storage contribution (bytes → credits).
+const STORAGE_DIVISOR: u128 = 1_000_000;
+/// Divisor for egress contribution (bytes → credits).
+const EGRESS_DIVISOR: u128 = 100_000;
+
 /// Synthetic DID for the commons mint.
 ///
 /// Derived deterministically from the well-known seed `[0xCC; 32]` (0xCC = "Commons Credit").
@@ -42,6 +53,7 @@ static COMMONS_MINT_DID: LazyLock<Did> = LazyLock::new(|| {
 ///
 /// Uses `u128` internally for accumulation, clamps to `u64` on output.
 /// All arithmetic is saturating to prevent overflow panics.
+#[must_use = "computed credits should be used to build a journal entry"]
 pub fn compute_credits_earned(
     cpu_millis: u64,
     memory_mb_millis: u64,
@@ -49,11 +61,11 @@ pub fn compute_credits_earned(
     egress_bytes: u64,
 ) -> u64 {
     let acc: u128 = (cpu_millis as u128)
-        .saturating_add((memory_mb_millis as u128) / 1_000)
-        .saturating_add((storage_bytes as u128) / 1_000_000)
-        .saturating_add((egress_bytes as u128) / 100_000);
+        .saturating_add((memory_mb_millis as u128) / MEMORY_DIVISOR)
+        .saturating_add((storage_bytes as u128) / STORAGE_DIVISOR)
+        .saturating_add((egress_bytes as u128) / EGRESS_DIVISOR);
 
-    // Clamp u128 → u64
+    // Saturate u128 → u64: values above u64::MAX are clamped.
     acc.min(u64::MAX as u128) as u64
 }
 
@@ -61,6 +73,7 @@ pub fn compute_credits_earned(
 ///
 /// Debits the commons mint and credits the contributor.
 /// Rejects `amount <= 0`.
+#[must_use = "journal entry should be appended to the ledger"]
 pub fn build_earn_entry(contributor: &Did, amount: i64) -> Result<JournalEntry> {
     if amount <= 0 {
         anyhow::bail!("earn amount must be positive, got {amount}");
@@ -82,6 +95,7 @@ pub fn build_earn_entry(contributor: &Did, amount: i64) -> Result<JournalEntry> 
 ///
 /// Debits the consumer and credits the commons mint.
 /// Rejects `amount <= 0`.
+#[must_use = "journal entry should be appended to the ledger"]
 pub fn build_spend_entry(consumer: &Did, amount: i64) -> Result<JournalEntry> {
     if amount <= 0 {
         anyhow::bail!("spend amount must be positive, got {amount}");
@@ -103,6 +117,7 @@ pub fn build_spend_entry(consumer: &Did, amount: i64) -> Result<JournalEntry> {
 ///
 /// Returns the remaining balance (`balance - required`) on success,
 /// or an error if insufficient. Balance floor is zero.
+#[must_use = "check result indicates whether operation should proceed"]
 pub fn check_sufficient_balance(balance: i64, required: i64) -> Result<i64, InsufficientCredits> {
     if balance < required {
         return Err(InsufficientCredits { balance, required });

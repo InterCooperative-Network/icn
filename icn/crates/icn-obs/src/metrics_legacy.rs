@@ -3733,6 +3733,23 @@ pub mod compute {
     pub fn task_scope_map_size_set(size: f64) {
         gauge!("icn_compute_task_scope_map_size").set(size);
     }
+
+    // === Commons Pool Metrics (Epic 6 #925) ===
+
+    /// Set the number of nodes currently in the commons resource pool.
+    pub fn commons_pool_participants_set(count: f64) {
+        gauge!("icn_compute_commons_pool_participants").set(count);
+    }
+
+    /// Set the aggregate commons-weighted CPU cores across all pool participants.
+    pub fn commons_pool_cpu_cores_set(value: f64) {
+        gauge!("icn_compute_commons_pool_cpu_cores").set(value);
+    }
+
+    /// Set the aggregate commons-weighted memory (MB) across all pool participants.
+    pub fn commons_pool_memory_mb_set(value: f64) {
+        gauge!("icn_compute_commons_pool_memory_mb").set(value);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)
