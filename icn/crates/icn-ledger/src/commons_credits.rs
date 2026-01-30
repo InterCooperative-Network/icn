@@ -65,6 +65,10 @@ const DEFAULT_EPOCH_EARNING_CAP: u64 = 100_000;
 /// **Epoch boundaries**: The caller is responsible for calling `reset()`
 /// at epoch boundaries (e.g., every 24 hours). This is advisory — the
 /// ledger remains authoritative.
+///
+/// **Integration status**: Infrastructure ready but not yet wired into
+/// the credit earning flow. A future PR should call `try_earn()` from
+/// the settlement path and manage epoch resets via a governance scheduler.
 #[derive(Debug)]
 pub struct EarningTracker {
     /// Maximum credits any single DID can earn per epoch.
