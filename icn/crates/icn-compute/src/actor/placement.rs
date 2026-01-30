@@ -102,6 +102,7 @@ impl ComputeActor {
         requested_at: u64,
         max_scope: Option<icn_kernel_api::ScopeLevel>,
         cell_affinity: Option<icn_kernel_api::CellId>,
+        allowed_scopes: Vec<icn_kernel_api::ScopeLevel>,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -147,6 +148,7 @@ impl ComputeActor {
             return Ok(());
         };
 
+        let scope_depths = self.scope_queue_depths.lock().await.clone();
         let node_state = crate::scheduler::NodeState {
             did: self.own_did.clone(),
             capacity: capacity.clone(),
@@ -155,7 +157,7 @@ impl ComputeActor {
                 .get(&self.own_did)
                 .map(|i| i.tasks_executing)
                 .unwrap_or(0),
-            scope_queue_depths: HashMap::new(),
+            scope_queue_depths: scope_depths,
         };
         drop(registry);
 
@@ -313,11 +315,23 @@ impl ComputeActor {
             }
         }
 
-        // TODO(icn-compute#921): Integrate CellService to populate scope context.
-        // Once CellService is wired into ComputeActor, use it to determine
-        // peer_scope (via cell_service.peer_scope(&submitter)) and executor_cell
-        // (via cell_service.local_cell()) instead of defaulting to Commons.
-        let scope_ctx = crate::scheduler::ScopeContext::empty();
+        // Epic 2 (#932/#933): Populate scope context from CellService and live budget.
+        let budget = self.capacity_budget.lock().await.clone();
+        let scope_ctx = match &self.cell_service {
+            Some(cs) => {
+                let peer_scope = cs.peer_scope(&submitter);
+                let executor_cell = cs.local_cell();
+                crate::scheduler::ScopeContext {
+                    peer_scope,
+                    executor_cell,
+                    capacity_budget: budget,
+                }
+            }
+            None => crate::scheduler::ScopeContext {
+                capacity_budget: budget,
+                ..crate::scheduler::ScopeContext::empty()
+            },
+        };
 
         // Build a PlacementRequest for the scoring call
         let placement_request = crate::scheduler::PlacementRequest {
@@ -328,6 +342,7 @@ impl ComputeActor {
             requested_at,
             max_scope,
             cell_affinity,
+            allowed_scopes: allowed_scopes.clone(),
         };
 
         // Score the task
@@ -963,6 +978,7 @@ impl ComputeActor {
                 requested_at,
                 max_scope: None,     // TODO: populate from federated task constraints
                 cell_affinity: None, // TODO: populate from federated task constraints
+                allowed_scopes: vec![], // TODO: populate from federated task constraints
             });
         }
 

@@ -346,10 +346,10 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor_did) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    // Note: Per-executor load tracking removed (high-cardinality)
                 }
             }
             drop(registry);
+            self.decrement_scope_queue(&task_hash).await;
 
             // Broadcast event for external listeners (e.g., WebSocket clients)
             if let Some(ref cb) = self.event_callback {
@@ -391,10 +391,10 @@ impl ComputeActor {
         if let Some(info) = registry.get_mut(&executor_did) {
             if info.tasks_executing > 0 {
                 info.tasks_executing -= 1;
-                // Note: Per-executor load tracking removed (high-cardinality)
             }
         }
         drop(registry);
+        self.decrement_scope_queue(&task_hash).await;
 
         // Broadcast event for external listeners (e.g., WebSocket clients)
         if let Some(ref cb) = self.event_callback {
@@ -546,10 +546,10 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    // Note: Per-executor load tracking removed (high-cardinality)
                 }
             }
         }
+        self.decrement_scope_queue(&task_hash).await;
 
         // Clean up pending placement state (Issue #511 - prevent memory leak)
         {
@@ -791,10 +791,10 @@ impl ComputeActor {
         if let Some(info) = registry.get_mut(&self.own_did) {
             if info.tasks_executing > 0 {
                 info.tasks_executing -= 1;
-                // Note: Per-executor load tracking removed (high-cardinality)
             }
         }
         drop(registry);
+        self.decrement_scope_queue(&result.task_hash).await;
 
         // Track usage for quota enforcement (Phase 16E)
         if let Some(ref policy_manager) = self.policy_manager {
@@ -900,7 +900,12 @@ impl ComputeActor {
         task_hash: TaskHash,
         executor: String,
     ) -> Result<(), ComputeError> {
-        // Just record the claim if we know about the task
+        // Look up submitter before claiming (for scope tracking)
+        let mgr = self.task_manager.lock().await;
+        let submitter = mgr.get(&task_hash).map(|t| t.submitter.clone());
+        drop(mgr);
+
+        // Record the claim if we know about the task
         let mut mgr = self.task_manager.lock().await;
         if mgr.get(&task_hash).is_some() {
             let _ = mgr.claim(&task_hash, executor.clone());
@@ -911,7 +916,23 @@ impl ComputeActor {
         let mut registry = self.executor_registry.lock().await;
         if let Some(info) = registry.get_mut(&executor) {
             info.tasks_executing += 1;
-            // Note: Per-executor load tracking removed (high-cardinality)
+        }
+        drop(registry);
+
+        // Epic 2 (#933): Track per-scope queue depth
+        if let Some(submitter) = submitter {
+            let scope = match &self.cell_service {
+                Some(cs) => cs.peer_scope(&submitter),
+                None => icn_kernel_api::ScopeLevel::Commons,
+            };
+            {
+                let mut depths = self.scope_queue_depths.lock().await;
+                *depths.entry(scope).or_insert(0) += 1;
+            }
+            {
+                let mut map = self.task_scope_map.lock().await;
+                map.insert(task_hash, scope);
+            }
         }
 
         Ok(())
@@ -922,6 +943,8 @@ impl ComputeActor {
         task_manager: &Arc<Mutex<TaskManager>>,
         executor_registry: &Arc<Mutex<HashMap<String, ExecutorInfo>>>,
         send_callback: &Option<SendCallback>,
+        scope_queue_depths: &Arc<Mutex<HashMap<icn_kernel_api::ScopeLevel, usize>>>,
+        task_scope_map: &Arc<Mutex<HashMap<TaskHash, icn_kernel_api::ScopeLevel>>>,
     ) -> Result<(), ComputeError> {
         let now = icn_time::current_timestamp_millis();
 
@@ -965,7 +988,16 @@ impl ComputeActor {
                 if let Some(info) = registry.get_mut(&executor) {
                     if info.tasks_executing > 0 {
                         info.tasks_executing -= 1;
-                        // Note: Per-executor load tracking removed (high-cardinality)
+                    }
+                }
+            }
+            // Decrement scope queue depth
+            {
+                let scope = task_scope_map.lock().await.remove(&hash);
+                if let Some(scope) = scope {
+                    let mut depths = scope_queue_depths.lock().await;
+                    if let Some(count) = depths.get_mut(&scope) {
+                        *count = count.saturating_sub(1);
                     }
                 }
             }
@@ -1144,8 +1176,9 @@ impl ComputeActor {
                     locality_hints: vec![],      // Future enhancement
                     max_cost: task.payment_rate, // Use payment_rate as max cost
                     requested_at: now,
-                    max_scope: None,     // TODO: populate from task constraints
-                    cell_affinity: None, // TODO: populate from task constraints
+                    max_scope: None,        // TODO: populate from task constraints
+                    cell_affinity: None,    // TODO: populate from task constraints
+                    allowed_scopes: vec![], // TODO: populate from task constraints
                 });
             } else {
                 // Phase 15: Legacy immediate claiming
@@ -1202,5 +1235,19 @@ impl ComputeActor {
         }
 
         Ok(())
+    }
+
+    /// Decrement the per-scope queue depth for a completed/failed task (Epic 2 #933).
+    pub(super) async fn decrement_scope_queue(&self, task_hash: &TaskHash) {
+        let scope = {
+            let mut map = self.task_scope_map.lock().await;
+            map.remove(task_hash)
+        };
+        if let Some(scope) = scope {
+            let mut depths = self.scope_queue_depths.lock().await;
+            if let Some(count) = depths.get_mut(&scope) {
+                *count = count.saturating_sub(1);
+            }
+        }
     }
 }
