@@ -39,13 +39,24 @@ pub const SIGN_PREFIX_ATTESTER: &[u8] = b"icn-receipt-attester-v1:";
 ///
 /// `Copy` is intentionally **not** derived — signatures should not be
 /// implicitly copied, only explicitly cloned or borrowed via [`as_bytes()`].
+///
+/// The inner field is private to enforce that all access goes through
+/// explicit methods, preserving the non-Copy invariant.
 #[derive(Clone, PartialEq, Eq)]
-pub struct SignatureBytes(pub [u8; 64]);
+pub struct SignatureBytes([u8; 64]);
 
 impl SignatureBytes {
     /// View as a reference to the underlying 64-byte array.
     pub fn as_bytes(&self) -> &[u8; 64] {
         &self.0
+    }
+
+    /// Return an owned copy of the underlying 64-byte array.
+    ///
+    /// This makes creating owned copies an explicit operation, preserving
+    /// the intent behind not implementing `Copy` for `SignatureBytes`.
+    pub fn to_bytes(&self) -> [u8; 64] {
+        self.0
     }
 }
 
@@ -57,18 +68,30 @@ impl std::fmt::Debug for SignatureBytes {
 
 impl Serialize for SignatureBytes {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&hex::encode(self.0))
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&hex::encode(self.0))
+        } else {
+            serializer.serialize_bytes(&self.0)
+        }
     }
 }
 
 impl<'de> Deserialize<'de> for SignatureBytes {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        let arr: [u8; 64] = bytes
-            .try_into()
-            .map_err(|_| serde::de::Error::custom("expected 64 bytes for Ed25519 signature"))?;
-        Ok(SignatureBytes(arr))
+        if deserializer.is_human_readable() {
+            let s = String::deserialize(deserializer)?;
+            let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
+            let arr: [u8; 64] = bytes
+                .try_into()
+                .map_err(|_| serde::de::Error::custom("expected 64 bytes for Ed25519 signature"))?;
+            Ok(SignatureBytes(arr))
+        } else {
+            let bytes = <Vec<u8>>::deserialize(deserializer)?;
+            let arr: [u8; 64] = bytes
+                .try_into()
+                .map_err(|_| serde::de::Error::custom("expected 64 bytes for Ed25519 signature"))?;
+            Ok(SignatureBytes(arr))
+        }
     }
 }
 
@@ -305,9 +328,11 @@ impl ExecutionReceipt {
         Ok(())
     }
 
-    // -- Signing (builder-style, consumes and returns Result) ---------------
+    // -- Signing (builder-style; executor infallible, later steps return Result) --
 
     /// Sign as executor. Sets `executor_signature`.
+    ///
+    /// This step is infallible and returns `Self` for ergonomic chaining.
     ///
     /// Payload: `SIGN_PREFIX_EXECUTOR || signing_payload()`
     pub fn sign_executor(mut self, key: &ed25519_dalek::SigningKey) -> Self {
@@ -368,7 +393,16 @@ impl ExecutionReceipt {
     // -- Verification -------------------------------------------------------
 
     /// Verify the executor's signature against the given DID.
+    ///
+    /// Enforces that `executor_did` matches the receipt's `executor` field,
+    /// preventing verification against a DID that doesn't match the claimed identity.
     pub fn verify_executor(&self, executor_did: &icn_identity::Did) -> Result<(), ComputeError> {
+        if executor_did.to_string() != self.executor {
+            return Err(ComputeError::InvalidSignature(format!(
+                "DID mismatch: receipt claims executor={}, but verifying against {}",
+                self.executor, executor_did
+            )));
+        }
         let sig = self
             .executor_signature
             .as_ref()
@@ -378,12 +412,19 @@ impl ExecutionReceipt {
 
     /// Verify the submitter's acknowledgement signature against the given DID.
     ///
-    /// Also enforces that `executor_signature` is present — a submitter ack
-    /// verified against an empty executor sig slot would be meaningless.
+    /// Enforces that:
+    /// - `submitter_did` matches the receipt's `submitter` field
+    /// - `executor_signature` is present (chain prerequisite)
     pub fn verify_submitter_ack(
         &self,
         submitter_did: &icn_identity::Did,
     ) -> Result<(), ComputeError> {
+        if submitter_did.to_string() != self.submitter {
+            return Err(ComputeError::InvalidSignature(format!(
+                "DID mismatch: receipt claims submitter={}, but verifying against {}",
+                self.submitter, submitter_did
+            )));
+        }
         if self.executor_signature.is_none() {
             return Err(ComputeError::InvalidSignature(
                 "cannot verify submitter ack: executor signature missing".into(),
@@ -398,8 +439,23 @@ impl ExecutionReceipt {
 
     /// Verify the attester's signature against the given DID.
     ///
-    /// Also enforces that both prior signatures are present.
+    /// Enforces that:
+    /// - `self.attester` is `Some` and matches `attester_did`
+    /// - Both prior signatures are present (chain prerequisite)
     pub fn verify_attester(&self, attester_did: &icn_identity::Did) -> Result<(), ComputeError> {
+        match &self.attester {
+            None => {
+                return Err(ComputeError::InvalidSignature(
+                    "cannot verify attester: attester DID not set on receipt".into(),
+                ));
+            }
+            Some(claimed) if claimed != &attester_did.to_string() => {
+                return Err(ComputeError::InvalidSignature(format!(
+                    "DID mismatch: receipt claims attester={claimed}, but verifying against {attester_did}"
+                )));
+            }
+            _ => {}
+        }
         if self.executor_signature.is_none() || self.submitter_ack.is_none() {
             return Err(ComputeError::InvalidSignature(
                 "cannot verify attester: prior signatures missing".into(),
@@ -632,16 +688,16 @@ mod tests {
         let mut r = sample_receipt();
         assert!(!r.is_fully_attested());
 
-        r.executor_signature = Some(SignatureBytes([0x11; 64]));
+        r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
         assert!(!r.is_fully_attested());
 
-        r.submitter_ack = Some(SignatureBytes([0x22; 64]));
+        r.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
         assert!(!r.is_fully_attested(), "missing attester DID + sig");
 
         r.attester = Some("did:icn:z6MkAttester".to_string());
         assert!(!r.is_fully_attested(), "missing attester signature");
 
-        r.attester_signature = Some(SignatureBytes([0x33; 64]));
+        r.attester_signature = Some(SignatureBytes::from([0x33; 64]));
         assert!(r.is_fully_attested());
     }
 
@@ -677,7 +733,7 @@ mod tests {
 
     #[test]
     fn test_signature_bytes_serde_roundtrip() {
-        let sig = SignatureBytes([0xAA; 64]);
+        let sig = SignatureBytes::from([0xAA; 64]);
         let json = serde_json::to_string(&sig).unwrap();
         let deserialized: SignatureBytes = serde_json::from_str(&json).unwrap();
         assert_eq!(sig, deserialized);
@@ -686,7 +742,7 @@ mod tests {
     #[test]
     fn test_receipt_serde_roundtrip() {
         let mut r = sample_receipt();
-        r.executor_signature = Some(SignatureBytes([0x11; 64]));
+        r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
         let json = serde_json::to_string(&r).unwrap();
         let deserialized: ExecutionReceipt = serde_json::from_str(&json).unwrap();
         assert_eq!(r, deserialized);
@@ -763,13 +819,16 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_executor_wrong_key() {
+    fn test_verify_executor_wrong_did_rejected() {
         let (r, executor_kp) = receipt_with_real_keys();
         let r = r.sign_executor(&to_signing_key(&executor_kp));
 
         let wrong_kp = icn_identity::KeyPair::generate().unwrap();
         let err = r.verify_executor(wrong_kp.did()).unwrap_err();
-        assert!(err.to_string().contains("verification failed"));
+        assert!(
+            err.to_string().contains("DID mismatch"),
+            "should reject DID that doesn't match receipt's executor field, got: {err}"
+        );
     }
 
     #[test]
@@ -788,10 +847,10 @@ mod tests {
         // Identical base fields, only vary executor signature bytes.
         // This directly proves the submitter payload binds to the executor sig.
         let mut r1 = sample_receipt();
-        r1.executor_signature = Some(SignatureBytes([0x11; 64]));
+        r1.executor_signature = Some(SignatureBytes::from([0x11; 64]));
 
         let mut r2 = sample_receipt();
-        r2.executor_signature = Some(SignatureBytes([0x22; 64]));
+        r2.executor_signature = Some(SignatureBytes::from([0x22; 64]));
 
         assert_ne!(
             r1.submitter_sign_payload(),
@@ -803,12 +862,12 @@ mod tests {
     #[test]
     fn test_attester_payload_includes_both_prior_sigs() {
         let mut r1 = sample_receipt();
-        r1.executor_signature = Some(SignatureBytes([0x11; 64]));
-        r1.submitter_ack = Some(SignatureBytes([0xAA; 64]));
+        r1.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        r1.submitter_ack = Some(SignatureBytes::from([0xAA; 64]));
 
         let mut r2 = sample_receipt();
-        r2.executor_signature = Some(SignatureBytes([0x11; 64]));
-        r2.submitter_ack = Some(SignatureBytes([0xBB; 64]));
+        r2.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        r2.submitter_ack = Some(SignatureBytes::from([0xBB; 64]));
 
         assert_ne!(
             r1.attester_sign_payload(),
@@ -885,20 +944,26 @@ mod tests {
 
     #[test]
     fn test_verify_missing_submitter_ack() {
-        let (r, kp) = receipt_with_real_keys();
-        let r = r.sign_executor(&to_signing_key(&kp));
+        let (r, executor_kp) = receipt_with_real_keys();
         let submitter_kp = icn_identity::KeyPair::generate().unwrap();
+        // Set submitter DID to match the keypair we'll verify against
+        let mut r = r.sign_executor(&to_signing_key(&executor_kp));
+        r.submitter = submitter_kp.did().to_string();
         let err = r.verify_submitter_ack(submitter_kp.did()).unwrap_err();
-        assert!(err.to_string().contains("missing"));
+        assert!(
+            err.to_string().contains("submitter ack missing"),
+            "got: {err}"
+        );
     }
 
     #[test]
     fn test_verify_submitter_rejects_missing_executor_sig() {
         // A receipt with submitter_ack but no executor_signature must fail
         // verification — the chain is broken.
-        let mut r = sample_receipt();
-        r.submitter_ack = Some(SignatureBytes([0xAA; 64])); // fake, but present
         let submitter_kp = icn_identity::KeyPair::generate().unwrap();
+        let mut r = sample_receipt();
+        r.submitter = submitter_kp.did().to_string();
+        r.submitter_ack = Some(SignatureBytes::from([0xAA; 64])); // fake, but present
         let err = r.verify_submitter_ack(submitter_kp.did()).unwrap_err();
         assert!(
             err.to_string().contains("executor signature missing"),
@@ -908,9 +973,10 @@ mod tests {
 
     #[test]
     fn test_verify_attester_rejects_missing_prior_sigs() {
-        let mut r = sample_receipt();
-        r.attester_signature = Some(SignatureBytes([0xBB; 64])); // fake, but present
         let attester_kp = icn_identity::KeyPair::generate().unwrap();
+        let mut r = sample_receipt();
+        r.attester = Some(attester_kp.did().to_string());
+        r.attester_signature = Some(SignatureBytes::from([0xBB; 64])); // fake, but present
         let err = r.verify_attester(attester_kp.did()).unwrap_err();
         assert!(
             err.to_string().contains("prior signatures missing"),
@@ -1026,5 +1092,97 @@ mod tests {
         r.egress_bytes = MAX_EGRESS_BYTES + 1;
         let err = r.validate().unwrap_err();
         assert!(err.to_string().contains("egress_bytes"), "got: {err}");
+    }
+
+    // -- DID identity binding tests ---
+
+    #[test]
+    fn test_verify_submitter_wrong_did_rejected() {
+        let (r, executor_kp) = receipt_with_real_keys();
+        let submitter_kp = icn_identity::KeyPair::generate().unwrap();
+        let mut r = r.sign_executor(&to_signing_key(&executor_kp));
+        r.submitter = submitter_kp.did().to_string();
+        let r = r
+            .sign_submitter_ack(&to_signing_key(&submitter_kp))
+            .unwrap();
+
+        let wrong_kp = icn_identity::KeyPair::generate().unwrap();
+        let err = r.verify_submitter_ack(wrong_kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains("DID mismatch"),
+            "should reject DID that doesn't match receipt's submitter field, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_verify_attester_wrong_did_rejected() {
+        let (r, executor_kp) = receipt_with_real_keys();
+        let submitter_kp = icn_identity::KeyPair::generate().unwrap();
+        let attester_kp = icn_identity::KeyPair::generate().unwrap();
+
+        let mut r = r.sign_executor(&to_signing_key(&executor_kp));
+        r.submitter = submitter_kp.did().to_string();
+        let r = r
+            .sign_submitter_ack(&to_signing_key(&submitter_kp))
+            .unwrap()
+            .sign_attester(attester_kp.did().to_string(), &to_signing_key(&attester_kp))
+            .unwrap();
+
+        let wrong_kp = icn_identity::KeyPair::generate().unwrap();
+        let err = r.verify_attester(wrong_kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains("DID mismatch"),
+            "should reject DID that doesn't match receipt's attester field, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_verify_attester_rejects_missing_attester_did() {
+        // Receipt has attester_signature but no attester DID set
+        let mut r = sample_receipt();
+        r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        r.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
+        r.attester_signature = Some(SignatureBytes::from([0x33; 64]));
+        // attester is None
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let err = r.verify_attester(kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains("attester DID not set"),
+            "should reject when receipt has no attester DID, got: {err}"
+        );
+    }
+
+    // -- Wire format tests ---
+
+    #[test]
+    fn test_settlement_message_icn_encoding_roundtrip() {
+        let r = sample_receipt();
+        let msg = SettlementMessage::Receipt(Box::new(r));
+        let encoded = icn_encoding::encode(&msg).unwrap();
+        let decoded: SettlementMessage = icn_encoding::decode(&encoded).unwrap();
+        assert_eq!(msg, decoded);
+    }
+
+    #[test]
+    fn test_receipt_icn_encoding_roundtrip() {
+        let mut r = sample_receipt();
+        r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        let encoded = icn_encoding::encode(&r).unwrap();
+        let decoded: ExecutionReceipt = icn_encoding::decode(&encoded).unwrap();
+        assert_eq!(r, decoded);
+    }
+
+    #[test]
+    fn test_signature_bytes_binary_serde_compact() {
+        // Verify that binary serialization is more compact than hex JSON
+        let sig = SignatureBytes::from([0xAA; 64]);
+        let json_bytes = serde_json::to_vec(&sig).unwrap();
+        let postcard_bytes = icn_encoding::encode(&sig).unwrap();
+        assert!(
+            postcard_bytes.len() < json_bytes.len(),
+            "binary encoding ({} bytes) should be smaller than JSON ({} bytes)",
+            postcard_bytes.len(),
+            json_bytes.len()
+        );
     }
 }
