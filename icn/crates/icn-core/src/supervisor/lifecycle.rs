@@ -216,10 +216,12 @@ async fn spawn_actors_with_identity(
 
     let did = identity_bundle.did().clone();
 
-    // Extract daemon-provided ledger handle from ServiceRegistry early
+    // Extract daemon-provided ledger handles from ServiceRegistry early
     // (needed before ledger init which happens before governance init)
-    let ledger_from_daemon: Option<Arc<RwLock<icn_ledger::Ledger>>> =
-        service_registry.and_then(|r| r.raw_handle::<RwLock<icn_ledger::Ledger>>("ledger"));
+    let ledger_from_daemon: Option<Arc<RwLock<icn_ledger::Ledger>>> = service_registry
+        .and_then(|r| r.raw_handle::<RwLock<icn_ledger::Ledger>>(ServiceRegistry::LEDGER_KEY));
+    let ledger_store_from_daemon: Option<Arc<icn_store::SledStore>> = service_registry
+        .and_then(|r| r.raw_handle::<icn_store::SledStore>(ServiceRegistry::LEDGER_STORE_KEY));
 
     // Create NodeProfile with hardware sensing (Phase 17)
     let node_profile = crate::node::create_node_profile(
@@ -241,9 +243,9 @@ async fn spawn_actors_with_identity(
     // Initialize trust graph, recovery store, and misbehavior detector
     // If service_registry provides a trust_graph handle, use it instead of creating a new one.
     // This enables proper kernel/app separation where the daemon owns the TrustGraph.
-    let trust_services = if let Some(trust_graph_from_daemon) =
-        service_registry.and_then(|r| r.raw_handle::<RwLock<icn_trust::TrustGraph>>("trust_graph"))
-    {
+    let trust_services = if let Some(trust_graph_from_daemon) = service_registry.and_then(|r| {
+        r.raw_handle::<RwLock<icn_trust::TrustGraph>>(ServiceRegistry::TRUST_GRAPH_KEY)
+    }) {
         info!("Using TrustGraph from daemon-provided ServiceRegistry");
         super::init_trust::init_trust_services_with_graph(
             config,
@@ -298,6 +300,7 @@ async fn spawn_actors_with_identity(
             trust_graph: trust_graph_handle.clone(),
             trust_service: trust_service_from_registry.clone(),
             ledger_handle: ledger_from_daemon,
+            ledger_store: ledger_store_from_daemon,
         },
     )
     .await?;
@@ -494,7 +497,9 @@ async fn spawn_actors_with_identity(
         Arc<dyn icn_governance::ProtocolParameterStore>,
     > = service_registry
         .and_then(|r| {
-            r.raw_handle::<icn_governance::SledParameterStore>("protocol_parameter_store")
+            r.raw_handle::<icn_governance::SledParameterStore>(
+                ServiceRegistry::PROTOCOL_PARAM_STORE_KEY,
+            )
         })
         .map(|s| s as Arc<dyn icn_governance::ProtocolParameterStore>);
 

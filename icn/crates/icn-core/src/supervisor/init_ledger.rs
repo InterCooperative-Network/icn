@@ -51,6 +51,9 @@ pub struct LedgerDeps {
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Pre-created ledger handle from daemon (daemon owns lifecycle)
     pub ledger_handle: Option<Arc<RwLock<Ledger>>>,
+    /// Pre-opened ledger store from daemon (avoids double sled open;
+    /// sled uses exclusive file locking so re-opening the same path fails)
+    pub ledger_store: Option<Arc<SledStore>>,
 }
 
 /// Initialize ledger and contract services
@@ -65,11 +68,16 @@ pub async fn init_ledger_services(
     did: Did,
     deps: LedgerDeps,
 ) -> anyhow::Result<LedgerServices> {
-    // Open ledger store for DisputeManager, TreasuryManager, and (if no daemon handle) the Ledger.
-    // Safe to call even when the daemon already opened this path: sled internally caches
-    // DB instances by path and returns the same reference-counted sled::Db.
+    // Reuse daemon-provided store or open a new one.
+    // sled uses exclusive file locking, so re-opening the same path would fail
+    // if the daemon already opened it.
     let store_path = config.ledger_store_path();
-    let store = Arc::new(SledStore::open(&store_path)?);
+    let store = if let Some(s) = deps.ledger_store {
+        info!("Using daemon-provided ledger store");
+        s
+    } else {
+        Arc::new(SledStore::open(&store_path)?)
+    };
 
     // Use daemon-provided ledger handle or create a new one
     let ledger_handle = if let Some(handle) = deps.ledger_handle {

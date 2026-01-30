@@ -421,6 +421,18 @@ impl Default for ServiceRegistry {
 }
 
 impl ServiceRegistry {
+    // Raw handle key constants — use these instead of string literals to prevent typos.
+    // A typo in the key results in silent `None` at runtime.
+
+    /// Key for `Arc<RwLock<TrustGraph>>` raw handle
+    pub const TRUST_GRAPH_KEY: &str = "trust_graph";
+    /// Key for `Arc<SledParameterStore>` raw handle (concrete type; upcast after retrieval)
+    pub const PROTOCOL_PARAM_STORE_KEY: &str = "protocol_parameter_store";
+    /// Key for `Arc<RwLock<Ledger>>` raw handle
+    pub const LEDGER_KEY: &str = "ledger";
+    /// Key for `Arc<SledStore>` raw handle (shared with DisputeManager/TreasuryManager)
+    pub const LEDGER_STORE_KEY: &str = "ledger_store";
+
     /// Create a new empty service registry
     pub fn new() -> Self {
         Self {

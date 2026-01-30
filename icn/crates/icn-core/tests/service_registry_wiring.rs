@@ -24,12 +24,12 @@ fn test_parameter_store_raw_handle_roundtrip() {
     let store = Arc::new(SledParameterStore::new(Arc::new(param_db)).unwrap());
 
     // Simulate daemon: store concrete type
-    let registry =
-        ServiceRegistry::new().with_raw_handle("protocol_parameter_store", store.clone());
+    let registry = ServiceRegistry::new()
+        .with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store.clone());
 
     // Simulate supervisor: retrieve and upcast
     let retrieved: Option<Arc<SledParameterStore>> =
-        registry.raw_handle("protocol_parameter_store");
+        registry.raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY);
     assert!(
         retrieved.is_some(),
         "raw_handle should return the stored SledParameterStore"
@@ -51,10 +51,12 @@ fn test_ledger_handle_raw_handle_roundtrip() {
     let handle = Arc::new(RwLock::new(ledger));
 
     // Simulate daemon: store handle
-    let registry = ServiceRegistry::new().with_raw_handle("ledger", handle.clone());
+    let registry =
+        ServiceRegistry::new().with_raw_handle(ServiceRegistry::LEDGER_KEY, handle.clone());
 
     // Simulate supervisor: retrieve
-    let retrieved: Option<Arc<RwLock<icn_ledger::Ledger>>> = registry.raw_handle("ledger");
+    let retrieved: Option<Arc<RwLock<icn_ledger::Ledger>>> =
+        registry.raw_handle(ServiceRegistry::LEDGER_KEY);
     assert!(
         retrieved.is_some(),
         "raw_handle should return the stored Ledger handle"
@@ -79,13 +81,68 @@ fn test_raw_handle_type_mismatch_returns_none() {
     let param_db = sled::open(tmp.path().join("params")).unwrap();
     let store = Arc::new(SledParameterStore::new(Arc::new(param_db)).unwrap());
 
-    let registry = ServiceRegistry::new().with_raw_handle("protocol_parameter_store", store);
+    let registry =
+        ServiceRegistry::new().with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store);
 
     // Try to retrieve as wrong type
     let result: Option<Arc<RwLock<icn_ledger::Ledger>>> =
-        registry.raw_handle("protocol_parameter_store");
+        registry.raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY);
     assert!(
         result.is_none(),
         "Type mismatch should return None, not panic"
     );
+}
+
+/// Test that mutations through the daemon's Arc are visible through the supervisor's Arc.
+///
+/// This verifies that raw_handle truly shares the same Arc instance (not a clone),
+/// so writes by the daemon propagate to the supervisor's view.
+#[test]
+fn test_parameter_store_mutation_propagation() {
+    use icn_governance::{ParameterValue, ProtocolParameter};
+
+    let tmp = tempfile::tempdir().unwrap();
+    let param_db = sled::open(tmp.path().join("params")).unwrap();
+    let store = Arc::new(SledParameterStore::new(Arc::new(param_db)).unwrap());
+
+    // Simulate daemon: register in registry
+    let registry = ServiceRegistry::new()
+        .with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store.clone());
+
+    // Simulate supervisor: retrieve from registry
+    let supervisor_store: Arc<SledParameterStore> = registry
+        .raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY)
+        .unwrap();
+
+    // Daemon writes a parameter
+    let param = ProtocolParameter::new(
+        "test.param",
+        "Test Param",
+        "A test parameter",
+        ParameterValue::Integer(42),
+    );
+    store.set(param, None, None).unwrap();
+
+    // Supervisor should see it
+    let retrieved = supervisor_store.get("test.param").unwrap();
+    assert!(retrieved.is_some(), "Supervisor should see daemon's write");
+    assert_eq!(retrieved.unwrap().id, "test.param");
+}
+
+/// Test that the ledger store can be shared via raw_handle.
+///
+/// This verifies the fix for the sled double-open bug: the daemon creates
+/// a single SledStore and passes it through raw_handle so the supervisor
+/// doesn't need to re-open the same sled path.
+#[test]
+fn test_ledger_store_shared_via_raw_handle() {
+    let tmp = tempfile::tempdir().unwrap();
+    let store = Arc::new(SledStore::open(tmp.path().join("ledger")).unwrap());
+
+    let registry =
+        ServiceRegistry::new().with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, store.clone());
+
+    let retrieved: Option<Arc<SledStore>> = registry.raw_handle(ServiceRegistry::LEDGER_STORE_KEY);
+    assert!(retrieved.is_some(), "Should retrieve ledger store");
+    assert!(Arc::ptr_eq(&store, &retrieved.unwrap()));
 }
