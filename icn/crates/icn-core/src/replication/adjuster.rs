@@ -14,25 +14,12 @@ use icn_store::{ContentHash, Store};
 
 /// Configuration for the scoped replication adjuster.
 ///
-/// The `rebalance_interval_secs` and `max_concurrent_repairs` fields are used
-/// when the adjuster is spawned as a background task (see Phase 19/20 roadmap).
-/// Currently, `on_membership_change()` is called reactively.
-// TODO(#924): Wire periodic rebalance loop using rebalance_interval_secs.
-// TODO(#924): Enforce max_concurrent_repairs when executing repair actions.
+/// Currently, `on_membership_change()` is called reactively. When a periodic
+/// background rebalance loop is added (Phase 19/20), additional fields such as
+/// `rebalance_interval_secs` and `rebalance_threshold` can be introduced here.
 #[derive(Clone, Debug)]
 pub struct AdjusterConfig {
-    /// How often to run periodic rebalance checks (seconds).
-    /// Default: 300 (5 minutes).
-    pub rebalance_interval_secs: u64,
-
-    /// Fractional deviation from the target factor that triggers rebalance.
-    /// Default: 0.2 (20% deviation).
-    ///
-    /// Not yet used — currently repairs trigger on any deviation. Will be
-    /// wired in the periodic rebalance loop (Phase 19/20).
-    pub rebalance_threshold: f64,
-
-    /// Maximum number of concurrent repair operations.
+    /// Maximum number of repair actions returned per `on_membership_change()` call.
     /// Default: 10.
     pub max_concurrent_repairs: usize,
 }
@@ -40,8 +27,6 @@ pub struct AdjusterConfig {
 impl Default for AdjusterConfig {
     fn default() -> Self {
         Self {
-            rebalance_interval_secs: 300,
-            rebalance_threshold: 0.2,
             max_concurrent_repairs: 10,
         }
     }
@@ -72,11 +57,10 @@ pub struct ScopeHealth {
     pub healthy: usize,
 }
 
-/// Adjusts replication in response to membership changes and periodic scans.
+/// Adjusts replication in response to membership changes.
 ///
 /// Currently operates reactively via `on_membership_change()`. A periodic
-/// background loop using `config.rebalance_interval_secs` is planned for
-/// Phase 19/20 (see TODO in `AdjusterConfig`).
+/// background rebalance loop is planned for Phase 19/20.
 pub struct ScopedReplicationAdjuster {
     config: AdjusterConfig,
     store: Arc<dyn Store>,
