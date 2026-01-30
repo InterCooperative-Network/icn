@@ -129,6 +129,66 @@ fn test_parameter_store_mutation_propagation() {
     assert_eq!(retrieved.unwrap().id, "test.param");
 }
 
+/// Test the full daemon→supervisor extraction pattern.
+///
+/// Simulates the complete flow: daemon creates all services and stores,
+/// registers them in ServiceRegistry, then supervisor extracts them
+/// (mirroring lifecycle.rs extraction logic).
+#[test]
+fn test_daemon_to_supervisor_registry_extraction() {
+    use icn_governance::ParameterValue;
+
+    let tmp = tempfile::tempdir().unwrap();
+
+    // === Daemon side: create all handles ===
+    let param_db = sled::open(tmp.path().join("params")).unwrap();
+    let param_store = Arc::new(SledParameterStore::new(Arc::new(param_db)).unwrap());
+
+    let ledger_store = Arc::new(SledStore::open(tmp.path().join("ledger")).unwrap());
+    let ledger_store_trait: Arc<dyn icn_store::Store> = ledger_store.clone();
+    let ledger = icn_ledger::Ledger::new(ledger_store_trait).unwrap();
+    let ledger_handle = Arc::new(RwLock::new(ledger));
+
+    let registry = ServiceRegistry::new()
+        .with_raw_handle(
+            ServiceRegistry::PROTOCOL_PARAM_STORE_KEY,
+            param_store.clone(),
+        )
+        .with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle.clone())
+        .with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store.clone());
+
+    // === Supervisor side: extract handles (mirrors lifecycle.rs) ===
+
+    // Ledger handle extraction (lifecycle.rs ~line 221)
+    let sup_ledger: Option<Arc<RwLock<icn_ledger::Ledger>>> =
+        registry.raw_handle(ServiceRegistry::LEDGER_KEY);
+    assert!(sup_ledger.is_some());
+    assert!(Arc::ptr_eq(&ledger_handle, sup_ledger.as_ref().unwrap()));
+
+    // Ledger store extraction (lifecycle.rs ~line 223)
+    let sup_store: Option<Arc<SledStore>> = registry.raw_handle(ServiceRegistry::LEDGER_STORE_KEY);
+    assert!(sup_store.is_some());
+    assert!(Arc::ptr_eq(&ledger_store, sup_store.as_ref().unwrap()));
+
+    // Parameter store extraction with upcast (lifecycle.rs ~line 496-502)
+    let sup_params: Option<Arc<SledParameterStore>> =
+        registry.raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY);
+    assert!(sup_params.is_some());
+    let sup_params_trait: Arc<dyn icn_governance::ProtocolParameterStore> = sup_params.unwrap();
+
+    // Verify functional: daemon writes, supervisor reads
+    let param = icn_governance::ProtocolParameter::new(
+        "test.integration",
+        "Integration Test",
+        "Verifies daemon-supervisor handle sharing",
+        ParameterValue::Integer(99),
+    );
+    param_store.set(param, None, None).unwrap();
+    let read_back = sup_params_trait.get("test.integration").unwrap();
+    assert!(read_back.is_some());
+    assert_eq!(read_back.unwrap().id, "test.integration");
+}
+
 /// Test that the ledger store can be shared via raw_handle.
 ///
 /// This verifies the fix for the sled double-open bug: the daemon creates

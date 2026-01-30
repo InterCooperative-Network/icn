@@ -1,7 +1,7 @@
 # Kernel/App Separation Architecture
 
 **Status**: Living Document  
-**Last Updated**: 2026-01-29  
+**Last Updated**: 2026-01-30
 **Related Issues**: Phase 19+ (Trust Extraction, PolicyOracle Migration)
 
 ---
@@ -336,20 +336,69 @@ impl ServiceRegistry {
 }
 ```
 
-**Usage in icnd**:
+**Key Constants** (prevent typo-induced silent `None`):
 
 ```rust
-// In icnd main.rs (conceptual)
-let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store)));
-let trust_service = Arc::new(TrustGraphService::new(trust_graph.clone()));
-
-let registry = ServiceRegistry::new()
-    .with_trust(trust_service)
-    .with_raw_handle("trust_graph", trust_graph);  // Transition
-
-let runtime = Runtime::new(config, registry)?;
-runtime.run().await?;
+impl ServiceRegistry {
+    pub const TRUST_GRAPH_KEY: &str = "trust_graph";
+    pub const PROTOCOL_PARAM_STORE_KEY: &str = "protocol_parameter_store";
+    pub const LEDGER_KEY: &str = "ledger";
+    pub const LEDGER_STORE_KEY: &str = "ledger_store";
+}
 ```
+
+Always use these constants instead of string literals when calling `with_raw_handle()` or `raw_handle()`.
+
+**Usage in icnd** (all three services wired):
+
+```rust
+// In icnd main.rs — build_service_registry()
+// 1. Trust
+let trust_graph_handle = Arc::new(RwLock::new(TrustGraph::new(store, did)));
+let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle.clone());
+registry = registry.with_trust(trust_service);
+registry = registry.with_raw_handle(ServiceRegistry::TRUST_GRAPH_KEY, trust_graph_handle);
+
+// 2. Governance
+let parameter_store = Arc::new(SledParameterStore::new(Arc::new(param_db))?);
+let governance_service = icn_governance_app::create_service(parameter_store.clone() as _);
+registry = registry.with_governance(governance_service);
+registry = registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, parameter_store);
+
+// 3. Ledger
+let ledger_store = Arc::new(SledStore::open(&ledger_store_path)?);
+let ledger = Ledger::new(ledger_store.clone() as _)?;
+let ledger_handle = Arc::new(RwLock::new(ledger));
+let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
+registry = registry.with_ledger(ledger_service);
+registry = registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
+registry = registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store);
+```
+
+#### raw_handle Type Patterns
+
+The `raw_handle<T>` method requires `T: Sized`. This creates two patterns depending on the stored type:
+
+**Pattern A: Concrete type with trait upcast** (for trait objects like `dyn ProtocolParameterStore`):
+```rust
+// Store concrete type (Sized)
+registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, arc_sled_param_store);
+
+// Retrieve as concrete, then upcast
+let store: Arc<SledParameterStore> = registry.raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY)?;
+let trait_obj: Arc<dyn ProtocolParameterStore> = store;  // upcast
+```
+
+**Pattern B: Direct storage** (for wrapped types like `Arc<RwLock<Ledger>>`):
+```rust
+// Store directly (RwLock<Ledger> is Sized)
+registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
+
+// Retrieve directly
+let handle: Arc<RwLock<Ledger>> = registry.raw_handle(ServiceRegistry::LEDGER_KEY)?;
+```
+
+**Why the daemon passes stores separately**: Sled uses exclusive file locking (`flock` on Linux). Opening the same sled path twice in the same process fails. The daemon creates stores once and passes them through `raw_handle` so the supervisor can reuse them for ancillary services (DisputeManager, TreasuryManager) without re-opening.
 
 ### 3.4 ConstraintSet
 
@@ -621,6 +670,8 @@ fn check_access(&self, score: f64) -> bool {
 | PolicySource → kernel TrustClass | 2026-01-28 | Type migration |
 | IdentityHandle → kernel TrustClass | 2026-01-28 | Type migration |
 | GossipDeps → PolicyOracle | 2026-01-27 | Removed TrustGraphOracle fallback |
+| GovernanceService wired in icnd | 2026-01-30 | Daemon owns SledParameterStore lifecycle |
+| LedgerService wired in icnd | 2026-01-30 | Daemon owns Ledger + SledStore lifecycle |
 
 ### 6.2 Remaining Work
 
@@ -629,14 +680,18 @@ fn check_access(&self, score: f64) -> bool {
 | MisbehaviorDetector | icn-core/security | Needs TrustService | Uses TrustGraph directly |
 | GatewayServer trust routes | icn-gateway | Partial | Some endpoints still use TrustGraph |
 | init_trust.rs cleanup | icn-core/supervisor | Done | Documentation added |
+| ContractActor | icn-ccl | Needs TrustService | Still accepts `Option<Arc<RwLock<TrustGraph>>>` |
 
 ### 6.3 Transition Handles
 
 These `raw_handles` exist for components not yet migrated:
 
-```rust
-registry.with_raw_handle("trust_graph", trust_graph.clone())
-```
+| Key | Type | Used By | Remove When |
+|-----|------|---------|-------------|
+| `TRUST_GRAPH_KEY` | `Arc<RwLock<TrustGraph>>` | MisbehaviorDetector, ContractActor | Components migrated to TrustService |
+| `PROTOCOL_PARAM_STORE_KEY` | `Arc<SledParameterStore>` | Supervisor init_governance | Supervisor creates its own (standalone mode only) |
+| `LEDGER_KEY` | `Arc<RwLock<Ledger>>` | Supervisor init_ledger | Supervisor creates its own (standalone mode only) |
+| `LEDGER_STORE_KEY` | `Arc<SledStore>` | Supervisor init_ledger (DisputeManager, TreasuryManager) | Sled replaced or all stores created by daemon |
 
 **Goal**: Remove all `raw_handles` when migration is complete.
 
@@ -766,7 +821,24 @@ Kernel code should only use `icn_kernel_api::TrustClass`.
 
 ---
 
-## Appendix: Key Files
+## Appendix A: Store Path Structure
+
+The daemon creates sled-backed stores under `config.store_path()` (default: `~/.icn/store/`):
+
+| Path | Owner | Contents |
+|------|-------|----------|
+| `store/trust/` | Daemon → TrustGraph | Trust attestations, scores |
+| `store/protocol_params/` | Daemon → GovernanceService | Protocol parameter values |
+| `store/ledger/` | Daemon → Ledger + DisputeManager + TreasuryManager | Double-entry transactions, disputes |
+
+Each path is opened exactly once by the daemon. The supervisor receives handles via `ServiceRegistry.raw_handle()` to avoid double-opening sled databases.
+
+Helper methods on `Config`:
+- `config.store_path()` → base store directory
+- `config.protocol_params_path()` → `store/protocol_params/`
+- `config.ledger_store_path()` → `store/ledger/`
+
+## Appendix B: Key Files
 
 | File | Purpose |
 |------|---------|
@@ -775,5 +847,10 @@ Kernel code should only use `icn_kernel_api::TrustClass`.
 | `icn/crates/icn-kernel-api/src/services.rs` | TrustService, ServiceRegistry |
 | `icn/crates/icn-core/src/supervisor/lifecycle.rs` | Service injection |
 | `icn/crates/icn-core/src/supervisor/init_trust.rs` | Trust initialization |
+| `icn/crates/icn-core/src/supervisor/init_governance.rs` | Governance initialization |
+| `icn/crates/icn-core/src/supervisor/init_ledger.rs` | Ledger initialization |
 | `icn/crates/icn-gateway/src/trust_policy.rs` | TrustPolicyOracle implementation |
+| `apps/trust/` | TrustService app implementation |
+| `apps/governance/` | GovernanceService app implementation |
+| `apps/ledger/` | LedgerService app implementation |
 | `CLAUDE.md` | Agent guidance (Kernel/App section) |
