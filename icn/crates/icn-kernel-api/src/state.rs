@@ -35,11 +35,15 @@ pub enum ReplicationPolicy {
     FederationEventual,
     /// Durable archive, retained indefinitely
     Archive,
-    /// Scope-aware: replicate within the given scope level with a target factor.
+    /// Scope-aware: replicate with a target factor, scoped to a particular level.
+    ///
+    /// The `scope` field indicates the scope granularity for replication planning
+    /// (e.g., Cell means "replicate within the cell"). The actual placement
+    /// boundary is determined by [`ObjectReplication::max_scope`].
     Scoped {
-        /// The scope within which replicas must be placed.
+        /// The scope granularity for replication planning.
         scope: ScopeLevel,
-        /// Target number of replicas within that scope.
+        /// Target number of replicas.
         factor: u8,
     },
 }

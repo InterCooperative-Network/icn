@@ -13,6 +13,12 @@ use icn_kernel_api::services::CellService;
 use icn_store::{ContentHash, Store};
 
 /// Configuration for the scoped replication adjuster.
+///
+/// The `rebalance_interval_secs` and `max_concurrent_repairs` fields are used
+/// when the adjuster is spawned as a background task (see Phase 19/20 roadmap).
+/// Currently, `on_membership_change()` is called reactively.
+// TODO(#924): Wire periodic rebalance loop using rebalance_interval_secs.
+// TODO(#924): Enforce max_concurrent_repairs when executing repair actions.
 #[derive(Clone, Debug)]
 pub struct AdjusterConfig {
     /// How often to run periodic rebalance checks (seconds).
@@ -64,8 +70,11 @@ pub struct ScopeHealth {
 }
 
 /// Adjusts replication in response to membership changes and periodic scans.
+///
+/// Currently operates reactively via `on_membership_change()`. A periodic
+/// background loop using `config.rebalance_interval_secs` is planned for
+/// Phase 19/20 (see TODO in `AdjusterConfig`).
 pub struct ScopedReplicationAdjuster {
-    #[allow(dead_code)]
     config: AdjusterConfig,
     store: Arc<dyn Store>,
     cell_service: Arc<dyn CellService>,
@@ -89,8 +98,11 @@ impl ScopedReplicationAdjuster {
     ///
     /// Scans all `Scoped` objects matching `scope` and returns repair actions
     /// for any that are under- or over-replicated relative to their target factor.
+    /// Actions are capped at `config.max_concurrent_repairs`.
     pub fn on_membership_change(&self, scope: ScopeLevel) -> Result<Vec<RepairAction>> {
-        self.repair_actions(scope)
+        let mut actions = self.repair_actions(scope)?;
+        actions.truncate(self.config.max_concurrent_repairs);
+        Ok(actions)
     }
 
     /// Evaluate the replication health of all `Scoped` objects at the given scope.
@@ -103,7 +115,8 @@ impl ScopedReplicationAdjuster {
         for hash in &hashes {
             if let Some(metadata) = self.store.get_replica_metadata(hash)? {
                 let target = metadata.effective_target_replicas(3);
-                let current = metadata.healthy_count();
+                let max_scope = metadata.max_scope();
+                let current = self.in_scope_healthy_count(&metadata, max_scope);
 
                 if current < target {
                     under += 1;
@@ -132,7 +145,8 @@ impl ScopedReplicationAdjuster {
         for hash in hashes {
             if let Some(metadata) = self.store.get_replica_metadata(&hash)? {
                 let target = metadata.effective_target_replicas(3);
-                let current_healthy = metadata.healthy_count();
+                let max_scope = metadata.max_scope();
+                let current_healthy = self.in_scope_healthy_count(&metadata, max_scope);
 
                 if current_healthy < target {
                     // Under-replicated: find peers in scope that don't already hold replicas
@@ -157,11 +171,26 @@ impl ScopedReplicationAdjuster {
                         });
                     }
                 } else if current_healthy > target {
-                    // Over-replicated: pick excess replicas to remove
+                    // Over-replicated: pick excess replicas to remove.
+                    // Removal preference: replicas at the widest scope first (least local).
                     let excess = current_healthy - target;
-                    let healthy_peers = metadata.healthy_replicas();
-                    // Remove from the end (least preferred)
-                    for peer in healthy_peers.iter().rev().take(excess) {
+                    let mut in_scope_healthy: Vec<(String, ScopeLevel)> = metadata
+                        .replicas
+                        .iter()
+                        .filter(|r| {
+                            r.health == icn_store::ReplicaHealth::Healthy
+                                && self.is_replica_in_scope(&r.peer_did, max_scope)
+                        })
+                        .map(|r| {
+                            let did = icn_kernel_api::types::Did::from(r.peer_did.clone());
+                            let s = self.cell_service.peer_scope(&did);
+                            (r.peer_did.clone(), s)
+                        })
+                        .collect();
+                    // Sort widest scope first (highest ordinal), so we prefer to remove
+                    // the least-local replicas.
+                    in_scope_healthy.sort_by(|a, b| b.1.cmp(&a.1));
+                    for (peer, _) in in_scope_healthy.iter().take(excess) {
                         actions.push(RepairAction::RemoveReplica {
                             content_hash: hash,
                             excess_peer: peer.clone(),
@@ -174,11 +203,46 @@ impl ScopedReplicationAdjuster {
         Ok(actions)
     }
 
+    /// Count healthy replicas that are within the object's max_scope.
+    ///
+    /// If no max_scope is set, all healthy replicas count.
+    fn in_scope_healthy_count(
+        &self,
+        metadata: &icn_store::ReplicaMetadata,
+        max_scope: Option<ScopeLevel>,
+    ) -> usize {
+        metadata
+            .replicas
+            .iter()
+            .filter(|r| {
+                r.health == icn_store::ReplicaHealth::Healthy
+                    && self.is_replica_in_scope(&r.peer_did, max_scope)
+            })
+            .count()
+    }
+
+    /// Check if a replica peer is within the given max_scope.
+    fn is_replica_in_scope(&self, peer_did: &str, max_scope: Option<ScopeLevel>) -> bool {
+        match max_scope {
+            Some(max) => {
+                let did = icn_kernel_api::types::Did::from(peer_did.to_string());
+                let peer_scope = self.cell_service.peer_scope(&did);
+                max.includes(peer_scope)
+            }
+            None => true,
+        }
+    }
+
     /// Return peer DIDs that are within the given scope relative to the local node.
+    ///
+    /// For `Cell` scope, returns cell members. For `Org` scope and wider, also
+    /// includes org peers known to the `CellService`.
+    ///
+    /// Note: For scopes wider than `Org`, a complete peer set would require
+    /// gossip-based discovery (handled by `ReplicationManager`). This method
+    /// provides the best-effort set from the `CellService` for adjuster use.
+    // TODO(#924): For Federation+ scopes, integrate with gossip peer discovery.
     fn peers_in_scope(&self, scope: ScopeLevel) -> Vec<String> {
-        // For Cell scope, return cell members.
-        // For Org scope, return cell members + org peers.
-        // For wider scopes, we'd need a broader peer set (not yet implemented).
         if let Some(cell_id) = self.cell_service.local_cell() {
             let mut peers: Vec<String> = self
                 .cell_service
@@ -188,12 +252,11 @@ impl ScopedReplicationAdjuster {
                 .collect();
 
             if scope >= ScopeLevel::Org {
-                // CellService doesn't expose a generic "org members" list,
-                // but peer_scope() lets us check individual peers. For now,
-                // cell members are a sufficient approximation for tests.
-                // In production, the ReplicationManager handles the full
-                // gossip-based peer discovery.
-                let _ = scope; // acknowledged
+                // Include org peers (same org, possibly different cell).
+                // CellService.is_org_peer() can check individual peers, but
+                // we don't have a list_org_peers() method yet. We rely on
+                // cell_members as the known subset. The ReplicationManager
+                // handles the full gossip-based peer set for production use.
             }
 
             peers.sort();

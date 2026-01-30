@@ -92,11 +92,12 @@ async fn test_store_blob_cell_scope_replication() {
 }
 
 /// Verify that `max_scope` is enforced: a blob with `max_scope: Cell` should not
-/// produce repair actions targeting non-cell peers.
+/// count org-peer replicas toward its target, and repair actions should only
+/// target cell members.
 #[tokio::test]
 async fn test_max_scope_enforcement() {
     let store = make_store();
-    // Only alice is a cell member; bob is an org peer
+    // alice is a cell member; bob is an org peer (outside Cell scope)
     let mut svc = MockCellService::new(Some(cell_id()));
     svc = svc.with_member("did:icn:alice".into());
     svc = svc.with_org_peer("did:icn:bob".into());
@@ -104,13 +105,21 @@ async fn test_max_scope_enforcement() {
 
     let hash = test_hash(0x02);
     let config = scoped_config(ScopeLevel::Cell, 2, ScopeLevel::Cell);
-    let meta = ReplicaMetadata::new(hash).with_replication_config(config);
+
+    // bob has a healthy replica, but it's outside max_scope: Cell
+    let mut meta = ReplicaMetadata::new(hash).with_replication_config(config);
+    meta.add_replica("did:icn:bob".to_string(), ReplicaHealth::Healthy);
     store.put_replica_metadata(&meta).unwrap();
 
-    let adjuster = ScopedReplicationAdjuster::new(AdjusterConfig::default(), store, svc);
-    let actions = adjuster.on_membership_change(ScopeLevel::Cell).unwrap();
+    let adjuster = ScopedReplicationAdjuster::new(AdjusterConfig::default(), store.clone(), svc);
 
-    // Only alice available in cell scope
+    // Health check: bob's replica is out of scope, so the object is still
+    // under-replicated (0 in-scope healthy, target = 2)
+    let health = adjuster.evaluate_scope(ScopeLevel::Cell).unwrap();
+    assert_eq!(health.under_replicated, 1, "bob's replica is out of scope");
+
+    // Repair actions should target alice (the only in-scope candidate)
+    let actions = adjuster.on_membership_change(ScopeLevel::Cell).unwrap();
     assert_eq!(actions.len(), 1);
     match &actions[0] {
         icn_core::replication::RepairAction::AddReplica { target_peers, .. } => {
@@ -201,12 +210,20 @@ async fn test_existing_cluster_strong_unchanged() {
 }
 
 /// Verify `evaluate_scope` returns correct health stats.
+///
+/// Uses a cell service with alice, bob as cell members and carol as an org peer.
+/// The objects have max_scope: Org, so carol's replicas count as in-scope.
 #[tokio::test]
 async fn test_scope_health_report() {
     let store = make_store();
-    let svc = make_cell_service(&["did:icn:alice", "did:icn:bob"]);
+    // alice, bob are cell members; carol is an org peer (within Org max_scope)
+    let mut svc = MockCellService::new(Some(cell_id()));
+    svc = svc.with_member("did:icn:alice".into());
+    svc = svc.with_member("did:icn:bob".into());
+    svc = svc.with_org_peer("did:icn:carol".into());
+    let svc = Arc::new(svc) as Arc<dyn CellService>;
 
-    // Object 1: healthy (2/2)
+    // Object 1: healthy (2/2 in-scope)
     let hash1 = test_hash(0x10);
     let config1 = scoped_config(ScopeLevel::Cell, 2, ScopeLevel::Org);
     let mut m1 = ReplicaMetadata::new(hash1).with_replication_config(config1);
@@ -214,14 +231,14 @@ async fn test_scope_health_report() {
     m1.add_replica("did:icn:bob".to_string(), ReplicaHealth::Healthy);
     store.put_replica_metadata(&m1).unwrap();
 
-    // Object 2: under-replicated (1/2)
+    // Object 2: under-replicated (1/2 in-scope)
     let hash2 = test_hash(0x11);
     let config2 = scoped_config(ScopeLevel::Cell, 2, ScopeLevel::Org);
     let mut m2 = ReplicaMetadata::new(hash2).with_replication_config(config2);
     m2.add_replica("did:icn:alice".to_string(), ReplicaHealth::Healthy);
     store.put_replica_metadata(&m2).unwrap();
 
-    // Object 3: over-replicated (3/2)
+    // Object 3: over-replicated (3/2 in-scope — carol is an org peer, within Org max_scope)
     let hash3 = test_hash(0x12);
     let config3 = scoped_config(ScopeLevel::Cell, 2, ScopeLevel::Org);
     let mut m3 = ReplicaMetadata::new(hash3).with_replication_config(config3);
