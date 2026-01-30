@@ -68,7 +68,7 @@ See [PHASE_HISTORY.md](../PHASE_HISTORY.md) for details.
 | Epic | Status | Key PRs | Description |
 |------|--------|---------|-------------|
 | Phase 2: Trust Extraction (#857) | ✅ Complete | #969, #970, #971 | TrustService migration, ledger oracle, OracleRegistry wiring |
-| Kernel Crate Cleanup (#912, #916) | ✅ Complete | #972, #974 | Remove icn-trust from icn-core, strict Meaning Firewall CI |
+| Kernel Crate Cleanup (#912, #915, #916) | ✅ Complete | #972, #973, #974 | Remove icn-trust from kernel crates, strict Meaning Firewall CI |
 | Cells & Scopes (#919) | ✅ Complete | #950, #962, #961 | ScopeLevel, CellId, CellService, scope-aware placement + replication |
 | ExecutionReceipt & Settlement | ✅ Complete | #956, #960 | Chained Ed25519 receipts, ReceiptClearingManager |
 | Commons Security (#966, #967) | ✅ Complete | #975, #976 | Sybil resistance + replay protection for commons credits |

@@ -32,6 +32,7 @@ Merged PRs:
 ### Kernel Crate Cleanup (Jan 30)
 
 - [#972](https://github.com/InterCooperative-Network/icn/pull/972) — Remove icn-trust from icn-core (#912)
+- [#973](https://github.com/InterCooperative-Network/icn/pull/973) — Remove icn-trust dev-dep from icn-net (#915)
 - [#974](https://github.com/InterCooperative-Network/icn/pull/974) — Strict Meaning Firewall CI with ratchet tests (#916)
 
 ### Cells & Scopes Epic (#919) — ✅ Complete
