@@ -633,8 +633,7 @@ mod tests {
         let consumer =
             Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
 
-        let entry_with_nonce =
-            build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
+        let entry_with_nonce = build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
         assert!(
             entry_with_nonce.nonce.is_some(),
             "receipt-backed spend entry must have nonce set"
