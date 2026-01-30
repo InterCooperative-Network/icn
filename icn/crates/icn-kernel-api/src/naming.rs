@@ -220,7 +220,7 @@ impl ServiceEndpoint {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        now > self.created_at + self.ttl_secs
+        now > self.created_at.saturating_add(self.ttl_secs)
     }
 }
 

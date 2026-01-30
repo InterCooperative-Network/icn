@@ -106,6 +106,12 @@ impl Default for ServiceDiscoveryManager {
     }
 }
 
+/// `ScopedDiscovery` implementation using `blocking_read()`/`blocking_write()`.
+///
+/// **Important:** These methods must only be called from a blocking (non-async) context
+/// or from within `tokio::task::spawn_blocking`. Calling them from an async task
+/// risks deadlocking under high contention. For async callers, use the `announce()`,
+/// `withdraw()`, `discover()`, and `get()` async methods directly.
 impl ScopedDiscovery for ServiceDiscoveryManager {
     fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
         let id = endpoint.service_id.clone();

@@ -88,6 +88,12 @@ pub fn sign_service_endpoint(
 ///
 /// Extracts the public key from the provider DID string and verifies the
 /// Ed25519 signature over the canonical signing payload.
+///
+/// **Key rotation note:** This function verifies against the current public key
+/// embedded in the provider DID. If the provider has rotated keys since signing,
+/// verification will fail. Callers that need key-rotation tolerance should check
+/// the `KEY_ROTATION_GRACE_PERIOD_SECS` window in `icn-gossip::key_rotation`
+/// and attempt verification with the previous key if the current key fails.
 pub fn verify_service_endpoint(endpoint: &ServiceEndpoint) -> Result<(), NamingError> {
     let provider_did = icn_identity::Did::from_str(&endpoint.provider)
         .map_err(|e| NamingError::InvalidSignature(format!("Cannot parse provider DID: {e}")))?;

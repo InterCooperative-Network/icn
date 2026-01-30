@@ -40,8 +40,9 @@ pub struct AnnounceRequest {
     /// TTL in seconds
     #[serde(default = "default_ttl")]
     pub ttl_secs: u64,
+    /// Unix timestamp of creation (included in signed payload)
+    pub created_at: u64,
     /// Ed25519 signature (hex-encoded)
-    #[serde(default)]
     pub signature: String,
 }
 
@@ -169,12 +170,15 @@ pub async fn announce_service(
     mgr: web::Data<Arc<ServiceDiscoveryManager>>,
     req: web::Json<AnnounceRequest>,
 ) -> crate::error::Result<HttpResponse> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    let sig_bytes = hex::decode(&req.signature).unwrap_or_default();
+    let sig_bytes = hex::decode(&req.signature).map_err(|_| {
+        crate::error::GatewayError::BadRequest("Invalid signature hex encoding".to_string())
+    })?;
+    if sig_bytes.len() != 64 {
+        return Err(crate::error::GatewayError::BadRequest(format!(
+            "Signature must be 64 bytes, got {}",
+            sig_bytes.len()
+        )));
+    }
 
     let endpoint = ServiceEndpoint {
         service_id: req.service_id.clone(),
@@ -199,8 +203,13 @@ pub async fn announce_service(
         scope_visibility: parse_scope(&req.scope_visibility),
         ttl_secs: req.ttl_secs,
         signature: Signature::new(sig_bytes),
-        created_at: now,
+        created_at: req.created_at,
     };
+
+    // Verify Ed25519 signature before accepting the endpoint
+    icn_gossip::verify_service_endpoint(&endpoint).map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid endpoint signature: {e}"))
+    })?;
 
     mgr.announce(endpoint)
         .await
