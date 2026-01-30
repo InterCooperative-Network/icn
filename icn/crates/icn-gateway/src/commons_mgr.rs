@@ -2141,7 +2141,10 @@ mod tests {
         let steward = steward_did();
 
         // Use steward enrollment to get Strong POP level (required for join)
-        let anchor = mgr.create_anchor_from_enrollment(&did, Some(&steward)).await.unwrap();
+        let anchor = mgr
+            .create_anchor_from_enrollment(&did, Some(&steward))
+            .await
+            .unwrap();
         let anchor_id = hex::encode(anchor.id());
 
         let holder = mgr

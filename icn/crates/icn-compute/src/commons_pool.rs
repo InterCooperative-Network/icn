@@ -340,10 +340,7 @@ mod tests {
         assert!(pool.get_participant("did:icn:bob").is_none());
     }
 
-    fn make_participant_with_trust(
-        did: &str,
-        trust_score: f64,
-    ) -> CommonsParticipant {
+    fn make_participant_with_trust(did: &str, trust_score: f64) -> CommonsParticipant {
         CommonsParticipant {
             did: did.to_string(),
             capacity: make_capacity(4.0, 8192, 50000),
@@ -397,8 +394,10 @@ mod tests {
         };
         let mut pool = CommonsPool::with_policy(policy);
 
-        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5)).unwrap();
-        pool.try_add_participant(make_participant_with_trust("did:icn:b", 0.5)).unwrap();
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
+        pool.try_add_participant(make_participant_with_trust("did:icn:b", 0.5))
+            .unwrap();
 
         // Third participant rejected — pool full
         let result = pool.try_add_participant(make_participant_with_trust("did:icn:c", 0.5));
@@ -413,7 +412,8 @@ mod tests {
         };
         let mut pool = CommonsPool::with_policy(policy);
 
-        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5)).unwrap();
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
 
         // Same DID can update even though pool is "full"
         let result = pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.6));
@@ -430,7 +430,8 @@ mod tests {
         let mut pool = CommonsPool::with_policy(policy);
 
         // Initially admitted
-        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5)).unwrap();
+        pool.try_add_participant(make_participant_with_trust("did:icn:a", 0.5))
+            .unwrap();
         assert_eq!(pool.participant_count(), 1);
 
         // Trust drops below threshold on re-announce → rejected
