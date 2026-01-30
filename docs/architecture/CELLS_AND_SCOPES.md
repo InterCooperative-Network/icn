@@ -379,6 +379,29 @@ Capacity budgets are not static. A demand-feedback loop adjusts allocations:
 2. **App** (ScopePolicy oracle) observes demand and outputs adjusted `CapacityBudget`
 3. **Kernel** applies the new budget at the next capacity announcement interval
 
+**Implementation** (Epic 2, PR #962):
+
+The demand-feedback loop runs as a background tokio task inside `ComputeActor::spawn()`, controlled by `DemandAdjustmentConfig`:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `interval_secs` | 60 | Seconds between adjustment rounds |
+| `learning_rate` | 0.05 | Max fraction shifted per round (clamped to 0.0–0.1) |
+| `min_samples` | 5 | Minimum total queued tasks before adjusting |
+
+The adjustment algorithm (`CapacityBudget::adjust_from_demand`):
+1. Computes per-scope utilization as fraction of total queue depth
+2. Calculates mean utilization across reporting scopes
+3. Shifts capacity toward over-utilized scopes (delta = `(util - mean) * learning_rate`)
+4. Clamps each fraction to `[MIN_SCOPE_FRACTION (0.01), MAX_SCOPE_FRACTION (0.80)]`
+5. Re-normalizes to preserve the original sum
+
+The clamping bounds prevent:
+- **Starvation**: No scope can drop below 1% even under sustained zero demand
+- **Monopolization**: No scope can exceed 80% even under sustained saturation
+
+Queue tracking: `scope_queue_depths` increments on task claim and decrements on completion, failure, cancellation, or timeout via `decrement_scope_queue()`. The `task_scope_map` (task_hash → ScopeLevel) enables O(1) scope lookup on exit.
+
 ### 3.3 Gossip: Capacity Announcements
 
 Existing `NodeCapacityAnnounce` messages are extended with scope budgets:
@@ -915,12 +938,15 @@ The kernel does NOT see:
 3. Register `CellService` in `ServiceRegistry`
 4. Unit tests for all new types
 
-### Phase 2: Capacity & Placement
+### Phase 2: Capacity & Placement ✅
 
-1. Add `CapacityBudget` to `icn-compute`
-2. Extend `PlacementRequest` with `allowed_scopes` and `cell_affinity`
-3. Implement hierarchical placement routing in `DefaultPlacementPolicy`
-4. Add demand-feedback loop for capacity adjustment
+> Implemented in PR #962 (`feat/scope-placement`).
+
+1. ✅ Add `CapacityBudget` to `icn-compute`
+2. ✅ Extend `PlacementRequest` with `allowed_scopes` and `cell_affinity`
+3. ✅ Implement hierarchical placement routing in `DefaultPlacementPolicy`
+4. ✅ Add demand-feedback loop for capacity adjustment
+5. ✅ Wire `CellService` into `ComputeActor` for real `ScopeContext`
 
 ### Phase 3: Discovery & Networking
 
@@ -980,7 +1006,10 @@ See individual issues for acceptance criteria and sub-tasks.
 | `icn/crates/icn-kernel-api/src/services.rs` | CellService trait (addition) |
 | `icn/crates/icn-kernel-api/src/naming.rs` | ServiceEndpoint type (addition) |
 | `icn/crates/icn-kernel-api/src/state.rs` | ReplicationPolicy extension |
-| `icn/crates/icn-compute/src/scheduler.rs` | CapacityBudget, PlacementRequest extensions |
-| `icn/crates/icn-compute/src/types.rs` | ExecutionReceipt (addition) |
+| `icn/crates/icn-compute/src/scheduler.rs` | CapacityBudget, PlacementRequest, DemandAdjustmentConfig, PlacementPolicy |
+| `icn/crates/icn-compute/src/actor/mod.rs` | ComputeActor with cell_service, scope_queue_depths, demand loop |
+| `icn/crates/icn-compute/src/actor/placement.rs` | Scope-aware placement handler, ScopeContext construction |
+| `icn/crates/icn-compute/src/actor/lifecycle.rs` | Queue depth tracking (increment on claim, decrement on exit) |
+| `icn/crates/icn-compute/src/types.rs` | ExecutionReceipt, ComputeMessage scope fields |
 | `icn/crates/icn-federation/src/types.rs` | Cross-scope clearing types |
 | `docs/architecture/KERNEL_APP_SEPARATION.md` | Meaning Firewall reference |

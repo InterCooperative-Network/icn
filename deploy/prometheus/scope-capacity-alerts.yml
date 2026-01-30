@@ -1,0 +1,98 @@
+# Prometheus alert rules for scope-aware capacity budgets (Epic 2)
+#
+# These rules monitor per-scope queue depths and capacity budget health.
+# Add to your Prometheus config via rule_files or as a ConfigMap in k8s.
+#
+# Metrics used:
+#   icn_compute_task_scope_map_size    - gauge: number of active task→scope mappings
+#   icn_compute_tasks_pending          - gauge: total pending tasks
+#   icn_compute_tasks_executing        - gauge: total executing tasks
+#   icn_compute_placement_requests_received_total - counter: placement requests
+#   icn_compute_placement_offers_sent_total       - counter: placement offers
+#
+# Future metrics (when scope-level labels are added):
+#   icn_compute_scope_queue_depth{scope="Local|Cell|Org|Federation|Commons"}
+#   icn_compute_scope_budget_fraction{scope="Local|Cell|Org|Federation|Commons"}
+
+groups:
+  - name: icn_scope_capacity
+    interval: 30s
+    rules:
+      # Alert when the task-to-scope tracking map grows excessively large,
+      # indicating tasks are not being completed/cleaned up.
+      - alert: ScopeMapSizeHigh
+        expr: icn_compute_task_scope_map_size > 500
+        for: 5m
+        labels:
+          severity: warning
+          domain: compute
+        annotations:
+          summary: "Task scope map size exceeds 500"
+          description: >
+            The task_scope_map tracking active task-to-scope assignments
+            has {{ $value }} entries. This may indicate tasks are not
+            completing or being cleaned up properly. Check for stuck tasks
+            or scope queue decrement failures.
+
+      # Alert when task scope map is critically large (possible memory leak)
+      - alert: ScopeMapSizeCritical
+        expr: icn_compute_task_scope_map_size > 2000
+        for: 2m
+        labels:
+          severity: critical
+          domain: compute
+        annotations:
+          summary: "Task scope map size critical (>2000)"
+          description: >
+            The task_scope_map has {{ $value }} entries, indicating a likely
+            leak in scope queue tracking. Tasks may not be decrementing on
+            completion. Investigate lifecycle.rs decrement_scope_queue paths.
+
+      # Alert when placement offers drop significantly (scope budgets may
+      # be over-restricted after demand adjustment)
+      - alert: PlacementOfferRateLow
+        expr: >
+          rate(icn_compute_placement_offers_sent_total[5m])
+          / rate(icn_compute_placement_requests_received_total[5m])
+          < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          domain: compute
+        annotations:
+          summary: "Placement offer rate below 10%"
+          description: >
+            Only {{ $value | humanizePercentage }} of placement requests are
+            generating offers. This may indicate scope budgets are too
+            restrictive after demand adjustment, or allowed_scopes filters
+            are rejecting most executors.
+
+      # Alert when pending tasks are accumulating (possible capacity exhaustion)
+      - alert: PendingTasksHigh
+        expr: icn_compute_tasks_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+          domain: compute
+        annotations:
+          summary: "High pending task count (>100)"
+          description: >
+            {{ $value }} tasks are pending. Combined with scope budgets,
+            some scopes may be starved. Check per-scope queue depths
+            to identify bottlenecks.
+
+      # Alert when no placement offers are being generated at all
+      - alert: PlacementOffersStalled
+        expr: >
+          rate(icn_compute_placement_offers_sent_total[10m]) == 0
+          and rate(icn_compute_placement_requests_received_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          domain: compute
+        annotations:
+          summary: "No placement offers despite incoming requests"
+          description: >
+            Placement requests are being received but no offers are generated.
+            All executors may be failing scope budget, trust, or capacity gates.
+            Check CellService configuration and capacity budget fractions.
