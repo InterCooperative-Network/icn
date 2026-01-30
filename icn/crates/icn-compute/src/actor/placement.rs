@@ -683,11 +683,9 @@ impl ComputeActor {
 
         // Store capacity in executor registry for placement decisions
         let mut registry = self.executor_registry.lock().await;
-        // Resolve trust score: from registry if known, otherwise from callback.
-        let trust_score = registry
-            .get(&executor)
-            .map(|info| info.trust_score)
-            .unwrap_or_else(|| (self.trust_callback)(&executor));
+        // Always fetch fresh trust score — stale cached values could let
+        // executors whose trust has degraded remain in the pool.
+        let trust_score = (self.trust_callback)(&executor);
         if let Some(info) = registry.get_mut(&executor) {
             info.capacity = Some(capacity.clone());
             info.last_seen = capacity.updated_at;
