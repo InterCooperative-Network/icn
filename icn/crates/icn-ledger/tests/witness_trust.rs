@@ -42,7 +42,12 @@ impl TrustService for TestTrustService {
         0.0
     }
 
-    fn record_event(&self, _actor: &icn_kernel_api::types::Did, _event: icn_kernel_api::services::TrustEvent) {}
+    fn record_event(
+        &self,
+        _actor: &icn_kernel_api::types::Did,
+        _event: icn_kernel_api::services::TrustEvent,
+    ) {
+    }
 }
 
 /// Create a test ledger with trust service backed by a TrustGraph owned by a specific DID

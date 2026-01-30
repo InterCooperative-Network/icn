@@ -85,12 +85,7 @@ impl CreditPolicy {
     /// Limit = 100 + (100 * 0.8 * 0.3) + (1000 * 0.05)
     ///       = 100 + 24 + 50
     ///       = 174 hours
-    pub fn calculate_limit(
-        &self,
-        member: &Did,
-        ledger: &Ledger,
-        trust_score: f64,
-    ) -> Result<i64> {
+    pub fn calculate_limit(&self, member: &Did, ledger: &Ledger, trust_score: f64) -> Result<i64> {
         let trust_score = trust_score.clamp(0.0, 1.0);
 
         // Get cleared volume (sum of all cleared credits)
