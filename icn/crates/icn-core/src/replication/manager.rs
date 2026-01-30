@@ -19,7 +19,8 @@ use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
-use icn_kernel_api::services::TrustService;
+use icn_kernel_api::services::{CellService, TrustService};
+use icn_kernel_api::state::ReplicationPolicy;
 use icn_kernel_api::TRUST_THRESHOLD_PARTNER;
 use icn_store::{ContentHash, ReplicaHealth, Store};
 
@@ -81,6 +82,12 @@ pub struct ReplicationManager {
     /// Gossip actor for sending replica requests
     gossip: Arc<RwLock<GossipActor>>,
 
+    /// Optional cell service for scope-aware candidate filtering.
+    ///
+    /// When present and an object uses `Scoped` replication, candidate
+    /// peers are filtered to only those within the object's `max_scope`.
+    cell_service: Option<Arc<dyn CellService>>,
+
     /// Cache of recent requests to avoid spam (content_hash -> timestamp)
     recent_requests: HashMap<ContentHash, SystemTime>,
 }
@@ -100,6 +107,27 @@ impl ReplicationManager {
             store,
             trust_service,
             gossip,
+            cell_service: None,
+            recent_requests: HashMap::new(),
+        }
+    }
+
+    /// Create a new ReplicationManager with a cell service for scope-aware replication.
+    pub fn with_cell_service(
+        own_did: Did,
+        config: ReplicationConfig,
+        store: Arc<dyn Store>,
+        trust_service: Arc<dyn TrustService>,
+        gossip: Arc<RwLock<GossipActor>>,
+        cell_service: Arc<dyn CellService>,
+    ) -> Self {
+        Self {
+            own_did,
+            config,
+            store,
+            trust_service,
+            gossip,
+            cell_service: Some(cell_service),
             recent_requests: HashMap::new(),
         }
     }
@@ -227,13 +255,16 @@ impl ReplicationManager {
         // Count healthy replicas
         let healthy_count = metadata.healthy_count();
 
+        // Use per-object target if available, otherwise fall back to global config
+        let target = metadata.effective_target_replicas(self.config.target_replicas);
+
         // Check if under-replicated
-        if healthy_count < self.config.target_replicas {
+        if healthy_count < target {
             debug!(
                 "Content {:?} under-replicated: {} / {} replicas",
                 hex::encode(hash),
                 healthy_count,
-                self.config.target_replicas
+                target
             );
 
             // Request additional replicas
@@ -332,8 +363,9 @@ impl ReplicationManager {
     /// Strategy:
     /// 1. Filter peers by minimum trust score threshold
     /// 2. Exclude peers already serving as replicas
-    /// 3. Sort by trust score (higher is better)
-    /// 4. Return top N candidates
+    /// 3. If object is `Scoped` and `cell_service` is available, filter by scope
+    /// 4. Sort by trust score (higher is better)
+    /// 5. Return top N candidates
     async fn select_replica_candidates(
         &self,
         metadata: &icn_store::ReplicaMetadata,
@@ -353,6 +385,15 @@ impl ReplicationManager {
             .map(|r| r.peer_did.clone())
             .collect();
 
+        // Determine if we need scope filtering
+        let scope_filter = match (&self.cell_service, &metadata.replication_config) {
+            (Some(_cs), Some(config)) => match config.policy {
+                ReplicationPolicy::Scoped { .. } => Some(config.max_scope),
+                _ => None,
+            },
+            _ => None,
+        };
+
         for peer_did in all_peers {
             // Skip if already a replica
             if existing_replicas.contains(&peer_did.to_string()) {
@@ -362,6 +403,19 @@ impl ReplicationManager {
             // Skip self
             if peer_did == self.own_did {
                 continue;
+            }
+
+            // If scope filtering is active, check peer is within max_scope
+            if let (Some(max_scope), Some(cs)) = (scope_filter, &self.cell_service) {
+                let kernel_did = icn_kernel_api::types::Did::from(peer_did.to_string());
+                let peer_scope = cs.peer_scope(&kernel_did);
+                if !max_scope.includes(peer_scope) {
+                    debug!(
+                        "Skipping peer {} (scope {:?} outside max_scope {:?})",
+                        peer_did, peer_scope, max_scope
+                    );
+                    continue;
+                }
             }
 
             // Get trust score via TrustService (kernel/app separated)
@@ -562,6 +616,85 @@ mod tests {
 
         assert_eq!(manager.config.target_replicas, 3);
         assert_eq!(manager.config.min_trust_score, TRUST_THRESHOLD_PARTNER);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_manager_uses_per_object_target() -> Result<()> {
+        use icn_kernel_api::scope::ScopeLevel;
+        use icn_kernel_api::state::{ObjectReplication, ReplicationPolicy};
+
+        let keypair = KeyPair::generate()?;
+        let did = keypair.did().clone();
+        let config = ReplicationConfig {
+            target_replicas: 3,
+            ..Default::default()
+        };
+
+        let store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
+        let trust_service = create_mock_trust_service();
+        let gossip = GossipActor::spawn(did.clone(), None);
+
+        let mut manager =
+            ReplicationManager::new(did.clone(), config, store.clone(), trust_service, gossip);
+
+        // Store an object with Scoped factor=1 (less than global target=3)
+        let hash = [0x11u8; 32];
+        let obj_config = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 1,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+        let mut metadata =
+            icn_store::ReplicaMetadata::new(hash).with_replication_config(obj_config);
+        // 1 healthy replica matches factor=1, so should be healthy
+        metadata.add_replica("did:icn:peer1".to_string(), ReplicaHealth::Healthy);
+        store.put_replica_metadata(&metadata)?;
+
+        // check_content_replication should return true (properly replicated per object config)
+        let result = manager.check_content_replication(&hash).await?;
+        assert!(
+            result,
+            "Object with factor=1 and 1 replica should be healthy"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_manager_backward_compat() -> Result<()> {
+        let keypair = KeyPair::generate()?;
+        let did = keypair.did().clone();
+        let config = ReplicationConfig {
+            target_replicas: 2,
+            ..Default::default()
+        };
+
+        let store = Arc::new(SledStore::temporary()?) as Arc<dyn Store>;
+        let trust_service = create_mock_trust_service();
+        let gossip = GossipActor::spawn(did.clone(), None);
+
+        let mut manager =
+            ReplicationManager::new(did.clone(), config, store.clone(), trust_service, gossip);
+
+        // Store an object with NO replication config (backward compat)
+        let hash = [0x22u8; 32];
+        let mut metadata = icn_store::ReplicaMetadata::new(hash);
+        // Only 1 replica, but target is 2 → under-replicated
+        metadata.add_replica("did:icn:peer1".to_string(), ReplicaHealth::Healthy);
+        store.put_replica_metadata(&metadata)?;
+
+        // check_content_replication should return false (under-replicated per global config)
+        let result = manager.check_content_replication(&hash).await?;
+        assert!(
+            !result,
+            "Object with no config should use global target (2)"
+        );
 
         Ok(())
     }

@@ -47,7 +47,10 @@ pub use node::{
     ResourceCaps, RolePolicy, ServiceRole, TOPIC_NODE_PROFILES,
 };
 pub use policy::{Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy};
-pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
+pub use replication::{
+    AdjusterConfig, RepairAction, ReplicationConfig, ReplicationHandle, ReplicationManager,
+    ScopeHealth, ScopedReplicationAdjuster,
+};
 pub use resource_enforcer_actor::{
     EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
     ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,

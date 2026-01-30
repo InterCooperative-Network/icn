@@ -3437,6 +3437,7 @@ dependencies = [
  "bytes",
  "ed25519-dalek",
  "icn-identity",
+ "icn-kernel-api",
  "icn-obs",
  "icn-time",
  "rand 0.8.5",
