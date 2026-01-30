@@ -26,7 +26,11 @@ impl TrustServiceImpl {
     pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
         let own_did = graph.read().own_did().clone();
         let oracle = Arc::new(TrustPolicyOracle::new(graph.clone()));
-        Self { graph, oracle, own_did }
+        Self {
+            graph,
+            oracle,
+            own_did,
+        }
     }
 
     /// Get direct access to the TrustGraph
@@ -86,11 +90,8 @@ impl TrustService for TrustServiceImpl {
                 };
                 let new_score = (current - penalty).max(0.0);
                 let trust_score = icn_trust::TrustScore::unchecked(new_score);
-                let edge = icn_trust::TrustEdge::new(
-                    self.own_did.clone(),
-                    identity_did,
-                    trust_score,
-                );
+                let edge =
+                    icn_trust::TrustEdge::new(self.own_did.clone(), identity_did, trust_score);
                 let mut graph = self.graph.write();
                 if let Err(e) = graph.add_edge(edge) {
                     tracing::warn!(actor = %actor, "Failed to persist trust penalty: {}", e);
@@ -116,11 +117,8 @@ impl TrustService for TrustServiceImpl {
                 };
                 let new_score = (current + weight * 0.25).min(1.0);
                 let trust_score = icn_trust::TrustScore::unchecked(new_score);
-                let edge = icn_trust::TrustEdge::new(
-                    self.own_did.clone(),
-                    identity_did,
-                    trust_score,
-                );
+                let edge =
+                    icn_trust::TrustEdge::new(self.own_did.clone(), identity_did, trust_score);
                 let mut graph = self.graph.write();
                 if let Err(e) = graph.add_edge(edge) {
                     tracing::warn!(actor = %actor, "Failed to persist trust boost: {}", e);
