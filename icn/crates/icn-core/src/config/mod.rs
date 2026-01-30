@@ -241,6 +241,44 @@ impl Config {
             );
         }
 
+        // Validate all trust-score config fields are in [0.0, 1.0]
+        let trust_fields: &[(&str, f64)] = &[
+            (
+                "gossip.replication.min_replica_trust",
+                self.gossip.replication.min_replica_trust,
+            ),
+            ("privacy.min_relay_trust", self.privacy.min_relay_trust),
+            (
+                "trust.attestation.min_attester_trust",
+                self.trust.attestation.min_attester_trust,
+            ),
+            (
+                "trust.attestation.min_evidence_score",
+                self.trust.attestation.min_evidence_score,
+            ),
+            (
+                "trust.propagation.decay_factor",
+                self.trust.propagation.decay_factor,
+            ),
+            (
+                "trust.propagation.min_edge_trust",
+                self.trust.propagation.min_edge_trust,
+            ),
+            (
+                "trust.sybil_resistance.max_trust_concentration",
+                self.trust.sybil_resistance.max_trust_concentration,
+            ),
+            (
+                "trust.sybil_resistance.min_diversity_ratio",
+                self.trust.sybil_resistance.min_diversity_ratio,
+            ),
+        ];
+        for (name, value) in trust_fields {
+            if !(0.0..=1.0).contains(value) {
+                errors.push(format!("{name} must be in [0.0, 1.0], got {value}"));
+            }
+        }
+
         // Federation validation
         if self.federation.enabled {
             if self.federation.coop_id.is_empty() {
@@ -899,6 +937,29 @@ min_trust_threshold = 1.5
         assert!(warnings
             .iter()
             .any(|w| w.contains("trust-gated TLS is disabled")));
+    }
+
+    #[test]
+    fn test_config_validation_rejects_out_of_range_trust_fields() {
+        let mut config = Config::default();
+        // Set one trust field out of range
+        config.trust.propagation.decay_factor = 1.5;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("trust.propagation.decay_factor")));
+
+        // Reset and try another
+        let mut config = Config::default();
+        config.gossip.replication.min_replica_trust = -0.1;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("gossip.replication.min_replica_trust")));
     }
 
     #[test]

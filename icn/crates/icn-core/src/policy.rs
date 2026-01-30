@@ -273,7 +273,31 @@ impl CapabilityQuota {
 /// ```
 #[async_trait::async_trait]
 pub trait TrustScoreProvider: Send + Sync {
-    /// Compute the trust score for a DID. Returns 0.0 for unknown DIDs.
+    /// Compute the trust score for a DID.
+    ///
+    /// # Contract
+    ///
+    /// - **Range**: Implementations MUST return a value in `[0.0, 1.0]`.
+    ///   Values outside this range will be clamped by consumers but indicate
+    ///   a bug in the provider.
+    /// - **Unknown DIDs**: Return `0.0` (Isolated trust class).
+    /// - **NaN / Infinity**: Must never be returned. Callers may treat NaN
+    ///   as 0.0 but this is a provider bug.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use icn_core::TrustScoreProvider;
+    ///
+    /// struct GraphProvider { /* wraps TrustGraph */ }
+    ///
+    /// #[async_trait::async_trait]
+    /// impl TrustScoreProvider for GraphProvider {
+    ///     async fn trust_score_for(&self, did: &icn_identity::Did) -> f64 {
+    ///         self.graph.compute_trust_score(did).unwrap_or(0.0)
+    ///     }
+    /// }
+    /// ```
     async fn trust_score_for(&self, did: &Did) -> f64;
 }
 
