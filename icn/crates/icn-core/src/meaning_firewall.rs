@@ -12,25 +12,25 @@
 //!
 //! They should NOT use domain-specific types:
 //! - TrustGraph, TrustClass, TrustScore (from icn-trust)
-//! - GovernanceRules, DecisionType (from icn-governance)  
+//! - GovernanceRules, DecisionType (from icn-governance)
 //! - MembershipCriteria (from icn-entity/coop/community)
 //!
-//! # Current Status
+//! # Strict Mode
 //!
-//! These tests document the target state after Phase 2 refactoring.
-//! Tests prefixed with `current_` show existing violations.
-//! Tests prefixed with `target_` will pass after Phase 2.
+//! These tests run in CI and **fail on regressions**. The known violation counts
+//! are pinned to exact values — adding new violations will break the build.
+//! Reducing violations requires updating the pinned counts downward.
 
 use std::path::PathBuf;
 
-/// Core kernel crates that must not depend on icn-trust.
+/// Core kernel crates that must not depend on domain crates.
 const KERNEL_CRATES: &[&str] = &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
 
 /// Domain-specific crates that kernel must not depend on directly.
 const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
 
 /// Forbidden import patterns in kernel crates.
-#[allow(dead_code)] // Documented for reference; will be used in Phase 2 migration
+#[allow(dead_code)]
 const FORBIDDEN_IMPORTS: &[&str] = &[
     "use icn_trust::",
     "icn_trust::",
@@ -42,7 +42,7 @@ const FORBIDDEN_IMPORTS: &[&str] = &[
 ];
 
 /// Allowed kernel-api types that kernel crates CAN use.
-#[allow(dead_code)] // Documented for reference; will be used in Phase 2 migration
+#[allow(dead_code)]
 const ALLOWED_ORACLE_TYPES: &[&str] = &[
     "PolicyRequest",
     "PolicyDecision",
@@ -53,7 +53,6 @@ const ALLOWED_ORACLE_TYPES: &[&str] = &[
 ];
 
 fn get_workspace_root() -> PathBuf {
-    // Navigate from icn/crates/icn-core to icn/crates
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
         .parent()
@@ -89,19 +88,6 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
 
 /// Check if a Cargo.toml contains a dependency on a specific crate.
 fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
-    // Handle various dependency declaration patterns:
-    // 1. Standard key forms:
-    //    icn-trust = "0.1.0"
-    //    icn-trust = { path = "...", version = "0.1.0" }
-    // 2. Workspace key form:
-    //    icn-trust.workspace = true
-    // 3. Table headers:
-    //    [dependencies.icn-trust]
-    //    [dev-dependencies.icn-trust]
-    //    [build-dependencies.icn-trust]
-    //
-    // Note: We intentionally do NOT match generic quoted occurrences like
-    // `"icn-trust"` to avoid false positives from comments or descriptions.
     cargo_toml.contains(&format!("{dep_name} ="))
         || cargo_toml.contains(&format!("{dep_name}="))
         || cargo_toml.contains(&format!("{dep_name}.workspace"))
@@ -125,106 +111,129 @@ fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
 mod tests {
     use super::*;
 
-    /// Documents CURRENT state: kernel crates DO have icn-trust dependencies.
-    /// This test should PASS now but will need to be removed after Phase 2.
+    // ===================================================================
+    // STRICT REGRESSION TESTS
+    //
+    // These tests pin the EXACT violation counts. They prevent regressions
+    // (adding new domain imports to kernel crates) while tracking progress.
+    //
+    // When you remove a violation, LOWER the expected count.
+    // If a test fails because the count is LOWER than expected, that's
+    // progress — update the constant.
+    // If a test fails because the count is HIGHER, that's a regression.
+    // ===================================================================
+
+    /// Pinned Cargo.toml dependency violations per kernel crate.
+    ///
+    /// Update these when violations are removed. Adding new violations
+    /// will cause this test to fail.
+    ///
+    /// Current state (2026-01-30):
+    /// - icn-gossip: CLEAN
+    /// - icn-net: 1 (dev-dep on icn-trust, PR #973 removes it)
+    /// - icn-gateway: 2 (icn-trust + icn-governance)
+    /// - icn-ledger: 2 (icn-trust + icn-governance)
     #[test]
-    fn current_kernel_crates_have_trust_dependencies() {
-        // Explicitly document expected violations for Phase 2
-        // Progress: icn-gossip cleaned in Wave 1A
-        // Remaining: icn-net (test-only dep), icn-gateway, icn-ledger
-        const EXPECTED_VIOLATIONS: &[&str] = &["icn-net", "icn-gateway", "icn-ledger"];
+    fn strict_cargo_dependency_violations() {
+        let expected: &[(&str, usize)] = &[
+            ("icn-gossip", 0), // CLEAN ✅
+            ("icn-net", 1),    // dev-dep on icn-trust (PR #973 removes it)
+            ("icn-gateway", 2), // icn-trust + icn-governance
+            ("icn-ledger", 2), // icn-trust + icn-governance
+        ];
 
-        let mut violations = Vec::new();
+        for &(crate_name, expected_count) in expected {
+            let cargo_toml = read_cargo_toml(crate_name)
+                .unwrap_or_else(|| panic!("Could not read {crate_name}/Cargo.toml"));
 
-        for crate_name in KERNEL_CRATES {
-            if let Some(cargo_toml) = read_cargo_toml(crate_name) {
-                if has_dependency(&cargo_toml, "icn-trust") {
-                    violations.push(*crate_name);
+            let mut actual = 0;
+            for domain_crate in DOMAIN_CRATES {
+                if has_dependency(&cargo_toml, domain_crate) {
+                    actual += 1;
                 }
             }
-        }
 
-        // This documents the current state - all 4 kernel crates depend on icn-trust
-        assert_eq!(
-            violations.len(),
-            EXPECTED_VIOLATIONS.len(),
-            "Expected violations in {:?}, found {:?}. \
-             If this changed, Phase 2 is making progress!",
-            EXPECTED_VIOLATIONS,
-            violations
-        );
-    }
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: {crate_name} has {actual} domain-crate dependencies \
+                 (expected at most {expected_count}). \
+                 Do not add new domain deps to kernel crates — use PolicyOracle instead."
+            );
 
-    /// Documents CURRENT import violations.
-    /// After Phase 2, this count should be 0.
-    #[test]
-    fn current_trust_import_count() {
-        let mut total_imports = 0;
-
-        for crate_name in KERNEL_CRATES {
-            let count = count_imports_in_crate(crate_name, "use icn_trust::");
-            total_imports += count;
-        }
-
-        // Document current state - expected to be >0 before Phase 2
-        // As Phase 2 progresses, this number should decrease
-        println!("Current icn_trust imports in kernel crates: {total_imports}");
-        assert!(
-            total_imports > 0,
-            "If this is 0, Phase 2 may be complete! \
-             Update this test to verify no regressions."
-        );
-    }
-
-    /// TARGET state: kernel crates should NOT depend on icn-trust.
-    /// This test is currently IGNORED and will be enabled after Phase 2.
-    #[test]
-    #[ignore = "Enable after Phase 2 completes - tracks #865, #866, #867"]
-    fn target_kernel_crates_no_trust_dependency() {
-        for crate_name in KERNEL_CRATES {
-            if let Some(cargo_toml) = read_cargo_toml(crate_name) {
-                assert!(
-                    !has_dependency(&cargo_toml, "icn-trust"),
-                    "{crate_name} depends on icn-trust - firewall breached! \
-                     Use PolicyOracle instead of direct TrustGraph access."
+            if actual < expected_count {
+                panic!(
+                    "PROGRESS: {crate_name} now has only {actual} domain-crate deps \
+                     (expected {expected_count}). Update the pinned count in \
+                     meaning_firewall.rs::strict_cargo_dependency_violations()."
                 );
             }
         }
     }
 
-    /// TARGET state: no direct icn_trust imports in kernel code.
+    /// Pinned `use icn_trust::` import count per kernel crate.
+    ///
+    /// Update these when imports are removed. Adding new imports
+    /// will cause this test to fail.
+    ///
+    /// Current state (2026-01-30):
+    /// - icn-gossip: CLEAN
+    /// - icn-net: CLEAN (no source imports, only had Cargo.toml dev-dep)
+    /// - icn-gateway: 3 (trust_mgr.rs:2, api/trust.rs:1)
+    /// - icn-ledger: 3 (credit_policy.rs:1, ledger.rs:1, fork_resolution.rs:1)
     #[test]
-    #[ignore = "Enable after Phase 2 completes"]
-    fn target_no_trust_imports_in_kernel() {
-        for crate_name in KERNEL_CRATES {
-            for file in list_rust_files(crate_name) {
-                if let Ok(content) = std::fs::read_to_string(&file) {
-                    for pattern in &["use icn_trust::", "TrustGraph", "TrustClass"] {
-                        assert!(
-                            !content.contains(pattern),
-                            "File {} contains forbidden import: {pattern}",
-                            file.display()
-                        );
-                    }
-                }
+    fn strict_trust_import_violations() {
+        let expected: &[(&str, usize)] = &[
+            ("icn-gossip", 0), // CLEAN ✅
+            ("icn-net", 0),    // CLEAN ✅
+            ("icn-gateway", 3),
+            ("icn-ledger", 3),
+        ];
+
+        for &(crate_name, expected_count) in expected {
+            let actual = count_imports_in_crate(crate_name, "use icn_trust::");
+
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: {crate_name} has {actual} `use icn_trust::` imports \
+                 (expected at most {expected_count}). \
+                 Do not add new icn_trust imports to kernel crates."
+            );
+
+            if actual < expected_count {
+                panic!(
+                    "PROGRESS: {crate_name} now has only {actual} `use icn_trust::` imports \
+                     (expected {expected_count}). Update the pinned count in \
+                     meaning_firewall.rs::strict_trust_import_violations()."
+                );
             }
         }
     }
 
-    /// Verify kernel crates CAN use PolicyOracle types from kernel-api.
-    /// This is the CORRECT pattern after Phase 2.
+    /// Ensure icn-gossip remains clean (no icn-trust dependency).
+    /// This crate was cleaned in Wave 1A and must stay clean.
     #[test]
-    fn kernel_api_provides_oracle_types() {
-        // Verify icn-kernel-api has the types kernel crates should use
-        if let Some(cargo_toml) = read_cargo_toml("icn-kernel-api") {
-            // icn-kernel-api should exist and be the bridge
+    fn gossip_crate_stays_clean() {
+        if let Some(cargo_toml) = read_cargo_toml("icn-gossip") {
             assert!(
-                cargo_toml.contains("icn-kernel-api"),
-                "icn-kernel-api crate exists"
+                !has_dependency(&cargo_toml, "icn-trust"),
+                "icn-gossip must not depend on icn-trust — it was cleaned in Wave 1A"
+            );
+            assert!(
+                !has_dependency(&cargo_toml, "icn-governance"),
+                "icn-gossip must not depend on icn-governance"
             );
         }
 
-        // Verify the PolicyOracle types are defined in kernel-api
+        let trust_imports = count_imports_in_crate("icn-gossip", "use icn_trust::");
+        assert_eq!(
+            trust_imports, 0,
+            "icn-gossip has {trust_imports} icn_trust imports — must be 0"
+        );
+    }
+
+    /// Verify kernel-api provides the required abstraction types.
+    #[test]
+    fn kernel_api_provides_oracle_types() {
         let kernel_api_files = list_rust_files("icn-kernel-api");
         let mut has_policy_oracle = false;
 
@@ -249,7 +258,6 @@ mod tests {
     fn kernel_api_no_domain_types() {
         for file in list_rust_files("icn-kernel-api") {
             if let Ok(content) = std::fs::read_to_string(&file) {
-                // kernel-api should not define or re-export domain types
                 for pattern in &[
                     "struct TrustGraph",
                     "pub struct TrustClass",
@@ -269,7 +277,6 @@ mod tests {
     fn firewall_status_summary() {
         println!("\n=== Meaning Firewall Status ===\n");
 
-        // Check Cargo.toml dependencies
         let mut cargo_violations = Vec::new();
         for crate_name in KERNEL_CRATES {
             if let Some(cargo_toml) = read_cargo_toml(crate_name) {
@@ -281,7 +288,6 @@ mod tests {
             }
         }
 
-        // Check import statements
         let mut import_violations = Vec::new();
         for crate_name in KERNEL_CRATES {
             let count = count_imports_in_crate(crate_name, "use icn_trust::");
@@ -304,11 +310,10 @@ mod tests {
         println!(
             "\nFirewall status: {}",
             if is_clean {
-                "✅ CLEAN"
+                "CLEAN"
             } else {
-                "⚠️ VIOLATIONS DETECTED"
+                "VIOLATIONS DETECTED (expected until Phase 4 completes)"
             }
         );
-        println!("(Violations expected until Phase 2 completes - see #865, #866, #867)");
     }
 }
