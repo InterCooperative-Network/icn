@@ -12,8 +12,10 @@
 //!
 //! # Deduplication
 //!
-//! Each receipt is deduplicated by `sha256(task_hash || executor_did_bytes)`. The engine
-//! tracks settled receipts in an in-memory `HashSet` (sled persistence is future work).
+//! Each receipt is deduplicated by `sha256("icn-ledger:settlement:v1:" || receipt_hash)`.
+//! The domain-separation prefix prevents cross-feature sha256 collisions.
+//! The engine tracks settled receipts in an in-memory `HashSet` (sled persistence is
+//! future work).
 //!
 //! # Design
 //!
@@ -30,6 +32,11 @@ use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::RwLock;
 
+/// Domain-separation prefix for settlement dedup keys.
+///
+/// Prevents accidental collision with other sha256 usages in the codebase.
+const DEDUP_PREFIX: &[u8] = b"icn-ledger:settlement:v1:";
+
 /// A settlement request DTO.
 ///
 /// Constructed by the caller from a verified `ExecutionReceipt`. The caller must:
@@ -40,22 +47,31 @@ use std::sync::RwLock;
 /// The engine will reject requests where `executor_verified` is false.
 #[derive(Debug, Clone)]
 pub struct SettlementRequest {
-    /// Hash of the compute task (from ExecutionReceipt.task_hash)
-    pub task_hash: [u8; 32],
+    /// Content hash identifying this receipt (opaque 32 bytes from compute layer).
+    ///
+    /// The ledger treats this as an opaque identifier — it does not know or care
+    /// how compute derived it. This is the primary dedup input.
+    pub receipt_hash: [u8; 32],
 
-    /// DID of the executor who performed the work
+    /// DID of the executor who performed the work (earns credit).
     pub executor: Did,
 
-    /// DID of the submitter who requested the work
+    /// DID of the submitter who requested the work (pays debit).
     pub submitter: Did,
 
-    /// Scope level of the original task
+    /// Optional attester DID for governance / audit trail.
+    pub attester: Option<Did>,
+
+    /// Scope level of the original task.
     pub scope: ScopeLevel,
 
-    /// Cost in the settlement currency (from ExecutionReceipt.cost)
-    pub cost: u64,
+    /// Amount to settle in the ledger currency's smallest unit.
+    ///
+    /// Uses `i64` to match the existing `AccountDelta` convention.
+    /// Must be positive (> 0).
+    pub amount: i64,
 
-    /// Currency for settlement (e.g., "credits")
+    /// Currency for settlement (e.g., "credits").
     pub currency: String,
 
     /// Whether the caller has verified the executor's signature.
@@ -65,11 +81,11 @@ pub struct SettlementRequest {
 
 /// Settlement engine for converting verified receipts into journal entries.
 ///
-/// Handles deduplication and scope validation, then delegates to
-/// `JournalEntryBuilder` for balanced double-entry creation.
+/// Handles deduplication, scope validation, and invariant checking, then
+/// delegates to `JournalEntryBuilder` for balanced double-entry creation.
 pub struct SettlementEngine {
     /// In-memory dedup set of settled receipt keys.
-    /// Each key is `sha256(task_hash || executor_did_bytes)`.
+    /// Each key is `sha256(DEDUP_PREFIX || receipt_hash)`.
     settled: RwLock<HashSet<[u8; 32]>>,
 }
 
@@ -87,8 +103,9 @@ impl SettlementEngine {
     ///
     /// - `LedgerError::InvalidEntry` if `executor_verified` is false
     /// - `LedgerError::InvalidEntry` if scope is Federation or Commons
+    /// - `LedgerError::InvalidEntry` if amount is not positive
+    /// - `LedgerError::InvalidEntry` if executor == submitter (self-dealing)
     /// - `LedgerError::DuplicateEntry` if this receipt has already been settled
-    /// - `LedgerError::InvalidEntry` if cost is zero
     /// - Propagates `JournalEntryBuilder::build()` errors
     pub fn settle_receipt(&self, request: &SettlementRequest) -> Result<JournalEntry, LedgerError> {
         // 1. Reject unverified receipts
@@ -113,15 +130,22 @@ impl SettlementEngine {
             ScopeLevel::Local | ScopeLevel::Cell | ScopeLevel::Org => {}
         }
 
-        // 3. Reject zero-cost receipts
-        if request.cost == 0 {
+        // 3. Reject non-positive amounts
+        if request.amount <= 0 {
             return Err(LedgerError::InvalidEntry(
-                "receipt cost must be non-zero".to_string(),
+                "settlement amount must be positive".to_string(),
             ));
         }
 
-        // 4. Check deduplication
-        let dedup_key = Self::dedup_key(&request.task_hash, &request.executor);
+        // 4. Reject self-dealing (executor == submitter)
+        if request.executor == request.submitter {
+            return Err(LedgerError::InvalidEntry(
+                "executor and submitter must be different DIDs".to_string(),
+            ));
+        }
+
+        // 5. Check deduplication
+        let dedup_key = Self::dedup_key(&request.receipt_hash);
         {
             let settled = self
                 .settled
@@ -129,32 +153,28 @@ impl SettlementEngine {
                 .map_err(|_| LedgerError::Internal("settlement lock poisoned".to_string()))?;
             if settled.contains(&dedup_key) {
                 return Err(LedgerError::DuplicateEntry(format!(
-                    "receipt already settled: task={} executor={}",
-                    hex::encode(request.task_hash),
-                    request.executor
+                    "receipt already settled: {}",
+                    hex::encode(request.receipt_hash),
                 )));
             }
         }
 
-        // 5. Build balanced journal entry: debit submitter, credit executor
-        let cost_i64 = i64::try_from(request.cost).map_err(|_| {
-            LedgerError::ArithmeticOverflow(format!(
-                "receipt cost {} exceeds i64::MAX",
-                request.cost
-            ))
-        })?;
-
+        // 6. Build balanced journal entry: debit submitter, credit executor
         let entry = JournalEntryBuilder::new(request.submitter.clone())
             .debit(
                 request.submitter.clone(),
                 request.currency.clone(),
-                cost_i64,
+                request.amount,
             )
-            .credit(request.executor.clone(), request.currency.clone(), cost_i64)
+            .credit(
+                request.executor.clone(),
+                request.currency.clone(),
+                request.amount,
+            )
             .build()
             .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
 
-        // 6. Record dedup key
+        // 7. Record dedup key
         {
             let mut settled = self
                 .settled
@@ -167,8 +187,8 @@ impl SettlementEngine {
     }
 
     /// Check whether a receipt has already been settled.
-    pub fn is_settled(&self, task_hash: &[u8; 32], executor: &Did) -> bool {
-        let key = Self::dedup_key(task_hash, executor);
+    pub fn is_settled(&self, receipt_hash: &[u8; 32]) -> bool {
+        let key = Self::dedup_key(receipt_hash);
         self.settled
             .read()
             .map(|s| s.contains(&key))
@@ -180,11 +200,15 @@ impl SettlementEngine {
         self.settled.read().map(|s| s.len()).unwrap_or(0)
     }
 
-    /// Compute deduplication key: `sha256(task_hash || executor_did_string_bytes)`.
-    fn dedup_key(task_hash: &[u8; 32], executor: &Did) -> [u8; 32] {
+    /// Compute deduplication key: `sha256(DEDUP_PREFIX || receipt_hash)`.
+    ///
+    /// The receipt_hash already uniquely identifies a receipt (it includes
+    /// the receipt_id nonce from compute layer). Scope is intentionally
+    /// excluded — a receipt can only settle once regardless of scope.
+    fn dedup_key(receipt_hash: &[u8; 32]) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(task_hash);
-        hasher.update(executor.to_string().as_bytes());
+        hasher.update(DEDUP_PREFIX);
+        hasher.update(receipt_hash);
         let result = hasher.finalize();
         let mut key = [0u8; 32];
         key.copy_from_slice(&result);
@@ -203,15 +227,16 @@ mod tests {
     use super::*;
     use icn_identity::KeyPair;
 
-    fn make_request(scope: ScopeLevel, cost: u64, verified: bool) -> SettlementRequest {
+    fn make_request(scope: ScopeLevel, amount: i64, verified: bool) -> SettlementRequest {
         let executor_kp = KeyPair::generate().unwrap();
         let submitter_kp = KeyPair::generate().unwrap();
         SettlementRequest {
-            task_hash: [0xAA; 32],
+            receipt_hash: [0xAA; 32],
             executor: executor_kp.did().clone(),
             submitter: submitter_kp.did().clone(),
+            attester: None,
             scope,
-            cost,
+            amount,
             currency: "credits".to_string(),
             executor_verified: verified,
         }
@@ -220,14 +245,15 @@ mod tests {
     fn make_request_with_keys(
         executor: &KeyPair,
         submitter: &KeyPair,
-        task_hash: [u8; 32],
+        receipt_hash: [u8; 32],
     ) -> SettlementRequest {
         SettlementRequest {
-            task_hash,
+            receipt_hash,
             executor: executor.did().clone(),
             submitter: submitter.did().clone(),
+            attester: None,
             scope: ScopeLevel::Local,
-            cost: 100,
+            amount: 100,
             currency: "credits".to_string(),
             executor_verified: true,
         }
@@ -240,11 +266,12 @@ mod tests {
         let submitter_kp = KeyPair::generate().unwrap();
 
         let request = SettlementRequest {
-            task_hash: [0xBB; 32],
+            receipt_hash: [0xBB; 32],
             executor: executor_kp.did().clone(),
             submitter: submitter_kp.did().clone(),
+            attester: None,
             scope: ScopeLevel::Local,
-            cost: 500,
+            amount: 500,
             currency: "credits".to_string(),
             executor_verified: true,
         };
@@ -344,14 +371,47 @@ mod tests {
     }
 
     #[test]
-    fn test_settle_zero_cost_rejected() {
+    fn test_settle_zero_amount_rejected() {
         let engine = SettlementEngine::new();
         let request = make_request(ScopeLevel::Local, 0, true);
 
         let result = engine.settle_receipt(&request);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("non-zero"), "got: {err}");
+        assert!(err.contains("positive"), "got: {err}");
+    }
+
+    #[test]
+    fn test_settle_negative_amount_rejected() {
+        let engine = SettlementEngine::new();
+        let request = make_request(ScopeLevel::Local, -50, true);
+
+        let result = engine.settle_receipt(&request);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("positive"), "got: {err}");
+    }
+
+    #[test]
+    fn test_settle_self_dealing_rejected() {
+        let engine = SettlementEngine::new();
+        let kp = KeyPair::generate().unwrap();
+
+        let request = SettlementRequest {
+            receipt_hash: [0xDD; 32],
+            executor: kp.did().clone(),
+            submitter: kp.did().clone(), // same as executor
+            attester: None,
+            scope: ScopeLevel::Local,
+            amount: 100,
+            currency: "credits".to_string(),
+            executor_verified: true,
+        };
+
+        let result = engine.settle_receipt(&request);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("different DIDs"), "got: {err}");
     }
 
     #[test]
@@ -359,38 +419,21 @@ mod tests {
         let engine = SettlementEngine::new();
         let executor_kp = KeyPair::generate().unwrap();
         let submitter_kp = KeyPair::generate().unwrap();
-        let task_hash = [0xDD; 32];
+        let receipt_hash = [0xDD; 32];
 
         // Not settled yet
-        assert!(!engine.is_settled(&task_hash, executor_kp.did()));
+        assert!(!engine.is_settled(&receipt_hash));
 
         // Settle it
-        let request = make_request_with_keys(&executor_kp, &submitter_kp, task_hash);
+        let request = make_request_with_keys(&executor_kp, &submitter_kp, receipt_hash);
         engine.settle_receipt(&request).unwrap();
 
         // Now it is settled
-        assert!(engine.is_settled(&task_hash, executor_kp.did()));
+        assert!(engine.is_settled(&receipt_hash));
     }
 
     #[test]
-    fn test_different_executor_same_task_not_duplicate() {
-        let engine = SettlementEngine::new();
-        let executor_a = KeyPair::generate().unwrap();
-        let executor_b = KeyPair::generate().unwrap();
-        let submitter = KeyPair::generate().unwrap();
-        let task_hash = [0xEE; 32];
-
-        let request_a = make_request_with_keys(&executor_a, &submitter, task_hash);
-        let request_b = make_request_with_keys(&executor_b, &submitter, task_hash);
-
-        // Both should succeed — different executors
-        assert!(engine.settle_receipt(&request_a).is_ok());
-        assert!(engine.settle_receipt(&request_b).is_ok());
-        assert_eq!(engine.settled_count(), 2);
-    }
-
-    #[test]
-    fn test_same_executor_different_task_not_duplicate() {
+    fn test_different_receipt_hash_not_duplicate() {
         let engine = SettlementEngine::new();
         let executor = KeyPair::generate().unwrap();
         let submitter = KeyPair::generate().unwrap();
@@ -398,7 +441,7 @@ mod tests {
         let request_a = make_request_with_keys(&executor, &submitter, [0x11; 32]);
         let request_b = make_request_with_keys(&executor, &submitter, [0x22; 32]);
 
-        // Both should succeed — different tasks
+        // Both should succeed — different receipt hashes
         assert!(engine.settle_receipt(&request_a).is_ok());
         assert!(engine.settle_receipt(&request_b).is_ok());
         assert_eq!(engine.settled_count(), 2);
@@ -416,31 +459,57 @@ mod tests {
 
     #[test]
     fn test_dedup_key_deterministic() {
-        let kp = KeyPair::generate().unwrap();
-        let task_hash = [0xFF; 32];
-
-        let key1 = SettlementEngine::dedup_key(&task_hash, kp.did());
-        let key2 = SettlementEngine::dedup_key(&task_hash, kp.did());
+        let hash = [0xFF; 32];
+        let key1 = SettlementEngine::dedup_key(&hash);
+        let key2 = SettlementEngine::dedup_key(&hash);
         assert_eq!(key1, key2);
     }
 
     #[test]
-    fn test_dedup_key_changes_on_different_executor() {
-        let kp_a = KeyPair::generate().unwrap();
-        let kp_b = KeyPair::generate().unwrap();
-        let task_hash = [0xFF; 32];
-
-        let key_a = SettlementEngine::dedup_key(&task_hash, kp_a.did());
-        let key_b = SettlementEngine::dedup_key(&task_hash, kp_b.did());
+    fn test_dedup_key_changes_on_different_receipt() {
+        let key_a = SettlementEngine::dedup_key(&[0x11; 32]);
+        let key_b = SettlementEngine::dedup_key(&[0x22; 32]);
         assert_ne!(key_a, key_b);
     }
 
     #[test]
-    fn test_dedup_key_changes_on_different_task() {
-        let kp = KeyPair::generate().unwrap();
+    fn test_dedup_key_domain_separated() {
+        // Verify the prefix actually changes the output vs raw sha256(receipt_hash)
+        let receipt_hash = [0xAA; 32];
+        let with_prefix = SettlementEngine::dedup_key(&receipt_hash);
 
-        let key_a = SettlementEngine::dedup_key(&[0x11; 32], kp.did());
-        let key_b = SettlementEngine::dedup_key(&[0x22; 32], kp.did());
-        assert_ne!(key_a, key_b);
+        let mut raw_hasher = Sha256::new();
+        raw_hasher.update(receipt_hash);
+        let raw_result = raw_hasher.finalize();
+        let mut raw_key = [0u8; 32];
+        raw_key.copy_from_slice(&raw_result);
+
+        assert_ne!(
+            with_prefix, raw_key,
+            "domain prefix must change the dedup key output"
+        );
+    }
+
+    #[test]
+    fn test_attester_field_preserved() {
+        let engine = SettlementEngine::new();
+        let executor_kp = KeyPair::generate().unwrap();
+        let submitter_kp = KeyPair::generate().unwrap();
+        let attester_kp = KeyPair::generate().unwrap();
+
+        let request = SettlementRequest {
+            receipt_hash: [0xEE; 32],
+            executor: executor_kp.did().clone(),
+            submitter: submitter_kp.did().clone(),
+            attester: Some(attester_kp.did().clone()),
+            scope: ScopeLevel::Local,
+            amount: 100,
+            currency: "credits".to_string(),
+            executor_verified: true,
+        };
+
+        // Settlement should succeed — attester is informational, not blocking
+        let result = engine.settle_receipt(&request);
+        assert!(result.is_ok());
     }
 }

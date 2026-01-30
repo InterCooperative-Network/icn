@@ -107,6 +107,24 @@ fn scope_to_wire(scope: ScopeLevel) -> u8 {
 // ExecutionReceipt
 // ---------------------------------------------------------------------------
 
+/// Maximum valid CPU time: 24 hours in milliseconds.
+const MAX_CPU_MILLIS: u64 = 86_400_000;
+
+/// Maximum valid memory: 1 TB-second in megabyte-milliseconds (1_000_000 MB * 1000 ms).
+const MAX_MEMORY_MB_MILLIS: u64 = 1_000_000_000;
+
+/// Maximum valid storage: 1 TB.
+const MAX_STORAGE_BYTES: u64 = 1_099_511_627_776;
+
+/// Maximum valid egress: 100 GB.
+const MAX_EGRESS_BYTES: u64 = 107_374_182_400;
+
+/// Minimum plausible Unix timestamp (2020-09-13).
+const MIN_VALID_TIMESTAMP: u64 = 1_600_000_000;
+
+/// Maximum allowed clock skew into the future, in seconds.
+const MAX_CLOCK_SKEW_SECS: u64 = 300;
+
 /// A signed attestation of resource consumption for a completed compute task.
 ///
 /// The receipt binds metering data to a chain of three signatures:
@@ -117,9 +135,18 @@ fn scope_to_wire(scope: ScopeLevel) -> u8 {
 ///
 /// All metering values use deterministic integer units to guarantee
 /// bit-exact signing payloads across architectures.
+///
+/// The `receipt_id` field is a random 32-byte nonce that provides replay
+/// protection. Even if all other fields are identical, a new nonce
+/// produces a unique signing payload and receipt hash.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ExecutionReceipt {
     // -- Identity --
+    /// Random 32-byte nonce for replay protection.
+    ///
+    /// Must be unique per receipt. Ensures that identical tasks produce
+    /// distinct receipts and signing payloads.
+    pub receipt_id: [u8; 32],
     /// Blake3 hash of the original [`ComputeTask`].
     pub task_hash: [u8; 32],
     /// DID of the executor node (e.g. `did:icn:z6Mk...`).
@@ -168,6 +195,9 @@ impl ExecutionReceipt {
     pub fn signing_payload(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(256);
 
+        // Nonce (replay protection)
+        buf.extend_from_slice(&self.receipt_id);
+
         // Identity
         buf.extend_from_slice(&self.task_hash);
         buf.extend_from_slice(&(self.executor.len() as u32).to_le_bytes());
@@ -194,9 +224,8 @@ impl ExecutionReceipt {
 
     /// Content hash of the receipt (blake3 over the signing payload).
     ///
-    /// This identifies the logical receipt — same task + same metering +
-    /// same participants → same hash, regardless of signatures.
-    /// Used as the deduplication key for settlement.
+    /// Includes `receipt_id` nonce, so identical tasks with different nonces
+    /// produce different hashes. Used as the deduplication key for settlement.
     pub fn receipt_hash(&self) -> ReceiptHash {
         *blake3::hash(&self.signing_payload()).as_bytes()
     }
@@ -209,8 +238,9 @@ impl ExecutionReceipt {
             && self.attester_signature.is_some()
     }
 
-    /// Validate structural invariants (DID format, metering sanity).
+    /// Validate structural invariants (DID format, timestamp, metering bounds).
     pub fn validate(&self) -> Result<(), ComputeError> {
+        // DID format
         if !self.executor.starts_with("did:icn:") {
             return Err(ComputeError::InvalidInput(format!(
                 "executor DID has invalid format: {}",
@@ -229,6 +259,47 @@ impl ExecutionReceipt {
                     "attester DID has invalid format: {attester}"
                 )));
             }
+        }
+
+        // Timestamp bounds
+        if self.created_at < MIN_VALID_TIMESTAMP {
+            return Err(ComputeError::InvalidInput(format!(
+                "created_at {} is before minimum valid timestamp {}",
+                self.created_at, MIN_VALID_TIMESTAMP
+            )));
+        }
+        let now = icn_time::current_timestamp_secs();
+        if self.created_at > now + MAX_CLOCK_SKEW_SECS {
+            return Err(ComputeError::InvalidInput(format!(
+                "created_at {} is more than {}s in the future (now={})",
+                self.created_at, MAX_CLOCK_SKEW_SECS, now
+            )));
+        }
+
+        // Metering bounds
+        if self.cpu_millis > MAX_CPU_MILLIS {
+            return Err(ComputeError::InvalidInput(format!(
+                "cpu_millis {} exceeds maximum {}",
+                self.cpu_millis, MAX_CPU_MILLIS
+            )));
+        }
+        if self.memory_mb_millis > MAX_MEMORY_MB_MILLIS {
+            return Err(ComputeError::InvalidInput(format!(
+                "memory_mb_millis {} exceeds maximum {}",
+                self.memory_mb_millis, MAX_MEMORY_MB_MILLIS
+            )));
+        }
+        if self.storage_bytes > MAX_STORAGE_BYTES {
+            return Err(ComputeError::InvalidInput(format!(
+                "storage_bytes {} exceeds maximum {}",
+                self.storage_bytes, MAX_STORAGE_BYTES
+            )));
+        }
+        if self.egress_bytes > MAX_EGRESS_BYTES {
+            return Err(ComputeError::InvalidInput(format!(
+                "egress_bytes {} exceeds maximum {}",
+                self.egress_bytes, MAX_EGRESS_BYTES
+            )));
         }
 
         Ok(())
@@ -438,6 +509,7 @@ mod tests {
     /// Helper: build a minimal valid receipt with no signatures.
     fn sample_receipt() -> ExecutionReceipt {
         ExecutionReceipt {
+            receipt_id: [0x01; 32],
             task_hash: [0xAB; 32],
             executor: "did:icn:z6MkExecutor".to_string(),
             submitter: "did:icn:z6MkSubmitter".to_string(),
@@ -469,6 +541,10 @@ mod tests {
     fn test_signing_payload_changes_on_field_mutation() {
         let base = sample_receipt();
         let base_payload = base.signing_payload();
+
+        let mut r = sample_receipt();
+        r.receipt_id[0] = 0xFF;
+        assert_ne!(r.signing_payload(), base_payload, "receipt_id mutation");
 
         let mut r = sample_receipt();
         r.task_hash[0] = 0x00;
@@ -627,6 +703,7 @@ mod tests {
     fn receipt_with_real_keys() -> (ExecutionReceipt, icn_identity::KeyPair) {
         let executor_kp = icn_identity::KeyPair::generate().unwrap();
         let r = ExecutionReceipt {
+            receipt_id: [0x02; 32],
             task_hash: [0xAB; 32],
             executor: executor_kp.did().to_string(),
             submitter: "did:icn:z6MkSubmitter".to_string(),
@@ -747,6 +824,7 @@ mod tests {
         let attester_kp = icn_identity::KeyPair::generate().unwrap();
 
         let r = ExecutionReceipt {
+            receipt_id: [0x03; 32],
             task_hash: [0xCC; 32],
             executor: executor_kp.did().to_string(),
             submitter: submitter_kp.did().to_string(),
@@ -867,5 +945,86 @@ mod tests {
             .sign_attester(kp.did().to_string(), &to_signing_key(&kp))
             .unwrap_err();
         assert!(err.to_string().contains("executor_signature missing"));
+    }
+
+    // -- Replay protection tests ---
+
+    #[test]
+    fn test_different_receipt_id_produces_different_payload() {
+        let mut r1 = sample_receipt();
+        r1.receipt_id = [0xAA; 32];
+        let mut r2 = sample_receipt();
+        r2.receipt_id = [0xBB; 32];
+
+        assert_ne!(
+            r1.signing_payload(),
+            r2.signing_payload(),
+            "different receipt_id must produce different signing payloads"
+        );
+        assert_ne!(
+            r1.receipt_hash(),
+            r2.receipt_hash(),
+            "different receipt_id must produce different receipt hashes"
+        );
+    }
+
+    // -- Timestamp validation tests ---
+
+    #[test]
+    fn test_validate_rejects_ancient_timestamp() {
+        let mut r = sample_receipt();
+        r.created_at = 1_000_000; // Way before MIN_VALID_TIMESTAMP
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("before minimum"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_future_timestamp() {
+        let mut r = sample_receipt();
+        r.created_at = icn_time::current_timestamp_secs() + MAX_CLOCK_SKEW_SECS + 1000;
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("in the future"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_accepts_recent_timestamp() {
+        let mut r = sample_receipt();
+        // Use a timestamp that's clearly in the past but after MIN_VALID_TIMESTAMP
+        r.created_at = icn_time::current_timestamp_secs() - 60;
+        assert!(r.validate().is_ok());
+    }
+
+    // -- Metering bounds tests ---
+
+    #[test]
+    fn test_validate_rejects_excessive_cpu_millis() {
+        let mut r = sample_receipt();
+        r.cpu_millis = MAX_CPU_MILLIS + 1;
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("cpu_millis"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_excessive_memory() {
+        let mut r = sample_receipt();
+        r.memory_mb_millis = MAX_MEMORY_MB_MILLIS + 1;
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("memory_mb_millis"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_excessive_storage() {
+        let mut r = sample_receipt();
+        r.storage_bytes = MAX_STORAGE_BYTES + 1;
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("storage_bytes"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_excessive_egress() {
+        let mut r = sample_receipt();
+        r.egress_bytes = MAX_EGRESS_BYTES + 1;
+        let err = r.validate().unwrap_err();
+        assert!(err.to_string().contains("egress_bytes"), "got: {err}");
     }
 }
