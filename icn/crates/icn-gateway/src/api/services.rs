@@ -16,6 +16,16 @@ use crate::service_discovery_mgr::ServiceDiscoveryManager;
 // ============================================================================
 
 /// Request to announce a service endpoint.
+///
+/// The `created_at` and `signature` fields are part of the signed payload: the
+/// provider sets `created_at` before signing, and the gateway verifies the
+/// Ed25519 signature over the canonical payload (which includes `created_at`).
+/// This means the gateway trusts the provider's clock for TTL expiry.
+///
+/// **Trust model:** A malicious provider could set `created_at` far in the
+/// future to extend effective TTL. This is acceptable because providers can
+/// already re-announce endpoints. The TTL mechanism protects against *stale*
+/// endpoints from providers that have gone offline, not against active abuse.
 #[derive(Debug, Deserialize)]
 pub struct AnnounceRequest {
     /// Unique service identifier
@@ -40,9 +50,11 @@ pub struct AnnounceRequest {
     /// TTL in seconds
     #[serde(default = "default_ttl")]
     pub ttl_secs: u64,
-    /// Unix timestamp of creation (included in signed payload)
+    /// Unix timestamp of creation (included in the signed payload).
+    /// Set by the provider before signing; the gateway does not override this
+    /// value because doing so would invalidate the signature.
     pub created_at: u64,
-    /// Ed25519 signature (hex-encoded)
+    /// Ed25519 signature (hex-encoded) over the canonical signing payload
     pub signature: String,
 }
 

@@ -3068,6 +3068,7 @@ dependencies = [
  "icn-encoding",
  "icn-entity",
  "icn-federation",
+ "icn-gossip",
  "icn-governance",
  "icn-identity",
  "icn-kernel-api",

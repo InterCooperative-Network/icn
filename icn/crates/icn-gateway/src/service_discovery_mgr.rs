@@ -11,6 +11,24 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
+/// Maximum number of service endpoints the registry will hold.
+/// Prevents unbounded memory growth in long-running deployments.
+const MAX_REGISTRY_SIZE: usize = 10_000;
+
+/// Debug-only check that warns if called from within a Tokio async runtime.
+/// This catches accidental use of blocking ScopedDiscovery methods from async code.
+#[allow(unused_variables)]
+fn debug_assert_blocking_context(method: &str) {
+    #[cfg(debug_assertions)]
+    if tokio::runtime::Handle::try_current().is_ok() {
+        tracing::warn!(
+            method = %method,
+            "ScopedDiscovery::{} called from async context; use async methods instead",
+            method
+        );
+    }
+}
+
 /// In-memory service endpoint registry with TTL-based expiry.
 #[derive(Clone)]
 pub struct ServiceDiscoveryManager {
@@ -27,10 +45,21 @@ impl ServiceDiscoveryManager {
     }
 
     /// Register a service endpoint.
+    ///
+    /// Returns an error if the registry has reached its capacity limit
+    /// (`MAX_REGISTRY_SIZE`) and the service_id is not already registered
+    /// (updates to existing entries are always allowed).
     pub async fn announce(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
         let id = endpoint.service_id.clone();
-        self.registry.write().await.insert(id.clone(), endpoint);
+        let mut reg = self.registry.write().await;
+        if reg.len() >= MAX_REGISTRY_SIZE && !reg.contains_key(&id) {
+            return Err(NamingError::RegistryFull(format!(
+                "Service registry is full ({MAX_REGISTRY_SIZE} entries)"
+            )));
+        }
+        reg.insert(id.clone(), endpoint);
         debug!("Service announced: {}", id);
+        icn_obs::metrics::service_discovery::announcements_inc();
         Ok(())
     }
 
@@ -41,6 +70,7 @@ impl ServiceDiscoveryManager {
             Some(ep) if ep.provider == provider => {
                 reg.remove(service_id);
                 debug!("Service withdrawn: {}", service_id);
+                icn_obs::metrics::service_discovery::withdrawals_inc();
                 Ok(())
             }
             Some(_) => Err(NamingError::Unauthorized(
@@ -95,7 +125,9 @@ impl ServiceDiscoveryManager {
         let removed = before - reg.len();
         if removed > 0 {
             debug!("Removed {} expired service endpoints", removed);
+            icn_obs::metrics::service_discovery::expired_removed_add(removed as u64);
         }
+        icn_obs::metrics::service_discovery::registry_size_set(reg.len() as u64);
         removed
     }
 }
@@ -109,14 +141,23 @@ impl Default for ServiceDiscoveryManager {
 /// `ScopedDiscovery` implementation using `blocking_read()`/`blocking_write()`.
 ///
 /// **Important:** These methods must only be called from a blocking (non-async) context
-/// or from within `tokio::task::spawn_blocking`. Calling them from an async task
-/// risks deadlocking under high contention. For async callers, use the `announce()`,
+/// or from within `tokio::task::spawn_blocking`. Calling them directly from an async
+/// task risks deadlocking under high contention. For async callers, use the `announce()`,
 /// `withdraw()`, `discover()`, and `get()` async methods directly.
+///
+/// In debug builds, these methods will log a warning if called from within an active
+/// Tokio runtime context (which may indicate accidental use from an async task).
 impl ScopedDiscovery for ServiceDiscoveryManager {
     fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
+        debug_assert_blocking_context("announce_endpoint");
         let id = endpoint.service_id.clone();
         // Use blocking write since the trait is not async
         let mut reg = self.registry.blocking_write();
+        if reg.len() >= MAX_REGISTRY_SIZE && !reg.contains_key(&id) {
+            return Err(NamingError::RegistryFull(format!(
+                "Service registry is full ({MAX_REGISTRY_SIZE} entries)"
+            )));
+        }
         reg.insert(id, endpoint);
         Ok(())
     }
@@ -126,6 +167,7 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
         service_id: &ServiceEndpointId,
         provider: &icn_kernel_api::types::Did,
     ) -> Result<(), NamingError> {
+        debug_assert_blocking_context("withdraw_endpoint");
         let mut reg = self.registry.blocking_write();
         match reg.get(service_id) {
             Some(ep) if ep.provider == *provider => {
@@ -144,6 +186,7 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
         scope: ScopeLevel,
         service_type: &ServiceType,
     ) -> Result<Vec<ServiceEndpoint>, NamingError> {
+        debug_assert_blocking_context("discover_endpoints");
         let reg = self.registry.blocking_read();
         Ok(reg
             .values()
@@ -160,6 +203,7 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
         service_type: &ServiceType,
         required_capabilities: &[String],
     ) -> Result<Vec<ServiceEndpoint>, NamingError> {
+        debug_assert_blocking_context("discover_endpoints_filtered");
         let reg = self.registry.blocking_read();
         Ok(reg
             .values()
@@ -176,6 +220,7 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
     }
 
     fn get_endpoint(&self, service_id: &ServiceEndpointId) -> Result<ServiceEndpoint, NamingError> {
+        debug_assert_blocking_context("get_endpoint");
         let reg = self.registry.blocking_read();
         reg.get(service_id)
             .filter(|ep| !ep.is_expired())

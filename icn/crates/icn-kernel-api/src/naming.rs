@@ -397,6 +397,10 @@ pub enum NamingError {
     #[error("Resolution timeout")]
     Timeout,
 
+    /// Registry is at capacity
+    #[error("Registry full: {0}")]
+    RegistryFull(String),
+
     /// Internal error
     #[error("Naming error: {0}")]
     Internal(String),

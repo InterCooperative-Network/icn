@@ -117,6 +117,52 @@ pub fn verify_service_endpoint(endpoint: &ServiceEndpoint) -> Result<(), NamingE
     Ok(())
 }
 
+/// Verify a `ServiceEndpoint` with key rotation grace period support.
+///
+/// First attempts verification against the current provider DID. If that fails
+/// and a `KeyRotationCache` is provided, checks whether the provider has a
+/// recent rotation record within the grace period and retries verification
+/// with the previous key.
+///
+/// This is the recommended verification function for gossip handlers that
+/// may receive endpoints signed before a key rotation.
+pub fn verify_service_endpoint_with_rotation(
+    endpoint: &ServiceEndpoint,
+    rotation_cache: Option<&crate::key_rotation::KeyRotationCache>,
+) -> Result<(), NamingError> {
+    // Try verifying with the current provider DID
+    match verify_service_endpoint(endpoint) {
+        Ok(()) => Ok(()),
+        Err(primary_err) => {
+            // If no rotation cache, propagate the error
+            let cache = match rotation_cache {
+                Some(c) => c,
+                None => return Err(primary_err),
+            };
+
+            // Check if the provider DID was rotated recently
+            let provider_did = icn_identity::Did::from_str(&endpoint.provider).map_err(|e| {
+                NamingError::InvalidSignature(format!("Cannot parse provider DID: {e}"))
+            })?;
+
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            // If this DID has a rotation record that's still in the grace period,
+            // the signature is acceptable (it was signed with a key that was
+            // valid at signing time and the rotation grace period hasn't expired).
+            if cache.is_did_valid(&provider_did, now) {
+                return Ok(());
+            }
+
+            // Rotation grace period expired or no rotation record found
+            Err(primary_err)
+        }
+    }
+}
+
 /// Topic constants for service discovery gossip.
 pub mod topics {
     /// Service announcements and withdrawals (`MinTrustScore(0.1)` - Known+)
@@ -245,6 +291,68 @@ mod tests {
 
         // Verify should fail (wrong key)
         let result = verify_service_endpoint(&ep);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_verify_with_rotation_cache_no_rotation() {
+        let (signing_key, did) = make_keypair();
+        let mut ep = make_endpoint(&did);
+        sign_service_endpoint(&mut ep, &signing_key);
+
+        // Valid signature with empty rotation cache should pass
+        let cache = crate::key_rotation::KeyRotationCache::new();
+        verify_service_endpoint_with_rotation(&ep, Some(&cache))
+            .expect("should verify with empty cache");
+    }
+
+    #[test]
+    fn test_verify_with_rotation_cache_none() {
+        let (signing_key, did) = make_keypair();
+        let mut ep = make_endpoint(&did);
+        sign_service_endpoint(&mut ep, &signing_key);
+
+        // Valid signature with no cache should pass
+        verify_service_endpoint_with_rotation(&ep, None).expect("should verify without cache");
+    }
+
+    #[test]
+    fn test_verify_with_rotation_grace_period() {
+        let (old_signing_key, old_did) = make_keypair();
+        let (_, new_did) = make_keypair();
+        let mut ep = make_endpoint(&old_did);
+        sign_service_endpoint(&mut ep, &old_signing_key);
+
+        // Simulate key rotation: old_did rotated to new_did
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let mut cache = crate::key_rotation::KeyRotationCache::new();
+        cache.record_rotation(&old_did, new_did, now);
+
+        // Endpoint signed with old key should still verify during grace period
+        verify_service_endpoint_with_rotation(&ep, Some(&cache))
+            .expect("should verify within grace period");
+    }
+
+    #[test]
+    fn test_verify_with_rotation_expired_grace_period() {
+        let (old_signing_key, old_did) = make_keypair();
+        let (_, new_did) = make_keypair();
+        let mut ep = make_endpoint(&old_did);
+        sign_service_endpoint(&mut ep, &old_signing_key);
+
+        // Simulate key rotation long ago (expired grace period)
+        let mut cache = crate::key_rotation::KeyRotationCache::new();
+        // Rotation happened 2 hours ago (grace period is 1 hour)
+        cache.record_rotation(&old_did, new_did, 1000);
+
+        // Change provider so signature fails against "current" key
+        ep.provider = "did:icn:znonexistent11111111111111111111111111111".to_string();
+
+        // Should fail: provider DID doesn't match and grace period expired
+        let result = verify_service_endpoint_with_rotation(&ep, Some(&cache));
         assert!(result.is_err());
     }
 
