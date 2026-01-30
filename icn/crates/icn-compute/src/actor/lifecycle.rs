@@ -931,6 +931,7 @@ impl ComputeActor {
             {
                 let mut map = self.task_scope_map.lock().await;
                 map.insert(task_hash, scope);
+                icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
             }
         }
 
@@ -1240,7 +1241,9 @@ impl ComputeActor {
     pub(super) async fn decrement_scope_queue(&self, task_hash: &TaskHash) {
         let scope = {
             let mut map = self.task_scope_map.lock().await;
-            map.remove(task_hash)
+            let scope = map.remove(task_hash);
+            icn_obs::metrics::compute::task_scope_map_size_set(map.len() as f64);
+            scope
         };
         if let Some(scope) = scope {
             let mut depths = self.scope_queue_depths.lock().await;

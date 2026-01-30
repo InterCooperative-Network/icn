@@ -3725,6 +3725,14 @@ pub mod compute {
         counter!("icn_compute_resource_changes_total", "type" => change_type.to_string())
             .increment(1);
     }
+
+    /// Set the current size of the task-to-scope tracking map.
+    ///
+    /// Tracks how many in-flight tasks have scope metadata. Useful for
+    /// monitoring memory overhead of scope-aware placement (Epic 2 #933).
+    pub fn task_scope_map_size_set(size: f64) {
+        gauge!("icn_compute_task_scope_map_size").set(size);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

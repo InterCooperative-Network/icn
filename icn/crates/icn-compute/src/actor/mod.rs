@@ -332,6 +332,10 @@ impl ComputeActor {
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
 
+        if self.cell_service.is_none() {
+            tracing::warn!("CellService not configured; all peers treated as Commons scope");
+        }
+
         // Clone Arc references for the timeout checker
         let task_manager_clone = Arc::clone(&self.task_manager);
         let executor_registry_clone = Arc::clone(&self.executor_registry);
