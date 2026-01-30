@@ -290,39 +290,47 @@ impl ReceiptClearingManager {
 
             match receipt.scope {
                 ScopeLevel::Federation => {
-                    let transfer = CrossCoopTransfer::new(
-                        hex::encode(receipt.receipt_hash),
-                        receipt.submitter_coop.clone(),
-                        receipt.submitter_did.parse().map_err(|e: anyhow::Error| {
-                            FederationError::InvalidDidFormat(e.to_string())
-                        })?,
-                        receipt.executor_coop.clone(),
-                        receipt.executor_did.parse().map_err(|e: anyhow::Error| {
-                            FederationError::InvalidDidFormat(e.to_string())
-                        })?,
-                        i64::try_from(receipt.cost).unwrap_or(i64::MAX),
-                        receipt.currency.clone(),
-                        i64::try_from(receipt.cost).unwrap_or(i64::MAX),
-                        receipt.currency.clone(),
-                    );
+                    let receipt_hex = hex::encode(receipt.receipt_hash);
+                    let result: Result<()> = (|| {
+                        let amount = i64::try_from(receipt.cost).map_err(|_| {
+                            FederationError::InvalidTransfer(format!(
+                                "receipt {receipt_hex} cost {} overflows i64",
+                                receipt.cost
+                            ))
+                        })?;
 
-                    match clearing_manager.propose_transfer(transfer) {
-                        Ok(transfer_id) => {
+                        let transfer = CrossCoopTransfer::new(
+                            receipt_hex.clone(),
+                            receipt.submitter_coop.clone(),
+                            receipt.submitter_did.parse().map_err(|e: anyhow::Error| {
+                                FederationError::InvalidDidFormat(e.to_string())
+                            })?,
+                            receipt.executor_coop.clone(),
+                            receipt.executor_did.parse().map_err(|e: anyhow::Error| {
+                                FederationError::InvalidDidFormat(e.to_string())
+                            })?,
+                            amount,
+                            receipt.currency.clone(),
+                            amount,
+                            receipt.currency.clone(),
+                        );
+
+                        clearing_manager.propose_transfer(transfer)?;
+                        Ok(())
+                    })();
+
+                    match result {
+                        Ok(()) => {
                             federation_flushed += 1;
                             debug!(
-                                transfer_id,
-                                receipt_hash = hex::encode(receipt.receipt_hash),
+                                receipt_hash = receipt_hex,
                                 "flushed federation receipt to clearing"
                             );
                         }
                         Err(e) => {
-                            errors.push(format!(
-                                "receipt {}: {}",
-                                hex::encode(receipt.receipt_hash),
-                                e
-                            ));
+                            errors.push(format!("receipt {receipt_hex}: {e}"));
                             warn!(
-                                receipt_hash = hex::encode(receipt.receipt_hash),
+                                receipt_hash = receipt_hex,
                                 error = %e,
                                 "failed to flush federation receipt"
                             );
@@ -802,5 +810,48 @@ mod tests {
         let json = serde_json::to_string(&receipt).unwrap();
         let deserialized: ClearingReceipt = serde_json::from_str(&json).unwrap();
         assert_eq!(receipt, deserialized);
+    }
+
+    #[test]
+    fn test_flush_cost_overflow_rejected() {
+        use crate::clearing::BilateralClearingAgreement;
+        use icn_identity::KeyPair;
+
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let clearing = ClearingManager::new(store, "food-coop".to_string()).unwrap();
+
+        let executor_kp = KeyPair::generate().unwrap();
+        let submitter_kp = KeyPair::generate().unwrap();
+
+        let agreement = BilateralClearingAgreement::new(
+            "food-tech-agreement".to_string(),
+            "food-coop".to_string(),
+            submitter_kp.did().clone(),
+            "tech-coop".to_string(),
+            executor_kp.did().clone(),
+        )
+        .with_rate("credits", "credits", 1.0);
+        clearing.create_agreement(agreement).unwrap();
+
+        let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
+        let receipt = ClearingReceipt {
+            receipt_hash: [0xDD; 32],
+            executor_did: executor_kp.did().to_string(),
+            executor_coop: "tech-coop".into(),
+            submitter_did: submitter_kp.did().to_string(),
+            submitter_coop: "food-coop".into(),
+            cost: u64::MAX, // overflows i64
+            currency: "credits".into(),
+            scope: ScopeLevel::Federation,
+            created_at: current_timestamp(),
+            disputed: false,
+            dispute_reason: None,
+        };
+        mgr.submit_receipt(receipt).unwrap();
+
+        let report = mgr.flush_to_clearing(&clearing).unwrap();
+        assert_eq!(report.federation_flushed, 0);
+        assert_eq!(report.errors.len(), 1);
+        assert!(report.errors[0].contains("overflows i64"));
     }
 }
