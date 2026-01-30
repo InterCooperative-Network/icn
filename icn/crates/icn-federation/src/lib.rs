@@ -46,6 +46,9 @@ pub mod clearing;
 pub mod clearing_manager;
 pub mod netting;
 
+// Epic 4: Receipt Clearing (cross-scope settlement)
+pub mod receipt_clearing;
+
 // Phase F4: Scoped Gossip
 pub mod channel;
 pub mod router;
@@ -68,6 +71,9 @@ pub use clearing_manager::{ClearingManager, SettlementReport};
 pub use error::{FederationError, Result};
 pub use gossip::FederationGossipHandler;
 pub use netting::{DebtCycle, NettingEngine, NettingResult, Obligation};
+pub use receipt_clearing::{
+    BatchClearingConfig, ClearingReceipt, FlushReport, ReceiptClearingManager,
+};
 pub use registry::CooperativeRegistry;
 pub use resolver::{CachedDidResolution, FederatedDidResolver};
 pub use router::FederatedGossipRouter;
