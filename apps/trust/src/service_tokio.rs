@@ -13,6 +13,10 @@
 use icn_kernel_api::authz::PolicyOracle;
 use icn_kernel_api::services::{TrustEvent, TrustService};
 use icn_trust::TrustGraph;
+
+/// Maximum reputation change per single event (25%).
+/// Used for both penalties (ProtocolViolation) and boosts (PositiveInteraction).
+const EVENT_WEIGHT_MULTIPLIER: f64 = 0.25;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -25,13 +29,24 @@ use crate::oracle_tokio::TrustPolicyOracleTokio;
 pub struct TrustServiceImplTokio {
     graph: Arc<RwLock<TrustGraph>>,
     oracle: Arc<TrustPolicyOracleTokio>,
+    own_did: icn_identity::Did,
 }
 
 impl TrustServiceImplTokio {
     /// Create a new trust service with the given TrustGraph
     pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
+        let own_did = {
+            let rt = tokio::runtime::Handle::current();
+            tokio::task::block_in_place(|| {
+                rt.block_on(async { graph.read().await.own_did().clone() })
+            })
+        };
         let oracle = Arc::new(TrustPolicyOracleTokio::new(graph.clone()));
-        Self { graph, oracle }
+        Self {
+            graph,
+            oracle,
+            own_did,
+        }
     }
 
     /// Get direct access to the TrustGraph
@@ -81,24 +96,47 @@ impl TrustService for TrustServiceImplTokio {
                     category = %category,
                     "Trust event: protocol violation"
                 );
-                // Apply trust penalty based on severity
-                let penalty = severity * 0.25; // Max 25% penalty per violation
+                let penalty = severity * EVENT_WEIGHT_MULTIPLIER;
+                let own = self.own_did.clone();
 
-                // Use block_in_place to access tokio lock
                 tokio::task::block_in_place(|| {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(async {
-                        let graph = self.graph.read().await;
-                        if let Ok(current) = graph.compute_trust_score(&identity_did) {
-                            let new_score = (current - penalty).max(0.0);
-                            // Note: TrustGraph doesn't have a direct set_score method
-                            // This would require adding a penalty/adjustment mechanism
+                        let current = {
+                            let graph = self.graph.read().await;
+                            match graph.compute_trust_score(&identity_did) {
+                                Ok(score) => score,
+                                Err(_) => {
+                                    // Unknown actors start at 0.0 trust — penalty
+                                    // still creates a trust edge recording the violation.
+                                    0.0
+                                }
+                            }
+                        };
+                        let new_score = (current - penalty).max(0.0);
+                        debug_assert!(
+                            (0.0..=1.0).contains(&new_score),
+                            "Trust score out of bounds: {new_score}"
+                        );
+                        let trust_score = icn_trust::TrustScore::unchecked(new_score);
+                        // Uses default Social graph type — misbehavior events affect social
+                        // trust rather than TechnicalReliability, which tracks uptime/latency.
+                        let edge =
+                            icn_trust::TrustEdge::new(own, identity_did.clone(), trust_score);
+                        let mut graph = self.graph.write().await;
+                        if let Err(e) = graph.add_edge(edge) {
+                            tracing::warn!(
+                                actor = %actor,
+                                "Failed to persist trust penalty: {}",
+                                e
+                            );
+                        } else {
                             tracing::debug!(
                                 actor = %actor,
                                 current = current,
                                 penalty = penalty,
                                 new_score = new_score,
-                                "Trust penalty applied (not persisted - needs TrustGraph API)"
+                                "Trust penalty persisted via TrustEdge"
                             );
                         }
                     })
@@ -110,7 +148,40 @@ impl TrustService for TrustServiceImplTokio {
                     weight = weight,
                     "Trust event: positive interaction"
                 );
-                // Positive interactions could boost trust over time
+                // Boost trust by adding an edge with improved score
+                let own = self.own_did.clone();
+
+                tokio::task::block_in_place(|| {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(async {
+                        let current = {
+                            let graph = self.graph.read().await;
+                            graph.compute_trust_score(&identity_did).unwrap_or(0.0)
+                        };
+                        let new_score = (current + weight * EVENT_WEIGHT_MULTIPLIER).min(1.0);
+                        debug_assert!(
+                            (0.0..=1.0).contains(&new_score),
+                            "Trust score out of bounds: {new_score}"
+                        );
+                        let trust_score = icn_trust::TrustScore::unchecked(new_score);
+                        let edge =
+                            icn_trust::TrustEdge::new(own, identity_did.clone(), trust_score);
+                        let mut graph = self.graph.write().await;
+                        if let Err(e) = graph.add_edge(edge) {
+                            tracing::warn!(
+                                actor = %actor,
+                                "Failed to persist trust boost: {}",
+                                e
+                            );
+                        } else {
+                            tracing::debug!(
+                                actor = %actor,
+                                new_score = new_score,
+                                "Trust boost persisted via TrustEdge"
+                            );
+                        }
+                    })
+                });
             }
             TrustEvent::QuarantineRequested { duration_secs } => {
                 tracing::warn!(
@@ -118,7 +189,6 @@ impl TrustService for TrustServiceImplTokio {
                     duration_secs = duration_secs,
                     "Trust event: quarantine requested"
                 );
-                // Quarantine handling would need to be coordinated with SecurityService
             }
         }
     }
@@ -129,19 +199,22 @@ mod tests {
     use super::*;
     use icn_kernel_api::services::TrustService as _;
 
-    fn create_test_graph() -> Arc<RwLock<TrustGraph>> {
+    fn create_test_graph() -> (Arc<RwLock<TrustGraph>>, icn_identity::Did) {
         let store = icn_store::SledStore::temporary().unwrap();
         let store: Arc<dyn icn_store::Store> = Arc::new(store);
 
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        Arc::new(RwLock::new(TrustGraph::new(store, did)))
+        (
+            Arc::new(RwLock::new(TrustGraph::new(store, did.clone()))),
+            did,
+        )
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_trust_service_tokio_creation() {
-        let graph = create_test_graph();
+        let (graph, _did) = create_test_graph();
         let service = TrustServiceImplTokio::new(graph);
 
         // Should have zero trust for unknown actors
@@ -156,7 +229,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_trust_score_unknown_actor() {
-        let graph = create_test_graph();
+        let (graph, _did) = create_test_graph();
         let service = TrustServiceImplTokio::new(graph);
 
         let unknown_keypair = icn_identity::KeyPair::generate().unwrap();

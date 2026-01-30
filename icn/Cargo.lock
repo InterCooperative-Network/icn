@@ -3404,6 +3404,7 @@ dependencies = [
  "anyhow",
  "hex",
  "icn-identity",
+ "icn-kernel-api",
  "icn-obs",
  "icn-store",
  "serde",
