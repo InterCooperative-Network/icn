@@ -9,7 +9,6 @@ use crate::ledger::Ledger;
 use crate::types::CreditLimit;
 use anyhow::Result;
 use icn_identity::Did;
-use icn_trust::TrustGraph;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -90,13 +89,9 @@ impl CreditPolicy {
         &self,
         member: &Did,
         ledger: &Ledger,
-        trust_graph: &TrustGraph,
+        trust_score: f64,
     ) -> Result<i64> {
-        // Get trust score (0.0 = untrusted, 1.0 = fully trusted)
-        let trust_score = trust_graph
-            .compute_trust_score(member)
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0);
+        let trust_score = trust_score.clamp(0.0, 1.0);
 
         // Get cleared volume (sum of all cleared credits)
         let cleared_volume = ledger.total_cleared_by(member, &self.currency)?;
@@ -270,12 +265,12 @@ impl CreditPolicyManager {
         member_since: u64,
         current_time: u64,
         ledger: &Ledger,
-        trust_graph: &TrustGraph,
+        trust_score: f64,
     ) -> Result<CreditLimit> {
         // Calculate base limit from credit policy
         let base_limit = self
             .credit_policy
-            .calculate_limit(member, ledger, trust_graph)?;
+            .calculate_limit(member, ledger, trust_score)?;
 
         // Get cleared volume for new member check
         let cleared_volume = ledger.total_cleared_by(member, &self.credit_policy.currency)?;
@@ -310,10 +305,10 @@ impl CreditPolicyManager {
         current_balance: i64,
         transaction_delta: i64,
         ledger: &Ledger,
-        trust_graph: &TrustGraph,
+        trust_score: f64,
     ) -> Result<bool> {
         let limit =
-            self.calculate_credit_limit(member, member_since, current_time, ledger, trust_graph)?;
+            self.calculate_credit_limit(member, member_since, current_time, ledger, trust_score)?;
 
         let would_exceed = self.credit_policy.would_exceed_limit(
             member,

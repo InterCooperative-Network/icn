@@ -163,16 +163,16 @@ async fn validate_witness_trust_score(
     _parties: &HashSet<Did>, // Reserved for future per-party validation
     min_trust: f64,
 ) -> Result<()> {
-    // If no trust graph is available, skip trust validation with a warning.
+    // If no trust service is available, skip trust validation with a warning.
     // SECURITY NOTE: This graceful degradation prioritizes availability over strict
     // enforcement. Cooperatives configuring min_witness_trust MUST also call
-    // set_trust_graph() or trust validation will be skipped silently.
+    // set_trust_service() or trust validation will be skipped silently.
     // The metric below allows monitoring for this misconfiguration.
-    let trust_graph = match &ledger.trust_graph {
-        Some(tg) => tg,
+    let trust_service = match &ledger.trust_service {
+        Some(ts) => ts,
         None => {
             tracing::warn!(
-                "Trust validation requested but no trust graph available, skipping trust check for witness {}",
+                "Trust validation requested but no TrustService available, skipping trust check for witness {}",
                 witness
             );
             icn_obs::metrics::ledger::witness_trust_validation_skipped_inc();
@@ -180,13 +180,10 @@ async fn validate_witness_trust_score(
         }
     };
 
-    // Compute trust score from trust graph owner's perspective
+    // Compute trust score via TrustService (kernel/app separated)
     // TODO: For future enhancement, compute trust from each party's perspective
-    // by creating per-party trust lookups or using party-specific trust graphs
-    let trust_score = {
-        let graph = trust_graph.read().await;
-        graph.compute_trust_score(witness).unwrap_or(0.0)
-    };
+    let kernel_did = icn_kernel_api::types::Did::from(witness.to_string());
+    let trust_score = trust_service.trust_score(&kernel_did);
 
     if trust_score < min_trust {
         icn_obs::metrics::ledger::witness_trust_validation_failed_inc();

@@ -20,6 +20,7 @@
 
 use anyhow::Result;
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::services::TrustService;
 use icn_ledger::{
     balance::compute_all_balances, entry::JournalEntryBuilder, Fork, ForkDetector, ForkResolution,
     ForkResolutionStrategy, ForkResolver, Ledger,
@@ -32,7 +33,42 @@ use std::time::SystemTime;
 use tempfile::TempDir;
 use tracing::info;
 
-/// Test node with ledger and trust graph
+/// Test TrustService wrapping a TrustGraph for integration tests
+struct TestTrustService {
+    graph: Arc<tokio::sync::RwLock<TrustGraph>>,
+}
+
+impl TestTrustService {
+    fn new(graph: Arc<tokio::sync::RwLock<TrustGraph>>) -> Self {
+        Self { graph }
+    }
+}
+
+impl TrustService for TestTrustService {
+    fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+        unimplemented!("oracle not needed for fork resolution tests")
+    }
+
+    fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        let graph = self.graph.clone();
+        let actor_str = actor.clone();
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let g = graph.read().await;
+                if let Ok(did) = actor_str.parse::<icn_identity::Did>() {
+                    g.compute_trust_score(&did).unwrap_or(0.0)
+                } else {
+                    0.0
+                }
+            })
+        })
+    }
+
+    fn record_event(&self, _actor: &icn_kernel_api::types::Did, _event: icn_kernel_api::services::TrustEvent) {}
+}
+
+/// Test node with ledger and trust service
 #[allow(dead_code)]
 struct TestLedgerNode {
     did: Did,
@@ -63,10 +99,14 @@ impl TestLedgerNode {
             did.clone(),
         )));
 
+        // Create TrustService wrapping the graph
+        let trust_service: Arc<dyn TrustService> =
+            Arc::new(TestTrustService::new(trust_graph.clone()));
+
         // Create fork resolution components
         let fork_detector = ForkDetector::new();
         let mut fork_resolver = ForkResolver::new(ForkResolutionStrategy::Hybrid);
-        fork_resolver.set_trust_graph(trust_graph.clone());
+        fork_resolver.set_trust_service(trust_service);
 
         Ok(Self {
             did,
@@ -443,8 +483,10 @@ async fn test_fork_resolution_trust_weighted() -> Result<()> {
     // Set up trust edges: Alice trusts Bob highly, Charlie less
     // Note: In real system this would be through trust_graph.add_edge()
 
+    let trust_service: Arc<dyn TrustService> =
+        Arc::new(TestTrustService::new(trust_graph));
     let mut resolver = ForkResolver::new(ForkResolutionStrategy::TrustWeighted);
-    resolver.set_trust_graph(trust_graph);
+    resolver.set_trust_service(trust_service);
 
     let parent = icn_ledger::ContentHash([0u8; 32]);
 
