@@ -79,12 +79,10 @@ impl TrustService for TrustServiceImpl {
                     let graph = self.graph.read();
                     match graph.compute_trust_score(&identity_did) {
                         Ok(score) => score,
-                        Err(e) => {
-                            tracing::warn!(
-                                actor = %actor,
-                                "Failed to read trust score, skipping penalty: {e}"
-                            );
-                            return;
+                        Err(_) => {
+                            // Unknown actors start at 0.0 trust — penalty still
+                            // creates a trust edge recording the violation.
+                            0.0
                         }
                     }
                 };
