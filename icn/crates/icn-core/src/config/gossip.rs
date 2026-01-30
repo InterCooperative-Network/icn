@@ -20,7 +20,6 @@
 //! heal_interval_secs = 60          # How often to attempt healing
 //! ```
 
-use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Gossip protocol configuration
@@ -45,7 +44,7 @@ pub struct ReplicationConfig {
     /// Minimum trust class required to serve as replica (Known = 0.1, Partner = 0.4, Federated = 0.7)
     /// Default: 0.4 (Partner)
     #[serde(default = "default_min_replica_trust")]
-    pub min_replica_trust: TrustScore,
+    pub min_replica_trust: f64,
 
     /// Health check interval in seconds
     #[serde(default = "default_health_check_interval_secs")]
@@ -76,8 +75,8 @@ fn default_target_replicas() -> usize {
     3
 }
 
-fn default_min_replica_trust() -> TrustScore {
-    TrustScore::unchecked(0.4) // Partner trust class
+fn default_min_replica_trust() -> f64 {
+    0.4 // Partner trust class
 }
 
 fn default_health_check_interval_secs() -> u64 {
@@ -144,7 +143,7 @@ impl ReplicationConfig {
     pub fn to_manager_config(&self) -> crate::replication::ReplicationConfig {
         crate::replication::ReplicationConfig {
             target_replicas: self.target_replicas,
-            min_trust_score: self.min_replica_trust.value(),
+            min_trust_score: self.min_replica_trust,
             health_check_interval_secs: self.health_check_interval_secs,
             stale_threshold_secs: self.stale_threshold_secs,
             unreachable_threshold_secs: self.unreachable_threshold_secs,
@@ -171,7 +170,7 @@ mod tests {
     fn test_gossip_config_defaults() {
         let config = GossipConfig::default();
         assert_eq!(config.replication.target_replicas, 3);
-        assert_eq!(config.replication.min_replica_trust.value(), 0.4);
+        assert!((config.replication.min_replica_trust - 0.4).abs() < f64::EPSILON);
         assert_eq!(config.replication.health_check_interval_secs, 60);
         assert_eq!(config.replication.stale_threshold_secs, 300);
         assert_eq!(config.replication.unreachable_threshold_secs, 900);
@@ -186,7 +185,7 @@ mod tests {
     fn test_replication_config_defaults() {
         let config = ReplicationConfig::default();
         assert_eq!(config.target_replicas, 3);
-        assert_eq!(config.min_replica_trust.value(), 0.4);
+        assert!((config.min_replica_trust - 0.4).abs() < f64::EPSILON);
         assert_eq!(config.health_check_interval_secs, 60);
         assert_eq!(config.stale_threshold_secs, 300);
         assert_eq!(config.unreachable_threshold_secs, 900);
@@ -206,7 +205,7 @@ mod tests {
         let config = GossipConfig {
             replication: ReplicationConfig {
                 target_replicas: 5,
-                min_replica_trust: TrustScore::unchecked(0.5),
+                min_replica_trust: 0.5,
                 health_check_interval_secs: 120,
                 stale_threshold_secs: 600,
                 unreachable_threshold_secs: 1800,
@@ -223,7 +222,7 @@ mod tests {
         let deserialized: GossipConfig = toml::from_str(&toml_str).unwrap();
 
         assert_eq!(deserialized.replication.target_replicas, 5);
-        assert_eq!(deserialized.replication.min_replica_trust.value(), 0.5);
+        assert!((deserialized.replication.min_replica_trust - 0.5).abs() < f64::EPSILON);
         assert_eq!(deserialized.replication.health_check_interval_secs, 120);
         assert_eq!(deserialized.replication.stale_threshold_secs, 600);
         assert_eq!(deserialized.replication.unreachable_threshold_secs, 1800);
@@ -251,7 +250,7 @@ silence_threshold_secs = 400
         assert_eq!(config.partition.silence_threshold_secs, 400);
 
         // Default values
-        assert_eq!(config.replication.min_replica_trust.value(), 0.4);
+        assert!((config.replication.min_replica_trust - 0.4).abs() < f64::EPSILON);
         assert_eq!(config.replication.health_check_interval_secs, 60);
         assert_eq!(config.partition.check_interval_secs, 30);
         assert!(config.partition.auto_heal_enabled);
@@ -261,7 +260,7 @@ silence_threshold_secs = 400
     fn test_replication_config_to_manager_config() {
         let config = ReplicationConfig {
             target_replicas: 5,
-            min_replica_trust: TrustScore::unchecked(0.7),
+            min_replica_trust: 0.7,
             health_check_interval_secs: 90,
             stale_threshold_secs: 450,
             unreachable_threshold_secs: 1200,

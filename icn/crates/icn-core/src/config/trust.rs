@@ -27,7 +27,6 @@
 //! min_diversity_ratio = 0.2     # Required attester diversity
 //! ```
 
-use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Trust graph configuration
@@ -52,7 +51,7 @@ pub struct AttestationConfig {
     /// Minimum trust score required to create attestations (0.0-1.0)
     /// Default: 0.3 (basic trust relationship)
     #[serde(default = "default_min_attester_trust")]
-    pub min_attester_trust: TrustScore,
+    pub min_attester_trust: f64,
 
     /// Maximum attestations per day per attester
     #[serde(default = "default_max_attestations_per_day")]
@@ -64,7 +63,7 @@ pub struct AttestationConfig {
 
     /// Minimum evidence score for attestations (0.0-1.0)
     #[serde(default = "default_min_evidence_score")]
-    pub min_evidence_score: TrustScore,
+    pub min_evidence_score: f64,
 }
 
 impl Default for AttestationConfig {
@@ -78,16 +77,16 @@ impl Default for AttestationConfig {
     }
 }
 
-fn default_min_attester_trust() -> TrustScore {
-    TrustScore::unchecked(0.3) // Require moderate trust to attest
+fn default_min_attester_trust() -> f64 {
+    0.3 // Require moderate trust to attest
 }
 
 fn default_max_attestations_per_day() -> usize {
     10 // Prevent spam while allowing legitimate use
 }
 
-fn default_min_evidence_score() -> TrustScore {
-    TrustScore::unchecked(0.5) // Require reasonable evidence quality
+fn default_min_evidence_score() -> f64 {
+    0.5 // Require reasonable evidence quality
 }
 
 /// Trust propagation configuration
@@ -100,11 +99,11 @@ pub struct PropagationConfig {
     /// Decay factor per hop (0.0-1.0)
     /// Trust score is multiplied by this factor for each hop
     #[serde(default = "default_decay_factor")]
-    pub decay_factor: TrustScore,
+    pub decay_factor: f64,
 
     /// Minimum edge trust to include in propagation (0.0-1.0)
     #[serde(default = "default_min_edge_trust")]
-    pub min_edge_trust: TrustScore,
+    pub min_edge_trust: f64,
 
     /// Enable trust caching for performance
     #[serde(default = "default_true")]
@@ -131,12 +130,12 @@ fn default_max_path_length() -> usize {
     3 // Balance reach and computation cost
 }
 
-fn default_decay_factor() -> TrustScore {
-    TrustScore::unchecked(0.8) // 20% decay per hop
+fn default_decay_factor() -> f64 {
+    0.8 // 20% decay per hop
 }
 
-fn default_min_edge_trust() -> TrustScore {
-    TrustScore::unchecked(0.1) // Include weak edges but not zero trust
+fn default_min_edge_trust() -> f64 {
+    0.1 // Include weak edges but not zero trust
 }
 
 fn default_cache_ttl_secs() -> u64 {
@@ -154,7 +153,7 @@ pub struct SybilResistanceConfig {
     /// If an attester vouches for entities with combined trust exceeding this,
     /// additional attestations have reduced weight
     #[serde(default = "default_max_trust_concentration")]
-    pub max_trust_concentration: TrustScore,
+    pub max_trust_concentration: f64,
 
     /// Network sampling size for sybil detection
     #[serde(default = "default_sample_size")]
@@ -163,7 +162,7 @@ pub struct SybilResistanceConfig {
     /// Minimum network diversity ratio (0.0-1.0)
     /// Entities with low diversity (few unique attesters) have reduced trust
     #[serde(default = "default_min_diversity_ratio")]
-    pub min_diversity_ratio: TrustScore,
+    pub min_diversity_ratio: f64,
 }
 
 impl Default for SybilResistanceConfig {
@@ -177,16 +176,16 @@ impl Default for SybilResistanceConfig {
     }
 }
 
-fn default_max_trust_concentration() -> TrustScore {
-    TrustScore::unchecked(0.3) // Prevent single attester from dominating
+fn default_max_trust_concentration() -> f64 {
+    0.3 // Prevent single attester from dominating
 }
 
 fn default_sample_size() -> usize {
     100 // Sample size for network analysis
 }
 
-fn default_min_diversity_ratio() -> TrustScore {
-    TrustScore::unchecked(0.2) // Require 20% unique attesters
+fn default_min_diversity_ratio() -> f64 {
+    0.2 // Require 20% unique attesters
 }
 
 fn default_true() -> bool {
@@ -202,40 +201,40 @@ mod tests {
         let config = TrustConfig::default();
 
         // Attestation defaults
-        assert_eq!(config.attestation.min_attester_trust.value(), 0.3);
+        assert_eq!(config.attestation.min_attester_trust, 0.3);
         assert_eq!(config.attestation.max_attestations_per_day, 10);
         assert!(config.attestation.evidence_required);
-        assert_eq!(config.attestation.min_evidence_score.value(), 0.5);
+        assert_eq!(config.attestation.min_evidence_score, 0.5);
 
         // Propagation defaults
         assert_eq!(config.propagation.max_path_length, 3);
-        assert_eq!(config.propagation.decay_factor.value(), 0.8);
-        assert_eq!(config.propagation.min_edge_trust.value(), 0.1);
+        assert_eq!(config.propagation.decay_factor, 0.8);
+        assert_eq!(config.propagation.min_edge_trust, 0.1);
         assert!(config.propagation.cache_enabled);
         assert_eq!(config.propagation.cache_ttl_secs, 300);
 
         // Sybil resistance defaults
         assert!(config.sybil_resistance.enabled);
-        assert_eq!(config.sybil_resistance.max_trust_concentration.value(), 0.3);
+        assert_eq!(config.sybil_resistance.max_trust_concentration, 0.3);
         assert_eq!(config.sybil_resistance.sample_size, 100);
-        assert_eq!(config.sybil_resistance.min_diversity_ratio.value(), 0.2);
+        assert_eq!(config.sybil_resistance.min_diversity_ratio, 0.2);
     }
 
     #[test]
     fn test_attestation_config_defaults() {
         let config = AttestationConfig::default();
-        assert_eq!(config.min_attester_trust.value(), 0.3);
+        assert_eq!(config.min_attester_trust, 0.3);
         assert_eq!(config.max_attestations_per_day, 10);
         assert!(config.evidence_required);
-        assert_eq!(config.min_evidence_score.value(), 0.5);
+        assert_eq!(config.min_evidence_score, 0.5);
     }
 
     #[test]
     fn test_propagation_config_defaults() {
         let config = PropagationConfig::default();
         assert_eq!(config.max_path_length, 3);
-        assert_eq!(config.decay_factor.value(), 0.8);
-        assert_eq!(config.min_edge_trust.value(), 0.1);
+        assert_eq!(config.decay_factor, 0.8);
+        assert_eq!(config.min_edge_trust, 0.1);
         assert!(config.cache_enabled);
         assert_eq!(config.cache_ttl_secs, 300);
     }
@@ -244,32 +243,32 @@ mod tests {
     fn test_sybil_resistance_config_defaults() {
         let config = SybilResistanceConfig::default();
         assert!(config.enabled);
-        assert_eq!(config.max_trust_concentration.value(), 0.3);
+        assert_eq!(config.max_trust_concentration, 0.3);
         assert_eq!(config.sample_size, 100);
-        assert_eq!(config.min_diversity_ratio.value(), 0.2);
+        assert_eq!(config.min_diversity_ratio, 0.2);
     }
 
     #[test]
     fn test_trust_config_toml_serialization() {
         let config = TrustConfig {
             attestation: AttestationConfig {
-                min_attester_trust: TrustScore::unchecked(0.5),
+                min_attester_trust: 0.5,
                 max_attestations_per_day: 20,
                 evidence_required: false,
-                min_evidence_score: TrustScore::unchecked(0.6),
+                min_evidence_score: 0.6,
             },
             propagation: PropagationConfig {
                 max_path_length: 5,
-                decay_factor: TrustScore::unchecked(0.9),
-                min_edge_trust: TrustScore::unchecked(0.2),
+                decay_factor: 0.9,
+                min_edge_trust: 0.2,
                 cache_enabled: false,
                 cache_ttl_secs: 600,
             },
             sybil_resistance: SybilResistanceConfig {
                 enabled: false,
-                max_trust_concentration: TrustScore::unchecked(0.4),
+                max_trust_concentration: 0.4,
                 sample_size: 200,
-                min_diversity_ratio: TrustScore::unchecked(0.3),
+                min_diversity_ratio: 0.3,
             },
         };
 
@@ -277,32 +276,23 @@ mod tests {
         let deserialized: TrustConfig = toml::from_str(&toml_str).unwrap();
 
         // Attestation
-        assert_eq!(deserialized.attestation.min_attester_trust.value(), 0.5);
+        assert_eq!(deserialized.attestation.min_attester_trust, 0.5);
         assert_eq!(deserialized.attestation.max_attestations_per_day, 20);
         assert!(!deserialized.attestation.evidence_required);
-        assert_eq!(deserialized.attestation.min_evidence_score.value(), 0.6);
+        assert_eq!(deserialized.attestation.min_evidence_score, 0.6);
 
         // Propagation
         assert_eq!(deserialized.propagation.max_path_length, 5);
-        assert_eq!(deserialized.propagation.decay_factor.value(), 0.9);
-        assert_eq!(deserialized.propagation.min_edge_trust.value(), 0.2);
+        assert_eq!(deserialized.propagation.decay_factor, 0.9);
+        assert_eq!(deserialized.propagation.min_edge_trust, 0.2);
         assert!(!deserialized.propagation.cache_enabled);
         assert_eq!(deserialized.propagation.cache_ttl_secs, 600);
 
         // Sybil resistance
         assert!(!deserialized.sybil_resistance.enabled);
-        assert_eq!(
-            deserialized
-                .sybil_resistance
-                .max_trust_concentration
-                .value(),
-            0.4
-        );
+        assert_eq!(deserialized.sybil_resistance.max_trust_concentration, 0.4);
         assert_eq!(deserialized.sybil_resistance.sample_size, 200);
-        assert_eq!(
-            deserialized.sybil_resistance.min_diversity_ratio.value(),
-            0.3
-        );
+        assert_eq!(deserialized.sybil_resistance.min_diversity_ratio, 0.3);
     }
 
     #[test]
@@ -321,13 +311,13 @@ sample_size = 150
         let config: TrustConfig = toml::from_str(toml_str).unwrap();
 
         // Explicitly set values
-        assert_eq!(config.attestation.min_attester_trust.value(), 0.4);
+        assert_eq!(config.attestation.min_attester_trust, 0.4);
         assert_eq!(config.propagation.max_path_length, 4);
         assert_eq!(config.sybil_resistance.sample_size, 150);
 
         // Default values
         assert_eq!(config.attestation.max_attestations_per_day, 10);
-        assert_eq!(config.propagation.decay_factor.value(), 0.8);
+        assert_eq!(config.propagation.decay_factor, 0.8);
         assert!(config.sybil_resistance.enabled);
     }
 
@@ -336,10 +326,10 @@ sample_size = 150
         let config = AttestationConfig::default();
 
         // Trust scores should be between 0 and 1
-        assert!(config.min_attester_trust.value() >= 0.0);
-        assert!(config.min_attester_trust.value() <= 1.0);
-        assert!(config.min_evidence_score.value() >= 0.0);
-        assert!(config.min_evidence_score.value() <= 1.0);
+        assert!(config.min_attester_trust >= 0.0);
+        assert!(config.min_attester_trust <= 1.0);
+        assert!(config.min_evidence_score >= 0.0);
+        assert!(config.min_evidence_score <= 1.0);
     }
 
     #[test]
@@ -347,10 +337,10 @@ sample_size = 150
         let config = PropagationConfig::default();
 
         // Trust scores and decay factor should be between 0 and 1
-        assert!(config.decay_factor.value() >= 0.0);
-        assert!(config.decay_factor.value() <= 1.0);
-        assert!(config.min_edge_trust.value() >= 0.0);
-        assert!(config.min_edge_trust.value() <= 1.0);
+        assert!(config.decay_factor >= 0.0);
+        assert!(config.decay_factor <= 1.0);
+        assert!(config.min_edge_trust >= 0.0);
+        assert!(config.min_edge_trust <= 1.0);
     }
 
     #[test]
@@ -358,10 +348,10 @@ sample_size = 150
         let config = SybilResistanceConfig::default();
 
         // Trust scores should be between 0 and 1
-        assert!(config.max_trust_concentration.value() >= 0.0);
-        assert!(config.max_trust_concentration.value() <= 1.0);
-        assert!(config.min_diversity_ratio.value() >= 0.0);
-        assert!(config.min_diversity_ratio.value() <= 1.0);
+        assert!(config.max_trust_concentration >= 0.0);
+        assert!(config.max_trust_concentration <= 1.0);
+        assert!(config.min_diversity_ratio >= 0.0);
+        assert!(config.min_diversity_ratio <= 1.0);
     }
 
     #[test]
@@ -371,8 +361,8 @@ sample_size = 150
         // Decay factor of 0.8 means 20% decay per hop, which is reasonable
         // Should be > 0 (otherwise trust would disappear immediately)
         // Should be < 1 (otherwise trust wouldn't decay)
-        assert!(config.decay_factor.value() > 0.0);
-        assert!(config.decay_factor.value() < 1.0);
+        assert!(config.decay_factor > 0.0);
+        assert!(config.decay_factor < 1.0);
     }
 
     #[test]

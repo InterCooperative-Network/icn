@@ -227,15 +227,56 @@ impl Config {
             errors.push("network.listen_addr cannot be empty".to_string());
         }
 
-        // TrustScore already validates range [0.0, 1.0] at construction time
-
-        // Trust threshold warnings
-        if self.network.min_trust_threshold.value() == 0.0 {
+        // Trust threshold validation
+        if self.network.min_trust_threshold < 0.0 || self.network.min_trust_threshold > 1.0 {
+            errors.push(format!(
+                "network.min_trust_threshold must be in [0.0, 1.0], got {}",
+                self.network.min_trust_threshold
+            ));
+        } else if self.network.min_trust_threshold == 0.0 {
             warnings.push(
                 "network.min_trust_threshold is 0.0 - trust-gated TLS is disabled, \
                  all authenticated DIDs will be accepted"
                     .to_string(),
             );
+        }
+
+        // Validate all trust-score config fields are in [0.0, 1.0]
+        let trust_fields: &[(&str, f64)] = &[
+            (
+                "gossip.replication.min_replica_trust",
+                self.gossip.replication.min_replica_trust,
+            ),
+            ("privacy.min_relay_trust", self.privacy.min_relay_trust),
+            (
+                "trust.attestation.min_attester_trust",
+                self.trust.attestation.min_attester_trust,
+            ),
+            (
+                "trust.attestation.min_evidence_score",
+                self.trust.attestation.min_evidence_score,
+            ),
+            (
+                "trust.propagation.decay_factor",
+                self.trust.propagation.decay_factor,
+            ),
+            (
+                "trust.propagation.min_edge_trust",
+                self.trust.propagation.min_edge_trust,
+            ),
+            (
+                "trust.sybil_resistance.max_trust_concentration",
+                self.trust.sybil_resistance.max_trust_concentration,
+            ),
+            (
+                "trust.sybil_resistance.min_diversity_ratio",
+                self.trust.sybil_resistance.min_diversity_ratio,
+            ),
+        ];
+        for (name, value) in trust_fields {
+            if !(0.0..=1.0).contains(value) {
+                errors.push(format!("{name} must be in [0.0, 1.0], got {value}"));
+            }
         }
 
         // Federation validation
@@ -298,7 +339,6 @@ impl Config {
         }
 
         // Trust validation
-        // Note: TrustScore validates range [0.0, 1.0] at construction time
         if self.trust.propagation.max_path_length == 0 {
             errors.push("trust.propagation.max_path_length cannot be 0".to_string());
         }
@@ -307,8 +347,6 @@ impl Config {
         if self.gossip.replication.target_replicas == 0 {
             errors.push("gossip.replication.target_replicas cannot be 0".to_string());
         }
-        // Note: TrustScore validates range [0.0, 1.0] at construction time
-
         // Compute validation
         if self.compute.verification.consensus_threshold < 0.0
             || self.compute.verification.consensus_threshold > 1.0
@@ -362,8 +400,6 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_trust::TrustScore;
-
     #[test]
     fn test_config_serialization() {
         let config = Config::default();
@@ -808,7 +844,7 @@ log_level = "info"
 "#;
 
         let config: Config = toml::from_str(custom_toml).unwrap();
-        assert!((config.network.min_trust_threshold.value() - 0.0).abs() < f64::EPSILON);
+        assert!((config.network.min_trust_threshold - 0.0).abs() < f64::EPSILON);
 
         // Test that fallback config can be generated
         let _fallback = config.rate_limiting.to_fallback_config();
@@ -860,21 +896,40 @@ log_level = "info"
     }
 
     #[test]
-    fn test_config_validation_trust_threshold_range() {
-        // TrustScore validates range during deserialization
-        let invalid_toml = r#"
-[network]
+    fn test_config_deser_accepts_out_of_range_trust() {
+        // f64 fields deserialize any numeric value — range is validated at runtime.
+        let toml_str = r#"
+mdns_enabled = true
+listen_addr = "0.0.0.0:7777"
+rpc_port = 5601
+bootstrap_peers = []
 min_trust_threshold = 1.5
 "#;
-        let result: Result<Config, _> = toml::from_str(invalid_toml);
-        // Should fail during TOML parsing since TrustScore rejects invalid values
+        let result: Result<NetworkConfig, _> = toml::from_str(toml_str);
+        assert!(result.is_ok());
+        assert!((result.unwrap().min_trust_threshold - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_config_validation_rejects_out_of_range_trust() {
+        let mut config = Config::default();
+        config.network.min_trust_threshold = 1.5;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("min_trust_threshold must be in [0.0, 1.0]")));
+
+        config.network.min_trust_threshold = -0.5;
+        let result = config.validate();
         assert!(result.is_err());
     }
 
     #[test]
     fn test_config_validation_zero_trust_warning() {
         let mut config = Config::default();
-        config.network.min_trust_threshold = TrustScore::unchecked(0.0);
+        config.network.min_trust_threshold = 0.0;
 
         let result = config.validate();
         assert!(result.is_ok());
@@ -885,27 +940,50 @@ min_trust_threshold = 1.5
     }
 
     #[test]
+    fn test_config_validation_rejects_out_of_range_trust_fields() {
+        let mut config = Config::default();
+        // Set one trust field out of range
+        config.trust.propagation.decay_factor = 1.5;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("trust.propagation.decay_factor")));
+
+        // Reset and try another
+        let mut config = Config::default();
+        config.gossip.replication.min_replica_trust = -0.1;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("gossip.replication.min_replica_trust")));
+    }
+
+    #[test]
     fn test_config_validation_trust_decay_factor_range() {
-        // TrustScore validates range during deserialization
-        let invalid_toml = r#"
-[trust.propagation]
+        // With f64, any value deserializes — parse just the PropagationConfig sub-section.
+        let toml_str = r#"
+max_path_length = 3
 decay_factor = 1.5
 "#;
-        let result: Result<Config, _> = toml::from_str(invalid_toml);
-        // Should fail during TOML parsing since TrustScore rejects invalid values
-        assert!(result.is_err());
+        let result: Result<PropagationConfig, _> = toml::from_str(toml_str);
+        assert!(result.is_ok());
+        assert!((result.unwrap().decay_factor - 1.5).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_config_validation_gossip_replica_trust_range() {
-        // TrustScore validates range during deserialization
-        let invalid_toml = r#"
-[gossip.replication]
+        // With f64, any value deserializes — parse just the ReplicationConfig sub-section.
+        let toml_str = r#"
+target_replicas = 3
 min_replica_trust = -0.5
 "#;
-        let result: Result<Config, _> = toml::from_str(invalid_toml);
-        // Should fail during TOML parsing since TrustScore rejects invalid values
-        assert!(result.is_err());
+        let result: Result<ReplicationConfig, _> = toml::from_str(toml_str);
+        assert!(result.is_ok());
+        assert!((result.unwrap().min_replica_trust - (-0.5)).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1099,15 +1177,13 @@ enabled = false
         // Verify defaults are properly restored
         assert_eq!(deserialized.gossip.replication.target_replicas, 3);
         assert_eq!(deserialized.compute.max_concurrent_tasks, 10);
-        assert!(
-            (deserialized.trust.attestation.min_attester_trust.value() - 0.3).abs() < f64::EPSILON
-        );
+        assert!((deserialized.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
 
         // Test with explicit values to ensure they serialize
         let mut custom_config = Config::default();
         custom_config.gossip.replication.target_replicas = 5;
         custom_config.compute.max_concurrent_tasks = 20;
-        custom_config.trust.attestation.min_attester_trust = TrustScore::unchecked(0.5);
+        custom_config.trust.attestation.min_attester_trust = 0.5;
 
         let custom_toml = toml::to_string_pretty(&custom_config).unwrap();
         let custom_deserialized: Config = toml::from_str(&custom_toml).unwrap();
@@ -1115,14 +1191,7 @@ enabled = false
         assert_eq!(custom_deserialized.gossip.replication.target_replicas, 5);
         assert_eq!(custom_deserialized.compute.max_concurrent_tasks, 20);
         assert!(
-            (custom_deserialized
-                .trust
-                .attestation
-                .min_attester_trust
-                .value()
-                - 0.5)
-                .abs()
-                < f64::EPSILON
+            (custom_deserialized.trust.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON
         );
     }
 
@@ -1168,12 +1237,12 @@ enabled = false
 
         // Test boundary cases
         let mut config_known = GossipConfig::default();
-        config_known.replication.min_replica_trust = TrustScore::unchecked(0.3);
+        config_known.replication.min_replica_trust = 0.3;
         let manager_known = config_known.replication.to_manager_config();
         assert_eq!(manager_known.min_trust_score, 0.3);
 
         let mut config_federated = GossipConfig::default();
-        config_federated.replication.min_replica_trust = TrustScore::unchecked(0.8);
+        config_federated.replication.min_replica_trust = 0.8;
         let manager_federated = config_federated.replication.to_manager_config();
         assert_eq!(manager_federated.min_trust_score, 0.8);
     }

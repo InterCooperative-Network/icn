@@ -9,46 +9,18 @@
 //! - **PolicySource trait**: Abstraction for policy lookup
 //! - **TrustPolicy struct**: Per-peer policy combining limits + capabilities
 //! - **Capability enum**: Fine-grained permissions for operations
-//! - **DefaultPolicySource**: Default implementation using TrustGraph
-//!
-//! # Usage
-//!
-//! ```rust,no_run
-//! use icn_core::policy::{DefaultPolicySource, PolicySource, Capability};
-//! use std::sync::Arc;
-//! use tokio::sync::RwLock;
-//!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create policy source from trust graph
-//! let keypair = icn_identity::KeyPair::generate()?;
-//! let own_did = keypair.did().clone();
-//! let store = Arc::new(icn_store::SledStore::temporary()?);
-//! let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(store, own_did)));
-//! let policy_source = DefaultPolicySource::new(trust_graph);
-//!
-//! // Look up policy for a peer
-//! let peer_did = icn_identity::KeyPair::generate()?.did().clone();
-//! let policy = policy_source.policy_for(&peer_did).await;
-//!
-//! // Check capabilities
-//! if policy.has_capability(&Capability::DeployContract) {
-//!     // Allow contract deployment
-//! }
-//! # Ok(())
-//! # }
-//! ```
+//! - **TrustScoreProvider trait**: Abstraction for trust score computation
+//! - **DefaultPolicySource**: Implementation using any `TrustScoreProvider`
 
 use icn_identity::Did;
 use icn_kernel_api::TrustClass;
-use icn_trust::TrustGraph;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Trait for looking up trust policies
 ///
 /// This abstraction allows for different policy sources:
-/// - DefaultPolicySource: Uses TrustGraph
+/// - DefaultPolicySource: Uses a TrustScoreProvider
 /// - StaticPolicySource: Fixed policies for testing
 /// - RemotePolicySource: Fetch policies from remote server
 #[async_trait::async_trait]
@@ -275,26 +247,77 @@ impl CapabilityQuota {
     }
 }
 
-/// Default policy source using TrustGraph
+/// Trait for providing trust scores without depending on icn-trust types.
+///
+/// Implementations bridge from domain-specific trust computation
+/// (e.g. TrustGraph) to a simple f64 score the kernel can use.
+///
+/// # Production Usage
+///
+/// The production implementation lives in `apps/trust` and wraps a
+/// `TrustGraph`. Kernel code should obtain this via `TrustService`
+/// from the `ServiceRegistry` rather than constructing directly.
+///
+/// ```ignore
+/// struct TrustGraphProvider {
+///     graph: Arc<RwLock<TrustGraph>>,
+/// }
+///
+/// #[async_trait::async_trait]
+/// impl TrustScoreProvider for TrustGraphProvider {
+///     async fn trust_score_for(&self, did: &Did) -> f64 {
+///         let g = self.graph.read().await;
+///         g.compute_trust_score(did).unwrap_or(0.0)
+///     }
+/// }
+/// ```
+#[async_trait::async_trait]
+pub trait TrustScoreProvider: Send + Sync {
+    /// Compute the trust score for a DID.
+    ///
+    /// # Contract
+    ///
+    /// - **Range**: Implementations MUST return a value in `[0.0, 1.0]`.
+    ///   Values outside this range will be clamped by consumers but indicate
+    ///   a bug in the provider.
+    /// - **Unknown DIDs**: Return `0.0` (Isolated trust class).
+    /// - **NaN / Infinity**: Must never be returned. Callers may treat NaN
+    ///   as 0.0 but this is a provider bug.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use icn_core::TrustScoreProvider;
+    ///
+    /// struct GraphProvider { /* wraps TrustGraph */ }
+    ///
+    /// #[async_trait::async_trait]
+    /// impl TrustScoreProvider for GraphProvider {
+    ///     async fn trust_score_for(&self, did: &icn_identity::Did) -> f64 {
+    ///         self.graph.compute_trust_score(did).unwrap_or(0.0)
+    ///     }
+    /// }
+    /// ```
+    async fn trust_score_for(&self, did: &Did) -> f64;
+}
+
+/// Default policy source using a [`TrustScoreProvider`].
 pub struct DefaultPolicySource {
-    trust_graph: Arc<RwLock<TrustGraph>>,
+    provider: Arc<dyn TrustScoreProvider>,
 }
 
 impl DefaultPolicySource {
-    /// Create a new default policy source
-    pub fn new(trust_graph: Arc<RwLock<TrustGraph>>) -> Self {
-        DefaultPolicySource { trust_graph }
+    /// Create a new default policy source from any trust score provider.
+    pub fn new(provider: Arc<dyn TrustScoreProvider>) -> Self {
+        DefaultPolicySource { provider }
     }
 }
 
 #[async_trait::async_trait]
 impl PolicySource for DefaultPolicySource {
     async fn policy_for(&self, did: &Did) -> TrustPolicy {
-        let trust_graph = self.trust_graph.read().await;
-        // Get trust score and convert to kernel-api TrustClass
-        let score = trust_graph.compute_trust_score(did).unwrap_or(0.0);
+        let score = self.provider.trust_score_for(did).await;
         let class = TrustClass::from_score(score);
-
         TrustPolicy::for_trust_class(class)
     }
 }
@@ -303,7 +326,32 @@ impl PolicySource for DefaultPolicySource {
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
-    use icn_trust::{TrustEdge, TrustScore};
+    use std::collections::HashMap as StdHashMap;
+    use tokio::sync::RwLock;
+
+    /// Mock trust score provider for testing
+    struct MockTrustScoreProvider {
+        scores: RwLock<StdHashMap<String, f64>>,
+    }
+
+    impl MockTrustScoreProvider {
+        fn new() -> Self {
+            Self {
+                scores: RwLock::new(StdHashMap::new()),
+            }
+        }
+
+        async fn set_score(&self, did: &str, score: f64) {
+            self.scores.write().await.insert(did.to_string(), score);
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl TrustScoreProvider for MockTrustScoreProvider {
+        async fn trust_score_for(&self, did: &Did) -> f64 {
+            *self.scores.read().await.get(did.as_str()).unwrap_or(&0.0)
+        }
+    }
 
     #[test]
     fn test_policy_isolated() {
@@ -367,14 +415,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_policy_source_isolated() {
-        use icn_store::SledStore;
+        let provider = Arc::new(MockTrustScoreProvider::new());
+        let policy_source = DefaultPolicySource::new(provider);
 
-        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn icn_store::Store>;
-        let own_did = KeyPair::generate().unwrap().did().clone();
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, own_did)));
-        let policy_source = DefaultPolicySource::new(trust_graph.clone());
-
-        // Unknown peer should get isolated policy
+        // Unknown peer should get isolated policy (score 0.0)
         let unknown_did = KeyPair::generate().unwrap().did().clone();
         let policy = policy_source.policy_for(&unknown_did).await;
 
@@ -384,26 +428,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_policy_source_known() {
-        use icn_store::SledStore;
+        let provider = Arc::new(MockTrustScoreProvider::new());
 
-        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn icn_store::Store>;
-        let alice = KeyPair::generate().unwrap().did().clone();
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, alice.clone())));
-        let policy_source = DefaultPolicySource::new(trust_graph.clone());
-
-        // Add trust edge - single edge gives Known class
+        // Set a trust score that maps to Known class (0.1-0.4)
         let bob = KeyPair::generate().unwrap().did().clone();
+        provider.set_score(bob.as_str(), 0.2).await;
 
-        {
-            let mut tg = trust_graph.write().await;
-            let _ = tg.add_edge(TrustEdge::new(
-                alice.clone(),
-                bob.clone(),
-                TrustScore::unchecked(0.5),
-            ));
-        }
-
+        let policy_source = DefaultPolicySource::new(provider);
         let policy = policy_source.policy_for(&bob).await;
+
         assert_eq!(policy.class, TrustClass::Known);
         assert_eq!(policy.max_messages_per_second, 50);
         assert!(policy.has_capability(&Capability::ReadLedger));
