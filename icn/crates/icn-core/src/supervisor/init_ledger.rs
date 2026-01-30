@@ -238,7 +238,12 @@ pub async fn init_ledger_services(
     let contract_actor = icn_ccl::ContractActor::new(
         did,
         contract_runtime_handle.clone(),
-        None, // TrustGraph moved to app layer; CCL migration pending
+        // TrustGraph moved to app layer; CCL extraction migration pending.
+        // SECURITY NOTE: With None, ContractActor skips deployer trust
+        // validation for non-self deployments (logs a warning). This is
+        // acceptable during migration because the OracleRegistry will
+        // provide trust checks once CCL is extracted to an app crate.
+        None,
     );
     let contract_actor_handle = Arc::new(RwLock::new(contract_actor));
 

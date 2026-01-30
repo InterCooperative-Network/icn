@@ -288,7 +288,10 @@ async fn spawn_actors_with_identity(
         let trust_oracle = trust_service.oracle();
         let trust_domain = trust_oracle.domain();
         oracle_registry.register(trust_domain.clone(), trust_oracle);
-        info!("Registered TrustPolicyOracle with OracleRegistry for domain '{}'", trust_domain);
+        info!(
+            "Registered TrustPolicyOracle with OracleRegistry for domain '{}'",
+            trust_domain
+        );
     }
 
     // Transition to CoreApps phase: first-party oracles are registered.
