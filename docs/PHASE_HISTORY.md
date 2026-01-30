@@ -11,17 +11,28 @@ This document contains detailed history of all completed development phases. For
 
 ---
 
-## Kernel/App Separation - Phase 2 Progress & Epics (Jan 26–30)
+## Kernel/App Separation - Phase 2 & Epics (Jan 26–30)
 
-### Phase 2: Trust Extraction (~80% Complete)
+### Phase 2: Trust Extraction — ✅ Complete
 
 **Tracking Issue**: [#857](https://github.com/InterCooperative-Network/icn/issues/857) (closed)
-**Remaining sub-issues**: #910, #867, #869, #877
+**Completed**: 2026-01-30
+**Remaining**: Only #877 (attestation reducer) as optional stretch goal.
 
-Merged PRs advancing Phase 2:
+Phase 2 established the Meaning Firewall for trust: kernel crates no longer import `icn-trust` directly. All trust queries flow through the `TrustService` trait and `OracleRegistry`.
+
+Merged PRs:
 - [#872](https://github.com/InterCooperative-Network/icn/pull/872), [#883](https://github.com/InterCooperative-Network/icn/pull/883), [#896](https://github.com/InterCooperative-Network/icn/pull/896), [#897](https://github.com/InterCooperative-Network/icn/pull/897)
 - [#904](https://github.com/InterCooperative-Network/icn/pull/904), [#906](https://github.com/InterCooperative-Network/icn/pull/906), [#907](https://github.com/InterCooperative-Network/icn/pull/907)
 - [#968](https://github.com/InterCooperative-Network/icn/pull/968) — GovernanceService + LedgerService daemon wiring
+- [#969](https://github.com/InterCooperative-Network/icn/pull/969) — MisbehaviorDetector → TrustService migration (#910)
+- [#970](https://github.com/InterCooperative-Network/icn/pull/970) — Ledger TrustGraph → TrustService (#867)
+- [#971](https://github.com/InterCooperative-Network/icn/pull/971) — OracleRegistry integration (#869)
+
+### Kernel Crate Cleanup (Jan 30)
+
+- [#972](https://github.com/InterCooperative-Network/icn/pull/972) — Remove icn-trust from icn-core (#912)
+- [#974](https://github.com/InterCooperative-Network/icn/pull/974) — Strict Meaning Firewall CI with ratchet tests (#916)
 
 ### Cells & Scopes Epic (#919) — ✅ Complete
 
@@ -42,11 +53,13 @@ Endpoint registry landed; health checking and routing remain:
 - [#952](https://github.com/InterCooperative-Network/icn/pull/952) — Endpoint registry
 - Open: #934-#937, #953, #954
 
-### Commons Resource Pool — 🚧 ~30%
+### Commons Resource Pool — 🚧 ~50%
 
-CommonsPool with metrics; security and governance remain:
+CommonsPool with metrics and security; governance integration remains:
 - [#963](https://github.com/InterCooperative-Network/icn/pull/963) — CommonsPool + metrics
-- Open: #947-#949, #964-#967
+- [#975](https://github.com/InterCooperative-Network/icn/pull/975) — Sybil resistance: trust-gated admission, POP level checks, EarningTracker (#966)
+- [#976](https://github.com/InterCooperative-Network/icn/pull/976) — Replay protection: nonce-based dedup, SettlementDedup (#967)
+- Open: #947-#949, #964-#965
 
 ### Daemon Service Wiring (#908, #909) — ✅ Complete
 
