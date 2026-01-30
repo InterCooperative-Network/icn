@@ -343,6 +343,11 @@ impl OracleRegistry {
     pub fn set_phase(&self, phase: BootstrapPhase) {
         let old = self.phase.swap(phase as u8, AtomicOrdering::SeqCst);
         let old_phase = BootstrapPhase::from_u8(old).unwrap_or(BootstrapPhase::Running);
+        // Phase transitions must be monotonic: Genesis → CoreApps → Running.
+        debug_assert!(
+            (phase as u8) >= old,
+            "Non-monotonic phase transition: {old_phase:?} → {phase:?}"
+        );
 
         // Clear cache when transitioning to Running
         if old_phase != BootstrapPhase::Running && phase == BootstrapPhase::Running {
