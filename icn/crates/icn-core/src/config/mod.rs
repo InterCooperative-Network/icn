@@ -172,6 +172,16 @@ impl Config {
         self.data_dir.join("store")
     }
 
+    /// Get the protocol parameter store path (sled DB for governance parameters)
+    pub fn protocol_params_path(&self) -> PathBuf {
+        self.store_path().join("protocol_params")
+    }
+
+    /// Get the ledger store path (sled DB for double-entry ledger)
+    pub fn ledger_store_path(&self) -> PathBuf {
+        self.store_path().join("ledger")
+    }
+
     /// Validate configuration and return a list of warnings/errors
     ///
     /// Returns Ok(warnings) if config is valid (warnings are non-fatal),

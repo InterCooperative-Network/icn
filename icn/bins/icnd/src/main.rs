@@ -106,11 +106,15 @@ fn build_service_registry(
         tracing::debug!("  - Raw trust_graph handle passed for transition components");
 
         // Create GovernanceService from apps/governance
-        let param_store_path = config.store_path().join("protocol_params");
-        std::fs::create_dir_all(&param_store_path)?;
-        let param_db = sled::open(&param_store_path)?;
-        let parameter_store =
-            Arc::new(icn_governance::SledParameterStore::new(Arc::new(param_db))?);
+        let param_store_path = config.protocol_params_path();
+        std::fs::create_dir_all(&param_store_path)
+            .context("Failed to create protocol params store directory")?;
+        let param_db = sled::open(&param_store_path)
+            .context("Failed to open protocol params sled database")?;
+        let parameter_store = Arc::new(
+            icn_governance::SledParameterStore::new(Arc::new(param_db))
+                .context("Failed to initialize SledParameterStore")?,
+        );
         let parameter_store_trait: Arc<dyn icn_governance::ProtocolParameterStore> =
             parameter_store.clone();
         let governance_service = icn_governance_app::create_service(parameter_store_trait);
@@ -122,11 +126,15 @@ fn build_service_registry(
         // Create LedgerService from apps/ledger
         // Ledger is created minimally here; supervisor configures it further
         // (gossip, trust, oracle, witnesses, credit policy, validation hooks)
-        let ledger_store_path = config.store_path().join("ledger");
-        std::fs::create_dir_all(&ledger_store_path)?;
-        let ledger_store: Arc<dyn icn_store::Store> =
-            Arc::new(icn_store::SledStore::open(&ledger_store_path)?);
-        let ledger = icn_ledger::Ledger::new(ledger_store)?;
+        let ledger_store_path = config.ledger_store_path();
+        std::fs::create_dir_all(&ledger_store_path)
+            .context("Failed to create ledger store directory")?;
+        let ledger_store: Arc<dyn icn_store::Store> = Arc::new(
+            icn_store::SledStore::open(&ledger_store_path)
+                .context("Failed to open ledger store")?,
+        );
+        let ledger =
+            icn_ledger::Ledger::new(ledger_store).context("Failed to initialize Ledger")?;
         let ledger_handle = Arc::new(RwLock::new(ledger));
         let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
         registry = registry.with_ledger(ledger_service);

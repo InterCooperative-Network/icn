@@ -128,7 +128,7 @@ pub async fn init_governance_services(
             info!("Using daemon-provided protocol parameter store");
             store
         } else {
-            let param_store_path = config.store_path().join("protocol_params");
+            let param_store_path = config.protocol_params_path();
             let param_db = sled::open(&param_store_path)?;
             Arc::new(SledParameterStore::new(Arc::new(param_db))?)
         };

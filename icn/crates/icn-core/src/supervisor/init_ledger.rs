@@ -66,7 +66,7 @@ pub async fn init_ledger_services(
     deps: LedgerDeps,
 ) -> anyhow::Result<LedgerServices> {
     // Create ledger store (needed for DisputeManager, TreasuryManager even if ledger is daemon-provided)
-    let store_path = config.store_path().join("ledger");
+    let store_path = config.ledger_store_path();
     let store = Arc::new(SledStore::open(&store_path)?);
 
     // Use daemon-provided ledger handle or create a new one
