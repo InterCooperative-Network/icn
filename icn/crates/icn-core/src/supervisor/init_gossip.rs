@@ -14,7 +14,6 @@ use tracing::{debug, info, warn};
 use icn_gossip::{GossipActor, PartitionConfig, PartitionDetector, PartitionHealer, VectorClock};
 use icn_identity::{Did, IdentityBundle};
 use icn_kernel_api::authz::PolicyOracle;
-use icn_kernel_api::AllowAllOracle;
 use icn_security::MisbehaviorDetector;
 use icn_snapshot::StateSnapshot;
 use icn_store::SledStore;
@@ -55,7 +54,7 @@ pub struct GossipDeps {
     /// Policy oracle for trust-gated gossip subscriptions
     ///
     /// Required for GossipActor to evaluate trust levels for subscription requests.
-    /// If not provided, AllowAllOracle is used (allows all subscriptions).
+    /// If not provided, gossip subscriptions are not trust-gated.
     pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
 }
 
@@ -73,24 +72,20 @@ pub async fn init_gossip_services(
     deps: GossipDeps,
 ) -> anyhow::Result<GossipServices> {
     // Use provided PolicyOracle for trust evaluation.
-    // If not provided, use AllowAllOracle (allows all subscriptions).
-    // The daemon should provide an oracle from apps/trust for proper kernel/app separation.
-    let oracle: Arc<dyn PolicyOracle> = match deps.policy_oracle {
-        Some(oracle) => {
-            info!("Using provided PolicyOracle for gossip trust evaluation");
-            oracle
-        }
-        None => {
-            warn!("No PolicyOracle provided - using AllowAllOracle (all subscriptions allowed)");
-            warn!(
-                "Ensure ServiceRegistry with TrustService is passed to supervisor for production"
-            );
-            Arc::new(AllowAllOracle::default())
-        }
-    };
+    // The supervisor always provides an OracleRegistry which handles bootstrap phases
+    // (Genesis/CoreApps: allow all, Running: deny unknown domains).
+    // AllowAllOracle is no longer needed as a fallback here.
+    let oracle: Option<Arc<dyn PolicyOracle>> = deps.policy_oracle;
+
+    if oracle.is_some() {
+        info!("Using OracleRegistry for gossip trust evaluation");
+    } else {
+        warn!("No PolicyOracle provided - gossip subscriptions are not trust-gated");
+        warn!("Ensure ServiceRegistry with TrustService is passed to supervisor for production");
+    }
 
     // Spawn Gossip actor with policy oracle
-    let gossip = GossipActor::new(did.clone(), Some(oracle));
+    let gossip = GossipActor::new(did.clone(), oracle);
     let gossip_handle = Arc::new(RwLock::new(gossip));
 
     info!("Gossip actor spawned with trust-gated subscription support");

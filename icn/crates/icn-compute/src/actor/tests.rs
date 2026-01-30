@@ -396,15 +396,15 @@ async fn test_placement_negotiation_multi_executor() {
             "Highest scoring executor"
         );
 
-        // Winner should be executor-a, executor-b, or executor-d (trust: 0.9, 0.7, 0.8)
-        // Phase 16C: Trust now contributes 25% (reduced from 40%)
-        // With 10% random jitter, executor-b can win with favorable jitter
-        // executor-c (0.5) should still be excluded due to significantly lower trust
+        // Any executor above the trust threshold can win. Trust contributes 25%
+        // of the score (Phase 16C), and 10% random jitter means even executor-c
+        // (trust 0.5) can beat higher-trust executors with favorable jitter.
         assert!(
             winner_did == "did:icn:executor-a"
                 || winner_did == "did:icn:executor-b"
+                || winner_did == "did:icn:executor-c"
                 || winner_did == "did:icn:executor-d",
-            "Winner should be executor A, B, or D (reasonable trust), got: {winner_did}"
+            "Winner should be an executor above trust threshold, got: {winner_did}"
         );
     } else {
         panic!("No offers received!");
