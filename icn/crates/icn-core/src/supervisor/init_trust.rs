@@ -25,7 +25,7 @@ use crate::config::Config;
 /// The `trust_graph` field is exposed here because:
 /// - `IdentityActor` needs it for trust mutations (add_edge, remove_edge)
 /// - RPC handlers need it for trust API endpoints
-/// - `MisbehaviorDetector` callbacks need it for trust penalties
+/// - `MisbehaviorDetector` applies penalties via `TrustService` (graph used for persistence)
 ///
 /// For read-only trust queries in kernel components, use:
 /// ```ignore
