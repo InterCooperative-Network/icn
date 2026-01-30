@@ -11,6 +11,49 @@ This document contains detailed history of all completed development phases. For
 
 ---
 
+## Kernel/App Separation - Phase 2 Progress & Epics (Jan 26–30)
+
+### Phase 2: Trust Extraction (~80% Complete)
+
+**Tracking Issue**: [#857](https://github.com/InterCooperative-Network/icn/issues/857) (closed)
+**Remaining sub-issues**: #910, #867, #869, #877
+
+Merged PRs advancing Phase 2:
+- [#872](https://github.com/InterCooperative-Network/icn/pull/872), [#883](https://github.com/InterCooperative-Network/icn/pull/883), [#896](https://github.com/InterCooperative-Network/icn/pull/896), [#897](https://github.com/InterCooperative-Network/icn/pull/897)
+- [#904](https://github.com/InterCooperative-Network/icn/pull/904), [#906](https://github.com/InterCooperative-Network/icn/pull/906), [#907](https://github.com/InterCooperative-Network/icn/pull/907)
+- [#968](https://github.com/InterCooperative-Network/icn/pull/968) — GovernanceService + LedgerService daemon wiring
+
+### Cells & Scopes Epic (#919) — ✅ Complete
+
+ScopeLevel, CellId, CellService, scope-aware placement and replication:
+- [#950](https://github.com/InterCooperative-Network/icn/pull/950) — CellId + ScopeLevel types
+- [#962](https://github.com/InterCooperative-Network/icn/pull/962) — CellService implementation
+- [#961](https://github.com/InterCooperative-Network/icn/pull/961) — Scope-aware placement + replication
+
+### ExecutionReceipt & Settlement — ✅ Complete
+
+Chained Ed25519 execution receipts with clearing:
+- [#956](https://github.com/InterCooperative-Network/icn/pull/956) — ExecutionReceipt with chained signatures
+- [#960](https://github.com/InterCooperative-Network/icn/pull/960) — ReceiptClearingManager
+
+### Service Discovery — 🚧 ~40%
+
+Endpoint registry landed; health checking and routing remain:
+- [#952](https://github.com/InterCooperative-Network/icn/pull/952) — Endpoint registry
+- Open: #934-#937, #953, #954
+
+### Commons Resource Pool — 🚧 ~30%
+
+CommonsPool with metrics; security and governance remain:
+- [#963](https://github.com/InterCooperative-Network/icn/pull/963) — CommonsPool + metrics
+- Open: #947-#949, #964-#967
+
+### Daemon Service Wiring (#908, #909) — ✅ Complete
+
+- [#968](https://github.com/InterCooperative-Network/icn/pull/968) — GovernanceService + LedgerService wired into icnd
+
+---
+
 ## Kernel/App Separation - Phase 0-1.5 (Complete) - 2026-01-26
 
 **PR**: [#855](https://github.com/InterCooperative-Network/icn/pull/855)

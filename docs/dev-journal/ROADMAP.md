@@ -1,7 +1,7 @@
 # ICN Roadmap
 
-**Last Updated**: 2026-01-26
-**Current Focus**: Kernel/App Separation Architecture
+**Last Updated**: 2026-01-30
+**Current Focus**: Finishing Phase 2 Trust Extraction + Kernel Cleanup
 **Target**: Clean kernel with pluggable first-party and third-party apps
 
 ---
@@ -54,7 +54,7 @@ See [PHASE_HISTORY.md](../PHASE_HISTORY.md) for details.
 | 0: PolicyOracle Infrastructure | ✅ Complete | PR #855 | OracleRegistry, BootstrapPhase, DecisionCache |
 | 1: App Runtime | ✅ Complete | PR #855 | AppRuntime, ComputeDispatcher, Manifest parsing |
 | 1.5: CCL Schema Layer | ✅ Complete | PR #855 | Entity, Governance, Economics, Agreement schemas |
-| 2: Trust Extraction | 🚧 Next | [#857](https://github.com/InterCooperative-Network/icn/issues/857) | Replace direct TrustGraph with PolicyOracle |
+| 2: Trust Extraction | 🚧 ~80% | [#857](https://github.com/InterCooperative-Network/icn/issues/857) | Tracking closed; 4 sub-issues remain: #910, #867, #869, #877 |
 | 3: State Generalization | ⏳ Planned | [#858](https://github.com/InterCooperative-Network/icn/issues/858) | Move domain logic out of icn-store |
 | 4: Governance Extraction | ⏳ Planned | [#859](https://github.com/InterCooperative-Network/icn/issues/859) | Move governance to app, first CCL consumer |
 | 5: Membership Consolidation | ⏳ Planned | [#860](https://github.com/InterCooperative-Network/icn/issues/860) | Merge entity/coop/community crates |
@@ -62,6 +62,28 @@ See [PHASE_HISTORY.md](../PHASE_HISTORY.md) for details.
 | 7: Naming Primitive | ⏳ Planned | [#862](https://github.com/InterCooperative-Network/icn/issues/862) | App-to-app discovery and communication |
 
 **Additional**: [#863](https://github.com/InterCooperative-Network/icn/issues/863) - Federation Agreement Support
+
+### Completed Epics (Jan 26–30)
+
+| Epic | Status | Key PRs | Description |
+|------|--------|---------|-------------|
+| Cells & Scopes (#919) | ✅ Complete | #950, #962, #961 | ScopeLevel, CellId, CellService, scope-aware placement + replication |
+| ExecutionReceipt & Settlement | ✅ Complete | #956, #960 | Chained Ed25519 receipts, ReceiptClearingManager |
+| Service Discovery | 🚧 ~40% | #952 | Endpoint registry landed. Open: #934-#937, #953, #954 |
+| Commons Resource Pool | 🚧 ~30% | #963 | CommonsPool + metrics. Open: #947-#949, #964-#967 |
+| Daemon Service Wiring (#908, #909) | ✅ Complete | #968 | GovernanceService + LedgerService in icnd |
+
+### Kernel Crate Cleanup
+
+Prerequisites for Phase 6 (Crate Consolidation):
+
+- [#912](https://github.com/InterCooperative-Network/icn/issues/912): Remove icn-trust from icn-core
+- [#913](https://github.com/InterCooperative-Network/icn/issues/913): Remove icn-governance from icn-core
+- [#914](https://github.com/InterCooperative-Network/icn/issues/914): Remove icn-ledger from icn-core
+- [#915](https://github.com/InterCooperative-Network/icn/issues/915): Remove icn-trust dev-dep from icn-net
+- [#916](https://github.com/InterCooperative-Network/icn/issues/916): Enable strict Meaning Firewall CI
+- [#911](https://github.com/InterCooperative-Network/icn/issues/911): Remove raw_handles transition mechanism
+- [#918](https://github.com/InterCooperative-Network/icn/issues/918): Move supervisor init_*.rs to app crates
 
 ---
 
@@ -167,14 +189,14 @@ Federation A uses consensus. Federation B uses majority vote. The agreement does
 
 | Phase | Effort |
 |-------|--------|
-| 2: Trust Extraction | 5-7 days |
+| 2: Trust Extraction (remaining) | ~2 days |
 | 3: State Generalization | 3-4 days |
 | 4: Governance Extraction | 3-4 days |
 | 5: Membership Consolidation | 4-5 days |
 | 6: Crate Consolidation | 3-4 days |
-| 7: Naming Primitive | 3-4 days |
+| 7: Naming Primitive | 2-3 days (service discovery foundation exists) |
 
-**Total remaining: ~25-30 days of focused work**
+**Total remaining: ~18-23 days of focused work**
 
 ---
 
