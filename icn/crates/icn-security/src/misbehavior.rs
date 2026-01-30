@@ -6,11 +6,13 @@
 //! and quarantine/ban mechanisms to protect the network from Byzantine actors.
 
 use icn_identity::Did;
+use icn_kernel_api::services::{TrustEvent, TrustService};
 use icn_obs::metrics::misbehavior as metrics;
 use icn_store::ContentHash;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
 
@@ -330,7 +332,11 @@ impl Default for MisbehaviorThresholds {
 }
 
 /// Byzantine fault detector
-/// Callback to update trust graph when reputation changes
+///
+/// Callback to update trust graph when reputation changes.
+///
+/// **Deprecated**: Use `MisbehaviorDetector::set_trust_service()` instead.
+/// This type is retained for backward compatibility with `icn-ccl` disputes.
 pub type TrustPenaltyCallback = std::sync::Arc<dyn Fn(&Did, f64) + Send + Sync>;
 
 pub struct MisbehaviorDetector {
@@ -349,7 +355,10 @@ pub struct MisbehaviorDetector {
     /// Banned DIDs
     banned: HashMap<Did, SystemTime>,
 
-    /// Callback to update trust graph when reputation changes (Phase 18)
+    /// TrustService for reporting violations (kernel/app separation)
+    trust_service: Option<Arc<dyn TrustService>>,
+
+    /// Legacy callback (deprecated, use trust_service instead)
     trust_penalty_callback: Option<TrustPenaltyCallback>,
 }
 
@@ -362,11 +371,24 @@ impl MisbehaviorDetector {
             thresholds,
             quarantined: HashMap::new(),
             banned: HashMap::new(),
+            trust_service: None,
             trust_penalty_callback: None,
         }
     }
 
-    /// Set callback to update trust graph when reputation changes (Phase 18)
+    /// Set the TrustService for reporting violations to the trust subsystem.
+    ///
+    /// This is the preferred way to integrate with the trust layer, replacing
+    /// the legacy `set_trust_penalty_callback()` approach. When both are set,
+    /// the TrustService takes priority.
+    pub fn set_trust_service(&mut self, service: Arc<dyn TrustService>) {
+        self.trust_service = Some(service);
+    }
+
+    /// Set callback to update trust graph when reputation changes.
+    ///
+    /// **Deprecated**: Use `set_trust_service()` instead for proper kernel/app
+    /// separation. This method is retained for backward compatibility.
     pub fn set_trust_penalty_callback(&mut self, callback: TrustPenaltyCallback) {
         self.trust_penalty_callback = Some(callback);
     }
@@ -472,8 +494,8 @@ impl MisbehaviorDetector {
         // Emit metrics
         metrics::violations_inc(&did.to_string(), &violation.description());
 
-        // Update trust graph if callback is set (Phase 18, with panic safety)
-        self.invoke_trust_callback(did);
+        // Update trust subsystem (Phase 18 penalty, kernel/app separation)
+        self.invoke_trust_callback(did, Some(&violation));
 
         // Check for auto-quarantine/ban
         if is_auto_ban || should_ban {
@@ -645,26 +667,60 @@ impl MisbehaviorDetector {
             info!("Released {} from quarantine (reputation recovered)", did);
             metrics::quarantined_dec();
 
-            // Update trust graph if callback is set (with panic safety)
-            self.invoke_trust_callback(did);
+            // Notify trust subsystem of reputation recovery (no violation to report)
+            self.invoke_trust_callback(did, None);
 
             // Cleanup old violations to prevent unbounded growth
             self.cleanup_old_violations();
         }
     }
 
-    /// Safely invoke the trust penalty callback with panic protection.
+    /// Notify the trust subsystem of a reputation change.
     ///
-    /// If the callback panics, the error is logged but does not propagate.
-    /// This prevents callback failures from crashing the detector.
-    fn invoke_trust_callback(&self, did: &Did) {
+    /// Prefers TrustService (kernel/app separation) over legacy callback.
+    /// Panics in either path are caught to prevent detector crashes.
+    ///
+    /// When `violation` is `Some`, reports a protocol violation.
+    /// When `violation` is `None`, reports a positive interaction (quarantine release).
+    fn invoke_trust_callback(&self, did: &Did, violation: Option<&Violation>) {
+        // Prefer TrustService over legacy callback
+        if let Some(ref service) = self.trust_service {
+            let event = if let Some(v) = violation {
+                let severity_raw = v.severity(); // u32, 1-10
+                let severity = (severity_raw as f64 / 10.0).clamp(0.0, 1.0);
+                TrustEvent::ProtocolViolation {
+                    severity,
+                    category: v.description(),
+                }
+            } else {
+                // Quarantine release → positive interaction
+                TrustEvent::PositiveInteraction { weight: 0.5 }
+            };
+
+            let kernel_did = did.to_string();
+            let service = service.clone();
+
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                service.record_event(&kernel_did, event);
+            }));
+
+            if let Err(e) = result {
+                warn!(
+                    "TrustService::record_event panicked for {}: {:?}",
+                    did,
+                    e.downcast_ref::<&str>().unwrap_or(&"unknown panic")
+                );
+            }
+            return;
+        }
+
+        // Legacy callback path
         if let Some(ref callback) = self.trust_penalty_callback {
             if let Some(score) = self.reputation_scores.get(did) {
                 let did_clone = did.clone();
                 let score_value = score.score;
                 let callback_clone = callback.clone();
 
-                // Catch panics from callback to prevent detector crash
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
                     callback_clone(&did_clone, score_value);
                 }));
@@ -712,8 +768,8 @@ impl MisbehaviorDetector {
             // Clear violation history for true administrative pardon
             self.violations.remove(did);
 
-            // Update trust graph if callback is set (with panic safety)
-            self.invoke_trust_callback(did);
+            // Notify trust subsystem of reputation recovery (no violation to report)
+            self.invoke_trust_callback(did, None);
 
             // Cleanup old violations from other DIDs
             self.cleanup_old_violations();
@@ -914,15 +970,9 @@ impl MisbehaviorDetector {
     ///
     /// This is the recommended way to create a detector on node startup.
     ///
-    /// **Important**: This method does not restore the `trust_penalty_callback`.
-    /// After calling this method, you must call `set_trust_penalty_callback()`
-    /// to integrate with the trust graph for reputation penalty propagation.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let detector = MisbehaviorDetector::with_store(thresholds, &store)?;
-    /// detector.set_trust_penalty_callback(trust_callback);
-    /// ```
+    /// **Important**: This method does not restore the `TrustService`.
+    /// After calling this method, you must call `set_trust_service()`
+    /// to integrate with the trust layer for violation reporting.
     pub fn with_store(
         thresholds: MisbehaviorThresholds,
         store: &dyn icn_store::Store,

@@ -18,13 +18,15 @@ use crate::oracle::TrustPolicyOracle;
 pub struct TrustServiceImpl {
     graph: Arc<RwLock<TrustGraph>>,
     oracle: Arc<TrustPolicyOracle>,
+    own_did: icn_identity::Did,
 }
 
 impl TrustServiceImpl {
     /// Create a new trust service with the given TrustGraph
     pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
+        let own_did = graph.read().own_did().clone();
         let oracle = Arc::new(TrustPolicyOracle::new(graph.clone()));
-        Self { graph, oracle }
+        Self { graph, oracle, own_did }
     }
 
     /// Get direct access to the TrustGraph
@@ -68,19 +70,28 @@ impl TrustService for TrustServiceImpl {
                     category = %category,
                     "Trust event: protocol violation"
                 );
-                // Apply trust penalty based on severity
-                let penalty = severity * 0.25; // Max 25% penalty per violation
-                let graph = self.graph.read();
-                if let Ok(current) = graph.compute_trust_score(&identity_did) {
-                    let new_score = (current - penalty).max(0.0);
-                    // Note: TrustGraph doesn't have a direct set_score method
-                    // This would require adding a penalty/adjustment mechanism
+                let penalty = severity * 0.25;
+                let current = {
+                    let graph = self.graph.read();
+                    graph.compute_trust_score(&identity_did).unwrap_or(1.0)
+                };
+                let new_score = (current - penalty).max(0.0);
+                let trust_score = icn_trust::TrustScore::unchecked(new_score);
+                let edge = icn_trust::TrustEdge::new(
+                    self.own_did.clone(),
+                    identity_did,
+                    trust_score,
+                );
+                let mut graph = self.graph.write();
+                if let Err(e) = graph.add_edge(edge) {
+                    tracing::warn!(actor = %actor, "Failed to persist trust penalty: {}", e);
+                } else {
                     tracing::debug!(
                         actor = %actor,
                         current = current,
                         penalty = penalty,
                         new_score = new_score,
-                        "Trust penalty applied (not persisted - needs TrustGraph API)"
+                        "Trust penalty persisted via TrustEdge"
                     );
                 }
             }
@@ -90,8 +101,27 @@ impl TrustService for TrustServiceImpl {
                     weight = weight,
                     "Trust event: positive interaction"
                 );
-                // Positive interactions could boost trust over time
-                // This would require TrustGraph API changes to implement
+                let current = {
+                    let graph = self.graph.read();
+                    graph.compute_trust_score(&identity_did).unwrap_or(0.0)
+                };
+                let new_score = (current + weight * 0.25).min(1.0);
+                let trust_score = icn_trust::TrustScore::unchecked(new_score);
+                let edge = icn_trust::TrustEdge::new(
+                    self.own_did.clone(),
+                    identity_did,
+                    trust_score,
+                );
+                let mut graph = self.graph.write();
+                if let Err(e) = graph.add_edge(edge) {
+                    tracing::warn!(actor = %actor, "Failed to persist trust boost: {}", e);
+                } else {
+                    tracing::debug!(
+                        actor = %actor,
+                        new_score = new_score,
+                        "Trust boost persisted via TrustEdge"
+                    );
+                }
             }
             TrustEvent::QuarantineRequested { duration_secs } => {
                 tracing::warn!(
@@ -99,7 +129,6 @@ impl TrustService for TrustServiceImpl {
                     duration_secs = duration_secs,
                     "Trust event: quarantine requested"
                 );
-                // Quarantine handling would need to be coordinated with SecurityService
             }
         }
     }

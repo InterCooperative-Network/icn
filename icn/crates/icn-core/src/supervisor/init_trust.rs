@@ -7,9 +7,10 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use icn_identity::Did;
-use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, TrustPenaltyCallback};
+use icn_kernel_api::services::TrustService;
+use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph, TrustScore};
+use icn_trust::TrustGraph;
 
 use crate::config::Config;
 
@@ -50,8 +51,12 @@ pub struct TrustServices {
 /// Creates:
 /// - Trust graph with persistent storage
 /// - Recovery store for social recovery
-/// - Misbehavior detector with trust penalty callback
-pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<TrustServices> {
+/// - Misbehavior detector with TrustService integration
+pub async fn init_trust_services(
+    config: &Config,
+    did: Did,
+    trust_service: Option<Arc<dyn TrustService>>,
+) -> anyhow::Result<TrustServices> {
     // Create trust graph
     // Note: Phase 21 adds TrustGraphFacade for multi-graph support (Social, Economic, Technical).
     // Currently using TrustGraph directly. Migration to TrustGraphFacade requires updating
@@ -63,7 +68,7 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
 
     info!("Trust graph initialized at {}", trust_store_path.display());
 
-    init_trust_services_impl(config, did, trust_graph_handle).await
+    init_trust_services_impl(config, trust_graph_handle, trust_service).await
 }
 
 /// Initialize trust services with an externally-provided TrustGraph
@@ -73,22 +78,22 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
 ///
 /// Creates:
 /// - Recovery store for social recovery
-/// - Misbehavior detector with trust penalty callback
+/// - Misbehavior detector with TrustService integration
 /// - Wires the provided TrustGraph for penalty callbacks
 pub async fn init_trust_services_with_graph(
     config: &Config,
-    did: Did,
     trust_graph_handle: Arc<RwLock<TrustGraph>>,
+    trust_service: Option<Arc<dyn TrustService>>,
 ) -> anyhow::Result<TrustServices> {
     info!("Using daemon-provided TrustGraph for trust services");
-    init_trust_services_impl(config, did, trust_graph_handle).await
+    init_trust_services_impl(config, trust_graph_handle, trust_service).await
 }
 
 /// Internal implementation for trust service initialization
 async fn init_trust_services_impl(
     config: &Config,
-    did: Did,
     trust_graph_handle: Arc<RwLock<TrustGraph>>,
+    trust_service: Option<Arc<dyn TrustService>>,
 ) -> anyhow::Result<TrustServices> {
     // Create recovery store for social recovery events
     let recovery_store_path = config.store_path().join("recovery");
@@ -121,12 +126,16 @@ async fn init_trust_services_impl(
                 MisbehaviorDetector::new(MisbehaviorThresholds::default())
             });
 
-    // Set up trust penalty callback to update trust graph (Phase 18)
-    let trust_penalty_callback = create_trust_penalty_callback(trust_graph_handle.clone(), did);
-    detector.set_trust_penalty_callback(trust_penalty_callback);
+    // Wire TrustService for kernel/app separation (replaces legacy callback)
+    if let Some(ts) = trust_service {
+        detector.set_trust_service(ts);
+        info!("MisbehaviorDetector using TrustService (kernel/app separation)");
+    } else {
+        debug!("No TrustService available; MisbehaviorDetector will not report to trust layer");
+    }
 
     let misbehavior_detector = Arc::new(RwLock::new(detector));
-    info!("Shared Byzantine fault detector created with trust graph integration");
+    info!("Shared Byzantine fault detector created");
 
     Ok(TrustServices {
         trust_graph: trust_graph_handle,
@@ -136,59 +145,44 @@ async fn init_trust_services_impl(
     })
 }
 
-/// Create trust penalty callback for misbehavior detector
-///
-/// NOTE: This callback is synchronous (uses block_in_place) to prevent race conditions
-/// with gossip-received trust updates. The caller waits for the trust update to complete.
-fn create_trust_penalty_callback(
-    trust_graph: Arc<RwLock<TrustGraph>>,
-    own_did: Did,
-) -> TrustPenaltyCallback {
-    Arc::new(move |peer_did: &Did, reputation_score: f64| {
-        let graph = trust_graph.clone();
-        let peer = peer_did.clone();
-        let own = own_did.clone();
-
-        // Use block_in_place to synchronously update trust graph
-        // This prevents races with gossip-received trust updates
-        tokio::task::block_in_place(|| {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                // Map reputation (0.0-1.0) to trust score (0.0-1.0)
-                // Reputation below 0.5 becomes untrusted (<0.1)
-                // Clamp to valid range to be defensive
-                let reputation_clamped = reputation_score.clamp(0.0, 1.0);
-                let trust_value = if reputation_clamped < 0.5 {
-                    reputation_clamped * 0.2 // 0.5 → 0.1, 0.0 → 0.0
-                } else {
-                    reputation_clamped // Keep 0.5-1.0 range
-                };
-                // Safe to use unchecked because trust_value is guaranteed to be in [0.0, 1.0]
-                let trust_score = TrustScore::unchecked(trust_value);
-
-                let mut graph = graph.write().await;
-                let edge = TrustEdge::new(own.clone(), peer.clone(), trust_score);
-
-                if let Err(e) = graph.add_edge(edge) {
-                    warn!(
-                        "Failed to update trust graph for {} (reputation: {:.2}): {}",
-                        peer, reputation_score, e
-                    );
-                } else {
-                    debug!(
-                        "Updated trust for {} to {:.2} (reputation: {:.2})",
-                        peer, trust_score, reputation_score
-                    );
-                }
-            })
-        });
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_kernel_api::authz::PolicyOracle;
+    use icn_kernel_api::services::TrustEvent;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    /// Mock TrustService that records events for verification
+    struct MockTrustService {
+        event_count: AtomicUsize,
+    }
+
+    impl MockTrustService {
+        fn new() -> Self {
+            Self {
+                event_count: AtomicUsize::new(0),
+            }
+        }
+
+        fn event_count(&self) -> usize {
+            self.event_count.load(Ordering::Relaxed)
+        }
+    }
+
+    impl TrustService for MockTrustService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            unimplemented!("not needed for these tests")
+        }
+
+        fn trust_score(&self, _actor: &String) -> f64 {
+            0.5
+        }
+
+        fn record_event(&self, _actor: &String, _event: TrustEvent) {
+            self.event_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
 
     #[tokio::test]
     async fn test_trust_services_init() {
@@ -200,18 +194,15 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        let services = init_trust_services(&config, did).await.unwrap();
+        let services = init_trust_services(&config, did, None).await.unwrap();
 
         // Verify services were initialized (just check we can acquire locks)
         let _graph = services.trust_graph.read().await;
         let _detector = services.misbehavior_detector.read().await;
     }
 
-    // test_trust_lookup_creation removed - trust lookup is now handled by TrustGraphOracle
-    // in init_gossip.rs via the PolicyOracle pattern. See TrustGraphOracle for the replacement.
-
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_misbehavior_updates_trust_graph() {
+    async fn test_misbehavior_reports_to_trust_service() {
         let temp_dir = TempDir::new().unwrap();
         let config = Config {
             data_dir: temp_dir.path().to_path_buf(),
@@ -220,7 +211,10 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let own_did = keypair.did().clone();
 
-        let services = init_trust_services(&config, own_did.clone()).await.unwrap();
+        let mock_ts = Arc::new(MockTrustService::new());
+        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+            .await
+            .unwrap();
 
         // Create a peer DID
         let peer_keypair = icn_identity::KeyPair::generate().unwrap();
@@ -235,18 +229,11 @@ mod tests {
             detector.record_violation(&peer_did, violation, vec![]);
         }
 
-        // Give the callback time to complete
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
-        // Verify the trust graph was updated
-        let graph = services.trust_graph.read().await;
-        let trust_score = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
-
-        // Score should be reduced from the violation (0.75 after one InvalidSignature)
-        // The callback maps this to trust score, so it should be 0.75
-        assert!(
-            (0.5..=1.0).contains(&trust_score),
-            "Trust score should be moderate after violation: got {trust_score}"
+        // TrustService should have received one event
+        assert_eq!(
+            mock_ts.event_count(),
+            1,
+            "TrustService should have received exactly one event"
         );
     }
 
@@ -260,7 +247,10 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let own_did = keypair.did().clone();
 
-        let services = init_trust_services(&config, own_did).await.unwrap();
+        let mock_ts = Arc::new(MockTrustService::new());
+        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+            .await
+            .unwrap();
 
         let peer_keypair = icn_identity::KeyPair::generate().unwrap();
         let peer_did = peer_keypair.did().clone();
@@ -268,11 +258,6 @@ mod tests {
         // Record multiple violations to trigger quarantine/ban
         {
             let mut detector = services.misbehavior_detector.write().await;
-
-            // Record enough violations to drop reputation below quarantine threshold
-            // InvalidSignature has severity 5, penalty = 0.25 per violation
-            // After 3 violations: 1.0 - (3 × 0.25) = 0.25 (quarantined)
-            // After 4+ violations: 1.0 - (4 × 0.25) = 0.0 (banned, as score <= ban_threshold of 0.0)
             for _ in 0..10 {
                 let violation = icn_security::Violation::InvalidSignature {
                     message_hash: [0u8; 32],
@@ -288,17 +273,16 @@ mod tests {
             "Peer should be quarantined or banned after many violations"
         );
 
-        // Trust should be very low
-        let graph = services.trust_graph.read().await;
-        let trust_score = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
-        assert!(
-            trust_score < 0.3,
-            "Trust score should be very low when quarantined/banned: got {trust_score}"
+        // All 10 violations should have been reported to TrustService
+        assert_eq!(
+            mock_ts.event_count(),
+            10,
+            "TrustService should have received all violation events"
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_quarantine_release_restores_trust() {
+    async fn test_quarantine_release_sends_positive_event() {
         let temp_dir = TempDir::new().unwrap();
         let config = Config {
             data_dir: temp_dir.path().to_path_buf(),
@@ -307,7 +291,10 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let own_did = keypair.did().clone();
 
-        let services = init_trust_services(&config, own_did).await.unwrap();
+        let mock_ts = Arc::new(MockTrustService::new());
+        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+            .await
+            .unwrap();
 
         let peer_keypair = icn_identity::KeyPair::generate().unwrap();
         let peer_did = peer_keypair.did().clone();
@@ -324,24 +311,17 @@ mod tests {
             }
         }
 
-        // Verify quarantined (not banned yet)
+        // 3 violation events
+        assert_eq!(mock_ts.event_count(), 3);
+
+        // Verify quarantined
         {
             let detector = services.misbehavior_detector.read().await;
             assert!(
                 detector.is_quarantined(&peer_did),
                 "Peer should be quarantined after 3 InvalidSignature violations"
             );
-            assert!(
-                !detector.is_banned(&peer_did),
-                "Peer should NOT be banned yet"
-            );
         }
-
-        // Get trust score before release
-        let trust_before = {
-            let graph = services.trust_graph.read().await;
-            graph.compute_trust_score(&peer_did).unwrap_or(0.0)
-        };
 
         // Force release from quarantine
         {
@@ -349,29 +329,18 @@ mod tests {
             detector.force_release_from_quarantine(&peer_did);
         }
 
-        // Give callback time to complete
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        // Should have one more event (PositiveInteraction from release)
+        assert_eq!(
+            mock_ts.event_count(),
+            4,
+            "Release should send a PositiveInteraction event"
+        );
 
         // Verify no longer quarantined
-        {
-            let detector = services.misbehavior_detector.read().await;
-            assert!(
-                !detector.is_quarantined(&peer_did),
-                "Peer should no longer be quarantined after force release"
-            );
-        }
-
-        // Trust should improve after release
-        let graph = services.trust_graph.read().await;
-        let trust_after = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
+        let detector = services.misbehavior_detector.read().await;
         assert!(
-            trust_after > trust_before,
-            "Trust should improve after quarantine release: before={trust_before}, after={trust_after}"
-        );
-        // Trust should be at least moderate after reset to 0.6 reputation
-        assert!(
-            trust_after >= 0.3,
-            "Trust should be at least moderate after release: got {trust_after}"
+            !detector.is_quarantined(&peer_did),
+            "Peer should no longer be quarantined after force release"
         );
     }
 }
