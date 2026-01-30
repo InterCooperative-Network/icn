@@ -65,7 +65,9 @@ pub async fn init_ledger_services(
     did: Did,
     deps: LedgerDeps,
 ) -> anyhow::Result<LedgerServices> {
-    // Create ledger store (needed for DisputeManager, TreasuryManager even if ledger is daemon-provided)
+    // Open ledger store for DisputeManager, TreasuryManager, and (if no daemon handle) the Ledger.
+    // Safe to call even when the daemon already opened this path: sled internally caches
+    // DB instances by path and returns the same reference-counted sled::Db.
     let store_path = config.ledger_store_path();
     let store = Arc::new(SledStore::open(&store_path)?);
 
