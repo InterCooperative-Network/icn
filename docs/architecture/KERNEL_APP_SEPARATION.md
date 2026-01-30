@@ -712,7 +712,7 @@ fn check_access(&self, score: f64) -> bool {
 | Ledger → TrustService (no TrustGraph) | 2026-01-30 | icn-trust moved to dev-dep (#867) |
 | OracleRegistry wired in supervisor | 2026-01-30 | Bootstrap phases, domain routing (#869) |
 | Network rate limiting → OracleRegistry | 2026-01-30 | Wired OracleRegistry as PolicyOracle; functional when trust oracle registered (#869) |
-| RPC PolicyOracle → OracleRegistry | 2026-01-30 | Wired OracleRegistry as PolicyOracle; functional when trust oracle registered (#869) |
+| RPC PolicyOracle → OracleRegistry | 2026-01-30 | Passed to RpcDeps; rate-limiting wiring TBD (#869) |
 | AllowAllOracle fallback removed | 2026-01-30 | Gossip uses OracleRegistry (#869) |
 
 ### 6.2 Remaining Work
