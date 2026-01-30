@@ -683,9 +683,13 @@ impl ComputeActor {
 
         // Store capacity in executor registry for placement decisions
         let mut registry = self.executor_registry.lock().await;
+        // Always fetch fresh trust score — stale cached values could let
+        // executors whose trust has degraded remain in the pool.
+        let trust_score = (self.trust_callback)(&executor);
         if let Some(info) = registry.get_mut(&executor) {
             info.capacity = Some(capacity.clone());
             info.last_seen = capacity.updated_at;
+            info.trust_score = trust_score;
             tracing::debug!(
                 executor = %executor,
                 cpu_cores = capacity.cpu_cores_available,
@@ -696,7 +700,6 @@ impl ComputeActor {
             );
         } else {
             // Executor not yet registered - create entry with capacity
-            let trust_score = (self.trust_callback)(&executor);
             let info = ExecutorInfo {
                 did: executor.clone(),
                 cooperative_id: None,     // Local executor
@@ -752,33 +755,54 @@ impl ComputeActor {
 
         // Lock discipline: acquire write lock, mutate, release immediately.
         //
-        // SECURITY NOTE: Unaffiliated nodes (cell_id=None) are granted full commons
-        // participation without Sybil resistance. This is intentional for the pilot
-        // phase but requires governance intervention before production scale.
         let commons_share = effective_budget.commons_share;
         if commons_share > 0.0 {
             let participant = crate::commons_pool::CommonsParticipant {
                 did: executor.clone(),
                 capacity,
                 budget: effective_budget,
+                trust_score,
                 last_announce: std::time::Instant::now(),
             };
             let mut pool = self.commons_pool.write().await;
-            pool.add_participant(participant);
+            let accepted = match pool.try_add_participant(participant) {
+                Ok(()) => true,
+                Err(rejection) => {
+                    tracing::warn!(
+                        executor = %executor,
+                        ?rejection,
+                        "Commons pool admission rejected (sybil policy)"
+                    );
+                    // Evict existing participant whose trust dropped below threshold.
+                    // Note: brief race window between failed try_add_participant() and
+                    // remove_participant(). Acceptable because CommonsPool is advisory
+                    // scheduling state, not authoritative economic state.
+                    if matches!(
+                        rejection,
+                        crate::commons_pool::SybilRejection::InsufficientTrust { .. }
+                    ) {
+                        pool.remove_participant(&executor);
+                    }
+                    false
+                }
+            };
             let count = pool.participant_count();
             let agg = pool.total_commons_capacity();
             drop(pool);
-            icn_obs::metrics::compute::commons_pool_updates_inc("add");
+            let label = if accepted { "add" } else { "reject" };
+            icn_obs::metrics::compute::commons_pool_updates_inc(label);
             icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
             icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
             icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
             icn_obs::metrics::compute::commons_pool_storage_mb_set(agg.storage_mb as f64);
-            tracing::debug!(
-                executor = %executor,
-                commons_share,
-                pool_size = count,
-                "Added/updated node in commons pool"
-            );
+            if accepted {
+                tracing::debug!(
+                    executor = %executor,
+                    commons_share,
+                    pool_size = count,
+                    "Added/updated node in commons pool"
+                );
+            }
         } else {
             let mut pool = self.commons_pool.write().await;
             pool.remove_participant(&executor);

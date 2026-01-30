@@ -16,6 +16,7 @@ use crate::entry::JournalEntryBuilder;
 use crate::types::JournalEntry;
 use anyhow::Result;
 use icn_identity::Did;
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 /// Currency identifier for commons credits.
@@ -45,6 +46,116 @@ static COMMONS_MINT_DID: LazyLock<Did> = LazyLock::new(|| {
     let verifying_key = signing_key.verifying_key();
     Did::from_public_key(&verifying_key)
 });
+
+/// Default per-epoch earning cap per participant (credits).
+///
+/// Prevents sybil farming: even if an attacker controls many identities,
+/// each is capped at this amount per epoch. The cap applies to the credit
+/// accounting layer, not the resource contribution itself.
+///
+/// TODO(governance): Make configurable via CCL governance parameters.
+const DEFAULT_EPOCH_EARNING_CAP: u64 = 100_000;
+
+/// Per-epoch earning tracker for sybil resistance.
+///
+/// Tracks cumulative credits earned by each DID within the current epoch.
+/// When earnings exceed the cap, further `build_earn_entry_capped` calls
+/// are rejected.
+///
+/// **Epoch boundaries**: The caller is responsible for calling `reset()`
+/// at epoch boundaries (e.g., every 24 hours). This is advisory — the
+/// ledger remains authoritative.
+///
+/// **Integration status**: Infrastructure ready but not yet wired into
+/// the credit earning flow. A future PR should call `try_earn()` from
+/// the settlement path and manage epoch resets via a governance scheduler.
+#[derive(Debug)]
+pub struct EarningTracker {
+    /// Maximum credits any single DID can earn per epoch.
+    pub cap: u64,
+    /// Epoch identifier (e.g., Unix day number).
+    pub epoch: u64,
+    /// Cumulative credits earned per DID in this epoch.
+    earned: HashMap<String, u64>,
+}
+
+impl EarningTracker {
+    /// Create a new tracker for the given epoch with the default cap.
+    pub fn new(epoch: u64) -> Self {
+        Self {
+            cap: DEFAULT_EPOCH_EARNING_CAP,
+            epoch,
+            earned: HashMap::new(),
+        }
+    }
+
+    /// Create a tracker with a custom cap.
+    pub fn with_cap(epoch: u64, cap: u64) -> Self {
+        Self {
+            cap,
+            epoch,
+            earned: HashMap::new(),
+        }
+    }
+
+    /// Record an earning and check if it would exceed the cap.
+    ///
+    /// Returns the *allowed* amount (which may be less than requested if
+    /// the participant is near the cap), or `Err` if the cap is already
+    /// reached.
+    pub fn try_earn(&mut self, did: &Did, amount: u64) -> Result<u64, EarningCapExceeded> {
+        let did_str = did.to_string();
+        let current = self.earned.get(&did_str).copied().unwrap_or(0);
+
+        if current >= self.cap {
+            return Err(EarningCapExceeded {
+                did: did_str,
+                epoch: self.epoch,
+                cap: self.cap,
+                already_earned: current,
+                requested: amount,
+            });
+        }
+
+        let remaining = self.cap.saturating_sub(current);
+        let allowed = amount.min(remaining);
+        *self.earned.entry(did_str).or_insert(0) += allowed;
+        Ok(allowed)
+    }
+
+    /// Get the amount a DID has earned so far in this epoch.
+    pub fn earned_so_far(&self, did: &Did) -> u64 {
+        self.earned.get(&did.to_string()).copied().unwrap_or(0)
+    }
+
+    /// Reset the tracker for a new epoch.
+    pub fn reset(&mut self, new_epoch: u64) {
+        self.epoch = new_epoch;
+        self.earned.clear();
+    }
+}
+
+/// Error returned when a participant exceeds the per-epoch earning cap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EarningCapExceeded {
+    pub did: String,
+    pub epoch: u64,
+    pub cap: u64,
+    pub already_earned: u64,
+    pub requested: u64,
+}
+
+impl std::fmt::Display for EarningCapExceeded {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "earning cap exceeded for {} in epoch {}: cap={}, earned={}, requested={}",
+            self.did, self.epoch, self.cap, self.already_earned, self.requested
+        )
+    }
+}
+
+impl std::error::Error for EarningCapExceeded {}
 
 /// Compute credits earned from contributed resources.
 ///
@@ -241,5 +352,77 @@ mod tests {
     fn test_exact_balance() {
         let remaining = check_sufficient_balance(300, 300);
         assert_eq!(remaining, Ok(0));
+    }
+
+    // ========== EarningTracker tests ==========
+
+    fn test_did_a() -> Did {
+        Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap()
+    }
+
+    #[test]
+    fn test_earning_tracker_basic() {
+        let mut tracker = EarningTracker::with_cap(1, 1000);
+        let did = test_did_a();
+
+        let allowed = tracker.try_earn(&did, 500).unwrap();
+        assert_eq!(allowed, 500);
+        assert_eq!(tracker.earned_so_far(&did), 500);
+    }
+
+    #[test]
+    fn test_earning_tracker_clamps_to_cap() {
+        let mut tracker = EarningTracker::with_cap(1, 1000);
+        let did = test_did_a();
+
+        tracker.try_earn(&did, 800).unwrap();
+        // Second earn would exceed cap — clamped to remaining 200
+        let allowed = tracker.try_earn(&did, 500).unwrap();
+        assert_eq!(allowed, 200);
+        assert_eq!(tracker.earned_so_far(&did), 1000);
+    }
+
+    #[test]
+    fn test_earning_tracker_rejects_at_cap() {
+        let mut tracker = EarningTracker::with_cap(1, 1000);
+        let did = test_did_a();
+
+        tracker.try_earn(&did, 1000).unwrap();
+        // Already at cap — rejected
+        let result = tracker.try_earn(&did, 1);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.cap, 1000);
+        assert_eq!(err.already_earned, 1000);
+    }
+
+    #[test]
+    fn test_earning_tracker_reset() {
+        let mut tracker = EarningTracker::with_cap(1, 1000);
+        let did = test_did_a();
+
+        tracker.try_earn(&did, 1000).unwrap();
+        assert!(tracker.try_earn(&did, 1).is_err());
+
+        // New epoch — counter resets
+        tracker.reset(2);
+        assert_eq!(tracker.earned_so_far(&did), 0);
+        let allowed = tracker.try_earn(&did, 500).unwrap();
+        assert_eq!(allowed, 500);
+    }
+
+    #[test]
+    fn test_earning_tracker_independent_dids() {
+        let mut tracker = EarningTracker::with_cap(1, 1000);
+        let did_a = test_did_a();
+        // Generate a different DID from a different seed
+        let seed_b: [u8; 32] = [0xBB; 32];
+        let key_b = ed25519_dalek::SigningKey::from_bytes(&seed_b);
+        let did_b = Did::from_public_key(&key_b.verifying_key());
+
+        tracker.try_earn(&did_a, 1000).unwrap();
+        // DID B has its own cap
+        let allowed = tracker.try_earn(&did_b, 500).unwrap();
+        assert_eq!(allowed, 500);
     }
 }

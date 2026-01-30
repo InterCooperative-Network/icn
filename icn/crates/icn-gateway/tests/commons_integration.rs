@@ -77,10 +77,12 @@ async fn test_jurisdiction_membership() {
 
     let keypair = KeyPair::generate().unwrap();
     let did = keypair.did().clone();
+    let steward_keypair = KeyPair::generate().unwrap();
+    let steward_did = steward_keypair.did().clone();
 
-    // Create anchor and holder
+    // Create anchor and holder with steward vouch (Strong POP required for join)
     let anchor = commons_mgr
-        .create_anchor_from_enrollment(&did, None)
+        .create_anchor_from_enrollment(&did, Some(&steward_did))
         .await
         .unwrap();
     let anchor_id = hex::encode(anchor.id());
@@ -229,10 +231,12 @@ async fn test_duplicate_prevention() {
 
     let keypair = KeyPair::generate().unwrap();
     let did = keypair.did().clone();
+    let steward_keypair = KeyPair::generate().unwrap();
+    let steward_did = steward_keypair.did().clone();
 
-    // Create first anchor - should succeed
+    // Create first anchor with steward vouch (Strong POP for join_jurisdiction)
     let anchor = commons_mgr
-        .create_anchor_from_enrollment(&did, None)
+        .create_anchor_from_enrollment(&did, Some(&steward_did))
         .await
         .unwrap();
     let anchor_id = hex::encode(anchor.id());
@@ -250,7 +254,7 @@ async fn test_duplicate_prevention() {
         .await;
     assert!(result.is_err());
 
-    // Join jurisdiction - should succeed
+    // Join jurisdiction - should succeed (Strong POP)
     let jurisdiction = JurisdictionId::new("coop:test");
     commons_mgr
         .join_jurisdiction(&holder_id, jurisdiction.clone(), vec![])
