@@ -41,7 +41,6 @@ struct HashableEntry<'a> {
     contract_ref: Option<&'a ContentHash>,
     accounts: &'a [crate::types::AccountDelta],
     parents: &'a [ContentHash],
-    #[serde(skip_serializing_if = "Option::is_none")]
     nonce: Option<&'a [u8; 32]>,
 }
 
