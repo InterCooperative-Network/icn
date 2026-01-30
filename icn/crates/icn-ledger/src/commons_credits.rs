@@ -331,9 +331,13 @@ impl std::error::Error for InsufficientCredits {}
 /// Tracks which execution receipts have already been settled, preventing
 /// double-settlement of the same receipt.
 ///
-/// **Thread safety**: Wrap in `Arc<Mutex<_>>` or `Arc<RwLock<_>>` for
-/// concurrent access. This struct is intentionally not `Sync` — the
-/// caller chooses the locking strategy.
+/// **Thread safety**: This struct is `Send + Sync` but provides no
+/// internal synchronisation. Wrap in `Arc<Mutex<_>>` or `Arc<RwLock<_>>`
+/// for concurrent access — the caller chooses the locking strategy.
+///
+/// ```ignore
+/// let dedup = Arc::new(Mutex::new(SettlementDedup::new()));
+/// ```
 ///
 /// **Persistence**: In-memory only. On restart, the ledger's content-hash
 /// dedup provides a secondary defense (entries with the same nonce produce
@@ -629,7 +633,8 @@ mod tests {
         let consumer =
             Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
 
-        let entry_with_nonce = build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
+        let entry_with_nonce =
+            build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
         assert!(
             entry_with_nonce.nonce.is_some(),
             "receipt-backed spend entry must have nonce set"
