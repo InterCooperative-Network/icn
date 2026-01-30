@@ -251,6 +251,26 @@ impl CapabilityQuota {
 ///
 /// Implementations bridge from domain-specific trust computation
 /// (e.g. TrustGraph) to a simple f64 score the kernel can use.
+///
+/// # Production Usage
+///
+/// The production implementation lives in `apps/trust` and wraps a
+/// `TrustGraph`. Kernel code should obtain this via `TrustService`
+/// from the `ServiceRegistry` rather than constructing directly.
+///
+/// ```ignore
+/// struct TrustGraphProvider {
+///     graph: Arc<RwLock<TrustGraph>>,
+/// }
+///
+/// #[async_trait::async_trait]
+/// impl TrustScoreProvider for TrustGraphProvider {
+///     async fn trust_score_for(&self, did: &Did) -> f64 {
+///         let g = self.graph.read().await;
+///         g.compute_trust_score(did).unwrap_or(0.0)
+///     }
+/// }
+/// ```
 #[async_trait::async_trait]
 pub trait TrustScoreProvider: Send + Sync {
     /// Compute the trust score for a DID. Returns 0.0 for unknown DIDs.

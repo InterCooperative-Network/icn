@@ -227,8 +227,13 @@ impl Config {
             errors.push("network.listen_addr cannot be empty".to_string());
         }
 
-        // Trust threshold warnings
-        if self.network.min_trust_threshold == 0.0 {
+        // Trust threshold validation
+        if self.network.min_trust_threshold < 0.0 || self.network.min_trust_threshold > 1.0 {
+            errors.push(format!(
+                "network.min_trust_threshold must be in [0.0, 1.0], got {}",
+                self.network.min_trust_threshold
+            ));
+        } else if self.network.min_trust_threshold == 0.0 {
             warnings.push(
                 "network.min_trust_threshold is 0.0 - trust-gated TLS is disabled, \
                  all authenticated DIDs will be accepted"
@@ -853,9 +858,8 @@ log_level = "info"
     }
 
     #[test]
-    fn test_config_validation_trust_threshold_range() {
-        // With f64, any value deserializes — range checking is a runtime concern.
-        // Parse just the NetworkConfig sub-section to avoid missing required Config fields.
+    fn test_config_deser_accepts_out_of_range_trust() {
+        // f64 fields deserialize any numeric value — range is validated at runtime.
         let toml_str = r#"
 mdns_enabled = true
 listen_addr = "0.0.0.0:7777"
@@ -866,6 +870,22 @@ min_trust_threshold = 1.5
         let result: Result<NetworkConfig, _> = toml::from_str(toml_str);
         assert!(result.is_ok());
         assert!((result.unwrap().min_trust_threshold - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_config_validation_rejects_out_of_range_trust() {
+        let mut config = Config::default();
+        config.network.min_trust_threshold = 1.5;
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| e.contains("min_trust_threshold must be in [0.0, 1.0]")));
+
+        config.network.min_trust_threshold = -0.5;
+        let result = config.validate();
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1096,9 +1116,7 @@ enabled = false
         // Verify defaults are properly restored
         assert_eq!(deserialized.gossip.replication.target_replicas, 3);
         assert_eq!(deserialized.compute.max_concurrent_tasks, 10);
-        assert!(
-            (deserialized.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON
-        );
+        assert!((deserialized.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
 
         // Test with explicit values to ensure they serialize
         let mut custom_config = Config::default();

@@ -20,7 +20,6 @@
 //! heal_interval_secs = 60          # How often to attempt healing
 //! ```
 
-
 use serde::{Deserialize, Serialize};
 
 /// Gossip protocol configuration

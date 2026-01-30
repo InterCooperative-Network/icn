@@ -47,8 +47,7 @@ pub use node::{
     ResourceCaps, RolePolicy, ServiceRole, TOPIC_NODE_PROFILES,
 };
 pub use policy::{
-    Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy,
-    TrustScoreProvider,
+    Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy, TrustScoreProvider,
 };
 pub use replication::{
     AdjusterConfig, RepairAction, ReplicationConfig, ReplicationHandle, ReplicationManager,
