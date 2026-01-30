@@ -47,7 +47,6 @@ zstd = "0.13"
 
 [dev-dependencies]
 icn-store.workspace = true
-icn-trust.workspace = true  # For tests only - will be removed when tests use mock oracles
 tracing-subscriber.workspace = true
 rand_core.workspace = true
 criterion = "0.5"
