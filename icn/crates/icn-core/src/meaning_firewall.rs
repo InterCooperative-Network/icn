@@ -165,9 +165,8 @@ mod tests {
 
             if actual < expected_count {
                 panic!(
-                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
-                     {actual} domain-crate deps (was pinned at {expected_count}). \
-                     A dependency was removed — update the pinned count in \
+                    "✅ PROGRESS: {crate_name} now has only {actual} domain-crate deps \
+                     (was pinned at {expected_count}). Update the pinned count in \
                      meaning_firewall.rs::strict_cargo_dependency_violations()."
                 );
             }
@@ -205,9 +204,8 @@ mod tests {
 
             if actual < expected_count {
                 panic!(
-                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
-                     {actual} `use icn_trust::` imports (was pinned at {expected_count}). \
-                     An import was removed — update the pinned count in \
+                    "✅ PROGRESS: {crate_name} now has only {actual} `use icn_trust::` \
+                     imports (was pinned at {expected_count}). Update the pinned count in \
                      meaning_firewall.rs::strict_trust_import_violations()."
                 );
             }
@@ -245,9 +243,8 @@ mod tests {
 
             if actual < expected_count {
                 panic!(
-                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
-                     {actual} `use icn_governance::` imports (was pinned at {expected_count}). \
-                     An import was removed — update the pinned count in \
+                    "✅ PROGRESS: {crate_name} now has only {actual} `use icn_governance::` \
+                     imports (was pinned at {expected_count}). Update the pinned count in \
                      meaning_firewall.rs::strict_governance_import_violations()."
                 );
             }
