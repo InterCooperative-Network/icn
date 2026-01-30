@@ -66,7 +66,7 @@ pub use services::{
     SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
     TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
-pub use state::{BlobService, KvService, LogService};
+pub use state::{BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy};
 pub use time::TimeService;
 
 // Re-export common types

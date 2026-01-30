@@ -9,6 +9,7 @@ default = []
 openapi = ["utoipa"]
 
 [dependencies]
+icn-kernel-api = { path = "../icn-kernel-api" }
 icn-identity.workspace = true
 icn-time = { path = "../icn-time" }
 icn-obs = { path = "../icn-obs" }

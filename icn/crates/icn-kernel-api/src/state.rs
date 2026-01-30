@@ -17,12 +17,15 @@
 //! - Domain-specific schemas (apps define these)
 //! - "Ledger" or "governance" data types (apps, not kernel)
 
+use serde::{Deserialize, Serialize};
+
+use crate::scope::ScopeLevel;
 use crate::types::{Hash, Key, LogId, Namespace, Offset, SchemaRef, Subscription, Value, Version};
 
 /// Replication policy for storage.
 ///
 /// Determines how data is replicated across nodes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReplicationPolicy {
     /// Single node, no replication
     LocalOnly,
@@ -32,6 +35,95 @@ pub enum ReplicationPolicy {
     FederationEventual,
     /// Durable archive, retained indefinitely
     Archive,
+    /// Scope-aware: replicate with a target factor, scoped to a particular level.
+    ///
+    /// The `scope` field indicates the scope granularity for replication planning
+    /// (e.g., Cell means "replicate within the cell"). The actual placement
+    /// boundary is determined by [`ObjectReplication::max_scope`].
+    Scoped {
+        /// The scope granularity for replication planning.
+        scope: ScopeLevel,
+        /// Target number of replicas.
+        factor: u8,
+    },
+}
+
+/// Per-object replication configuration.
+///
+/// Combines a [`ReplicationPolicy`] with scope bounds that constrain
+/// where replicas may be placed. The invariant `min_durability_scope <= max_scope`
+/// is enforced at construction time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObjectReplication {
+    /// The replication policy governing how this object is replicated.
+    pub policy: ReplicationPolicy,
+    /// The narrowest scope that must hold at least one replica for durability.
+    pub min_durability_scope: ScopeLevel,
+    /// The widest scope to which replicas may be distributed.
+    pub max_scope: ScopeLevel,
+}
+
+impl ObjectReplication {
+    /// Create a new `ObjectReplication` with validated scope bounds.
+    ///
+    /// Returns an error if `min_durability_scope > max_scope`.
+    pub fn new(
+        policy: ReplicationPolicy,
+        min_durability_scope: ScopeLevel,
+        max_scope: ScopeLevel,
+    ) -> Result<Self, StateError> {
+        let obj = Self {
+            policy,
+            min_durability_scope,
+            max_scope,
+        };
+        obj.validate()?;
+        Ok(obj)
+    }
+
+    /// Validate that the scope bounds and policy parameters are consistent.
+    ///
+    /// For `Scoped` policies, also checks that `factor >= 1` and that the
+    /// policy's `scope` lies within `[min_durability_scope, max_scope]`.
+    pub fn validate(&self) -> Result<(), StateError> {
+        if self.min_durability_scope > self.max_scope {
+            return Err(StateError::Internal(
+                "min_durability_scope must be <= max_scope".into(),
+            ));
+        }
+        if let ReplicationPolicy::Scoped { scope, factor } = self.policy {
+            if factor == 0 {
+                return Err(StateError::Internal(
+                    "Scoped replication factor must be >= 1".into(),
+                ));
+            }
+            if scope < self.min_durability_scope || scope > self.max_scope {
+                return Err(StateError::Internal(format!(
+                    "Scoped scope {:?} must be within [{:?}, {:?}]",
+                    scope, self.min_durability_scope, self.max_scope
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Return the effective replication factor.
+    ///
+    /// For `Scoped` policies, returns the configured factor.
+    /// For other policies, returns a sensible default:
+    /// - `LocalOnly` → 1
+    /// - `ClusterStrong` → 3
+    /// - `FederationEventual` → 3
+    /// - `Archive` → 5
+    pub fn effective_factor(&self) -> usize {
+        match self.policy {
+            ReplicationPolicy::LocalOnly => 1,
+            ReplicationPolicy::ClusterStrong => 3,
+            ReplicationPolicy::FederationEventual => 3,
+            ReplicationPolicy::Archive => 5,
+            ReplicationPolicy::Scoped { factor, .. } => factor as usize,
+        }
+    }
 }
 
 /// Event stored in a log.
@@ -366,5 +458,183 @@ mod tests {
         };
         assert!(err.to_string().contains("expected 1"));
         assert!(err.to_string().contains("got 2"));
+    }
+
+    #[test]
+    fn test_scoped_policy_creation() {
+        let policy = ReplicationPolicy::Scoped {
+            scope: ScopeLevel::Cell,
+            factor: 3,
+        };
+        match policy {
+            ReplicationPolicy::Scoped { scope, factor } => {
+                assert_eq!(scope, ScopeLevel::Cell);
+                assert_eq!(factor, 3);
+            }
+            _ => panic!("Expected Scoped variant"),
+        }
+    }
+
+    #[test]
+    fn test_existing_policies_unchanged() {
+        assert_eq!(ReplicationPolicy::LocalOnly, ReplicationPolicy::LocalOnly);
+        assert_eq!(
+            ReplicationPolicy::ClusterStrong,
+            ReplicationPolicy::ClusterStrong
+        );
+        assert_eq!(
+            ReplicationPolicy::FederationEventual,
+            ReplicationPolicy::FederationEventual
+        );
+        assert_eq!(ReplicationPolicy::Archive, ReplicationPolicy::Archive);
+        assert_ne!(
+            ReplicationPolicy::LocalOnly,
+            ReplicationPolicy::ClusterStrong
+        );
+    }
+
+    #[test]
+    fn test_scoped_policy_serde_roundtrip() {
+        let policy = ReplicationPolicy::Scoped {
+            scope: ScopeLevel::Org,
+            factor: 5,
+        };
+        let json = serde_json::to_string(&policy).unwrap();
+        let parsed: ReplicationPolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, policy);
+
+        // Also test unit variants roundtrip
+        for p in [
+            ReplicationPolicy::LocalOnly,
+            ReplicationPolicy::ClusterStrong,
+            ReplicationPolicy::FederationEventual,
+            ReplicationPolicy::Archive,
+        ] {
+            let json = serde_json::to_string(&p).unwrap();
+            let parsed: ReplicationPolicy = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, p);
+        }
+    }
+
+    #[test]
+    fn test_object_replication_valid() {
+        let obj = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        );
+        assert!(obj.is_ok());
+        let obj = obj.unwrap();
+        assert_eq!(obj.min_durability_scope, ScopeLevel::Cell);
+        assert_eq!(obj.max_scope, ScopeLevel::Org);
+    }
+
+    #[test]
+    fn test_object_replication_invalid() {
+        let obj = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 2,
+            },
+            ScopeLevel::Federation,
+            ScopeLevel::Cell,
+        );
+        assert!(obj.is_err());
+    }
+
+    #[test]
+    fn test_effective_factor() {
+        let local = ObjectReplication::new(
+            ReplicationPolicy::LocalOnly,
+            ScopeLevel::Local,
+            ScopeLevel::Local,
+        )
+        .unwrap();
+        assert_eq!(local.effective_factor(), 1);
+
+        let cluster = ObjectReplication::new(
+            ReplicationPolicy::ClusterStrong,
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+        assert_eq!(cluster.effective_factor(), 3);
+
+        let archive = ObjectReplication::new(
+            ReplicationPolicy::Archive,
+            ScopeLevel::Local,
+            ScopeLevel::Commons,
+        )
+        .unwrap();
+        assert_eq!(archive.effective_factor(), 5);
+
+        let scoped = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Org,
+                factor: 7,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Federation,
+        )
+        .unwrap();
+        assert_eq!(scoped.effective_factor(), 7);
+    }
+
+    #[test]
+    fn test_scoped_factor_zero_rejected() {
+        let obj = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 0,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        );
+        assert!(obj.is_err());
+    }
+
+    #[test]
+    fn test_scoped_scope_outside_bounds_rejected() {
+        // scope (Org) > max_scope (Cell) → invalid
+        let obj = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Org,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Cell,
+        );
+        assert!(obj.is_err());
+
+        // scope (Local) < min_durability_scope (Cell) → invalid
+        let obj2 = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Local,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        );
+        assert!(obj2.is_err());
+    }
+
+    #[test]
+    fn test_object_replication_serde() {
+        let obj = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 3,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+
+        let json = serde_json::to_string(&obj).unwrap();
+        let parsed: ObjectReplication = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, obj);
     }
 }

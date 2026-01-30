@@ -108,6 +108,12 @@ pub struct ReplicaMetadata {
     /// Callers are responsible for ensuring that the map keys are valid peer DIDs before insertion.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub last_verified: HashMap<String, u64>,
+
+    /// Per-object replication configuration (scope-aware).
+    ///
+    /// When present, overrides the global replication target for this object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replication_config: Option<icn_kernel_api::state::ObjectReplication>,
 }
 
 impl ReplicaMetadata {
@@ -122,6 +128,7 @@ impl ReplicaMetadata {
             chunk_size: None,
             last_challenged: HashMap::new(),
             last_verified: HashMap::new(),
+            replication_config: None,
         }
     }
 
@@ -141,6 +148,7 @@ impl ReplicaMetadata {
             chunk_size: Some(chunk_size),
             last_challenged: HashMap::new(),
             last_verified: HashMap::new(),
+            replication_config: None,
         }
     }
 
@@ -274,6 +282,41 @@ impl ReplicaMetadata {
     pub fn needs_re_replication(&self, min_healthy_replicas: usize) -> bool {
         self.healthy_count() < min_healthy_replicas
     }
+
+    /// Builder method to attach a per-object replication config.
+    pub fn with_replication_config(
+        mut self,
+        config: icn_kernel_api::state::ObjectReplication,
+    ) -> Self {
+        self.replication_config = Some(config);
+        self
+    }
+
+    /// Return the effective target replica count.
+    ///
+    /// Uses the per-object config factor if present, otherwise falls back to `default`.
+    pub fn effective_target_replicas(&self, default: usize) -> usize {
+        self.replication_config
+            .as_ref()
+            .map(|c| c.effective_factor())
+            .unwrap_or(default)
+    }
+
+    /// Return the `max_scope` from the per-object config, if any.
+    pub fn max_scope(&self) -> Option<icn_kernel_api::scope::ScopeLevel> {
+        self.replication_config.map(|c| c.max_scope)
+    }
+
+    /// Check whether a peer at the given scope level is within this object's max_scope.
+    ///
+    /// Returns `true` if there is no replication config (no restriction) or if the
+    /// peer's scope is included by `max_scope`.
+    pub fn is_within_scope(&self, peer_scope: icn_kernel_api::scope::ScopeLevel) -> bool {
+        match self.replication_config {
+            Some(config) => config.max_scope.includes(peer_scope),
+            None => true,
+        }
+    }
 }
 
 /// Storage trait for pluggable backends
@@ -393,6 +436,39 @@ pub trait Store: Send + Sync {
         } else {
             Ok(false)
         }
+    }
+
+    /// List content hashes that have a `Scoped` replication policy matching the given scope.
+    ///
+    /// Scans all replica metadata and returns hashes where the per-object
+    /// `replication_config` has a `Scoped` policy at the requested scope level.
+    ///
+    /// Note: This performs a full scan of all replica metadata (O(n)). For
+    /// deployments with large object counts, consider adding a scope-indexed
+    /// lookup in a future optimization pass.
+    fn list_scoped_replica_hashes(
+        &self,
+        scope: icn_kernel_api::scope::ScopeLevel,
+    ) -> Result<Vec<ContentHash>> {
+        use icn_kernel_api::state::ReplicationPolicy;
+
+        let all_hashes = self.list_replica_hashes()?;
+        let mut result = Vec::new();
+        for hash in all_hashes {
+            if let Some(metadata) = self.get_replica_metadata(&hash)? {
+                if let Some(config) = &metadata.replication_config {
+                    if let ReplicationPolicy::Scoped {
+                        scope: obj_scope, ..
+                    } = &config.policy
+                    {
+                        if *obj_scope == scope {
+                            result.push(hash);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(result)
     }
 
     /// Check if this store backend supports transactions
@@ -1565,6 +1641,165 @@ mod tests {
             store.get(b"log:transfer:001")?,
             Some(b"alice->bob:100".to_vec())
         );
+
+        Ok(())
+    }
+
+    // ---- Scope-aware replication config tests ----
+
+    #[test]
+    fn test_replica_metadata_with_config() -> Result<()> {
+        use icn_kernel_api::scope::ScopeLevel;
+        use icn_kernel_api::state::{ObjectReplication, ReplicationPolicy};
+
+        let hash = test_hash();
+        let config = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+
+        let metadata = ReplicaMetadata::new(hash).with_replication_config(config);
+
+        // Serialize roundtrip
+        let json = serde_json::to_string(&metadata)?;
+        let parsed: ReplicaMetadata = serde_json::from_str(&json)?;
+        assert_eq!(parsed.replication_config, Some(config));
+        assert_eq!(parsed.content_hash, hash);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replica_metadata_backward_compat() -> Result<()> {
+        // Simulate old format without replication_config field
+        let json = r#"{
+            "content_hash": [170,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,187],
+            "replicas": [],
+            "updated_at": {"secs_since_epoch": 1700000000, "nanos_since_epoch": 0}
+        }"#;
+
+        let parsed: ReplicaMetadata = serde_json::from_str(json)?;
+        assert!(parsed.replication_config.is_none());
+        assert_eq!(parsed.content_hash, test_hash());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_effective_target_replicas_from_config() {
+        use icn_kernel_api::scope::ScopeLevel;
+        use icn_kernel_api::state::{ObjectReplication, ReplicationPolicy};
+
+        let config = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 5,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+
+        let metadata = ReplicaMetadata::new(test_hash()).with_replication_config(config);
+        assert_eq!(metadata.effective_target_replicas(3), 5);
+    }
+
+    #[test]
+    fn test_effective_target_replicas_default() {
+        let metadata = ReplicaMetadata::new(test_hash());
+        assert_eq!(metadata.effective_target_replicas(3), 3);
+    }
+
+    #[test]
+    fn test_is_within_scope() {
+        use icn_kernel_api::scope::ScopeLevel;
+        use icn_kernel_api::state::{ObjectReplication, ReplicationPolicy};
+
+        let config = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+
+        let metadata = ReplicaMetadata::new(test_hash()).with_replication_config(config);
+
+        // Cell peer within Org max_scope → true
+        assert!(metadata.is_within_scope(ScopeLevel::Cell));
+        assert!(metadata.is_within_scope(ScopeLevel::Org));
+        assert!(metadata.is_within_scope(ScopeLevel::Local));
+
+        // Federation and Commons are wider than Org max_scope → false
+        assert!(!metadata.is_within_scope(ScopeLevel::Federation));
+        assert!(!metadata.is_within_scope(ScopeLevel::Commons));
+
+        // No config → always in scope
+        let no_config = ReplicaMetadata::new(test_hash());
+        assert!(no_config.is_within_scope(ScopeLevel::Commons));
+    }
+
+    #[test]
+    fn test_list_scoped_replica_hashes() -> Result<()> {
+        use icn_kernel_api::scope::ScopeLevel;
+        use icn_kernel_api::state::{ObjectReplication, ReplicationPolicy};
+
+        let store = SledStore::temporary()?;
+
+        // Object 1: Scoped at Cell
+        let hash1 = test_hash();
+        let config1 = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Cell,
+                factor: 2,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+        )
+        .unwrap();
+        let meta1 = ReplicaMetadata::new(hash1).with_replication_config(config1);
+        store.put_replica_metadata(&meta1)?;
+
+        // Object 2: Scoped at Org
+        let hash2 = test_hash2();
+        let config2 = ObjectReplication::new(
+            ReplicationPolicy::Scoped {
+                scope: ScopeLevel::Org,
+                factor: 3,
+            },
+            ScopeLevel::Cell,
+            ScopeLevel::Federation,
+        )
+        .unwrap();
+        let meta2 = ReplicaMetadata::new(hash2).with_replication_config(config2);
+        store.put_replica_metadata(&meta2)?;
+
+        // Object 3: No config (non-scoped)
+        let mut hash3 = [0u8; 32];
+        hash3[0] = 0xEE;
+        let meta3 = ReplicaMetadata::new(hash3);
+        store.put_replica_metadata(&meta3)?;
+
+        // Query Cell-scoped → only hash1
+        let cell_hashes = store.list_scoped_replica_hashes(ScopeLevel::Cell)?;
+        assert_eq!(cell_hashes.len(), 1);
+        assert_eq!(cell_hashes[0], hash1);
+
+        // Query Org-scoped → only hash2
+        let org_hashes = store.list_scoped_replica_hashes(ScopeLevel::Org)?;
+        assert_eq!(org_hashes.len(), 1);
+        assert_eq!(org_hashes[0], hash2);
+
+        // Query Federation-scoped → none
+        let fed_hashes = store.list_scoped_replica_hashes(ScopeLevel::Federation)?;
+        assert!(fed_hashes.is_empty());
 
         Ok(())
     }
