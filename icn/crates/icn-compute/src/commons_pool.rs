@@ -47,6 +47,24 @@ pub enum SybilRejection {
     PoolFull { capacity: usize },
 }
 
+impl std::fmt::Display for SybilRejection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SybilRejection::InsufficientTrust { score, required } => {
+                write!(
+                    f,
+                    "insufficient trust score: {score:.2} < {required:.2} required"
+                )
+            }
+            SybilRejection::PoolFull { capacity } => {
+                write!(f, "commons pool full: {capacity} participants at capacity")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SybilRejection {}
+
 /// A node participating in the commons resource pool.
 #[derive(Debug, Clone)]
 pub struct CommonsParticipant {
@@ -128,11 +146,13 @@ impl CommonsPool {
     /// Add a participant after validating against the sybil policy.
     ///
     /// Returns `Err(SybilRejection)` if the participant fails checks:
-    /// - Trust score below `min_trust_score`
+    /// - Trust score below `min_trust_score` (both new and existing)
     /// - Pool at `max_participants` capacity (new participants only)
     ///
-    /// Existing participants (same DID) are always updated — they already
-    /// passed admission.
+    /// Existing participants whose trust drops below threshold are
+    /// **rejected** (returns `InsufficientTrust`). The caller is
+    /// responsible for evicting them from the pool if desired — this
+    /// method does not remove them automatically.
     pub fn try_add_participant(
         &mut self,
         participant: CommonsParticipant,
@@ -422,7 +442,9 @@ mod tests {
                 required: 0.2,
             })
         );
-        // Existing entry remains (not evicted by the failed update)
+        // Pool does NOT auto-evict — it returns the error and the caller
+        // decides whether to evict. In production, placement.rs calls
+        // `pool.remove_participant()` on InsufficientTrust rejection.
         assert_eq!(pool.participant_count(), 1);
     }
 }

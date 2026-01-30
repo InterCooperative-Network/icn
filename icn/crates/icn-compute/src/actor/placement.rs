@@ -767,8 +767,8 @@ impl ComputeActor {
                 last_announce: std::time::Instant::now(),
             };
             let mut pool = self.commons_pool.write().await;
-            match pool.try_add_participant(participant) {
-                Ok(()) => {}
+            let accepted = match pool.try_add_participant(participant) {
+                Ok(()) => true,
                 Err(rejection) => {
                     tracing::warn!(
                         executor = %executor,
@@ -782,22 +782,26 @@ impl ComputeActor {
                     ) {
                         pool.remove_participant(&executor);
                     }
+                    false
                 }
-            }
+            };
             let count = pool.participant_count();
             let agg = pool.total_commons_capacity();
             drop(pool);
-            icn_obs::metrics::compute::commons_pool_updates_inc("add");
+            let label = if accepted { "add" } else { "reject" };
+            icn_obs::metrics::compute::commons_pool_updates_inc(label);
             icn_obs::metrics::compute::commons_pool_participants_set(count as f64);
             icn_obs::metrics::compute::commons_pool_cpu_cores_set(agg.cpu_cores);
             icn_obs::metrics::compute::commons_pool_memory_mb_set(agg.memory_mb as f64);
             icn_obs::metrics::compute::commons_pool_storage_mb_set(agg.storage_mb as f64);
-            tracing::debug!(
-                executor = %executor,
-                commons_share,
-                pool_size = count,
-                "Added/updated node in commons pool"
-            );
+            if accepted {
+                tracing::debug!(
+                    executor = %executor,
+                    commons_share,
+                    pool_size = count,
+                    "Added/updated node in commons pool"
+                );
+            }
         } else {
             let mut pool = self.commons_pool.write().await;
             pool.remove_participant(&executor);

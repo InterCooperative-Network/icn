@@ -134,6 +134,12 @@ pub use events::{
     TransactionCreated, Transfer,
 };
 
+// Commons credit accounting
+pub use commons_credits::{
+    build_earn_entry, build_spend_entry, check_sufficient_balance, compute_credits_earned,
+    EarningCapExceeded, EarningTracker, InsufficientCredits, COMMONS_CREDIT_CURRENCY,
+};
+
 // Exchange rate oracle
 pub use oracle::{
     CacheStats, CurrencyPair, ExchangeRate, FederationRateSource, ManualRateRecord,
