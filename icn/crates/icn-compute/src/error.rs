@@ -79,6 +79,11 @@ pub enum ComputeError {
     /// Lock error
     #[error("lock error")]
     LockError,
+
+    /// Insufficient commons credits for the requested operation (Epic 6 #948).
+    /// Accounting infrastructure only — enforcement at scheduling time is deferred.
+    #[error("insufficient commons credits: balance={balance}, required={required}")]
+    InsufficientCommonsCredits { balance: i64, required: i64 },
 }
 
 impl From<icn_encoding::Error> for ComputeError {

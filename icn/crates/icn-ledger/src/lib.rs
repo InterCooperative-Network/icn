@@ -51,6 +51,7 @@
 //! ```
 
 pub mod balance;
+pub mod commons_credits;
 pub mod credit_policy;
 pub mod dispute;
 pub mod dynamic_limits;
