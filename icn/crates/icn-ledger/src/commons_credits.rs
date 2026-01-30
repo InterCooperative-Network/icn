@@ -385,11 +385,13 @@ impl SettlementDedup {
     }
 
     /// Number of receipts tracked.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.settled.len()
     }
 
     /// Whether the tracker is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.settled.is_empty()
     }

@@ -72,9 +72,10 @@ pub struct JournalEntry {
     /// For commons credit entries, this should be set to the `receipt_id`
     /// of the `ExecutionReceipt` that triggered the earn/spend.
     ///
-    /// Note: Do NOT use `skip_serializing_if` here — postcard (used for
-    /// persistent storage) is a non-self-describing format and requires
-    /// the Option discriminant to always be present.
+    /// Note: Do NOT use `skip_serializing_if` here — while the ledger
+    /// currently uses serde_json (which tolerates missing fields),
+    /// omitting `None` would change the canonical JSON representation
+    /// and thus the content hash, breaking deduplication.
     pub nonce: Option<[u8; 32]>,
 }
 
