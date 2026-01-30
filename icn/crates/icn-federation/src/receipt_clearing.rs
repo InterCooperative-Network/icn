@@ -98,6 +98,14 @@ impl Default for BatchClearingConfig {
 /// Federation-scoped receipts are converted to `CrossCoopTransfer`s and
 /// proposed through the existing `ClearingManager`. Commons-scoped receipts
 /// are logged and stubbed pending Epic 6 (#925).
+///
+/// # Flush lifecycle
+///
+/// This manager does **not** auto-flush. Callers must periodically:
+/// 1. Check [`should_flush()`](Self::should_flush) (batch size or age exceeded)
+/// 2. Call [`flush_to_clearing()`](Self::flush_to_clearing) to drain pending receipts
+///
+/// A background task in the actor layer (future work) should poll on a timer.
 pub struct ReceiptClearingManager {
     /// Pending receipts awaiting flush
     pending: RwLock<VecDeque<ClearingReceipt>>,
@@ -154,6 +162,25 @@ impl ReceiptClearingManager {
             poisoned.into_inner()
         });
 
+        // Enforce batch size cap to prevent unbounded memory growth
+        if pending.len() >= self.config.max_batch_size {
+            return Err(FederationError::InvalidState(format!(
+                "clearing batch full ({} receipts); flush before submitting more",
+                self.config.max_batch_size
+            )));
+        }
+
+        // Reject duplicate receipt hashes
+        if pending
+            .iter()
+            .any(|r| r.receipt_hash == receipt.receipt_hash)
+        {
+            return Err(FederationError::InvalidTransfer(format!(
+                "duplicate receipt hash {}",
+                hex::encode(receipt.receipt_hash)
+            )));
+        }
+
         // Start batch timer on first receipt
         let mut batch_start = self.batch_started_at.write().unwrap_or_else(|poisoned| {
             warn!("Batch timer lock poisoned, recovering");
@@ -174,7 +201,10 @@ impl ReceiptClearingManager {
         Ok(())
     }
 
-    /// Dispute a pending receipt. Only the submitter may dispute.
+    /// Dispute a pending receipt. Either the submitter or executor may dispute.
+    ///
+    /// - **Submitter**: disputes if they believe the work wasn't performed correctly
+    /// - **Executor**: disputes if they believe the receipt is fraudulent or incorrect
     ///
     /// Disputed receipts are skipped during flush.
     pub fn dispute_receipt(
@@ -193,11 +223,11 @@ impl ReceiptClearingManager {
             .find(|r| r.receipt_hash == *receipt_hash)
             .ok_or_else(|| FederationError::TransferNotFound(hex::encode(receipt_hash)))?;
 
-        // Only the submitter can dispute a receipt
-        if receipt.submitter_did != disputer {
+        // Either party to the receipt can dispute
+        if receipt.submitter_did != disputer && receipt.executor_did != disputer {
             return Err(FederationError::Unauthorized(format!(
-                "only submitter {} can dispute, not {}",
-                receipt.submitter_did, disputer
+                "only submitter {} or executor {} can dispute, not {}",
+                receipt.submitter_did, receipt.executor_did, disputer
             )));
         }
 
@@ -537,7 +567,20 @@ mod tests {
     }
 
     #[test]
-    fn test_dispute_by_non_submitter_rejected() {
+    fn test_dispute_by_executor_accepted() {
+        let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
+        let receipt = make_receipt(ScopeLevel::Federation);
+        let executor = receipt.executor_did.clone();
+        let hash = receipt.receipt_hash;
+        mgr.submit_receipt(receipt).unwrap();
+
+        mgr.dispute_receipt(&hash, &executor, "incorrect metering".into())
+            .unwrap();
+        assert_eq!(mgr.disputed_count(), 1);
+    }
+
+    #[test]
+    fn test_dispute_by_third_party_rejected() {
         let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
         let receipt = make_receipt(ScopeLevel::Federation);
         let hash = receipt.receipt_hash;
@@ -547,6 +590,7 @@ mod tests {
             .dispute_receipt(&hash, "did:icn:intruder", "fraud".into())
             .unwrap_err();
         assert!(err.to_string().contains("only submitter"));
+        assert!(err.to_string().contains("or executor"));
     }
 
     #[test]
@@ -853,5 +897,38 @@ mod tests {
         assert_eq!(report.federation_flushed, 0);
         assert_eq!(report.errors.len(), 1);
         assert!(report.errors[0].contains("overflows i64"));
+    }
+
+    // ---- submit_receipt guards ----
+
+    #[test]
+    fn test_submit_duplicate_hash_rejected() {
+        let mgr = ReceiptClearingManager::new(BatchClearingConfig::default());
+        let receipt = make_receipt(ScopeLevel::Federation);
+        let receipt2 = receipt.clone();
+        mgr.submit_receipt(receipt).unwrap();
+
+        let err = mgr.submit_receipt(receipt2).unwrap_err();
+        assert!(err.to_string().contains("duplicate receipt hash"));
+    }
+
+    #[test]
+    fn test_submit_batch_full_rejected() {
+        let config = BatchClearingConfig {
+            max_batch_size: 3,
+            max_batch_age_secs: 9999,
+        };
+        let mgr = ReceiptClearingManager::new(config);
+
+        for i in 0..3u8 {
+            let mut receipt = make_receipt(ScopeLevel::Federation);
+            receipt.receipt_hash = [i; 32];
+            mgr.submit_receipt(receipt).unwrap();
+        }
+
+        let mut receipt = make_receipt(ScopeLevel::Federation);
+        receipt.receipt_hash = [0xFF; 32];
+        let err = mgr.submit_receipt(receipt).unwrap_err();
+        assert!(err.to_string().contains("batch full"));
     }
 }
