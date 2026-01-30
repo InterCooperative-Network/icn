@@ -297,7 +297,6 @@ async fn spawn_actors_with_identity(
         super::init_ledger::LedgerDeps {
             gossip_handle: gossip_handle.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
-            trust_graph: trust_graph_handle.clone(),
             trust_service: trust_service_from_registry.clone(),
             ledger_handle: ledger_from_daemon,
             ledger_store: ledger_store_from_daemon,

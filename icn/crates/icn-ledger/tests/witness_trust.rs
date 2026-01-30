@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_identity::KeyPair;
+use icn_kernel_api::services::TrustService;
 use icn_ledger::{
     entry::JournalEntryBuilder, Ledger, WitnessConfig, WitnessPolicy, WitnessSignature,
     WitnessedEntry,
@@ -15,7 +16,41 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 
-/// Create a test ledger with trust graph owned by a specific DID
+/// A test TrustService that wraps a TrustGraph for witness trust tests
+struct TestTrustService {
+    graph: Arc<RwLock<TrustGraph>>,
+}
+
+impl TestTrustService {
+    fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
+        Self { graph }
+    }
+}
+
+impl TrustService for TestTrustService {
+    fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+        unimplemented!("oracle not needed for witness trust tests")
+    }
+
+    fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        // Use try_read for non-blocking access (tests don't have write contention)
+        if let Ok(g) = self.graph.try_read() {
+            if let Ok(did) = actor.parse::<icn_identity::Did>() {
+                return g.compute_trust_score(&did).unwrap_or(0.0);
+            }
+        }
+        0.0
+    }
+
+    fn record_event(
+        &self,
+        _actor: &icn_kernel_api::types::Did,
+        _event: icn_kernel_api::services::TrustEvent,
+    ) {
+    }
+}
+
+/// Create a test ledger with trust service backed by a TrustGraph owned by a specific DID
 fn create_ledger_with_trust_for_owner(
     owner_did: icn_identity::Did,
 ) -> (Ledger, TempDir, Arc<RwLock<TrustGraph>>) {
@@ -27,9 +62,11 @@ fn create_ledger_with_trust_for_owner(
     let trust_graph = TrustGraph::new(trust_store, owner_did);
     let trust_graph_arc = Arc::new(RwLock::new(trust_graph));
 
-    // Create ledger with trust graph
+    // Create ledger with TrustService (wrapping TrustGraph)
+    let trust_service: Arc<dyn TrustService> =
+        Arc::new(TestTrustService::new(trust_graph_arc.clone()));
     let mut ledger = Ledger::new(store).unwrap();
-    ledger.set_trust_graph(trust_graph_arc.clone());
+    ledger.set_trust_service(trust_service);
 
     // Disable entry author trust validation for these tests
     // (we're testing witness trust validation, not entry author validation)

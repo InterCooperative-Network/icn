@@ -37,9 +37,9 @@ pub enum LedgerError {
     #[error("fork resolution failed: {0}")]
     ForkResolutionFailed(String),
 
-    /// Trust graph required
-    #[error("trust graph required for this operation")]
-    TrustGraphRequired,
+    /// Trust service required
+    #[error("trust service required for this operation")]
+    TrustServiceRequired,
 
     /// Duplicate entry
     #[error("duplicate entry: {0}")]

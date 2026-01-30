@@ -11,7 +11,6 @@ use crate::types::{ContentHash, JournalEntry, WitnessSignature};
 use anyhow::{anyhow, Result};
 use icn_kernel_api::services::TrustService;
 use icn_store::Store;
-use icn_trust::TrustGraph;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -74,8 +73,6 @@ const WITNESS_PREFIX: &str = "ledger:witnesses:";
 /// Fork resolution system
 pub struct ForkResolver {
     strategy: ForkResolutionStrategy,
-    /// Trust graph for trust-weighted resolution (deprecated)
-    trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
     /// Trust service for trust-weighted resolution (kernel/app separated)
     trust_service: Option<Arc<dyn TrustService>>,
     store: Option<Arc<dyn Store>>,
@@ -86,17 +83,9 @@ impl ForkResolver {
     pub fn new(strategy: ForkResolutionStrategy) -> Self {
         Self {
             strategy,
-            trust_graph: None,
             trust_service: None,
             store: None,
         }
-    }
-
-    /// Set the trust graph for trust-weighted resolution (deprecated)
-    ///
-    /// Use `set_trust_service()` instead for proper kernel/app separation.
-    pub fn set_trust_graph(&mut self, trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>) {
-        self.trust_graph = Some(trust_graph);
     }
 
     /// Set the trust service for trust-weighted resolution (kernel/app separated)
@@ -109,26 +98,11 @@ impl ForkResolver {
         self.store = Some(store);
     }
 
-    /// Get trust score for a DID using TrustService (preferred) or TrustGraph (fallback)
+    /// Get trust score for a DID using TrustService
     fn get_trust_score(&self, did: &icn_identity::Did) -> f64 {
-        // Prefer TrustService if available (kernel/app separation)
         if let Some(ref trust_service) = self.trust_service {
             let kernel_did = icn_kernel_api::types::Did::from(did.to_string());
             return trust_service.trust_score(&kernel_did);
-        }
-
-        // Fall back to TrustGraph (deprecated path)
-        if let Some(ref trust_graph) = self.trust_graph {
-            // Use block_in_place for async lock from sync context
-            let trust_graph_clone = trust_graph.clone();
-            let did_clone = did.clone();
-            return tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = trust_graph_clone.read().await;
-                    graph.compute_trust_score(&did_clone).unwrap_or(0.0)
-                })
-            });
         }
 
         0.0
@@ -201,10 +175,9 @@ impl ForkResolver {
         entry1: &JournalEntry,
         entry2: &JournalEntry,
     ) -> Result<ForkResolution> {
-        // Check that we have a trust source (TrustService or TrustGraph)
-        if self.trust_service.is_none() && self.trust_graph.is_none() {
+        if self.trust_service.is_none() {
             return Err(anyhow!(
-                "Trust source required for trust-weighted resolution"
+                "TrustService required for trust-weighted resolution"
             ));
         }
 
@@ -287,8 +260,7 @@ impl ForkResolver {
         let mut score = 0.0;
 
         // Trust component (40% weight)
-        // Use TrustService if available, else TrustGraph (via helper method)
-        if self.trust_service.is_some() || self.trust_graph.is_some() {
+        if self.trust_service.is_some() {
             let trust = self.get_trust_score(&entry.author);
             score += trust * 0.4;
         }

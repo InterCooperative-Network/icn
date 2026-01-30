@@ -15,7 +15,6 @@ use icn_ledger::{
 };
 use icn_security::MisbehaviorDetector;
 use icn_store::SledStore;
-use icn_trust::TrustGraph;
 
 use crate::config::Config;
 
@@ -44,10 +43,7 @@ pub struct LedgerServices {
 pub struct LedgerDeps {
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
-    /// Trust graph for fallback (deprecated, kept for backward compatibility)
-    pub trust_graph: Arc<RwLock<TrustGraph>>,
-    /// Trust service for proper kernel/app separation
-    /// When provided, passed to Ledger.set_trust_service()
+    /// Trust service for kernel/app separated trust score queries
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Pre-created ledger handle from daemon (daemon owns lifecycle)
     pub ledger_handle: Option<Arc<RwLock<Ledger>>>,
@@ -97,13 +93,12 @@ pub async fn init_ledger_services(
         ledger.set_gossip(deps.gossip_handle.clone());
         ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
 
-        // Use TrustService if available (kernel/app separation), else fall back to TrustGraph
+        // Set TrustService for kernel/app separated trust queries
         if let Some(trust_service) = deps.trust_service.clone() {
             ledger.set_trust_service(trust_service);
-            info!("Ledger initialized with TrustService (kernel/app separated)");
+            info!("Ledger initialized with TrustService");
         } else {
-            ledger.set_trust_graph(deps.trust_graph.clone());
-            info!("Ledger initialized with TrustGraph (deprecated fallback)");
+            info!("Ledger initialized without TrustService (trust validation disabled)");
         }
 
         // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
@@ -238,10 +233,12 @@ pub async fn init_ledger_services(
     info!("Charter and treasury validators initialized with validation hook");
 
     // Create ContractActor
+    // Note: TrustGraph is no longer passed via LedgerDeps; ContractActor will
+    // receive it via ServiceRegistry in a future migration (CCL extraction).
     let contract_actor = icn_ccl::ContractActor::new(
         did,
         contract_runtime_handle.clone(),
-        Some(deps.trust_graph.clone()),
+        None, // TrustGraph moved to app layer; CCL migration pending
     );
     let contract_actor_handle = Arc::new(RwLock::new(contract_actor));
 

@@ -11,7 +11,6 @@ icn-entity = { path = "../icn-entity" }
 icn-time = { path = "../icn-time" }
 icn-store.workspace = true
 icn-gossip.workspace = true
-icn-trust.workspace = true
 icn-kernel-api.workspace = true
 icn-obs.workspace = true
 icn-security.workspace = true
@@ -32,7 +31,7 @@ tempfile = "3.24"
 criterion = "0.5"
 rand = "0.8"
 icn-governance = { path = "../icn-governance" }
-icn-kernel-api = { path = "../icn-kernel-api" }
+icn-trust = { path = "../icn-trust" }
 
 [[bench]]
 name = "ledger_bench"
