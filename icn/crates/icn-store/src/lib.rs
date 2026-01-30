@@ -442,6 +442,10 @@ pub trait Store: Send + Sync {
     ///
     /// Scans all replica metadata and returns hashes where the per-object
     /// `replication_config` has a `Scoped` policy at the requested scope level.
+    ///
+    /// Note: This performs a full scan of all replica metadata (O(n)). For
+    /// deployments with large object counts, consider adding a scope-indexed
+    /// lookup in a future optimization pass.
     fn list_scoped_replica_hashes(
         &self,
         scope: icn_kernel_api::scope::ScopeLevel,

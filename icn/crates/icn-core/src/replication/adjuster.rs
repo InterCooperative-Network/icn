@@ -172,7 +172,8 @@ impl ScopedReplicationAdjuster {
                     }
                 } else if current_healthy > target {
                     // Over-replicated: pick excess replicas to remove.
-                    // Removal preference: replicas at the widest scope first (least local).
+                    // Removal preference: widest-scope replicas first (e.g., Org before Cell).
+                    // This preserves locality — data stays closer to the cell that owns it.
                     let excess = current_healthy - target;
                     let mut in_scope_healthy: Vec<(String, ScopeLevel)> = metadata
                         .replicas
