@@ -438,6 +438,7 @@ mod tests {
             }],
             parents,
             signature: None,
+            nonce: None,
         }
     }
 

@@ -150,7 +150,44 @@ fn test_scheduling_enforces_credits() {
     unimplemented!("credit enforcement at scheduling time is deferred to a future epic");
 }
 
-/// Test 6: Pool participant lifecycle — add, aggregate, remove, re-aggregate.
+/// Test 6: Receipt-backed earn entries produce distinct hashes (replay protection).
+#[test]
+fn test_receipt_backed_earn_entries_are_distinct() {
+    use icn_ledger::commons_credits::{build_earn_entry_with_receipt, SettlementDedup};
+
+    let contributor =
+        icn_identity::Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9")
+            .unwrap();
+
+    // Simulate two separate execution receipts for the same amount
+    let receipt_a = [0xAA; 32];
+    let receipt_b = [0xBB; 32];
+
+    let entry_a = build_earn_entry_with_receipt(&contributor, 1000, receipt_a).unwrap();
+    let entry_b = build_earn_entry_with_receipt(&contributor, 1000, receipt_b).unwrap();
+
+    // Different receipt_ids → different content hashes
+    assert_ne!(
+        entry_a.id.as_ref().unwrap().0,
+        entry_b.id.as_ref().unwrap().0,
+        "two receipts for same amount must produce distinct journal entries"
+    );
+
+    // Both have nonces set
+    assert_eq!(entry_a.nonce, Some(receipt_a));
+    assert_eq!(entry_b.nonce, Some(receipt_b));
+
+    // SettlementDedup prevents double-settlement
+    let mut dedup = SettlementDedup::new();
+    assert!(dedup.try_settle(receipt_a).is_ok(), "first settlement ok");
+    assert!(dedup.try_settle(receipt_b).is_ok(), "second receipt ok");
+    assert!(
+        dedup.try_settle(receipt_a).is_err(),
+        "replaying receipt_a must fail"
+    );
+}
+
+/// Test 7: Pool participant lifecycle — add, aggregate, remove, re-aggregate.
 #[test]
 fn test_pool_participant_lifecycle() {
     let mut pool = CommonsPool::new();

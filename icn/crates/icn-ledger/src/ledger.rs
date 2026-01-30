@@ -4494,6 +4494,7 @@ mod tests {
             ],
             parents: vec![],
             signature: None,
+            nonce: None,
         };
 
         let current_time = icn_time::current_timestamp_secs();

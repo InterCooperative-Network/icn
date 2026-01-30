@@ -823,6 +823,7 @@ mod tests {
             accounts: vec![],
             parents: vec![],
             signature: None,
+            nonce: None,
         };
 
         PreparedFxTransfer {

@@ -60,6 +60,22 @@ pub struct JournalEntry {
 
     /// Signature by author
     pub signature: Option<Signature>,
+
+    /// Optional nonce for replay protection.
+    ///
+    /// When present, the nonce is included in the content hash computation,
+    /// ensuring that entries with identical amounts/accounts/timestamps
+    /// produce distinct hashes. This prevents silent deduplication of
+    /// legitimate repeat transactions (e.g., two separate earn events
+    /// for the same amount).
+    ///
+    /// For commons credit entries, this should be set to the `receipt_id`
+    /// of the `ExecutionReceipt` that triggered the earn/spend.
+    ///
+    /// Note: Do NOT use `skip_serializing_if` here — postcard (used for
+    /// persistent storage) is a non-self-describing format and requires
+    /// the Option discriminant to always be present.
+    pub nonce: Option<[u8; 32]>,
 }
 
 /// Delta for a single account in a journal entry
@@ -289,7 +305,7 @@ pub enum Resolution {
     Reject,
 
     /// Merge with modifications
-    Merge(JournalEntry),
+    Merge(Box<JournalEntry>),
 }
 
 /// Dispute status for a journal entry
