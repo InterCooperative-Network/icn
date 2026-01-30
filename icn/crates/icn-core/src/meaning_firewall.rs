@@ -133,14 +133,14 @@ mod tests {
     ///
     /// Current state (2026-01-30):
     /// - icn-gossip: CLEAN
-    /// - icn-net: 1 (dev-dep on icn-trust, removed by #915/PR #973)
+    /// - icn-net: CLEAN (dev-dep removed by #915/PR #973)
     /// - icn-gateway: 2 (icn-trust + icn-governance)
     /// - icn-ledger: 2 (icn-trust + icn-governance)
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-gossip", 0),  // CLEAN ✅
-            ("icn-net", 1),     // dev-dep on icn-trust (removed by #915/PR #973)
+            ("icn-net", 0),     // CLEAN ✅ (dev-dep removed by #915/PR #973)
             ("icn-gateway", 2), // icn-trust + icn-governance
             ("icn-ledger", 2),  // icn-trust + icn-governance
         ];
@@ -189,7 +189,7 @@ mod tests {
             ("icn-gossip", 0), // CLEAN ✅
             ("icn-net", 0),    // CLEAN ✅
             ("icn-gateway", 3),
-            ("icn-ledger", 3),
+            ("icn-ledger", 0),  // CLEAN ✅ (imports removed by #970)
         ];
 
         for &(crate_name, expected_count) in expected {

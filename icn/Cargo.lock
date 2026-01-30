@@ -3297,7 +3297,6 @@ dependencies = [
  "icn-snapshot",
  "icn-store",
  "icn-time",
- "icn-trust",
  "mdns-sd",
  "portpicker",
  "quinn",
