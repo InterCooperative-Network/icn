@@ -1,6 +1,5 @@
 //! Privacy configuration for metadata protection and onion routing
 
-use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Privacy configuration for metadata protection and onion routing
@@ -23,7 +22,7 @@ pub struct PrivacyConfig {
     /// Minimum trust score for relay selection (0.0 to 1.0)
     /// Higher values = fewer relays but more trusted
     #[serde(default = "default_min_relay_trust")]
-    pub min_relay_trust: TrustScore,
+    pub min_relay_trust: f64,
 
     /// Enable topic name encryption
     /// Topic names will be encrypted so observers can't see what topics are subscribed
@@ -54,8 +53,8 @@ fn default_onion_hops() -> usize {
     2 // Default to 2 relay hops
 }
 
-fn default_min_relay_trust() -> TrustScore {
-    TrustScore::unchecked(0.3) // Minimum trust score for relay selection
+fn default_min_relay_trust() -> f64 {
+    0.3 // Minimum trust score for relay selection
 }
 
 fn default_padding_target() -> usize {
