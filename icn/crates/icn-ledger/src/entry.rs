@@ -11,6 +11,7 @@ pub struct JournalEntryBuilder {
     contract_ref: Option<ContentHash>,
     accounts: Vec<AccountDelta>,
     parents: Vec<ContentHash>,
+    nonce: Option<[u8; 32]>,
 }
 
 impl JournalEntryBuilder {
@@ -21,6 +22,7 @@ impl JournalEntryBuilder {
             contract_ref: None,
             accounts: Vec::new(),
             parents: Vec::new(),
+            nonce: None,
         }
     }
 
@@ -56,6 +58,16 @@ impl JournalEntryBuilder {
         self
     }
 
+    /// Set a nonce for replay protection.
+    ///
+    /// When set, the nonce is included in the content hash, ensuring
+    /// entries with identical content produce distinct hashes. Use this
+    /// for commons credit entries where the nonce is the `receipt_id`.
+    pub fn nonce(mut self, nonce: [u8; 32]) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
     /// Build and validate the journal entry
     pub fn build(self) -> Result<JournalEntry> {
         // Validate double-entry invariant: Σ debits == Σ credits per currency
@@ -76,6 +88,7 @@ impl JournalEntryBuilder {
             accounts: self.accounts,
             parents: self.parents,
             signature: None, // Will be set by caller
+            nonce: self.nonce,
         };
 
         // Compute the content hash

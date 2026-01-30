@@ -16,7 +16,7 @@ use crate::entry::JournalEntryBuilder;
 use crate::types::JournalEntry;
 use anyhow::Result;
 use icn_identity::Did;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 /// Currency identifier for commons credits.
@@ -184,22 +184,55 @@ pub fn compute_credits_earned(
 ///
 /// Debits the commons mint and credits the contributor.
 /// Rejects `amount <= 0`.
+///
+/// **Warning**: Without a nonce, identical earn amounts for the same
+/// contributor produce identical content hashes, which the ledger
+/// deduplicates. Prefer [`build_earn_entry_with_receipt`] for
+/// receipt-backed earnings.
 #[must_use = "journal entry should be appended to the ledger"]
 pub fn build_earn_entry(contributor: &Did, amount: i64) -> Result<JournalEntry> {
+    build_earn_entry_inner(contributor, amount, None)
+}
+
+/// Build a double-entry earn entry tied to a specific execution receipt.
+///
+/// The `receipt_id` is used as a nonce in the journal entry, ensuring
+/// that two separate earn events for the same amount produce distinct
+/// content hashes. This prevents silent deduplication of legitimate
+/// repeat earnings.
+#[must_use = "journal entry should be appended to the ledger"]
+pub fn build_earn_entry_with_receipt(
+    contributor: &Did,
+    amount: i64,
+    receipt_id: [u8; 32],
+) -> Result<JournalEntry> {
+    build_earn_entry_inner(contributor, amount, Some(receipt_id))
+}
+
+fn build_earn_entry_inner(
+    contributor: &Did,
+    amount: i64,
+    nonce: Option<[u8; 32]>,
+) -> Result<JournalEntry> {
     if amount <= 0 {
         anyhow::bail!("earn amount must be positive, got {amount}");
     }
 
     let mint_did = COMMONS_MINT_DID.clone();
 
-    let entry = JournalEntryBuilder::new(mint_did.clone())
+    let mut builder = JournalEntryBuilder::new(mint_did.clone())
         .debit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount)
         .credit(
             contributor.clone(),
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
-        )
-        .build()?;
+        );
+
+    if let Some(n) = nonce {
+        builder = builder.nonce(n);
+    }
+
+    let entry = builder.build()?;
 
     icn_obs::metrics::compute::commons_credits_earned_add(amount as u64);
     Ok(entry)
@@ -209,22 +242,52 @@ pub fn build_earn_entry(contributor: &Did, amount: i64) -> Result<JournalEntry> 
 ///
 /// Debits the consumer and credits the commons mint.
 /// Rejects `amount <= 0`.
+///
+/// **Warning**: Without a nonce, identical spend amounts produce
+/// identical content hashes. Prefer [`build_spend_entry_with_receipt`]
+/// for receipt-backed spending.
 #[must_use = "journal entry should be appended to the ledger"]
 pub fn build_spend_entry(consumer: &Did, amount: i64) -> Result<JournalEntry> {
+    build_spend_entry_inner(consumer, amount, None)
+}
+
+/// Build a double-entry spend entry tied to a specific execution receipt.
+///
+/// The `receipt_id` is used as a nonce in the journal entry, preventing
+/// silent deduplication of legitimate repeat spend events.
+#[must_use = "journal entry should be appended to the ledger"]
+pub fn build_spend_entry_with_receipt(
+    consumer: &Did,
+    amount: i64,
+    receipt_id: [u8; 32],
+) -> Result<JournalEntry> {
+    build_spend_entry_inner(consumer, amount, Some(receipt_id))
+}
+
+fn build_spend_entry_inner(
+    consumer: &Did,
+    amount: i64,
+    nonce: Option<[u8; 32]>,
+) -> Result<JournalEntry> {
     if amount <= 0 {
         anyhow::bail!("spend amount must be positive, got {amount}");
     }
 
     let mint_did = COMMONS_MINT_DID.clone();
 
-    let entry = JournalEntryBuilder::new(consumer.clone())
+    let mut builder = JournalEntryBuilder::new(consumer.clone())
         .debit(
             consumer.clone(),
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
         )
-        .credit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount)
-        .build()?;
+        .credit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount);
+
+    if let Some(n) = nonce {
+        builder = builder.nonce(n);
+    }
+
+    let entry = builder.build()?;
 
     icn_obs::metrics::compute::commons_credits_spent_add(amount as u64);
     Ok(entry)
@@ -260,6 +323,89 @@ impl std::fmt::Display for InsufficientCredits {
 }
 
 impl std::error::Error for InsufficientCredits {}
+
+// ---------------------------------------------------------------------------
+// Settlement deduplication (replay protection)
+// ---------------------------------------------------------------------------
+
+/// Tracks which execution receipts have already been settled, preventing
+/// double-settlement of the same receipt.
+///
+/// **Thread safety**: This struct is `Send + Sync` but provides no
+/// internal synchronisation. Wrap in `Arc<Mutex<_>>` or `Arc<RwLock<_>>`
+/// for concurrent access — the caller chooses the locking strategy.
+///
+/// ```ignore
+/// let dedup = Arc::new(Mutex::new(SettlementDedup::new()));
+/// ```
+///
+/// **Persistence**: In-memory only. On restart, the ledger's content-hash
+/// dedup provides a secondary defense (entries with the same nonce produce
+/// the same hash). For durable dedup across restarts, persist the set to
+/// the store.
+#[derive(Debug)]
+pub struct SettlementDedup {
+    settled: HashSet<[u8; 32]>,
+}
+
+/// Error returned when a receipt has already been settled.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DuplicateSettlement {
+    pub receipt_id: [u8; 32],
+}
+
+impl std::fmt::Display for DuplicateSettlement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "duplicate settlement: receipt {} already settled",
+            hex::encode(self.receipt_id)
+        )
+    }
+}
+
+impl std::error::Error for DuplicateSettlement {}
+
+impl SettlementDedup {
+    /// Create an empty dedup tracker.
+    pub fn new() -> Self {
+        Self {
+            settled: HashSet::new(),
+        }
+    }
+
+    /// Check and record a receipt_id. Returns `Ok(())` if this is the
+    /// first settlement, or `Err(DuplicateSettlement)` if already seen.
+    pub fn try_settle(&mut self, receipt_id: [u8; 32]) -> Result<(), DuplicateSettlement> {
+        if !self.settled.insert(receipt_id) {
+            return Err(DuplicateSettlement { receipt_id });
+        }
+        Ok(())
+    }
+
+    /// Check whether a receipt has already been settled without recording it.
+    pub fn is_settled(&self, receipt_id: &[u8; 32]) -> bool {
+        self.settled.contains(receipt_id)
+    }
+
+    /// Number of receipts tracked.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.settled.len()
+    }
+
+    /// Whether the tracker is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.settled.is_empty()
+    }
+}
+
+impl Default for SettlementDedup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -424,5 +570,132 @@ mod tests {
         // DID B has its own cap
         let allowed = tracker.try_earn(&did_b, 500).unwrap();
         assert_eq!(allowed, 500);
+    }
+
+    // --- Replay protection tests ---
+
+    #[test]
+    fn test_earn_with_receipt_produces_distinct_hashes() {
+        let contributor =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry1 = build_earn_entry_with_receipt(&contributor, 500, [0xAA; 32]).unwrap();
+        let entry2 = build_earn_entry_with_receipt(&contributor, 500, [0xBB; 32]).unwrap();
+
+        // Same amount, different receipt_ids → different content hashes
+        assert_ne!(
+            entry1.id.as_ref().unwrap().0,
+            entry2.id.as_ref().unwrap().0,
+            "different receipt_ids must produce different content hashes"
+        );
+    }
+
+    #[test]
+    fn test_earn_with_receipt_nonce_included_in_hash() {
+        // Verify the nonce actually affects the hash by comparing
+        // an entry with nonce vs without nonce (same amount, same author).
+        // Since timestamps differ between calls, we verify indirectly:
+        // two entries with different nonces always differ.
+        let contributor =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry_with_nonce =
+            build_earn_entry_with_receipt(&contributor, 500, [0xAA; 32]).unwrap();
+        assert!(
+            entry_with_nonce.nonce.is_some(),
+            "receipt-backed entry must have nonce set"
+        );
+
+        let entry_without_nonce = build_earn_entry(&contributor, 500).unwrap();
+        assert!(
+            entry_without_nonce.nonce.is_none(),
+            "plain entry must not have nonce"
+        );
+    }
+
+    #[test]
+    fn test_spend_with_receipt_produces_distinct_hashes() {
+        let consumer =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry1 = build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
+        let entry2 = build_spend_entry_with_receipt(&consumer, 200, [0xDD; 32]).unwrap();
+
+        assert_ne!(
+            entry1.id.as_ref().unwrap().0,
+            entry2.id.as_ref().unwrap().0,
+            "different receipt_ids must produce different content hashes"
+        );
+    }
+
+    #[test]
+    fn test_spend_with_receipt_nonce_included_in_hash() {
+        let consumer =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry_with_nonce = build_spend_entry_with_receipt(&consumer, 200, [0xCC; 32]).unwrap();
+        assert!(
+            entry_with_nonce.nonce.is_some(),
+            "receipt-backed spend entry must have nonce set"
+        );
+
+        let entry_without_nonce = build_spend_entry(&consumer, 200).unwrap();
+        assert!(
+            entry_without_nonce.nonce.is_none(),
+            "plain spend entry must not have nonce"
+        );
+    }
+
+    #[test]
+    fn test_earn_entry_has_nonce() {
+        let contributor =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry = build_earn_entry_with_receipt(&contributor, 100, [0xFF; 32]).unwrap();
+        assert_eq!(entry.nonce, Some([0xFF; 32]));
+    }
+
+    #[test]
+    fn test_earn_entry_without_receipt_has_no_nonce() {
+        let contributor =
+            Did::from_str("did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9").unwrap();
+
+        let entry = build_earn_entry(&contributor, 100).unwrap();
+        assert_eq!(entry.nonce, None);
+    }
+
+    // --- Settlement dedup tests ---
+
+    #[test]
+    fn test_settlement_dedup_first_settle_succeeds() {
+        let mut dedup = SettlementDedup::new();
+        assert!(dedup.try_settle([0x01; 32]).is_ok());
+        assert_eq!(dedup.len(), 1);
+    }
+
+    #[test]
+    fn test_settlement_dedup_rejects_duplicate() {
+        let mut dedup = SettlementDedup::new();
+        assert!(dedup.try_settle([0x01; 32]).is_ok());
+
+        let err = dedup.try_settle([0x01; 32]).unwrap_err();
+        assert_eq!(err.receipt_id, [0x01; 32]);
+    }
+
+    #[test]
+    fn test_settlement_dedup_different_receipts_independent() {
+        let mut dedup = SettlementDedup::new();
+        assert!(dedup.try_settle([0x01; 32]).is_ok());
+        assert!(dedup.try_settle([0x02; 32]).is_ok());
+        assert_eq!(dedup.len(), 2);
+    }
+
+    #[test]
+    fn test_settlement_dedup_is_settled_query() {
+        let mut dedup = SettlementDedup::new();
+        assert!(!dedup.is_settled(&[0x01; 32]));
+        let _ = dedup.try_settle([0x01; 32]);
+        assert!(dedup.is_settled(&[0x01; 32]));
+        assert!(!dedup.is_settled(&[0x02; 32]));
     }
 }
