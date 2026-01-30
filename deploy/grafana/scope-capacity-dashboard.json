@@ -1,0 +1,304 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Scope Capacity Overview",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Task Scope Map Size",
+      "description": "Number of active task-to-scope mappings. High values indicate tasks not being cleaned up.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 500},
+              {"color": "red", "value": 2000}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+      "targets": [
+        {
+          "expr": "icn_compute_task_scope_map_size",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Pending Tasks",
+      "description": "Total pending compute tasks across all scopes.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 50},
+              {"color": "red", "value": 100}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "targets": [
+        {
+          "expr": "icn_compute_tasks_pending",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Placement Performance",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Placement Offer Rate",
+      "description": "Ratio of placement offers sent to requests received. Low values indicate scope budget or capacity exhaustion.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0.1},
+              {"color": "green", "value": 0.5}
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+      "targets": [
+        {
+          "expr": "rate(icn_compute_placement_offers_sent_total[5m]) / rate(icn_compute_placement_requests_received_total[5m])",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Placement Request/Offer Rates",
+      "description": "Per-second rates of placement requests received and offers sent.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+      "targets": [
+        {
+          "expr": "rate(icn_compute_placement_requests_received_total[5m])",
+          "legendFormat": "requests/s {{instance}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(icn_compute_placement_offers_sent_total[5m])",
+          "legendFormat": "offers/s {{instance}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Task Lifecycle",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Task Completion Rate by Outcome",
+      "description": "Rate of task completions, failures, and timeouts.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "ops"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+      "targets": [
+        {
+          "expr": "rate(icn_compute_tasks_completed_total[5m])",
+          "legendFormat": "completed",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(icn_compute_tasks_failed_total[5m])",
+          "legendFormat": "failed",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(icn_compute_tasks_timeout_total[5m])",
+          "legendFormat": "timeout",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Task Submission vs Claim Rate",
+      "description": "Rates of task submissions and claims. A growing gap indicates placement issues.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "ops"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19},
+      "targets": [
+        {
+          "expr": "rate(icn_compute_tasks_submitted_total[5m])",
+          "legendFormat": "submitted",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(icn_compute_tasks_claimed_total[5m])",
+          "legendFormat": "claimed",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(icn_compute_tasks_rejected_trust_total[5m])",
+          "legendFormat": "rejected (trust)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Executor Health",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 27},
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Available Executors",
+      "description": "Number of registered executors. Drop indicates node failures or network partitions.",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "green", "value": 3}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 28},
+      "targets": [
+        {
+          "expr": "icn_compute_executors_available",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Executing Tasks",
+      "description": "Currently executing tasks per node.",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 50}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 28},
+      "targets": [
+        {
+          "expr": "icn_compute_tasks_executing",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "title": "Placement Score Distribution",
+      "description": "Placement scores of accepted offers. Low scores indicate limited executor selection.",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "unit": "short",
+          "min": 0,
+          "max": 1
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "targets": [
+        {
+          "expr": "icn_compute_placement_score",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["icn", "compute", "scope-capacity"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ICN Scope-Aware Capacity",
+  "uid": "icn-scope-capacity",
+  "version": 1
+}

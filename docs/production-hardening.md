@@ -594,6 +594,23 @@ grep "BloomFilter deserialization" /var/log/icnd.log
 grep "Message too large\|Invalid message" /var/log/icnd.log
 ```
 
+### Scope-Aware Capacity (Epic 2)
+
+**Metrics** (added in PR #962):
+- `icn_compute_task_scope_map_size` (gauge): Number of active task→scope mappings. Tracks memory overhead of scope queue tracking. Alert if >500 (warning) or >2000 (critical, possible leak).
+
+**Alert rules**: See `deploy/prometheus/scope-capacity-alerts.yml` for production-ready Prometheus rules.
+
+**Operational notes**:
+
+1. **Timeout decrement lag**: The timeout checker (`check_timeouts`) runs synchronously in the main command loop, so scope queue decrements for timed-out tasks may lag by the timeout check interval. This is acceptable because the demand adjustment loop runs every 60s — any lag within that window has no effect on budget rebalancing. If a burst of timeouts occurs, queue depths self-correct on the next check cycle.
+
+2. **CellService not configured**: If `ComputeActor` is started without a `CellService`, a WARN log is emitted and all submitters are treated as `Commons` scope. This is the expected state during bootstrap or for nodes not yet enrolled in a cell.
+
+3. **Demand adjustment cold start**: The demand loop requires `min_samples` (default: 5) total queued tasks before making any adjustments. On lightly loaded nodes, the default `CapacityBudget` applies indefinitely. This is by design — adjustment noise on sparse data would degrade allocation quality.
+
+4. **Memory scaling**: At 100K concurrent tasks, `task_scope_map` consumes ~5MB. Monitor via `icn_compute_task_scope_map_size` gauge. Set alerts at 50K+ entries for production.
+
 ---
 
 ## Remaining Work
