@@ -49,6 +49,8 @@ pub struct LedgerDeps {
     /// Trust service for proper kernel/app separation
     /// When provided, passed to Ledger.set_trust_service()
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    /// Pre-created ledger handle from daemon (daemon owns lifecycle)
+    pub ledger_handle: Option<Arc<RwLock<Ledger>>>,
 }
 
 /// Initialize ledger and contract services
@@ -63,88 +65,88 @@ pub async fn init_ledger_services(
     did: Did,
     deps: LedgerDeps,
 ) -> anyhow::Result<LedgerServices> {
-    // Create ledger store
+    // Create ledger store (needed for DisputeManager, TreasuryManager even if ledger is daemon-provided)
     let store_path = config.store_path().join("ledger");
     let store = Arc::new(SledStore::open(&store_path)?);
 
-    // Initialize ledger with gossip, misbehavior detection, and trust
-    let mut ledger = Ledger::new(store.clone())?;
-    ledger.set_gossip(deps.gossip_handle.clone());
-    ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
-
-    // Use TrustService if available (kernel/app separation), else fall back to TrustGraph
-    if let Some(trust_service) = deps.trust_service.clone() {
-        ledger.set_trust_service(trust_service);
-        info!("Ledger initialized with TrustService (kernel/app separated)");
+    // Use daemon-provided ledger handle or create a new one
+    let ledger_handle = if let Some(handle) = deps.ledger_handle {
+        info!("Using daemon-provided Ledger handle");
+        handle
     } else {
-        ledger.set_trust_graph(deps.trust_graph.clone());
-        info!("Ledger initialized with TrustGraph (deprecated fallback)");
-    }
+        Arc::new(RwLock::new(Ledger::new(store.clone())?))
+    };
 
-    // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
-    let oracle_config = config.ledger.oracle.to_oracle_config();
-    let threshold_count = oracle_config.suspicious_rate_thresholds.len();
-    let oracle_manager = Arc::new(OracleManager::with_config(store.clone(), oracle_config));
-    ledger.set_oracle_manager(oracle_manager);
+    // Configure ledger with gossip, misbehavior detection, trust, and policies
+    {
+        let mut ledger = ledger_handle.write().await;
 
-    if threshold_count > 0 {
-        info!(
-            "Oracle manager initialized with {} per-pair rate threshold(s)",
-            threshold_count
-        );
-    } else {
-        info!(
-            "Oracle manager initialized with default threshold {}",
-            config.ledger.oracle.default_suspicious_rate_threshold
-        );
-    }
+        ledger.set_gossip(deps.gossip_handle.clone());
+        ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
 
-    // Initialize witness config for material transaction signatures (Issue #676)
-    let witness_config = config.ledger.witness.to_witness_config()?;
-    let witness_policy = format!("{:?}", witness_config.default_policy);
-    ledger.set_witness_config(witness_config);
+        // Use TrustService if available (kernel/app separation), else fall back to TrustGraph
+        if let Some(trust_service) = deps.trust_service.clone() {
+            ledger.set_trust_service(trust_service);
+            info!("Ledger initialized with TrustService (kernel/app separated)");
+        } else {
+            ledger.set_trust_graph(deps.trust_graph.clone());
+            info!("Ledger initialized with TrustGraph (deprecated fallback)");
+        }
 
-    match &config.ledger.witness.threshold {
-        Some(threshold) => {
+        // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
+        let oracle_config = config.ledger.oracle.to_oracle_config();
+        let threshold_count = oracle_config.suspicious_rate_thresholds.len();
+        let oracle_manager = Arc::new(OracleManager::with_config(store.clone(), oracle_config));
+        ledger.set_oracle_manager(oracle_manager);
+
+        if threshold_count > 0 {
             info!(
-                "Witness signatures configured: policy={}, threshold={} (timeout={}s)",
-                witness_policy, threshold, config.ledger.witness.collection_timeout_secs
+                "Oracle manager initialized with {} per-pair rate threshold(s)",
+                threshold_count
+            );
+        } else {
+            info!(
+                "Oracle manager initialized with default threshold {}",
+                config.ledger.oracle.default_suspicious_rate_threshold
             );
         }
-        None => {
-            info!(
-                "Witness signatures configured: policy={} for all transactions (timeout={}s)",
-                witness_policy, config.ledger.witness.collection_timeout_secs
-            );
+
+        // Initialize witness config for material transaction signatures (Issue #676)
+        let witness_config = config.ledger.witness.to_witness_config()?;
+        let witness_policy = format!("{:?}", witness_config.default_policy);
+        ledger.set_witness_config(witness_config);
+
+        match &config.ledger.witness.threshold {
+            Some(threshold) => {
+                info!(
+                    "Witness signatures configured: policy={}, threshold={} (timeout={}s)",
+                    witness_policy, threshold, config.ledger.witness.collection_timeout_secs
+                );
+            }
+            None => {
+                info!(
+                    "Witness signatures configured: policy={} for all transactions (timeout={}s)",
+                    witness_policy, config.ledger.witness.collection_timeout_secs
+                );
+            }
         }
+
+        // Initialize membership store for tracking when members joined
+        let membership_store = Arc::new(SledMembershipStore::new(store.clone()));
+        ledger.set_membership_store(membership_store);
+        info!("Membership store initialized for new member tracking");
+
+        // Initialize credit policy for server-side credit limit enforcement
+        let credit_policy = CreditPolicy::conservative("hours".to_string());
+        let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
+        let credit_manager = CreditPolicyManager::new(credit_policy, new_member_policy);
+        ledger.set_credit_policy_manager(credit_manager);
+
+        info!(
+            "Credit policy manager initialized with conservative policy for 'hours' currency \
+             (new members: 10hr initial, 90-day ramp, 50hr contribution threshold)"
+        );
     }
-
-    // Initialize membership store for tracking when members joined
-    // Used for new member credit limit ramping
-    let membership_store = Arc::new(SledMembershipStore::new(store.clone()));
-    ledger.set_membership_store(membership_store);
-
-    info!("Membership store initialized for new member tracking");
-
-    // Initialize credit policy for server-side credit limit enforcement.
-    // Dynamic limits: baseline + trust bonus + history bonus.
-    // Note: Using "hours" as the default currency unit for cooperatives.
-    let credit_policy = CreditPolicy::conservative("hours".to_string());
-
-    // New member protection policy configuration.
-    // New members start with 10 hour limit, ramping to full over 90 days.
-    // Members who contribute 50+ hours get full limit regardless of tenure.
-    let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
-
-    let credit_manager = CreditPolicyManager::new(credit_policy, new_member_policy);
-    ledger.set_credit_policy_manager(credit_manager);
-
-    info!(
-        "Credit policy manager initialized with conservative policy for 'hours' currency \
-         (new members: 10hr initial, 90-day ramp, 50hr contribution threshold)"
-    );
-
-    let ledger_handle = Arc::new(RwLock::new(ledger));
 
     info!("Ledger initialized at {}", store_path.display());
 

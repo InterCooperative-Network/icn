@@ -104,10 +104,35 @@ fn build_service_registry(
 
         tracing::info!("Trust service initialized from apps/trust");
         tracing::debug!("  - Raw trust_graph handle passed for transition components");
-    }
 
-    // TODO: Add governance service from apps/governance when available
-    // TODO: Add ledger service from apps/ledger when available
+        // Create GovernanceService from apps/governance
+        let param_store_path = config.store_path().join("protocol_params");
+        std::fs::create_dir_all(&param_store_path)?;
+        let param_db = sled::open(&param_store_path)?;
+        let parameter_store =
+            Arc::new(icn_governance::SledParameterStore::new(Arc::new(param_db))?);
+        let parameter_store_trait: Arc<dyn icn_governance::ProtocolParameterStore> =
+            parameter_store.clone();
+        let governance_service = icn_governance_app::create_service(parameter_store_trait);
+        registry = registry.with_governance(governance_service);
+        // Store concrete type for raw_handle (dyn traits are !Sized)
+        registry = registry.with_raw_handle("protocol_parameter_store", parameter_store);
+        tracing::info!("Governance service initialized from apps/governance");
+
+        // Create LedgerService from apps/ledger
+        // Ledger is created minimally here; supervisor configures it further
+        // (gossip, trust, oracle, witnesses, credit policy, validation hooks)
+        let ledger_store_path = config.store_path().join("ledger");
+        std::fs::create_dir_all(&ledger_store_path)?;
+        let ledger_store: Arc<dyn icn_store::Store> =
+            Arc::new(icn_store::SledStore::open(&ledger_store_path)?);
+        let ledger = icn_ledger::Ledger::new(ledger_store)?;
+        let ledger_handle = Arc::new(RwLock::new(ledger));
+        let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
+        registry = registry.with_ledger(ledger_service);
+        registry = registry.with_raw_handle("ledger", ledger_handle);
+        tracing::info!("Ledger service initialized from apps/ledger");
+    }
 
     Ok(registry)
 }

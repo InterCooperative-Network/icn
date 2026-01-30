@@ -3166,6 +3166,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-governance-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "icn-governance",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-store",
+ "parking_lot 0.12.5",
+ "tracing",
+]
+
+[[package]]
 name = "icn-identity"
 version = "0.1.0"
 dependencies = [
@@ -3243,6 +3256,20 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "icn-ledger-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-ledger",
+ "icn-store",
+ "parking_lot 0.12.5",
  "tokio",
  "tracing",
 ]
@@ -3616,9 +3643,12 @@ dependencies = [
  "icn-ccl",
  "icn-core",
  "icn-gossip",
+ "icn-governance",
+ "icn-governance-app",
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
+ "icn-ledger-app",
  "icn-net",
  "icn-obs",
  "icn-rpc",
@@ -3627,6 +3657,7 @@ dependencies = [
  "icn-trust-app",
  "rpassword",
  "rustls",
+ "sled",
  "tokio",
  "tracing",
  "zeroize",
