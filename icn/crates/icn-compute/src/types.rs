@@ -411,6 +411,13 @@ pub enum ComputeMessage {
     NodeCapacityAnnounce {
         executor: String,
         capacity: crate::scheduler::NodeCapacity,
+        /// Cell this node belongs to. `None` = unaffiliated (Epic 6 #947).
+        #[serde(default)]
+        cell_id: Option<icn_kernel_api::CellId>,
+        /// Explicit capacity budget. `None` means use default for the
+        /// affiliation status (Epic 6 #947).
+        #[serde(default)]
+        capacity_budget: Option<crate::scheduler::CapacityBudget>,
     },
 
     // === Phase 16D: Actor Checkpointing & Migration ===

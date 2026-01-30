@@ -103,6 +103,9 @@ pub struct ComputeActor {
     capacity_budget: Arc<RwLock<crate::scheduler::CapacityBudget>>,
     /// Configuration for demand-feedback adjustment loop (Epic 2 #933)
     demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig,
+    /// Commons resource pool for tracking nodes contributing to the commons (Epic 6 #946).
+    /// Advisory scheduling state only — ledger is authoritative economic state.
+    commons_pool: Arc<RwLock<crate::commons_pool::CommonsPool>>,
     /// Resource refresh configuration
     resource_refresh_config: crate::scheduler::ResourceRefreshConfig,
     /// Current cached resource profile
@@ -146,6 +149,7 @@ impl ComputeActor {
             task_scope_map: Arc::new(Mutex::new(HashMap::new())),
             capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
+            commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
             shutdown_tx: tokio::sync::broadcast::channel(1).0,
@@ -482,6 +486,8 @@ impl ComputeActor {
                                     let msg = crate::types::ComputeMessage::NodeCapacityAnnounce {
                                         executor: own_did.clone(),
                                         capacity: new_capacity.clone(),
+                                        cell_id: None,
+                                        capacity_budget: None,
                                     };
                                     send_cb(msg);
                                 }
@@ -804,8 +810,14 @@ impl ComputeActor {
                 )
                 .await
             }
-            ComputeMessage::NodeCapacityAnnounce { executor, capacity } => {
-                self.on_capacity_announce(executor, capacity).await
+            ComputeMessage::NodeCapacityAnnounce {
+                executor,
+                capacity,
+                cell_id,
+                capacity_budget,
+            } => {
+                self.on_capacity_announce(executor, capacity, cell_id, capacity_budget)
+                    .await
             }
 
             // Phase 16D: Checkpoint & Migration messages

@@ -57,6 +57,7 @@ wat = "1.244"
 criterion = "0.5"
 tempfile = "3.24"
 icn-identity = { path = "../icn-identity" }
+icn-ledger = { path = "../icn-ledger" }
 
 [[bench]]
 name = "compute_bench"

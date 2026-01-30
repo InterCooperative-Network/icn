@@ -29,6 +29,7 @@ mod actor;
 mod actor_model;
 mod actor_runtime;
 mod checkpoint_store;
+pub mod commons_pool;
 mod dispute;
 mod error;
 mod executor;
@@ -59,6 +60,7 @@ pub use actor_runtime::{
 pub use checkpoint_store::{
     CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,
 };
+pub use commons_pool::{AggregateCapacity, CommonsParticipant, CommonsPool};
 pub use dispute::{
     ComputeDispute, ComputeResult as DisputeComputeResult, DisputeManager, DisputeResolution,
     DisputeStatus, Evidence, EvidenceType, VerificationMode,

@@ -669,11 +669,15 @@ impl ComputeActor {
         &self,
         executor: String,
         capacity: crate::scheduler::NodeCapacity,
+        cell_id: Option<icn_kernel_api::CellId>,
+        capacity_budget: Option<crate::scheduler::CapacityBudget>,
     ) -> Result<(), ComputeError> {
         tracing::debug!(
             executor = %executor,
             cpu_available = capacity.cpu_cores_available,
             memory_available = capacity.memory_mb_available,
+            has_cell = cell_id.is_some(),
+            has_budget = capacity_budget.is_some(),
             "Received capacity announcement"
         );
 
@@ -714,6 +718,66 @@ impl ComputeActor {
 
         // Update metrics for executor capacity
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+        drop(registry);
+
+        // --- Commons pool decision matrix (Epic 6 #947) ---
+        //
+        // | cell_id | capacity_budget | Behavior                                     |
+        // |---------|-----------------|----------------------------------------------|
+        // | None    | None            | Unaffiliated. Full commons: commons_share=1.0 |
+        // | None    | Some(b)         | Unaffiliated with explicit budget. Use b.     |
+        // | Some(_) | None            | Affiliated, no explicit budget. Use default.  |
+        // | Some(_) | Some(b)         | Affiliated with explicit budget. Use b.       |
+        //
+        // Invariant: affiliated nodes without explicit budget default to
+        // `CapacityBudget::default()` (0.10 commons), NOT full commons.
+        let effective_budget = match (&cell_id, capacity_budget) {
+            (None, None) => {
+                // Unaffiliated node — full commons participation.
+                crate::scheduler::CapacityBudget {
+                    local_reserve: 0.0,
+                    cell_share: 0.0,
+                    org_share: 0.0,
+                    federation_share: 0.0,
+                    commons_share: 1.0,
+                }
+            }
+            (None, Some(b)) => b,
+            (Some(_), None) => {
+                // Affiliated with no explicit budget — use default (0.10 commons).
+                crate::scheduler::CapacityBudget::default()
+            }
+            (Some(_), Some(b)) => b,
+        };
+
+        // Lock discipline: acquire write lock, mutate, release immediately.
+        let commons_share = effective_budget.commons_share;
+        if commons_share > 0.0 {
+            let participant = crate::commons_pool::CommonsParticipant {
+                did: executor.clone(),
+                capacity,
+                budget: effective_budget,
+                last_announce: std::time::Instant::now(),
+            };
+            let mut pool = self.commons_pool.write().await;
+            pool.add_participant(participant);
+            let count = pool.participant_count();
+            drop(pool);
+            tracing::debug!(
+                executor = %executor,
+                commons_share,
+                pool_size = count,
+                "Added/updated node in commons pool"
+            );
+        } else {
+            let mut pool = self.commons_pool.write().await;
+            pool.remove_participant(&executor);
+            drop(pool);
+            tracing::debug!(
+                executor = %executor,
+                "Removed node from commons pool (zero commons share)"
+            );
+        }
 
         Ok(())
     }
