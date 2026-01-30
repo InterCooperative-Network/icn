@@ -33,10 +33,16 @@ impl TrustServiceImplTokio {
     pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
         let own_did = {
             let rt = tokio::runtime::Handle::current();
-            tokio::task::block_in_place(|| rt.block_on(async { graph.read().await.own_did().clone() }))
+            tokio::task::block_in_place(|| {
+                rt.block_on(async { graph.read().await.own_did().clone() })
+            })
         };
         let oracle = Arc::new(TrustPolicyOracleTokio::new(graph.clone()));
-        Self { graph, oracle, own_did }
+        Self {
+            graph,
+            oracle,
+            own_did,
+        }
     }
 
     /// Get direct access to the TrustGraph
@@ -108,11 +114,8 @@ impl TrustService for TrustServiceImplTokio {
                         };
                         let new_score = (current - penalty).max(0.0);
                         let trust_score = icn_trust::TrustScore::unchecked(new_score);
-                        let edge = icn_trust::TrustEdge::new(
-                            own,
-                            identity_did.clone(),
-                            trust_score,
-                        );
+                        let edge =
+                            icn_trust::TrustEdge::new(own, identity_did.clone(), trust_score);
                         let mut graph = self.graph.write().await;
                         if let Err(e) = graph.add_edge(edge) {
                             tracing::warn!(
@@ -150,11 +153,8 @@ impl TrustService for TrustServiceImplTokio {
                         };
                         let new_score = (current + weight * 0.25).min(1.0);
                         let trust_score = icn_trust::TrustScore::unchecked(new_score);
-                        let edge = icn_trust::TrustEdge::new(
-                            own,
-                            identity_did.clone(),
-                            trust_score,
-                        );
+                        let edge =
+                            icn_trust::TrustEdge::new(own, identity_did.clone(), trust_score);
                         let mut graph = self.graph.write().await;
                         if let Err(e) = graph.add_edge(edge) {
                             tracing::warn!(
@@ -195,7 +195,10 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        (Arc::new(RwLock::new(TrustGraph::new(store, did.clone()))), did)
+        (
+            Arc::new(RwLock::new(TrustGraph::new(store, did.clone()))),
+            did,
+        )
     }
 
     #[tokio::test(flavor = "multi_thread")]
