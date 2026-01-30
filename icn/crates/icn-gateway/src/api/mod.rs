@@ -27,6 +27,7 @@ pub mod notifications;
 pub mod oracle;
 pub mod recurring_payments;
 pub mod sdis;
+pub mod services;
 pub mod sessions;
 pub mod steward;
 pub mod treasury;

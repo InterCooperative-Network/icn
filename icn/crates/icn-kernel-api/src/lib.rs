@@ -59,7 +59,7 @@ pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
 pub use identity::{DidResolver, IdentityService, Keystore};
-pub use naming::{Discovery, NamingService};
+pub use naming::{Discovery, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId};
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,

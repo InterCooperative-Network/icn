@@ -37,4 +37,5 @@ pub mod ledger;
 pub mod nat;
 pub mod network;
 pub mod rpc;
+pub mod service_discovery;
 pub mod storage;

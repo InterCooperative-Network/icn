@@ -56,6 +56,7 @@ pub mod pagination;
 pub mod rate_limit;
 pub mod security;
 pub mod server;
+pub mod service_discovery_mgr;
 pub mod session;
 pub mod steward_mgr;
 pub mod treasury_mgr;

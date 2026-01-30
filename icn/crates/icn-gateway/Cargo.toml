@@ -76,6 +76,7 @@ icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }
 icn-compute = { path = "../icn-compute" }
+icn-gossip = { path = "../icn-gossip" }
 icn-federation = { path = "../icn-federation", features = ["utoipa"] }
 icn-trust = { path = "../icn-trust" }
 icn-ccl = { path = "../icn-ccl" }
