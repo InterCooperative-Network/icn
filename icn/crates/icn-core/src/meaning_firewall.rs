@@ -130,16 +130,16 @@ mod tests {
     ///
     /// Current state (2026-01-30):
     /// - icn-gossip: CLEAN
-    /// - icn-net: 1 (dev-dep on icn-trust, PR #973 removes it)
+    /// - icn-net: 1 (dev-dep on icn-trust, removed by #915/PR #973)
     /// - icn-gateway: 2 (icn-trust + icn-governance)
     /// - icn-ledger: 2 (icn-trust + icn-governance)
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-gossip", 0), // CLEAN ✅
-            ("icn-net", 1),    // dev-dep on icn-trust (PR #973 removes it)
+            ("icn-gossip", 0),  // CLEAN ✅
+            ("icn-net", 1),     // dev-dep on icn-trust (removed by #915/PR #973)
             ("icn-gateway", 2), // icn-trust + icn-governance
-            ("icn-ledger", 2), // icn-trust + icn-governance
+            ("icn-ledger", 2),  // icn-trust + icn-governance
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -162,8 +162,9 @@ mod tests {
 
             if actual < expected_count {
                 panic!(
-                    "PROGRESS: {crate_name} now has only {actual} domain-crate deps \
-                     (expected {expected_count}). Update the pinned count in \
+                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
+                     {actual} domain-crate deps (was pinned at {expected_count}). \
+                     A dependency was removed — update the pinned count in \
                      meaning_firewall.rs::strict_cargo_dependency_violations()."
                 );
             }
@@ -201,8 +202,9 @@ mod tests {
 
             if actual < expected_count {
                 panic!(
-                    "PROGRESS: {crate_name} now has only {actual} `use icn_trust::` imports \
-                     (expected {expected_count}). Update the pinned count in \
+                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
+                     {actual} `use icn_trust::` imports (was pinned at {expected_count}). \
+                     An import was removed — update the pinned count in \
                      meaning_firewall.rs::strict_trust_import_violations()."
                 );
             }
@@ -312,7 +314,7 @@ mod tests {
             if is_clean {
                 "CLEAN"
             } else {
-                "VIOLATIONS DETECTED (expected until Phase 4 completes)"
+                "VIOLATIONS DETECTED (expected until Phase 2 kernel cleanup completes)"
             }
         );
     }
