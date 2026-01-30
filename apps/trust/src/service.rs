@@ -11,6 +11,10 @@ use std::sync::Arc;
 
 use crate::oracle::TrustPolicyOracle;
 
+/// Maximum reputation change per single event (25%).
+/// Used for both penalties (ProtocolViolation) and boosts (PositiveInteraction).
+const EVENT_WEIGHT_MULTIPLIER: f64 = 0.25;
+
 /// Trust service implementation
 ///
 /// This wraps TrustGraph and TrustPolicyOracle, exposing them through
@@ -74,7 +78,7 @@ impl TrustService for TrustServiceImpl {
                     category = %category,
                     "Trust event: protocol violation"
                 );
-                let penalty = severity * 0.25;
+                let penalty = severity * EVENT_WEIGHT_MULTIPLIER;
                 let current = {
                     let graph = self.graph.read();
                     match graph.compute_trust_score(&identity_did) {
@@ -87,7 +91,13 @@ impl TrustService for TrustServiceImpl {
                     }
                 };
                 let new_score = (current - penalty).max(0.0);
+                debug_assert!(
+                    (0.0..=1.0).contains(&new_score),
+                    "Trust score out of bounds: {new_score}"
+                );
                 let trust_score = icn_trust::TrustScore::unchecked(new_score);
+                // Uses default Social graph type — misbehavior events affect social
+                // trust rather than TechnicalReliability, which tracks uptime/latency.
                 let edge =
                     icn_trust::TrustEdge::new(self.own_did.clone(), identity_did, trust_score);
                 let mut graph = self.graph.write();
@@ -113,7 +123,11 @@ impl TrustService for TrustServiceImpl {
                     let graph = self.graph.read();
                     graph.compute_trust_score(&identity_did).unwrap_or(0.0)
                 };
-                let new_score = (current + weight * 0.25).min(1.0);
+                let new_score = (current + weight * EVENT_WEIGHT_MULTIPLIER).min(1.0);
+                debug_assert!(
+                    (0.0..=1.0).contains(&new_score),
+                    "Trust score out of bounds: {new_score}"
+                );
                 let trust_score = icn_trust::TrustScore::unchecked(new_score);
                 let edge =
                     icn_trust::TrustEdge::new(self.own_did.clone(), identity_did, trust_score);
