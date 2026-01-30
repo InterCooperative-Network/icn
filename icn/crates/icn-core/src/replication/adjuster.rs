@@ -27,6 +27,9 @@ pub struct AdjusterConfig {
 
     /// Fractional deviation from the target factor that triggers rebalance.
     /// Default: 0.2 (20% deviation).
+    ///
+    /// Not yet used — currently repairs trigger on any deviation. Will be
+    /// wired in the periodic rebalance loop (Phase 19/20).
     pub rebalance_threshold: f64,
 
     /// Maximum number of concurrent repair operations.
@@ -161,6 +164,8 @@ impl ScopedReplicationAdjuster {
                     let target_peers: Vec<String> = candidates
                         .into_iter()
                         .filter(|p| !existing.contains(p))
+                        // Only consider peers within the object's max_scope placement bound
+                        .filter(|p| self.is_replica_in_scope(p, max_scope))
                         .take(needed)
                         .collect();
 
@@ -236,12 +241,11 @@ impl ScopedReplicationAdjuster {
 
     /// Return peer DIDs that are within the given scope relative to the local node.
     ///
-    /// For `Cell` scope, returns cell members. For `Org` scope and wider, also
-    /// includes org peers known to the `CellService`.
-    ///
-    /// Note: For scopes wider than `Org`, a complete peer set would require
-    /// gossip-based discovery (handled by `ReplicationManager`). This method
-    /// provides the best-effort set from the `CellService` for adjuster use.
+    /// Currently returns cell members for all scope levels. For `Org` scope and
+    /// wider, this is an incomplete set — a `list_org_peers()` method on
+    /// `CellService` is needed to include non-cell org peers. The
+    /// `ReplicationManager` handles the full gossip-based peer set for
+    /// production use.
     // TODO(#924): For Federation+ scopes, integrate with gossip peer discovery.
     fn peers_in_scope(&self, scope: ScopeLevel) -> Vec<String> {
         if let Some(cell_id) = self.cell_service.local_cell() {

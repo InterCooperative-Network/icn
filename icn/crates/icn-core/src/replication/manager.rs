@@ -363,7 +363,7 @@ impl ReplicationManager {
     /// Strategy:
     /// 1. Filter peers by minimum trust score threshold
     /// 2. Exclude peers already serving as replicas
-    /// 3. If object is `Scoped` and `cell_service` is available, filter by scope
+    /// 3. If `replication_config` specifies a `max_scope` and `cell_service` is available, filter by scope
     /// 4. Sort by trust score (higher is better)
     /// 5. Return top N candidates
     async fn select_replica_candidates(

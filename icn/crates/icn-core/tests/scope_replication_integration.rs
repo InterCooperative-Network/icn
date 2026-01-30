@@ -258,6 +258,12 @@ async fn test_scope_health_report() {
 }
 
 /// Verify the manager uses per-object Scoped factor to decide replication health.
+///
+/// This test verifies that `trigger_health_check()` completes without error when
+/// a Scoped object meets its per-object target (factor=1) despite the global
+/// target being higher (5). The per-object target override behavior is tested
+/// more directly in the unit tests `test_manager_uses_per_object_target` and
+/// `test_manager_in_scope_count_without_cell_service`.
 #[tokio::test]
 async fn test_manager_scope_aware_health_check() -> Result<()> {
     let keypair = KeyPair::generate()?;
@@ -280,8 +286,9 @@ async fn test_manager_scope_aware_health_check() -> Result<()> {
     meta.add_replica("did:icn:peer1".to_string(), ReplicaHealth::Healthy);
     store.put_replica_metadata(&meta)?;
 
-    // Should be healthy despite global target=5, because per-object target=1
-    // We test the internal method indirectly through trigger_health_check
+    // Health check should complete without error. The per-object factor=1 is
+    // met (1 healthy replica), so no replication requests should be generated
+    // even though the global target is 5.
     let result = manager.trigger_health_check().await;
     assert!(result.is_ok());
 
