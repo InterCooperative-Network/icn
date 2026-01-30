@@ -206,3 +206,24 @@ fn test_ledger_store_shared_via_raw_handle() {
     assert!(retrieved.is_some(), "Should retrieve ledger store");
     assert!(Arc::ptr_eq(&store, &retrieved.unwrap()));
 }
+
+/// Verify that opening the same sled path twice fails with exclusive locking.
+///
+/// This test documents WHY the daemon must share store handles via raw_handle
+/// rather than letting the supervisor re-open the same path. On Linux, sled uses
+/// `flock(LOCK_EX)` which rejects a second open from a different file descriptor.
+#[test]
+fn test_sled_double_open_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("exclusive_db");
+
+    // First open succeeds
+    let _db1 = SledStore::open(&path).unwrap();
+
+    // Second open on the same path should fail (exclusive file lock)
+    let result = SledStore::open(&path);
+    assert!(
+        result.is_err(),
+        "Opening the same sled path twice should fail due to exclusive file locking"
+    );
+}

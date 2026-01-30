@@ -87,7 +87,10 @@ pub async fn init_ledger_services(
         Arc::new(RwLock::new(Ledger::new(store.clone())?))
     };
 
-    // Configure ledger with gossip, misbehavior detection, trust, and policies
+    // Configure ledger with gossip, misbehavior detection, trust, and policies.
+    // Note: This write lock is held for the entire configuration block (~60 lines).
+    // This is acceptable because it runs during supervisor startup before any
+    // concurrent readers exist. No contention is possible at this point.
     {
         let mut ledger = ledger_handle.write().await;
 

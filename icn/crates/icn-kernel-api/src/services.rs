@@ -399,6 +399,27 @@ pub trait CellService: Send + Sync {
 /// direct access to domain objects (e.g., TrustGraph for MisbehaviorDetector).
 /// The `raw_handles` field provides type-erased storage for these transition
 /// needs. These should be removed as components are fully migrated.
+///
+/// # Raw Handle Type Pattern
+///
+/// `raw_handle<T>` requires `T: Sized`, so `dyn Trait` objects cannot be stored
+/// directly. Use the appropriate pattern based on the stored type:
+///
+/// **Concrete type with trait upcast** (when consumers need a trait object):
+/// ```ignore
+/// // Store: Arc<SledParameterStore> (concrete, Sized)
+/// registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store);
+/// // Retrieve concrete, then upcast:
+/// let store: Arc<SledParameterStore> = registry.raw_handle(KEY)?;
+/// let trait_obj: Arc<dyn ProtocolParameterStore> = store;
+/// ```
+///
+/// **Wrapped type** (when the wrapper is Sized, e.g., `RwLock<T>`):
+/// ```ignore
+/// // Store and retrieve directly:
+/// registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
+/// let handle: Arc<RwLock<Ledger>> = registry.raw_handle(KEY)?;
+/// ```
 pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
