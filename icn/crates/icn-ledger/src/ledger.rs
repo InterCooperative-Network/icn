@@ -438,10 +438,18 @@ impl Ledger {
         self.journal_version
     }
 
-    /// Set the trust service for entry validation (kernel/app separated)
+    /// Set the trust service for entry validation (kernel/app separated).
     ///
-    /// When set, the ledger uses TrustService for trust score queries.
+    /// When set, the ledger uses `TrustService` for trust score queries.
     /// This enables proper separation between kernel (ledger) and domain (trust).
+    ///
+    /// # Degradation behaviour
+    ///
+    /// If no trust service is configured (or it is removed), every trust
+    /// query returns **0.0**.  This means:
+    /// - Fork resolution falls back to timestamp-based tie-breaking.
+    /// - Credit limit calculations use baseline-only values.
+    /// - Witness validation is skipped (with a metrics counter bump).
     pub fn set_trust_service(
         &mut self,
         trust_service: Arc<dyn icn_kernel_api::services::TrustService>,
@@ -456,6 +464,8 @@ impl Ledger {
     /// Returns 0.0 if no trust service is configured or DID parsing fails.
     pub(crate) fn get_trust_score(&self, did: &icn_identity::Did) -> f64 {
         if let Some(ref trust_service) = self.trust_service {
+            // TODO: implement From<&icn_identity::Did> for kernel Did to avoid
+            //       the string allocation here (low impact — once per entry).
             let kernel_did = icn_kernel_api::types::Did::from(did.to_string());
             return trust_service.trust_score(&kernel_did);
         }
@@ -463,11 +473,17 @@ impl Ledger {
         0.0
     }
 
-    /// Get trust score for a DID asynchronously (for async contexts)
+    /// Get trust score for a DID asynchronously (for async contexts).
     ///
     /// Returns 0.0 if no trust service is configured or DID parsing fails.
+    ///
+    /// # Deprecation
+    ///
+    /// `TrustService::trust_score()` is synchronous, so this wrapper adds no
+    /// value.  Prefer [`get_trust_score`](Self::get_trust_score) directly.
+    #[deprecated(note = "TrustService::trust_score() is sync — use get_trust_score() instead")]
+    #[allow(dead_code)]
     pub(crate) async fn get_trust_score_async(&self, did: &icn_identity::Did) -> f64 {
-        // TrustService::trust_score() is synchronous
         self.get_trust_score(did)
     }
 
@@ -1334,7 +1350,7 @@ impl Ledger {
         if self.trust_service.is_some() {
             let author_did = &entry.author;
             let min_trust = self.min_trust_for_entry;
-            let trust_score = self.get_trust_score_async(author_did).await;
+            let trust_score = self.get_trust_score(author_did);
 
             if trust_score < min_trust {
                 warn!(
