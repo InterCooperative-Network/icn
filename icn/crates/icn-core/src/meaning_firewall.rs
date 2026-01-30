@@ -30,6 +30,9 @@ const KERNEL_CRATES: &[&str] = &["icn-net", "icn-gateway", "icn-gossip", "icn-le
 const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
 
 /// Forbidden import patterns in kernel crates.
+/// Used as reference for what constitutes a Meaning Firewall violation.
+/// The strict_*_import_violations tests use `use icn_*::` patterns directly;
+/// bare type names here are too broad for automated scanning (appear in docs).
 #[allow(dead_code)]
 const FORBIDDEN_IMPORTS: &[&str] = &[
     "use icn_trust::",
@@ -211,7 +214,47 @@ mod tests {
         }
     }
 
-    /// Ensure icn-gossip remains clean (no icn-trust dependency).
+    /// Pinned `use icn_governance::` import count per kernel crate.
+    ///
+    /// Mirrors `strict_trust_import_violations` for governance imports.
+    /// Governance extraction is Phase 4 — these counts will ratchet to 0.
+    ///
+    /// Current state (2026-01-30):
+    /// - icn-net: CLEAN ✅
+    /// - icn-gossip: CLEAN ✅
+    /// - icn-ledger: CLEAN ✅
+    /// - icn-gateway: 17 (governance admin endpoints — Phase 4 work)
+    #[test]
+    fn strict_governance_import_violations() {
+        let expected: &[(&str, usize)] = &[
+            ("icn-net", 0),      // CLEAN ✅
+            ("icn-gossip", 0),   // CLEAN ✅
+            ("icn-ledger", 0),   // CLEAN ✅
+            ("icn-gateway", 17), // Phase 4 governance extraction pending
+        ];
+
+        for &(crate_name, expected_count) in expected {
+            let actual = count_imports_in_crate(crate_name, "use icn_governance::");
+
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: {crate_name} has {actual} `use icn_governance::` imports \
+                 (expected at most {expected_count}). \
+                 Do not add new icn_governance imports to kernel crates."
+            );
+
+            if actual < expected_count {
+                panic!(
+                    "ACTION REQUIRED (this is good news!): {crate_name} now has only \
+                     {actual} `use icn_governance::` imports (was pinned at {expected_count}). \
+                     An import was removed — update the pinned count in \
+                     meaning_firewall.rs::strict_governance_import_violations()."
+                );
+            }
+        }
+    }
+
+    /// Ensure icn-gossip remains clean (no domain-crate dependencies or imports).
     /// This crate was cleaned in Wave 1A and must stay clean.
     #[test]
     fn gossip_crate_stays_clean() {
@@ -226,11 +269,17 @@ mod tests {
             );
         }
 
-        let trust_imports = count_imports_in_crate("icn-gossip", "use icn_trust::");
-        assert_eq!(
-            trust_imports, 0,
-            "icn-gossip has {trust_imports} icn_trust imports — must be 0"
-        );
+        // Verify no domain-crate imports leak into gossip source.
+        // Uses `use icn_*::` patterns (not bare type names from
+        // FORBIDDEN_IMPORTS, which can appear in doc comments/strings).
+        for domain in DOMAIN_CRATES {
+            let import_pattern = format!("use {}::", domain.replace('-', "_"));
+            let hits = count_imports_in_crate("icn-gossip", &import_pattern);
+            assert_eq!(
+                hits, 0,
+                "icn-gossip has {hits} `{import_pattern}` imports — must be 0"
+            );
+        }
     }
 
     /// Verify kernel-api provides the required abstraction types.
