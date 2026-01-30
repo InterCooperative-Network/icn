@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Complete Daemon Service Wiring (2026-01-30)
+
+**Wire GovernanceService and LedgerService into daemon** (PR #968, closes #908, #909):
+
+Completes kernel/app separation for all three domain services (trust, governance, ledger). The daemon now owns the full lifecycle of sled-backed stores and passes handles to the supervisor via `ServiceRegistry`.
+
+- Wire `GovernanceService` from `apps/governance` into `build_service_registry()`
+- Wire `LedgerService` from `apps/ledger` into `build_service_registry()`
+- Pass `Arc<SledStore>` via `raw_handle` to prevent sled double-open (exclusive file locking)
+- Add `ServiceRegistry` key constants (`TRUST_GRAPH_KEY`, `PROTOCOL_PARAM_STORE_KEY`, `LEDGER_KEY`, `LEDGER_STORE_KEY`) to prevent typo-induced silent failures
+- Add `Config::protocol_params_path()` and `Config::ledger_store_path()` helpers
+- Supervisor `init_governance` and `init_ledger` accept optional daemon-provided handles with fallback creation for standalone use
+- 8 integration tests covering handle roundtrip, type safety, mutation propagation, and sled double-open prevention
+- Updated `KERNEL_APP_SEPARATION.md` with raw_handle type patterns, store path structure, and migration status
+
 ### Added - Kernel/App Separation Architecture (2026-01-26)
 
 **Major Architecture Initiative** (PR #855, Issue #856):
