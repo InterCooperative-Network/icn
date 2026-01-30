@@ -393,6 +393,10 @@ pub enum ComputeMessage {
         /// Backward-compatible: defaults to None.
         #[serde(default)]
         cell_affinity: Option<icn_kernel_api::CellId>,
+        /// Explicit list of allowed scope levels (Epic 2).
+        /// Empty means all scopes accepted.
+        #[serde(default)]
+        allowed_scopes: Vec<icn_kernel_api::ScopeLevel>,
     },
     /// Executor offers to execute a task (Phase 16B)
     PlacementOffer {

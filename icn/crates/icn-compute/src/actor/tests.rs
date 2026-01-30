@@ -332,6 +332,7 @@ async fn test_placement_negotiation_multi_executor() {
             .as_secs(),
         max_scope: None,
         cell_affinity: None,
+        allowed_scopes: vec![],
     };
 
     tracing::info!("Broadcasting PlacementRequest to all executors");
@@ -453,6 +454,7 @@ async fn test_locality_aware_placement_scoring() {
         requested_at: 0,
         max_scope: None,
         cell_affinity: None,
+        allowed_scopes: vec![],
     };
 
     // Executor A: High trust (0.8), no locality information

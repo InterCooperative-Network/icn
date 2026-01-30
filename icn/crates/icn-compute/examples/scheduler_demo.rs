@@ -132,6 +132,7 @@ fn demo_gpu_placement() {
             requested_at: 0,
             max_scope: None,
             cell_affinity: None,
+            allowed_scopes: vec![],
         };
 
         match policy.score_task(

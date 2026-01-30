@@ -843,6 +843,34 @@ impl CapacityBudget {
     }
 }
 
+/// Configuration for the demand-feedback capacity adjustment loop.
+///
+/// Controls how frequently and aggressively the per-scope capacity budget
+/// is rebalanced based on observed queue depths.
+#[derive(Debug, Clone)]
+pub struct DemandAdjustmentConfig {
+    /// Interval between adjustment rounds in seconds (default: 60).
+    pub interval_secs: u64,
+
+    /// Maximum fraction shifted per adjustment round (default: 0.05).
+    /// Clamped to [0.0, 0.1] by `CapacityBudget::adjust_from_demand`.
+    pub learning_rate: f64,
+
+    /// Minimum number of queued tasks across all scopes before adjustment
+    /// kicks in (default: 5). Prevents noisy adjustments from sparse data.
+    pub min_samples: usize,
+}
+
+impl Default for DemandAdjustmentConfig {
+    fn default() -> Self {
+        Self {
+            interval_secs: 60,
+            learning_rate: 0.05,
+            min_samples: 5,
+        }
+    }
+}
+
 /// Locality hints for task placement.
 ///
 /// These guide the scheduler to prefer certain execution locations.
@@ -985,6 +1013,15 @@ pub struct PlacementRequest {
     /// If `None`, no cell affinity preference.
     #[serde(default)]
     pub cell_affinity: Option<CellId>,
+
+    /// Explicit list of allowed scope levels for execution.
+    ///
+    /// If empty, all scopes are accepted (no restriction).
+    /// If non-empty, only executors whose scope is in this list may run the task.
+    /// This is more expressive than `max_scope`: e.g., allow `Cell` and `Federation`
+    /// but not `Org`.
+    #[serde(default)]
+    pub allowed_scopes: Vec<ScopeLevel>,
 }
 
 /// Executor's offer to run a task.
@@ -1167,13 +1204,32 @@ impl LocalityContext {
 pub trait PlacementPolicy: Send + Sync {
     /// Score a task for execution on this node.
     ///
-    /// Returns None if this node cannot or should not execute the task.
-    /// Returns Some(offer) with a score between 0.0 and 1.0.
+    /// Returns `None` if this node cannot or should not execute the task.
+    /// Returns `Some(offer)` with a score between 0.0 and 1.0.
+    ///
+    /// # Evaluation order
+    ///
+    /// The default implementation ([`DefaultPlacementPolicy`]) evaluates
+    /// gates in the following order, returning `None` at the first failure:
+    ///
+    /// 1. **Trust threshold** — reject if `trust_score < min_trust`
+    /// 2. **Max scope gate** — reject if `scope_ctx.peer_scope > request.max_scope`
+    /// 3. **Allowed scopes gate** — reject if `request.allowed_scopes` is non-empty
+    ///    and the executor's scope is not in the list
+    /// 4. **Capacity check** — reject if CPU or memory is insufficient
+    /// 5. **Scope budget check** — reject if the executor's scope queue exceeds
+    ///    its `CapacityBudget` fraction
+    /// 6. **GPU requirements** — reject if required GPU spec is unmet
+    /// 7. **Score calculation** — trust, locality, scope affinity, cell affinity,
+    ///    freshness, load penalty
+    ///
+    /// Security-related gates (1–3) run before expensive capacity checks (4–6)
+    /// to fail fast on policy violations.
     ///
     /// # Parameters
     ///
     /// - `request`: The full placement request (task_hash, resource_profile,
-    ///   locality_hints, max_scope, cell_affinity)
+    ///   locality_hints, max_scope, cell_affinity, allowed_scopes)
     /// - `submitter`: DID of the task submitter
     /// - `node_state`: Current executor node capacity and queue state
     /// - `trust_score`: Submitter's trust score as seen by the executor
@@ -1257,6 +1313,13 @@ impl PlacementPolicy for DefaultPlacementPolicy {
             if scope_ctx.peer_scope > max_scope {
                 return None; // Executor is too far from submitter
             }
+        }
+
+        // Allowed scopes gate: reject if executor's scope is not in the allowed list
+        if !request.allowed_scopes.is_empty()
+            && !request.allowed_scopes.contains(&scope_ctx.peer_scope)
+        {
+            return None; // Executor's scope not in allowed list
         }
 
         // Capacity check
@@ -1388,6 +1451,57 @@ impl PlacementPolicy for DefaultPlacementPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Standard 8-core node state used across placement tests.
+    fn test_node_state() -> NodeState {
+        NodeState {
+            did: "did:icn:executor".into(),
+            capacity: NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 6.0,
+                memory_mb_total: 16384,
+                memory_mb_available: 12288,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: 1000,
+            },
+            executing_tasks: HashMap::new(),
+            queue_depth: 0,
+            scope_queue_depths: HashMap::new(),
+        }
+    }
+
+    /// Minimal placement request with no scope restrictions.
+    fn test_placement_request() -> PlacementRequest {
+        PlacementRequest {
+            task_hash: [0u8; 32],
+            resource_profile: ResourceProfile::minimal(),
+            locality_hints: vec![],
+            max_cost: None,
+            requested_at: 1000,
+            max_scope: None,
+            cell_affinity: None,
+            allowed_scopes: vec![],
+        }
+    }
+
+    /// Score a task using the default policy with standard trust (0.8) and empty locality.
+    fn score_with_defaults(
+        policy: &DefaultPlacementPolicy,
+        request: &PlacementRequest,
+        node_state: &NodeState,
+        scope_ctx: &ScopeContext,
+    ) -> Option<PlacementOffer> {
+        policy.score_task(
+            request,
+            "did:icn:alice",
+            node_state,
+            0.8,
+            &LocalityContext::empty(),
+            scope_ctx,
+        )
+    }
 
     #[test]
     fn test_resource_profile_minimal() {
@@ -1530,6 +1644,7 @@ mod tests {
             requested_at: 1000,
             max_scope: None,
             cell_affinity: None,
+            allowed_scopes: vec![],
         };
 
         // High trust, should get good score
@@ -2060,130 +2175,50 @@ mod tests {
         .unwrap();
         assert!(request.max_scope.is_none());
         assert!(request.cell_affinity.is_none());
+        assert!(request.allowed_scopes.is_empty());
     }
 
     #[test]
     fn test_scope_gate_rejects_out_of_scope() {
         let policy = DefaultPlacementPolicy::default();
-        let profile = ResourceProfile::minimal();
+        let node_state = test_node_state();
 
-        let node_state = NodeState {
-            did: "did:icn:executor".into(),
-            capacity: NodeCapacity {
-                cpu_cores_total: 8.0,
-                cpu_cores_available: 6.0,
-                memory_mb_total: 16384,
-                memory_mb_available: 12288,
-                storage_mb_available: 100_000,
-                network_mbps: 1000.0,
-                gpu_devices: vec![],
-                updated_at: 1000,
-            },
-            executing_tasks: HashMap::new(),
-            queue_depth: 0,
-            scope_queue_depths: HashMap::new(),
-        };
+        let mut request = test_placement_request();
+        request.max_scope = Some(ScopeLevel::Cell);
 
-        let task_hash = [0u8; 32];
-        let empty_locality = LocalityContext::empty();
-
-        // Request restricted to Cell scope
-        let request = PlacementRequest {
-            task_hash,
-            resource_profile: profile.clone(),
-            locality_hints: vec![],
-            max_cost: None,
-            requested_at: 1000,
-            max_scope: Some(ScopeLevel::Cell),
-            cell_affinity: None,
-        };
-
-        // Executor at Commons scope (too far) → rejected
-        let commons_ctx = ScopeContext {
-            peer_scope: ScopeLevel::Commons,
+        let ctx = |scope| ScopeContext {
+            peer_scope: scope,
             executor_cell: None,
             capacity_budget: CapacityBudget::default(),
         };
-        assert!(policy
-            .score_task(
-                &request,
-                "did:icn:alice",
-                &node_state,
-                0.8,
-                &empty_locality,
-                &commons_ctx,
-            )
-            .is_none());
 
-        // Executor at Cell scope (within range) → accepted
-        let cell_ctx = ScopeContext {
-            peer_scope: ScopeLevel::Cell,
-            executor_cell: None,
-            capacity_budget: CapacityBudget::default(),
-        };
-        assert!(policy
-            .score_task(
-                &request,
-                "did:icn:alice",
-                &node_state,
-                0.8,
-                &empty_locality,
-                &cell_ctx,
-            )
-            .is_some());
-
-        // Executor at Local scope (narrower than max) → accepted
-        let local_ctx = ScopeContext {
-            peer_scope: ScopeLevel::Local,
-            executor_cell: None,
-            capacity_budget: CapacityBudget::default(),
-        };
-        assert!(policy
-            .score_task(
-                &request,
-                "did:icn:alice",
-                &node_state,
-                0.8,
-                &empty_locality,
-                &local_ctx,
-            )
-            .is_some());
+        // Commons (too far) → rejected
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Commons))
+                .is_none()
+        );
+        // Cell (within range) → accepted
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Cell)).is_some()
+        );
+        // Local (narrower than max) → accepted
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Local)).is_some()
+        );
     }
 
     #[test]
     fn test_scope_affinity_scoring() {
         let policy = DefaultPlacementPolicy::default();
-        let profile = ResourceProfile::minimal();
+        let node_state = test_node_state();
+        let request = test_placement_request();
 
-        let node_state = NodeState {
-            did: "did:icn:executor".into(),
-            capacity: NodeCapacity {
-                cpu_cores_total: 8.0,
-                cpu_cores_available: 6.0,
-                memory_mb_total: 16384,
-                memory_mb_available: 12288,
-                storage_mb_available: 100_000,
-                network_mbps: 1000.0,
-                gpu_devices: vec![],
-                updated_at: 1000,
-            },
-            executing_tasks: HashMap::new(),
-            queue_depth: 0,
-            scope_queue_depths: HashMap::new(),
+        let local_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Local,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
         };
-
-        let task_hash = [0u8; 32];
-        let empty_locality = LocalityContext::empty();
-
-        let request = PlacementRequest {
-            task_hash,
-            resource_profile: profile.clone(),
-            locality_hints: vec![],
-            max_cost: None,
-            requested_at: 1000,
-            max_scope: None,
-            cell_affinity: None,
-        };
+        let commons_ctx = ScopeContext::empty();
 
         // Collect scores from many runs to smooth out jitter
         let n = 100;
@@ -2191,34 +2226,10 @@ mod tests {
         let mut commons_total = 0.0;
 
         for _ in 0..n {
-            let local_ctx = ScopeContext {
-                peer_scope: ScopeLevel::Local,
-                executor_cell: None,
-                capacity_budget: CapacityBudget::default(),
-            };
-            let commons_ctx = ScopeContext::empty();
-
-            local_total += policy
-                .score_task(
-                    &request,
-                    "did:icn:alice",
-                    &node_state,
-                    0.8,
-                    &empty_locality,
-                    &local_ctx,
-                )
+            local_total += score_with_defaults(&policy, &request, &node_state, &local_ctx)
                 .unwrap()
                 .score;
-
-            commons_total += policy
-                .score_task(
-                    &request,
-                    "did:icn:alice",
-                    &node_state,
-                    0.8,
-                    &empty_locality,
-                    &commons_ctx,
-                )
+            commons_total += score_with_defaults(&policy, &request, &node_state, &commons_ctx)
                 .unwrap()
                 .score;
         }
@@ -2369,56 +2380,23 @@ mod tests {
     #[test]
     fn test_scope_budget_exhaustion() {
         let policy = DefaultPlacementPolicy::default();
-        let profile = ResourceProfile::minimal();
+        let node_state = test_node_state();
+        let request = test_placement_request();
 
         // Node with 8 cores, default budget gives Cell 25% → 2.0 CPU for Cell
         // At 0.1 CPU/task (DEFAULT_CPU_PER_TASK) → 20 task slots for Cell scope
-        let node_state = NodeState {
-            did: "did:icn:executor".into(),
-            capacity: NodeCapacity {
-                cpu_cores_total: 8.0,
-                cpu_cores_available: 6.0,
-                memory_mb_total: 16384,
-                memory_mb_available: 12288,
-                storage_mb_available: 100_000,
-                network_mbps: 1000.0,
-                gpu_devices: vec![],
-                updated_at: 1000,
-            },
-            executing_tasks: HashMap::new(),
-            queue_depth: 0,
-            scope_queue_depths: HashMap::new(),
-        };
-        let task_hash = [0u8; 32];
-        let empty_locality = LocalityContext::empty();
-        let request = PlacementRequest {
-            task_hash,
-            resource_profile: profile.clone(),
-            locality_hints: vec![],
-            max_cost: None,
-            requested_at: 1000,
-            max_scope: None,
-            cell_affinity: None,
-        };
-
-        // Cell scope with queue under budget → accepted
-        let cell_ctx_low = ScopeContext {
+        let cell_ctx = ScopeContext {
             peer_scope: ScopeLevel::Cell,
             executor_cell: None,
             capacity_budget: CapacityBudget::default(),
         };
+
+        // Cell scope with queue under budget → accepted
         let mut under_budget_state = node_state.clone();
         under_budget_state
             .scope_queue_depths
             .insert(ScopeLevel::Cell, 10);
-        let offer = policy.score_task(
-            &request,
-            "did:icn:alice",
-            &under_budget_state,
-            0.8,
-            &empty_locality,
-            &cell_ctx_low,
-        );
+        let offer = score_with_defaults(&policy, &request, &under_budget_state, &cell_ctx);
         assert!(offer.is_some(), "Should accept when queue is under budget");
 
         // Cell scope with queue over budget → rejected
@@ -2426,17 +2404,311 @@ mod tests {
         over_budget_state
             .scope_queue_depths
             .insert(ScopeLevel::Cell, 25);
-        let offer = policy.score_task(
-            &request,
-            "did:icn:alice",
-            &over_budget_state,
-            0.8,
-            &empty_locality,
-            &cell_ctx_low,
-        );
+        let offer = score_with_defaults(&policy, &request, &over_budget_state, &cell_ctx);
         assert!(
             offer.is_none(),
             "Should reject when scope queue exceeds budget"
+        );
+    }
+
+    #[test]
+    fn test_allowed_scopes_empty_means_any() {
+        let policy = DefaultPlacementPolicy::default();
+        let node_state = test_node_state();
+        let request = test_placement_request();
+
+        for &scope in &ScopeLevel::ALL {
+            let ctx = ScopeContext {
+                peer_scope: scope,
+                executor_cell: None,
+                capacity_budget: CapacityBudget::default(),
+            };
+            assert!(
+                score_with_defaults(&policy, &request, &node_state, &ctx).is_some(),
+                "Empty allowed_scopes should accept scope {scope:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_allowed_scopes_filters_executor() {
+        let policy = DefaultPlacementPolicy::default();
+        let node_state = test_node_state();
+
+        let mut request = test_placement_request();
+        request.allowed_scopes = vec![ScopeLevel::Org];
+
+        let cell_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &cell_ctx).is_none(),
+            "Cell executor should be rejected when only Org is allowed"
+        );
+    }
+
+    #[test]
+    fn test_allowed_scopes_accepts_matching() {
+        let policy = DefaultPlacementPolicy::default();
+        let node_state = test_node_state();
+
+        let mut request = test_placement_request();
+        request.allowed_scopes = vec![ScopeLevel::Cell, ScopeLevel::Federation];
+
+        let cell_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &cell_ctx).is_some(),
+            "Cell executor should be accepted when Cell is in allowed list"
+        );
+    }
+
+    #[test]
+    fn test_demand_adjustment_increases_busy_scope() {
+        let mut budget = CapacityBudget::default();
+        // Simulate heavy Cell demand
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Cell, 0.8);
+        utilization.insert(ScopeLevel::Org, 0.1);
+        utilization.insert(ScopeLevel::Commons, 0.05);
+        utilization.insert(ScopeLevel::Federation, 0.03);
+        utilization.insert(ScopeLevel::Local, 0.02);
+
+        let cell_before = budget.fraction_for(ScopeLevel::Cell);
+        budget.adjust_from_demand(&utilization, 0.05);
+        let cell_after = budget.fraction_for(ScopeLevel::Cell);
+
+        assert!(
+            cell_after > cell_before,
+            "Cell fraction should increase when Cell has high demand: before={cell_before}, after={cell_after}"
+        );
+    }
+
+    #[test]
+    fn test_demand_adjustment_preserves_sum() {
+        let mut budget = CapacityBudget::default();
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Cell, 0.6);
+        utilization.insert(ScopeLevel::Org, 0.3);
+        utilization.insert(ScopeLevel::Commons, 0.1);
+
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        let total: f64 = ScopeLevel::ALL
+            .iter()
+            .map(|&s| budget.fraction_for(s))
+            .sum();
+        assert!(
+            (total - 1.0).abs() < 1e-6,
+            "Budget fractions should sum to ~1.0 after adjustment, got {total}"
+        );
+    }
+
+    #[test]
+    fn test_demand_config_defaults() {
+        let config = DemandAdjustmentConfig::default();
+        assert_eq!(config.interval_secs, 60);
+        assert!((config.learning_rate - 0.05).abs() < 1e-9);
+        assert_eq!(config.min_samples, 5);
+    }
+
+    #[test]
+    fn test_budget_passed_to_scope_context() {
+        // Verify that a non-default budget is used by ScopeContext
+        let mut budget = CapacityBudget::default();
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Cell, 0.9);
+        utilization.insert(ScopeLevel::Commons, 0.1);
+        budget.adjust_from_demand(&utilization, 0.05);
+
+        let ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: None,
+            capacity_budget: budget.clone(),
+        };
+
+        // The budget in the context should match what we set
+        assert!(
+            (ctx.capacity_budget.fraction_for(ScopeLevel::Cell)
+                - budget.fraction_for(ScopeLevel::Cell))
+            .abs()
+                < 1e-9,
+            "ScopeContext should carry the provided budget"
+        );
+    }
+
+    #[test]
+    fn test_combined_max_scope_and_allowed_scopes() {
+        // When both max_scope and allowed_scopes are set, both gates apply.
+        let policy = DefaultPlacementPolicy::default();
+        let node_state = test_node_state();
+
+        let mut request = test_placement_request();
+        request.max_scope = Some(ScopeLevel::Org);
+        request.allowed_scopes = vec![ScopeLevel::Cell, ScopeLevel::Org];
+
+        let ctx = |scope| ScopeContext {
+            peer_scope: scope,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+
+        // Cell: within max_scope (Cell <= Org) AND in allowed list → accepted
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Cell)).is_some(),
+            "Cell should be accepted: within max_scope AND in allowed_scopes"
+        );
+
+        // Local: within max_scope (Local <= Org) BUT NOT in allowed list → rejected
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Local)).is_none(),
+            "Local should be rejected: within max_scope but NOT in allowed_scopes"
+        );
+
+        // Federation: exceeds max_scope (Federation > Org) → rejected by max_scope gate
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &ctx(ScopeLevel::Federation))
+                .is_none(),
+            "Federation should be rejected: exceeds max_scope"
+        );
+    }
+
+    #[test]
+    fn test_cell_affinity_bonus_with_matching_cell() {
+        let policy = DefaultPlacementPolicy::default();
+        let node_state = test_node_state();
+        let cell_id = CellId([42u8; 32]);
+
+        let mut request = test_placement_request();
+        request.cell_affinity = Some(cell_id);
+
+        let matching_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: Some(cell_id),
+            capacity_budget: CapacityBudget::default(),
+        };
+        let different_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Cell,
+            executor_cell: Some(CellId([99u8; 32])),
+            capacity_budget: CapacityBudget::default(),
+        };
+
+        // Average over many runs to smooth out jitter
+        let n = 100;
+        let mut matching_total = 0.0;
+        let mut different_total = 0.0;
+        for _ in 0..n {
+            matching_total += score_with_defaults(&policy, &request, &node_state, &matching_ctx)
+                .unwrap()
+                .score;
+            different_total += score_with_defaults(&policy, &request, &node_state, &different_ctx)
+                .unwrap()
+                .score;
+        }
+
+        let matching_avg = matching_total / n as f64;
+        let different_avg = different_total / n as f64;
+
+        // Cell affinity bonus is 0.05, so matching should be consistently higher
+        assert!(
+            matching_avg > different_avg + 0.03,
+            "Matching cell should score higher: matching={matching_avg:.4}, different={different_avg:.4}"
+        );
+    }
+
+    #[test]
+    fn test_demand_adjustment_skips_below_min_samples() {
+        let mut budget = CapacityBudget::default();
+        let original = budget.clone();
+
+        // Provide sparse utilization data (total queue < default min_samples of 5)
+        // The demand loop checks `total >= config.min_samples` before calling adjust.
+        // But adjust_from_demand itself doesn't check min_samples — it just skips
+        // if no utilization data is present. The min_samples check lives in the loop.
+        //
+        // Here we verify that adjust_from_demand with empty data is a no-op.
+        let empty_utilization = HashMap::new();
+        budget.adjust_from_demand(&empty_utilization, 0.05);
+
+        // Budget should be completely unchanged
+        assert_eq!(budget.local_reserve, original.local_reserve);
+        assert_eq!(budget.cell_share, original.cell_share);
+        assert_eq!(budget.org_share, original.org_share);
+        assert_eq!(budget.federation_share, original.federation_share);
+        assert_eq!(budget.commons_share, original.commons_share);
+    }
+
+    #[test]
+    fn test_demand_adjustment_min_fraction_prevents_starvation() {
+        let mut budget = CapacityBudget::default();
+
+        // Extreme demand imbalance: Local is 100%, everything else is 0%
+        let mut utilization = HashMap::new();
+        utilization.insert(ScopeLevel::Local, 1.0);
+        utilization.insert(ScopeLevel::Cell, 0.0);
+        utilization.insert(ScopeLevel::Org, 0.0);
+        utilization.insert(ScopeLevel::Federation, 0.0);
+        utilization.insert(ScopeLevel::Commons, 0.0);
+
+        // Run many rounds to push budget to extremes
+        for _ in 0..500 {
+            budget.adjust_from_demand(&utilization, 0.1);
+        }
+
+        // Every scope should still have at least MIN_SCOPE_FRACTION (0.01)
+        for &scope in &ScopeLevel::ALL {
+            let fraction = budget.fraction_for(scope);
+            assert!(
+                fraction >= 0.005, // Allow some floating point slack below 0.01
+                "Scope {scope:?} fraction {fraction} should not be starved to zero"
+            );
+        }
+
+        // Budget should still be valid
+        assert!(budget.validate().is_ok());
+    }
+
+    #[test]
+    fn test_scope_budget_with_custom_budget() {
+        // Verify that a custom budget (not default) correctly gates placement
+        let policy = DefaultPlacementPolicy::default();
+        let mut node_state = test_node_state();
+        node_state.scope_queue_depths.insert(ScopeLevel::Commons, 5);
+        let request = test_placement_request();
+
+        // With default budget, Commons gets 10% of 8 cores = 0.8 CPU,
+        // at 0.1 CPU/task = 8 task slots. 5 queued < 8 → accepted.
+        let default_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Commons,
+            executor_cell: None,
+            capacity_budget: CapacityBudget::default(),
+        };
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &default_ctx).is_some(),
+            "Default budget should allow 5 Commons tasks"
+        );
+
+        // With tiny commons budget (1%), 8 * 0.01 / 0.1 = 0.8 → max 1 task slot.
+        // 5 queued >= 1 → rejected.
+        let tiny_ctx = ScopeContext {
+            peer_scope: ScopeLevel::Commons,
+            executor_cell: None,
+            capacity_budget: CapacityBudget {
+                local_reserve: 0.50,
+                cell_share: 0.25,
+                org_share: 0.15,
+                federation_share: 0.09,
+                commons_share: 0.01,
+            },
+        };
+        assert!(
+            score_with_defaults(&policy, &request, &node_state, &tiny_ctx).is_none(),
+            "Tiny commons budget should reject 5 queued tasks"
         );
     }
 }

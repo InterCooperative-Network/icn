@@ -91,6 +91,18 @@ pub struct ComputeActor {
     /// Rate limiter for federated announcements (per cooperative)
     /// Maps cooperative_id -> (last_announce_time, count_in_window)
     federated_announce_rate_limiter: Arc<Mutex<HashMap<String, (u64, u32)>>>,
+    /// Cell service for scope-aware placement (Epic 2 #932)
+    cell_service: Option<Arc<dyn icn_kernel_api::CellService>>,
+    /// Per-scope queue depths for demand tracking (Epic 2 #933)
+    scope_queue_depths: Arc<Mutex<HashMap<icn_kernel_api::ScopeLevel, usize>>>,
+    /// Maps task_hash → scope level for decrement on completion (Epic 2 #933)
+    task_scope_map: Arc<Mutex<HashMap<TaskHash, icn_kernel_api::ScopeLevel>>>,
+    /// Live capacity budget adjusted by demand feedback (Epic 2 #933).
+    /// Uses RwLock because reads (every placement request) vastly outnumber
+    /// writes (once per demand adjustment interval, default 60s).
+    capacity_budget: Arc<RwLock<crate::scheduler::CapacityBudget>>,
+    /// Configuration for demand-feedback adjustment loop (Epic 2 #933)
+    demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig,
     /// Resource refresh configuration
     resource_refresh_config: crate::scheduler::ResourceRefreshConfig,
     /// Current cached resource profile
@@ -129,6 +141,11 @@ impl ComputeActor {
             federation_registry: None, // Phase 21: Set via set_federation_registry()
             own_cooperative_id: None,  // Phase 21: Set via set_cooperative_id()
             federated_announce_rate_limiter: Arc::new(Mutex::new(HashMap::new())),
+            cell_service: None,
+            scope_queue_depths: Arc::new(Mutex::new(HashMap::new())),
+            task_scope_map: Arc::new(Mutex::new(HashMap::new())),
+            capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
+            demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
             shutdown_tx: tokio::sync::broadcast::channel(1).0,
@@ -262,6 +279,22 @@ impl ComputeActor {
         self.own_cooperative_id.as_deref()
     }
 
+    /// Set the demand adjustment configuration (Epic 2 #933).
+    pub fn set_demand_adjustment_config(
+        &mut self,
+        config: crate::scheduler::DemandAdjustmentConfig,
+    ) {
+        self.demand_adjustment_config = config;
+    }
+
+    /// Set the cell service for scope-aware placement (Epic 2 #932).
+    ///
+    /// When set, placement scoring uses real scope relationships from the
+    /// cell service instead of defaulting to `ScopeContext::empty()`.
+    pub fn set_cell_service(&mut self, service: Arc<dyn icn_kernel_api::CellService>) {
+        self.cell_service = Some(service);
+    }
+
     /// Check if we're at capacity for claiming new tasks
     async fn at_capacity(&self) -> bool {
         let registry = self.executor_registry.lock().await;
@@ -301,10 +334,16 @@ impl ComputeActor {
     pub fn spawn(self) -> ComputeHandle {
         let (tx, mut rx) = mpsc::channel::<ComputeCommand>(256);
 
+        if self.cell_service.is_none() {
+            tracing::warn!("CellService not configured; all peers treated as Commons scope");
+        }
+
         // Clone Arc references for the timeout checker
         let task_manager_clone = Arc::clone(&self.task_manager);
         let executor_registry_clone = Arc::clone(&self.executor_registry);
         let send_callback_clone = self.send_callback.clone();
+        let scope_depths_clone = Arc::clone(&self.scope_queue_depths);
+        let task_scope_map_clone = Arc::clone(&self.task_scope_map);
 
         // Spawn timeout checker task
         tokio::spawn(async move {
@@ -315,6 +354,8 @@ impl ComputeActor {
                     &task_manager_clone,
                     &executor_registry_clone,
                     &send_callback_clone,
+                    &scope_depths_clone,
+                    &task_scope_map_clone,
                 )
                 .await
                 {
@@ -458,6 +499,58 @@ impl ComputeActor {
                         }
                         _ = shutdown_rx.recv() => {
                             tracing::info!("Resource refresh task received shutdown signal");
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+
+        // Spawn demand-feedback capacity adjustment loop (Epic 2 #933)
+        {
+            let scope_depths = Arc::clone(&self.scope_queue_depths);
+            let capacity_budget = Arc::clone(&self.capacity_budget);
+            let config = self.demand_adjustment_config.clone();
+            let mut shutdown_rx = self.shutdown_tx.subscribe();
+
+            tokio::spawn(async move {
+                tracing::info!(
+                    interval_secs = config.interval_secs,
+                    learning_rate = config.learning_rate,
+                    min_samples = config.min_samples,
+                    "Demand adjustment loop started"
+                );
+                let mut interval =
+                    tokio::time::interval(tokio::time::Duration::from_secs(config.interval_secs));
+                // Skip the immediate first tick
+                interval.tick().await;
+
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            let depths = scope_depths.lock().await;
+                            let total: usize = depths.values().sum();
+
+                            // Only adjust if we have enough data points
+                            if total >= config.min_samples {
+                                // Build utilization map: fraction of total queue per scope
+                                let mut utilization = HashMap::new();
+                                for (&scope, &count) in depths.iter() {
+                                    utilization.insert(scope, count as f64 / total as f64);
+                                }
+                                drop(depths);
+
+                                let mut budget = capacity_budget.write().await;
+                                budget.adjust_from_demand(&utilization, config.learning_rate);
+                                tracing::debug!(
+                                    total_queued = total,
+                                    budget = ?*budget,
+                                    "Adjusted capacity budget from demand"
+                                );
+                            }
+                        }
+                        _ = shutdown_rx.recv() => {
+                            tracing::info!("Demand adjustment task received shutdown signal");
                             break;
                         }
                     }
@@ -678,6 +771,7 @@ impl ComputeActor {
                 requested_at,
                 max_scope,
                 cell_affinity,
+                allowed_scopes,
             } => {
                 self.on_placement_request(
                     task_hash,
@@ -688,6 +782,7 @@ impl ComputeActor {
                     requested_at,
                     max_scope,
                     cell_affinity,
+                    allowed_scopes,
                 )
                 .await
             }
