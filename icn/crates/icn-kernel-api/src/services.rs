@@ -399,6 +399,27 @@ pub trait CellService: Send + Sync {
 /// direct access to domain objects (e.g., TrustGraph for MisbehaviorDetector).
 /// The `raw_handles` field provides type-erased storage for these transition
 /// needs. These should be removed as components are fully migrated.
+///
+/// # Raw Handle Type Pattern
+///
+/// `raw_handle<T>` requires `T: Sized`, so `dyn Trait` objects cannot be stored
+/// directly. Use the appropriate pattern based on the stored type:
+///
+/// **Concrete type with trait upcast** (when consumers need a trait object):
+/// ```ignore
+/// // Store: Arc<SledParameterStore> (concrete, Sized)
+/// registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store);
+/// // Retrieve concrete, then upcast:
+/// let store: Arc<SledParameterStore> = registry.raw_handle(KEY)?;
+/// let trait_obj: Arc<dyn ProtocolParameterStore> = store;
+/// ```
+///
+/// **Wrapped type** (when the wrapper is Sized, e.g., `RwLock<T>`):
+/// ```ignore
+/// // Store and retrieve directly:
+/// registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
+/// let handle: Arc<RwLock<Ledger>> = registry.raw_handle(KEY)?;
+/// ```
 pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
@@ -421,6 +442,18 @@ impl Default for ServiceRegistry {
 }
 
 impl ServiceRegistry {
+    // Raw handle key constants — use these instead of string literals to prevent typos.
+    // A typo in the key results in silent `None` at runtime.
+
+    /// Key for `Arc<RwLock<TrustGraph>>` raw handle
+    pub const TRUST_GRAPH_KEY: &str = "trust_graph";
+    /// Key for `Arc<SledParameterStore>` raw handle (concrete type; upcast after retrieval)
+    pub const PROTOCOL_PARAM_STORE_KEY: &str = "protocol_parameter_store";
+    /// Key for `Arc<RwLock<Ledger>>` raw handle
+    pub const LEDGER_KEY: &str = "ledger";
+    /// Key for `Arc<SledStore>` raw handle (shared with DisputeManager/TreasuryManager)
+    pub const LEDGER_STORE_KEY: &str = "ledger_store";
+
     /// Create a new empty service registry
     pub fn new() -> Self {
         Self {

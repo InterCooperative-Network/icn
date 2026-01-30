@@ -29,6 +29,8 @@ pub struct GovernanceDeps {
     pub event_bus: EventBus,
     /// Shutdown signal receiver
     pub shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    /// Pre-created parameter store from daemon (avoids double sled open)
+    pub protocol_parameter_store: Option<Arc<dyn ProtocolParameterStore>>,
 }
 
 /// Services returned from governance initialization
@@ -121,10 +123,15 @@ pub async fn init_governance_services(
     );
 
     // Initialize protocol parameter store (Phase 20)
-    let param_store_path = config.store_path().join("protocol_params");
-    let param_db = sled::open(&param_store_path)?;
     let protocol_parameter_store: Arc<dyn ProtocolParameterStore> =
-        Arc::new(SledParameterStore::new(Arc::new(param_db))?);
+        if let Some(store) = deps.protocol_parameter_store {
+            info!("Using daemon-provided protocol parameter store");
+            store
+        } else {
+            let param_store_path = config.protocol_params_path();
+            let param_db = sled::open(&param_store_path)?;
+            Arc::new(SledParameterStore::new(Arc::new(param_db))?)
+        };
 
     // Load default parameters on first run (if store is empty)
     {

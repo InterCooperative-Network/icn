@@ -167,9 +167,26 @@ impl Config {
         self.data_dir.join("identity.age")
     }
 
-    /// Get the store path
+    /// Get the base store path (`{data_dir}/store/`)
+    ///
+    /// Subdirectory layout (each opened once by the daemon):
+    /// - `store/trust/`           — Trust attestations and scores
+    /// - `store/protocol_params/` — Governance protocol parameters
+    /// - `store/ledger/`          — Double-entry transactions, disputes, treasury
+    /// - `store/governance/`      — Governance actor state (proposals, votes)
+    /// - `store/dead_letter/`     — Failed operation recovery queue
     pub fn store_path(&self) -> PathBuf {
         self.data_dir.join("store")
+    }
+
+    /// Get the protocol parameter store path (sled DB for governance parameters)
+    pub fn protocol_params_path(&self) -> PathBuf {
+        self.store_path().join("protocol_params")
+    }
+
+    /// Get the ledger store path (sled DB for double-entry ledger)
+    pub fn ledger_store_path(&self) -> PathBuf {
+        self.store_path().join("ledger")
     }
 
     /// Validate configuration and return a list of warnings/errors

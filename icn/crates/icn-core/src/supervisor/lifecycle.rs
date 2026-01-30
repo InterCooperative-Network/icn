@@ -216,6 +216,13 @@ async fn spawn_actors_with_identity(
 
     let did = identity_bundle.did().clone();
 
+    // Extract daemon-provided ledger handles from ServiceRegistry early
+    // (needed before ledger init which happens before governance init)
+    let ledger_from_daemon: Option<Arc<RwLock<icn_ledger::Ledger>>> = service_registry
+        .and_then(|r| r.raw_handle::<RwLock<icn_ledger::Ledger>>(ServiceRegistry::LEDGER_KEY));
+    let ledger_store_from_daemon: Option<Arc<icn_store::SledStore>> = service_registry
+        .and_then(|r| r.raw_handle::<icn_store::SledStore>(ServiceRegistry::LEDGER_STORE_KEY));
+
     // Create NodeProfile with hardware sensing (Phase 17)
     let node_profile = crate::node::create_node_profile(
         did.clone(),
@@ -236,9 +243,9 @@ async fn spawn_actors_with_identity(
     // Initialize trust graph, recovery store, and misbehavior detector
     // If service_registry provides a trust_graph handle, use it instead of creating a new one.
     // This enables proper kernel/app separation where the daemon owns the TrustGraph.
-    let trust_services = if let Some(trust_graph_from_daemon) =
-        service_registry.and_then(|r| r.raw_handle::<RwLock<icn_trust::TrustGraph>>("trust_graph"))
-    {
+    let trust_services = if let Some(trust_graph_from_daemon) = service_registry.and_then(|r| {
+        r.raw_handle::<RwLock<icn_trust::TrustGraph>>(ServiceRegistry::TRUST_GRAPH_KEY)
+    }) {
         info!("Using TrustGraph from daemon-provided ServiceRegistry");
         super::init_trust::init_trust_services_with_graph(
             config,
@@ -292,6 +299,8 @@ async fn spawn_actors_with_identity(
             misbehavior_detector: misbehavior_detector.clone(),
             trust_graph: trust_graph_handle.clone(),
             trust_service: trust_service_from_registry.clone(),
+            ledger_handle: ledger_from_daemon,
+            ledger_store: ledger_store_from_daemon,
         },
     )
     .await?;
@@ -482,6 +491,18 @@ async fn spawn_actors_with_identity(
     let event_bus = Arc::new(crate::events::EventBus::new());
     info!("Event bus created");
 
+    // Extract daemon-provided parameter store from ServiceRegistry (if available).
+    // SledParameterStore is stored as concrete type since raw_handle requires Sized.
+    let protocol_parameter_store_from_daemon: Option<
+        Arc<dyn icn_governance::ProtocolParameterStore>,
+    > = service_registry
+        .and_then(|r| {
+            r.raw_handle::<icn_governance::SledParameterStore>(
+                ServiceRegistry::PROTOCOL_PARAM_STORE_KEY,
+            )
+        })
+        .map(|s| s as Arc<dyn icn_governance::ProtocolParameterStore>);
+
     // Initialize governance services
     let governance_services = super::init_governance::init_governance_services(
         config,
@@ -490,6 +511,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             event_bus: event_bus.clone(),
             shutdown_rx: shutdown_tx.subscribe(),
+            protocol_parameter_store: protocol_parameter_store_from_daemon,
         },
     )
     .await?;
