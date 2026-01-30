@@ -773,7 +773,10 @@ impl ComputeActor {
                         ?rejection,
                         "Commons pool admission rejected (sybil policy)"
                     );
-                    // Evict existing participant whose trust dropped below threshold
+                    // Evict existing participant whose trust dropped below threshold.
+                    // Note: brief race window between failed try_add_participant() and
+                    // remove_participant(). Acceptable because CommonsPool is advisory
+                    // scheduling state, not authoritative economic state.
                     if matches!(
                         rejection,
                         crate::commons_pool::SybilRejection::InsufficientTrust { .. }

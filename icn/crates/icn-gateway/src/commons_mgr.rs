@@ -448,7 +448,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         // Sybil gate: require at least Strong POP level
-        if holder.personhood_level == POPLevel::Weak {
+        if holder.personhood_level < POPLevel::Strong {
             bail!(
                 "Joining a jurisdiction requires at least Strong POP level (current: Weak). \
                  Obtain additional attestations to upgrade."
@@ -790,7 +790,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         }
 
         // Require at least Strong POP level to become a steward
-        if holder.personhood_level == POPLevel::Weak {
+        if holder.personhood_level < POPLevel::Strong {
             bail!("Steward requires at least Strong POP level");
         }
 
@@ -1281,7 +1281,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         }
 
         // Sybil gate: require at least Strong POP level for membership
-        if holder.personhood_level == POPLevel::Weak {
+        if holder.personhood_level < POPLevel::Strong {
             bail!(
                 "Membership requires at least Strong POP level (current: Weak). \
                  Obtain additional attestations to upgrade."
