@@ -97,8 +97,10 @@ pub struct ComputeActor {
     scope_queue_depths: Arc<Mutex<HashMap<icn_kernel_api::ScopeLevel, usize>>>,
     /// Maps task_hash → scope level for decrement on completion (Epic 2 #933)
     task_scope_map: Arc<Mutex<HashMap<TaskHash, icn_kernel_api::ScopeLevel>>>,
-    /// Live capacity budget adjusted by demand feedback (Epic 2 #933)
-    capacity_budget: Arc<Mutex<crate::scheduler::CapacityBudget>>,
+    /// Live capacity budget adjusted by demand feedback (Epic 2 #933).
+    /// Uses RwLock because reads (every placement request) vastly outnumber
+    /// writes (once per demand adjustment interval, default 60s).
+    capacity_budget: Arc<RwLock<crate::scheduler::CapacityBudget>>,
     /// Configuration for demand-feedback adjustment loop (Epic 2 #933)
     demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig,
     /// Resource refresh configuration
@@ -142,7 +144,7 @@ impl ComputeActor {
             cell_service: None,
             scope_queue_depths: Arc::new(Mutex::new(HashMap::new())),
             task_scope_map: Arc::new(Mutex::new(HashMap::new())),
-            capacity_budget: Arc::new(Mutex::new(crate::scheduler::CapacityBudget::default())),
+            capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
@@ -538,7 +540,7 @@ impl ComputeActor {
                                 }
                                 drop(depths);
 
-                                let mut budget = capacity_budget.lock().await;
+                                let mut budget = capacity_budget.write().await;
                                 budget.adjust_from_demand(&utilization, config.learning_rate);
                                 tracing::debug!(
                                     total_queued = total,

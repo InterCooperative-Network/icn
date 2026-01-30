@@ -316,7 +316,7 @@ impl ComputeActor {
         }
 
         // Epic 2 (#932/#933): Populate scope context from CellService and live budget.
-        let budget = self.capacity_budget.lock().await.clone();
+        let budget = self.capacity_budget.read().await.clone();
         let scope_ctx = match &self.cell_service {
             Some(cs) => {
                 let peer_scope = cs.peer_scope(&submitter);

@@ -1204,13 +1204,32 @@ impl LocalityContext {
 pub trait PlacementPolicy: Send + Sync {
     /// Score a task for execution on this node.
     ///
-    /// Returns None if this node cannot or should not execute the task.
-    /// Returns Some(offer) with a score between 0.0 and 1.0.
+    /// Returns `None` if this node cannot or should not execute the task.
+    /// Returns `Some(offer)` with a score between 0.0 and 1.0.
+    ///
+    /// # Evaluation order
+    ///
+    /// The default implementation ([`DefaultPlacementPolicy`]) evaluates
+    /// gates in the following order, returning `None` at the first failure:
+    ///
+    /// 1. **Trust threshold** — reject if `trust_score < min_trust`
+    /// 2. **Max scope gate** — reject if `scope_ctx.peer_scope > request.max_scope`
+    /// 3. **Allowed scopes gate** — reject if `request.allowed_scopes` is non-empty
+    ///    and the executor's scope is not in the list
+    /// 4. **Capacity check** — reject if CPU or memory is insufficient
+    /// 5. **Scope budget check** — reject if the executor's scope queue exceeds
+    ///    its `CapacityBudget` fraction
+    /// 6. **GPU requirements** — reject if required GPU spec is unmet
+    /// 7. **Score calculation** — trust, locality, scope affinity, cell affinity,
+    ///    freshness, load penalty
+    ///
+    /// Security-related gates (1–3) run before expensive capacity checks (4–6)
+    /// to fail fast on policy violations.
     ///
     /// # Parameters
     ///
     /// - `request`: The full placement request (task_hash, resource_profile,
-    ///   locality_hints, max_scope, cell_affinity)
+    ///   locality_hints, max_scope, cell_affinity, allowed_scopes)
     /// - `submitter`: DID of the task submitter
     /// - `node_state`: Current executor node capacity and queue state
     /// - `trust_score`: Submitter's trust score as seen by the executor
