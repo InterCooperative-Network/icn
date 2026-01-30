@@ -683,9 +683,15 @@ impl ComputeActor {
 
         // Store capacity in executor registry for placement decisions
         let mut registry = self.executor_registry.lock().await;
+        // Resolve trust score: from registry if known, otherwise from callback.
+        let trust_score = registry
+            .get(&executor)
+            .map(|info| info.trust_score)
+            .unwrap_or_else(|| (self.trust_callback)(&executor));
         if let Some(info) = registry.get_mut(&executor) {
             info.capacity = Some(capacity.clone());
             info.last_seen = capacity.updated_at;
+            info.trust_score = trust_score;
             tracing::debug!(
                 executor = %executor,
                 cpu_cores = capacity.cpu_cores_available,
@@ -696,7 +702,6 @@ impl ComputeActor {
             );
         } else {
             // Executor not yet registered - create entry with capacity
-            let trust_score = (self.trust_callback)(&executor);
             let info = ExecutorInfo {
                 did: executor.clone(),
                 cooperative_id: None,     // Local executor
@@ -752,19 +757,33 @@ impl ComputeActor {
 
         // Lock discipline: acquire write lock, mutate, release immediately.
         //
-        // SECURITY NOTE: Unaffiliated nodes (cell_id=None) are granted full commons
-        // participation without Sybil resistance. This is intentional for the pilot
-        // phase but requires governance intervention before production scale.
         let commons_share = effective_budget.commons_share;
         if commons_share > 0.0 {
             let participant = crate::commons_pool::CommonsParticipant {
                 did: executor.clone(),
                 capacity,
                 budget: effective_budget,
+                trust_score,
                 last_announce: std::time::Instant::now(),
             };
             let mut pool = self.commons_pool.write().await;
-            pool.add_participant(participant);
+            match pool.try_add_participant(participant) {
+                Ok(()) => {}
+                Err(rejection) => {
+                    tracing::warn!(
+                        executor = %executor,
+                        ?rejection,
+                        "Commons pool admission rejected (sybil policy)"
+                    );
+                    // Evict existing participant whose trust dropped below threshold
+                    if matches!(
+                        rejection,
+                        crate::commons_pool::SybilRejection::InsufficientTrust { .. }
+                    ) {
+                        pool.remove_participant(&executor);
+                    }
+                }
+            }
             let count = pool.participant_count();
             let agg = pool.total_commons_capacity();
             drop(pool);

@@ -35,6 +35,7 @@ fn test_unaffiliated_node_joins_pool() {
             federation_share: 0.0,
             commons_share: 1.0,
         },
+        trust_score: 0.5,
         last_announce: Instant::now(),
     };
 
@@ -169,6 +170,7 @@ fn test_pool_participant_lifecycle() {
                 commons_share: *share,
                 ..CapacityBudget::default()
             },
+            trust_score: 0.5,
             last_announce: Instant::now(),
         });
     }

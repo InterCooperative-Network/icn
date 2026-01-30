@@ -433,7 +433,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
     // ========== Affiliation Operations ==========
 
-    /// Add an affiliation (join jurisdiction)
+    /// Add an affiliation (join jurisdiction).
+    ///
+    /// Sybil resistance: requires at least `POPLevel::Strong` to join.
     pub async fn join_jurisdiction(
         &self,
         holder_id: &str,
@@ -444,6 +446,14 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .store
             .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
+
+        // Sybil gate: require at least Strong POP level
+        if holder.personhood_level == POPLevel::Weak {
+            bail!(
+                "Joining a jurisdiction requires at least Strong POP level (current: Weak). \
+                 Obtain additional attestations to upgrade."
+            );
+        }
 
         // Check if already affiliated
         if holder
@@ -1249,7 +1259,11 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
     // ========== Membership Management Operations ==========
 
-    /// Apply for membership in a jurisdiction
+    /// Apply for membership in a jurisdiction.
+    ///
+    /// Sybil resistance: requires at least `POPLevel::Strong` to apply.
+    /// This prevents an attacker from creating many `Weak`-level identities
+    /// to flood jurisdiction membership rolls.
     pub async fn apply_for_membership(
         &self,
         holder_id: &str,
@@ -1264,6 +1278,14 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         if !holder.is_active() {
             bail!("Holder is not active");
+        }
+
+        // Sybil gate: require at least Strong POP level for membership
+        if holder.personhood_level == POPLevel::Weak {
+            bail!(
+                "Membership requires at least Strong POP level (current: Weak). \
+                 Obtain additional attestations to upgrade."
+            );
         }
 
         // Check not already affiliated
@@ -2116,8 +2138,10 @@ mod tests {
     async fn test_join_and_leave_jurisdiction() {
         let mgr = CommonsManager::new();
         let did = test_did();
+        let steward = steward_did();
 
-        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        // Use steward enrollment to get Strong POP level (required for join)
+        let anchor = mgr.create_anchor_from_enrollment(&did, Some(&steward)).await.unwrap();
         let anchor_id = hex::encode(anchor.id());
 
         let holder = mgr

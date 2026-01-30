@@ -149,10 +149,12 @@ async fn test_membership_lifecycle() {
 
     let member_keypair = KeyPair::generate().unwrap();
     let member_did = member_keypair.did().clone();
+    let steward_keypair = KeyPair::generate().unwrap();
+    let steward_did = steward_keypair.did().clone();
 
-    // Create anchor and holder
+    // Create anchor and holder with steward vouch (Strong POP required for join)
     let anchor = commons_mgr
-        .create_anchor_from_enrollment(&member_did, None)
+        .create_anchor_from_enrollment(&member_did, Some(&steward_did))
         .await
         .unwrap();
     let anchor_id = hex::encode(anchor.id());
