@@ -900,17 +900,16 @@ impl ComputeActor {
         task_hash: TaskHash,
         executor: String,
     ) -> Result<(), ComputeError> {
-        // Look up submitter before claiming (for scope tracking)
-        let mgr = self.task_manager.lock().await;
-        let submitter = mgr.get(&task_hash).map(|t| t.submitter.clone());
-        drop(mgr);
-
-        // Record the claim if we know about the task
-        let mut mgr = self.task_manager.lock().await;
-        if mgr.get(&task_hash).is_some() {
-            let _ = mgr.claim(&task_hash, executor.clone());
-        }
-        drop(mgr);
+        // Single lock: look up submitter and claim atomically to avoid a
+        // race where the task is removed between two separate locks.
+        let submitter = {
+            let mut mgr = self.task_manager.lock().await;
+            let submitter = mgr.get(&task_hash).map(|t| t.submitter.clone());
+            if submitter.is_some() {
+                let _ = mgr.claim(&task_hash, executor.clone());
+            }
+            submitter
+        };
 
         // Update executor load tracking
         let mut registry = self.executor_registry.lock().await;

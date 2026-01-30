@@ -2659,7 +2659,7 @@ mod tests {
         utilization.insert(ScopeLevel::Org, 0.1);
         utilization.insert(ScopeLevel::Commons, 0.05);
         utilization.insert(ScopeLevel::Federation, 0.03);
-        utilization.insert(ScopeLevel::Commons, 0.02);
+        utilization.insert(ScopeLevel::Local, 0.02);
 
         let cell_before = budget.fraction_for(ScopeLevel::Cell);
         budget.adjust_from_demand(&utilization, 0.05);

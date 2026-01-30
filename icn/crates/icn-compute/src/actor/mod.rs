@@ -508,6 +508,12 @@ impl ComputeActor {
             let mut shutdown_rx = self.shutdown_tx.subscribe();
 
             tokio::spawn(async move {
+                tracing::info!(
+                    interval_secs = config.interval_secs,
+                    learning_rate = config.learning_rate,
+                    min_samples = config.min_samples,
+                    "Demand adjustment loop started"
+                );
                 let mut interval =
                     tokio::time::interval(tokio::time::Duration::from_secs(config.interval_secs));
                 // Skip the immediate first tick
