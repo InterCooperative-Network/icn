@@ -373,8 +373,13 @@ impl TrustGraph {
 
         self.store.put(key.as_bytes(), &value)?;
 
-        // Invalidate cache for target (LRU cache with TTL)
-        self.cache.invalidate(&edge.target);
+        // Invalidate cache for target and transitively affected DIDs.
+        //
+        // When edge A→B changes, B's score changes (direct invalidation).
+        // Additionally, any DID C where B→C exists may have a stale cached
+        // score because the transitive path through B changed. We invalidate
+        // those too to prevent serving stale scores.
+        self.invalidate_affected(&edge.target);
 
         // Update reachability filter for both direct and transitive paths
         if edge.source == self.own_did {
@@ -716,11 +721,13 @@ impl TrustGraph {
 
     /// Remove a trust edge
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
+        // Collect transitive targets BEFORE removing the edge, since
+        // remove deletes the edge from storage and we need the target's
+        // outgoing edges for transitive invalidation.
+        self.invalidate_affected(target);
+
         let key = self.edge_key(source, target);
         self.store.delete(key.as_bytes())?;
-
-        // Invalidate cache for target
-        self.cache.invalidate(target);
 
         Ok(())
     }
@@ -780,6 +787,36 @@ impl TrustGraph {
     }
 
     /// Clear the trust score cache
+    /// Invalidate cached scores for a DID and all transitively affected DIDs.
+    ///
+    /// When edge X→target changes, target's score is directly affected.
+    /// Additionally, any DID C where target→C exists may have a stale
+    /// score because the transitive path (X→target→C) changed. We
+    /// invalidate those one-hop-out DIDs as well.
+    ///
+    /// This is bounded: we only go one hop out from `target`, not the
+    /// full graph. The scoring algorithm is two-hop (direct + transitive),
+    /// so one additional hop of invalidation is sufficient.
+    fn invalidate_affected(&self, target: &Did) {
+        // Always invalidate the direct target
+        self.cache.invalidate(target);
+
+        // Invalidate transitive targets: DIDs that target has outgoing edges to.
+        // These scores may depend on trust flowing through `target`.
+        if let Ok(outgoing) = self.get_outgoing_edges(target) {
+            for edge in &outgoing {
+                self.cache.invalidate(&edge.target);
+            }
+            if !outgoing.is_empty() {
+                debug!(
+                    "Transitive cache invalidation: {} + {} downstream DIDs",
+                    target,
+                    outgoing.len()
+                );
+            }
+        }
+    }
+
     pub fn clear_cache(&self) {
         self.cache.clear();
     }
@@ -1159,5 +1196,130 @@ mod tests {
         let incoming = graph.get_incoming_edges(&bob).unwrap();
         assert_eq!(incoming.len(), 1, "Expired edges should be filtered out");
         assert_eq!(incoming[0].source, alice);
+    }
+
+    // ================================================================
+    // Cache invalidation tests (#878)
+    // ================================================================
+
+    #[test]
+    fn cache_hit_after_score_computation() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6));
+        graph.add_edge(edge).unwrap();
+
+        // First call computes and caches
+        let score1 = graph.compute_trust_score(&bob).unwrap();
+        assert!((score1 - 0.42).abs() < 0.01); // 0.6 * 0.7 direct weight
+
+        // Second call should return cached value
+        let score2 = graph.compute_trust_score(&bob).unwrap();
+        assert_eq!(score1, score2);
+    }
+
+    #[test]
+    fn cache_invalidated_on_edge_mutation() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        // Add edge and compute score (populates cache)
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6));
+        graph.add_edge(edge).unwrap();
+        let score_before = graph.compute_trust_score(&bob).unwrap();
+
+        // Mutate the edge (update score)
+        let updated = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9));
+        graph.add_edge(updated).unwrap();
+
+        // Recompute — should NOT return stale cached value
+        let score_after = graph.compute_trust_score(&bob).unwrap();
+        assert!(
+            score_after > score_before,
+            "Score should increase after edge update: {score_before} -> {score_after}"
+        );
+    }
+
+    #[test]
+    fn cache_invalidated_on_edge_removal() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8));
+        graph.add_edge(edge).unwrap();
+
+        // Compute score (populates cache)
+        let score = graph.compute_trust_score(&bob).unwrap();
+        assert!(score > 0.0);
+
+        // Remove the edge
+        graph.remove_edge(&alice, &bob).unwrap();
+
+        // Recompute — should be 0 now
+        let score_after = graph.compute_trust_score(&bob).unwrap();
+        assert_eq!(score_after, 0.0, "Score should be 0 after edge removal");
+    }
+
+    #[test]
+    fn transitive_cache_invalidation() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        // Alice trusts Bob
+        graph
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
+            .unwrap();
+
+        // Bob trusts Carol (transitive: Alice → Bob → Carol)
+        graph
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.7),
+            ))
+            .unwrap();
+
+        // Compute Carol's transitive score (populates cache)
+        let carol_score_before = graph.compute_trust_score(&carol).unwrap();
+        assert!(
+            carol_score_before > 0.0,
+            "Carol should have transitive trust"
+        );
+
+        // Mutate Alice→Bob edge (lower trust in Bob)
+        // This should invalidate Carol's cache because the transitive path changed
+        graph
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.2),
+            ))
+            .unwrap();
+
+        // Recompute Carol's score — should reflect lowered trust through Bob
+        let carol_score_after = graph.compute_trust_score(&carol).unwrap();
+        assert!(
+            carol_score_after < carol_score_before,
+            "Carol's score should decrease when Alice's trust in Bob decreases: {} -> {}",
+            carol_score_before,
+            carol_score_after,
+        );
     }
 }
