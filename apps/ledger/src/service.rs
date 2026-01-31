@@ -4,7 +4,9 @@
 //! This provides the full ledger interface for kernel integration.
 
 use icn_kernel_api::authz::PolicyOracle;
-use icn_kernel_api::services::{LedgerEvent, LedgerService};
+use icn_kernel_api::services::{
+    LedgerEvent, LedgerService, ResourceAccessInfo, RevokeResourceAccessRequest,
+};
 use icn_kernel_api::types::Did;
 use icn_ledger::Ledger;
 use std::sync::Arc;
@@ -40,7 +42,7 @@ impl LedgerServiceImpl {
     fn to_identity_did(did: &Did) -> Result<icn_identity::Did, anyhow::Error> {
         did.to_string()
             .parse::<icn_identity::Did>()
-            .map_err(|e| anyhow::anyhow!("Invalid DID format: {}", e))
+            .map_err(|e| anyhow::anyhow!("Invalid DID format: {e}"))
     }
 }
 
@@ -55,6 +57,7 @@ impl LedgerService for LedgerServiceImpl {
             Ok(did) => did,
             Err(e) => {
                 warn!(error = %e, "Failed to parse DID for balance query");
+                metrics::counter!("icn_ledger_did_parse_failures_total").increment(1);
                 return 0;
             }
         };
@@ -136,6 +139,22 @@ impl LedgerService for LedgerServiceImpl {
 
         // TODO: Emit metrics
         // icn_obs::metrics::ledger::event_recorded_inc(&event_type);
+    }
+
+    fn list_enforceable_resources(
+        &self,
+        _current_time: u64,
+    ) -> Result<Vec<ResourceAccessInfo>, String> {
+        // TODO(PR 3.2): Wire SledResourceAccessStore when init_ledger moves
+        // to apps/ledger. Currently returns empty because no persistent
+        // resource access backend is connected to the ledger.
+        Ok(Vec::new())
+    }
+
+    fn revoke_resource_access(&self, _req: &RevokeResourceAccessRequest) -> Result<(), String> {
+        // TODO(PR 3.2): Wire SledResourceAccessStore when init_ledger moves
+        // to apps/ledger.
+        Err("Resource access revocation not supported".to_string())
     }
 }
 

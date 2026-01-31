@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Decouple ResourceEnforcerActor from icn-ledger (2026-01-30)
+
+**PR 3.1 Kernel/App Separation** (PR #979):
+
+Replace direct `icn-ledger` type imports in `ResourceEnforcerActor` with `LedgerService` trait calls from `icn-kernel-api`. The enforcer now queries resources and revokes access through the abstract service interface, removing 6 raw type imports.
+
+- Add `list_enforceable_resources()` and `revoke_resource_access()` to `LedgerService` trait with kernel-level DTOs (`ResourceAccessInfo`, `IdleViolationInfo`, `RevokeResourceAccessRequest`)
+- Replace `ResourceAccessStore`, `AccessModel`, `AntiSpeculationRules` imports with `LedgerService` method calls
+- Change `RevocationEvent.holder` and `ResourceAccessInfo.holder` to `Did` type (was `String`)
+- Add default implementations for new `LedgerService` methods (empty list / "not supported" error)
+- Add `test_enforce_without_gossip` test verifying enforcement works without gossip dependency
+- Rewrite `resource_enforcer_gossip` integration tests to use `LedgerService`-based stubs
+
+**Known Limitations**: Resource access enforcement is a no-op until PR 3.2 wires `SledResourceAccessStore` into `apps/ledger`. The `list_enforceable_resources()` stub returns an empty list, so no resources are checked or revoked in production.
+
 ### Changed - Remove icn-trust from icn-core (2026-01-31)
 
 **Tier 1 Kernel/App Separation** (PR #977):

@@ -110,6 +110,7 @@ pub fn init_metrics() -> Result<()> {
     metrics::ledger::init_descriptions();
     metrics::nat::init_descriptions();
     metrics::network::init_descriptions();
+    metrics::resource_enforcer::init_descriptions();
     metrics::rpc::init_descriptions();
     metrics::storage::init_descriptions();
     tracing::info!("Metrics descriptions initialized");

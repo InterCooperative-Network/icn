@@ -6,61 +6,10 @@
 // Allow unwrap/expect in test code - panics are acceptable for tests
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use icn_core::resource_enforcer_actor::{
-    ResourceAccessStore, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
-};
-use icn_entity::EntityId;
+use icn_core::resource_enforcer_actor::{RevocationEvent, RESOURCE_REVOCATIONS_TOPIC};
 use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
-use icn_ledger::{AccessModel, AntiSpeculationRules, ResourceAccess};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-
-/// Wait time for async gossip publication tasks to complete.
-/// 200ms provides margin for multi-node scenarios where gossip
-/// publication involves actor communication and potential network delays.
-const ASYNC_PUBLISH_WAIT_MS: u64 = 200;
-
-/// Mock store for testing that tracks revocation events
-struct MockResourceAccessStore {
-    resources: Mutex<HashMap<String, ResourceAccess>>,
-    revocations: Arc<Mutex<Vec<RevocationEvent>>>,
-}
-
-impl MockResourceAccessStore {
-    fn new(revocations_log: Arc<Mutex<Vec<RevocationEvent>>>) -> Self {
-        Self {
-            resources: Mutex::new(HashMap::new()),
-            revocations: revocations_log,
-        }
-    }
-
-    #[allow(dead_code)]
-    fn add_resource(&self, id: String, access: ResourceAccess) {
-        self.resources.lock().unwrap().insert(id, access);
-    }
-}
-
-impl ResourceAccessStore for MockResourceAccessStore {
-    fn list_all(&self) -> anyhow::Result<Vec<(String, ResourceAccess)>> {
-        let resources = self.resources.lock().unwrap();
-        Ok(resources
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect())
-    }
-
-    fn update(&mut self, resource_id: &str, access: &ResourceAccess) -> anyhow::Result<()> {
-        let mut resources = self.resources.lock().unwrap();
-        resources.insert(resource_id.to_string(), access.clone());
-        Ok(())
-    }
-
-    fn emit_revocation(&mut self, event: RevocationEvent) -> anyhow::Result<()> {
-        self.revocations.lock().unwrap().push(event);
-        Ok(())
-    }
-}
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_revocation_event_gossip_publication() {
@@ -117,11 +66,10 @@ async fn test_revocation_event_gossip_publication() {
             .unwrap();
     }
 
-    // Create a revocation event
-    let entity = EntityId::from_did(node1_did);
+    // Create a revocation event (holder is now a String, not EntityId)
     let event = RevocationEvent {
         resource_id: "test-resource-123".to_string(),
-        holder: entity,
+        holder: node1_did.to_string(),
         reason: "Resource idle for 8 days".to_string(),
         timestamp: icn_time::current_timestamp_secs(),
         idle_seconds: 8 * 24 * 3600, // 8 days
@@ -148,60 +96,177 @@ async fn test_revocation_event_gossip_publication() {
 }
 
 #[tokio::test]
-async fn test_gossip_store_wrapper_integration() {
-    use icn_core::supervisor::init_resource_enforcer::GossipResourceAccessStore;
+async fn test_enforcer_actor_with_gossip_deps() {
+    use icn_core::resource_enforcer_actor::{
+        ResourceAccessEnforcerActor, ResourceEnforcerConfig, ResourceEnforcerDeps,
+    };
+    use icn_kernel_api::services::LedgerService;
 
-    // Create revocation log for tracking
-    let revocations_log = Arc::new(Mutex::new(Vec::new()));
+    /// Stub LedgerService for integration testing
+    struct StubLedgerService;
+
+    impl LedgerService for StubLedgerService {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+            unimplemented!("not needed for enforcer integration tests")
+        }
+
+        fn balance(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: icn_kernel_api::services::LedgerEvent) {}
+    }
 
     // Create gossip actor
     let keypair = KeyPair::generate().unwrap();
-    let keypair_clone = keypair.clone();
-    let did = keypair_clone.did();
+    let did = keypair.did();
     let gossip_handle = GossipActor::spawn(did.clone(), None);
 
-    // Set keypair for signing
+    // Create revocation topic
     {
         let mut gossip = gossip_handle.write().await;
-        gossip.set_keypair(keypair);
+        gossip.create_topic(icn_gossip::types::Topic {
+            name: RESOURCE_REVOCATIONS_TOPIC.to_string(),
+            acl: icn_gossip::types::AccessControl::Public,
+            scope: icn_gossip::types::Scope::Global,
+            min_trust_threshold: None,
+            retention: std::time::Duration::from_secs(86400 * 7),
+            max_entries: 1000,
+        });
     }
 
-    // Create gossip-aware store
-    let inner_store = Box::new(MockResourceAccessStore::new(revocations_log.clone()));
-    let mut gossip_store = GossipResourceAccessStore::new(inner_store, gossip_handle.clone());
-
-    // Create a resource and track it
-    let entity = EntityId::from_did(did);
-    let access = ResourceAccess::new(
-        "resource-456".to_string(),
-        entity.clone(),
-        AccessModel::UseAccess {
-            duration_seconds: 90 * 24 * 3600, // 90 days
-            renewable: true,
-            max_accumulated: 4,
-        },
-    )
-    .with_rules(AntiSpeculationRules::strict());
-
-    gossip_store.update("resource-456", &access).unwrap();
-
-    // Emit a revocation
-    let event = RevocationEvent {
-        resource_id: "resource-456".to_string(),
-        holder: entity,
-        reason: "Automatic revocation: idle".to_string(),
-        timestamp: icn_time::current_timestamp_secs(),
-        idle_seconds: 10 * 24 * 3600, // 10 days
+    // Create enforcer with gossip-enabled deps
+    let config = ResourceEnforcerConfig {
+        check_interval_seconds: 3600,
+        batch_size: 100,
+        enabled: true,
     };
 
-    gossip_store.emit_revocation(event.clone()).unwrap();
+    let deps = ResourceEnforcerDeps {
+        ledger_service: Arc::new(StubLedgerService),
+        gossip_handle: Some(gossip_handle.clone()),
+    };
 
-    // Wait for async publication
-    tokio::time::sleep(tokio::time::Duration::from_millis(ASYNC_PUBLISH_WAIT_MS)).await;
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+    let shutdown_rx = shutdown_tx.subscribe();
 
-    // Verify event was logged locally
-    let logged = revocations_log.lock().unwrap();
-    assert_eq!(logged.len(), 1);
-    assert_eq!(logged[0].resource_id, "resource-456");
-    assert_eq!(logged[0].reason, "Automatic revocation: idle");
+    let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
+
+    // Verify actor is running
+    let stats = handle.get_stats().await.expect("Failed to get stats");
+    assert_eq!(stats.checks_performed, 0);
+    assert_eq!(stats.total_revocations, 0);
+
+    // Force a check (stub returns no enforceable resources, so 0 revocations)
+    let result = handle.force_check().await.expect("Failed to force check");
+    assert_eq!(result.resources_checked, 0);
+    assert_eq!(result.revocations, 0);
+
+    // Verify stats updated
+    let stats = handle.get_stats().await.expect("Failed to get stats");
+    assert_eq!(stats.checks_performed, 1);
+
+    // Signal shutdown
+    let _ = shutdown_tx.send(());
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+}
+
+/// Test that enforcement with violating resources publishes revocation events to gossip.
+#[tokio::test]
+async fn test_enforcer_with_violations_publishes_gossip() {
+    use icn_core::resource_enforcer_actor::{
+        ResourceAccessEnforcerActor, ResourceEnforcerConfig, ResourceEnforcerDeps,
+    };
+    use icn_kernel_api::services::{LedgerService, ResourceAccessInfo};
+
+    /// LedgerService that returns resources with idle violations
+    struct ViolatingLedgerService;
+
+    impl LedgerService for ViolatingLedgerService {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+            unimplemented!("not needed for enforcer integration tests")
+        }
+
+        fn balance(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: icn_kernel_api::services::LedgerEvent) {}
+
+        fn list_enforceable_resources(
+            &self,
+            _current_time: u64,
+        ) -> Result<Vec<ResourceAccessInfo>, String> {
+            Ok(vec![ResourceAccessInfo {
+                resource_id: "idle-resource-1".to_string(),
+                holder: "did:icn:test_holder".to_string(),
+                granted_at: 0,
+                is_revoked: false,
+                idle_violation: Some(icn_kernel_api::services::IdleViolationInfo {
+                    idle_seconds: 7 * 24 * 3600,
+                    max_idle_seconds: 5 * 24 * 3600,
+                }),
+            }])
+        }
+
+        fn revoke_resource_access(
+            &self,
+            _req: &icn_kernel_api::services::RevokeResourceAccessRequest,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    // Create gossip actor with revocation topic
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did();
+    let gossip_handle = GossipActor::spawn(did.clone(), None);
+
+    {
+        let mut gossip = gossip_handle.write().await;
+        gossip.create_topic(icn_gossip::types::Topic {
+            name: RESOURCE_REVOCATIONS_TOPIC.to_string(),
+            acl: icn_gossip::types::AccessControl::Public,
+            scope: icn_gossip::types::Scope::Global,
+            min_trust_threshold: None,
+            retention: std::time::Duration::from_secs(86400 * 7),
+            max_entries: 1000,
+        });
+    }
+
+    let config = ResourceEnforcerConfig {
+        check_interval_seconds: 3600,
+        batch_size: 100,
+        enabled: true,
+    };
+
+    let deps = ResourceEnforcerDeps {
+        ledger_service: Arc::new(ViolatingLedgerService),
+        gossip_handle: Some(gossip_handle.clone()),
+    };
+
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+    let shutdown_rx = shutdown_tx.subscribe();
+    let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
+
+    // Force a check — should revoke the idle resource and publish to gossip
+    let result = handle.force_check().await.expect("Failed to force check");
+    assert_eq!(result.resources_checked, 1);
+    assert_eq!(result.revocations, 1);
+
+    // Verify stats
+    let stats = handle.get_stats().await.expect("Failed to get stats");
+    assert_eq!(stats.total_revocations, 1);
+    assert_eq!(stats.checks_performed, 1);
+
+    let _ = shutdown_tx.send(());
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 }

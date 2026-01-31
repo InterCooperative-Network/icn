@@ -29,6 +29,9 @@ anyhow = "1.0"
 # Logging
 tracing = "0.1"
 
+# Metrics
+metrics = "0.24"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tempfile = "3"

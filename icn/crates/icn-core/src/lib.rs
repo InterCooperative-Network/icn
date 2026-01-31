@@ -54,8 +54,8 @@ pub use replication::{
     ScopeHealth, ScopedReplicationAdjuster,
 };
 pub use resource_enforcer_actor::{
-    EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceAccessStore,
-    ResourceEnforcerConfig, ResourceEnforcerHandle, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
+    EnforcementResult, EnforcementStats, ResourceAccessEnforcerActor, ResourceEnforcerConfig,
+    ResourceEnforcerDeps, ResourceEnforcerHandle, RevocationEvent, RESOURCE_REVOCATIONS_TOPIC,
 };
 pub use runtime::Runtime;
 pub use storage_challenge::{ChallengeScheduler, ChallengeSchedulerHandle};
