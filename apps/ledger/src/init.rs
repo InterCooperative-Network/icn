@@ -1,32 +1,35 @@
-//! Ledger and contract initialization
+//! Ledger service initialization
 //!
-//! Initializes the double-entry ledger, dispute management, and contract execution.
+//! Initializes the ledger configuration (oracle, witness, membership, credit policy),
+//! dispute management, treasury management, contract runtime, and validation hooks.
+//!
+//! The caller is responsible for:
+//! - Creating `Ledger` + `SledStore` beforehand
+//! - Wiring runtime handles (gossip, misbehavior, trust) AFTER calling this
+//!
+//! This module takes only primitive/domain types — no `icn-core` config types.
 
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_ledger::{
     CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy, OracleManager,
     SledMembershipStore, TreasuryManager,
 };
-use icn_security::MisbehaviorDetector;
 use icn_store::SledStore;
 
-use crate::config::Config;
-
-/// Timeout for acquiring treasury validation lock (milliseconds)
+/// Timeout for acquiring treasury validation lock (milliseconds).
 /// Set to 1000ms (1 second) to handle high load and slow storage backends.
 /// If validation times out, the transaction is rejected to prevent unauthorized withdrawals.
 const TREASURY_VALIDATION_LOCK_TIMEOUT_MS: u64 = 1000;
 
-/// Services initialized during ledger setup
+/// Services created during ledger initialization.
+///
+/// Does NOT include `ledger_handle` or `ledger_store` — the caller already owns those.
 pub struct LedgerServices {
-    /// The ledger handle
-    pub ledger_handle: Arc<RwLock<Ledger>>,
     /// Dispute manager for handling payment disputes
     pub dispute_manager: Arc<RwLock<DisputeManager>>,
     /// Treasury manager for cooperative treasury operations
@@ -35,75 +38,37 @@ pub struct LedgerServices {
     pub contract_runtime: Arc<RwLock<icn_ccl::ContractRuntime>>,
     /// Contract actor for contract lifecycle management
     pub contract_actor: Arc<RwLock<icn_ccl::ContractActor>>,
-    /// Ledger store (shared with dispute manager)
-    pub ledger_store: Arc<SledStore>,
 }
 
-/// Dependencies for ledger initialization
-pub struct LedgerDeps {
-    pub gossip_handle: Arc<RwLock<GossipActor>>,
-    pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
-    /// Trust service for kernel/app separated trust score queries
-    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
-    /// Pre-created ledger handle from daemon (daemon owns lifecycle)
-    pub ledger_handle: Option<Arc<RwLock<Ledger>>>,
-    /// Pre-opened ledger store from daemon (avoids double sled open;
-    /// sled uses exclusive file locking so re-opening the same path fails)
-    pub ledger_store: Option<Arc<SledStore>>,
-}
-
-/// Initialize ledger and contract services
+/// Initialize ledger services (oracle, witness, membership, credit, dispute, treasury, contracts).
 ///
-/// Creates:
-/// - Ledger with gossip and misbehavior integration
-/// - DisputeManager for payment dispute resolution
-/// - ContractRuntime for CCL execution
-/// - ContractActor for contract lifecycle
+/// This configures the ledger with oracle, witness, membership, and credit policies,
+/// then creates the DisputeManager, TreasuryManager, ContractRuntime, charter validator,
+/// combined validation hook, and ContractActor.
+///
+/// # Arguments
+/// * `ledger_handle` - Pre-created Ledger handle (owned by daemon)
+/// * `store` - Pre-opened SledStore (shared with Ledger, DisputeManager, TreasuryManager)
+/// * `did` - Node's DID
+/// * `oracle_config` - Oracle configuration (built from primitive config values by daemon)
+/// * `witness_config` - Witness configuration (built from primitive config values by daemon)
 pub async fn init_ledger_services(
-    config: &Config,
+    ledger_handle: Arc<RwLock<Ledger>>,
+    store: Arc<SledStore>,
     did: Did,
-    deps: LedgerDeps,
+    oracle_config: icn_ledger::oracle::OracleConfig,
+    witness_config: icn_ledger::WitnessConfig,
 ) -> anyhow::Result<LedgerServices> {
-    // Reuse daemon-provided store or open a new one.
-    // sled uses exclusive file locking, so re-opening the same path would fail
-    // if the daemon already opened it.
-    let store_path = config.ledger_store_path();
-    let store = if let Some(s) = deps.ledger_store {
-        info!("Using daemon-provided ledger store");
-        s
-    } else {
-        Arc::new(SledStore::open(&store_path)?)
-    };
-
-    // Use daemon-provided ledger handle or create a new one
-    let ledger_handle = if let Some(handle) = deps.ledger_handle {
-        info!("Using daemon-provided Ledger handle");
-        handle
-    } else {
-        Arc::new(RwLock::new(Ledger::new(store.clone())?))
-    };
-
-    // Configure ledger with gossip, misbehavior detection, trust, and policies.
-    // Note: This write lock is held for the entire configuration block (~60 lines).
+    // Configure ledger with oracle, witness, membership, and credit policies.
+    // Note: This write lock is held for the entire configuration block.
     // This is acceptable because it runs during supervisor startup before any
     // concurrent readers exist. No contention is possible at this point.
     {
         let mut ledger = ledger_handle.write().await;
 
-        ledger.set_gossip(deps.gossip_handle.clone());
-        ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
-
-        // Set TrustService for kernel/app separated trust queries
-        if let Some(trust_service) = deps.trust_service.clone() {
-            ledger.set_trust_service(trust_service);
-            info!("Ledger initialized with TrustService");
-        } else {
-            info!("Ledger initialized without TrustService (trust validation disabled)");
-        }
-
         // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
-        let oracle_config = config.ledger.oracle.to_oracle_config();
         let threshold_count = oracle_config.suspicious_rate_thresholds.len();
+        let default_threshold = oracle_config.default_suspicious_rate_threshold;
         let oracle_manager = Arc::new(OracleManager::with_config(store.clone(), oracle_config));
         ledger.set_oracle_manager(oracle_manager);
 
@@ -115,26 +80,27 @@ pub async fn init_ledger_services(
         } else {
             info!(
                 "Oracle manager initialized with default threshold {}",
-                config.ledger.oracle.default_suspicious_rate_threshold
+                default_threshold
             );
         }
 
         // Initialize witness config for material transaction signatures (Issue #676)
-        let witness_config = config.ledger.witness.to_witness_config()?;
         let witness_policy = format!("{:?}", witness_config.default_policy);
+        let witness_threshold = witness_config.threshold;
+        let witness_timeout = witness_config.collection_timeout_secs;
         ledger.set_witness_config(witness_config);
 
-        match &config.ledger.witness.threshold {
+        match witness_threshold {
             Some(threshold) => {
                 info!(
                     "Witness signatures configured: policy={}, threshold={} (timeout={}s)",
-                    witness_policy, threshold, config.ledger.witness.collection_timeout_secs
+                    witness_policy, threshold, witness_timeout
                 );
             }
             None => {
                 info!(
                     "Witness signatures configured: policy={} for all transactions (timeout={}s)",
-                    witness_policy, config.ledger.witness.collection_timeout_secs
+                    witness_policy, witness_timeout
                 );
             }
         }
@@ -156,7 +122,7 @@ pub async fn init_ledger_services(
         );
     }
 
-    info!("Ledger initialized at {}", store_path.display());
+    info!("Ledger configured");
 
     // Initialize DisputeManager (shares store with Ledger)
     let dispute_manager = DisputeManager::new(store.clone())?;
@@ -250,11 +216,9 @@ pub async fn init_ledger_services(
     info!("Contract actor created");
 
     Ok(LedgerServices {
-        ledger_handle,
         dispute_manager: dispute_manager_handle,
         treasury_manager: treasury_manager_handle,
         contract_runtime: contract_runtime_handle,
         contract_actor: contract_actor_handle,
-        ledger_store: store,
     })
 }

@@ -3265,9 +3265,11 @@ name = "icn-ledger-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "icn-ccl",
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
+ "icn-obs",
  "icn-store",
  "metrics",
  "parking_lot 0.12.5",

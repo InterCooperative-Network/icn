@@ -73,7 +73,10 @@ struct Args {
 /// This creates the app-level services (trust, governance, ledger) and
 /// packages them in a ServiceRegistry for injection into the kernel.
 /// This is the key point where domain logic is separated from kernel logic.
-fn build_service_registry(
+///
+/// All mapping from icn-core config structs to primitive adapter args lives here
+/// (in the daemon binary), keeping apps/ledger free of icn-core dependencies.
+async fn build_service_registry(
     config: &Config,
     identity_bundle: Option<&icn_identity::IdentityBundle>,
 ) -> Result<ServiceRegistry> {
@@ -90,7 +93,7 @@ fn build_service_registry(
             Arc::new(icn_store::SledStore::open(&trust_store_path)?);
 
         // Create TrustGraph with tokio lock (for icn-core compatibility)
-        let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did);
+        let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
         // Create TrustService from apps/trust
@@ -133,8 +136,6 @@ fn build_service_registry(
         tracing::info!("Governance service initialized from apps/governance");
 
         // Create LedgerService from apps/ledger
-        // Ledger is created minimally here; supervisor configures it further
-        // (gossip, trust, oracle, witnesses, credit policy, validation hooks)
         let ledger_store_path = config.ledger_store_path();
         std::fs::create_dir_all(&ledger_store_path).with_context(|| {
             format!(
@@ -156,10 +157,49 @@ fn build_service_registry(
         let ledger_handle = Arc::new(RwLock::new(ledger));
         let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
         registry = registry.with_ledger(ledger_service);
-        registry = registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
-        // Pass concrete SledStore so supervisor can reuse it for DisputeManager/TreasuryManager
-        // without re-opening the sled DB (sled uses exclusive file locking per open)
-        registry = registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store);
+        registry = registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle.clone());
+        registry = registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store.clone());
+
+        // Initialize ledger services (oracle, witness, membership, credit, dispute,
+        // treasury, contracts). Config→primitive mapping stays in the daemon binary.
+        let oracle_config = icn_ledger_app::config::build_oracle_config(
+            config.ledger.oracle.default_ttl_secs,
+            config.ledger.oracle.min_sources_for_consensus,
+            config.ledger.oracle.outlier_threshold,
+            config.ledger.oracle.staleness_threshold_secs,
+            config.ledger.oracle.default_suspicious_rate_threshold,
+            config.ledger.oracle.suspicious_rate_thresholds.clone(),
+        );
+        let witness_config = icn_ledger_app::config::build_witness_config(
+            &config.ledger.witness.default_policy,
+            config.ledger.witness.threshold,
+            config.ledger.witness.quorum_required,
+            config.ledger.witness.quorum_witnesses.as_deref(),
+            config.ledger.witness.collection_timeout_secs,
+            config.ledger.witness.min_witness_trust,
+        )
+        .context("Invalid witness configuration")?;
+        let ledger_services = icn_ledger_app::init::init_ledger_services(
+            ledger_handle, ledger_store, own_did.clone(), oracle_config, witness_config,
+        )
+        .await
+        .context("Failed to initialize ledger services")?;
+        registry = registry.with_raw_handle(
+            ServiceRegistry::DISPUTE_MANAGER_KEY,
+            ledger_services.dispute_manager,
+        );
+        registry = registry.with_raw_handle(
+            ServiceRegistry::TREASURY_MANAGER_KEY,
+            ledger_services.treasury_manager,
+        );
+        registry = registry.with_raw_handle(
+            ServiceRegistry::CONTRACT_RUNTIME_KEY,
+            ledger_services.contract_runtime,
+        );
+        registry = registry.with_raw_handle(
+            ServiceRegistry::CONTRACT_ACTOR_KEY,
+            ledger_services.contract_actor,
+        );
         tracing::info!("Ledger service initialized from apps/ledger");
     }
 
@@ -365,7 +405,7 @@ async fn main() -> Result<()> {
 
     // Build service registry with domain app services
     // This injects app-level services into the kernel for proper separation
-    let service_registry = build_service_registry(&config, identity_bundle.as_ref())?;
+    let service_registry = build_service_registry(&config, identity_bundle.as_ref()).await?;
 
     // Create runtime with injected services
     let runtime = Runtime::new(config.clone(), identity_bundle).with_services(service_registry);
