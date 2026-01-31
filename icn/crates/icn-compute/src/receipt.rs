@@ -396,6 +396,8 @@ impl ExecutionReceipt {
     ///
     /// Enforces that `executor_did` matches the receipt's `executor` field,
     /// preventing verification against a DID that doesn't match the claimed identity.
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_executor(&self, executor_did: &icn_identity::Did) -> Result<(), ComputeError> {
         let hash_hex = self.receipt_hash_hex();
         if executor_did.to_string() != self.executor {
@@ -418,6 +420,9 @@ impl ExecutionReceipt {
     /// Enforces that:
     /// - `submitter_did` matches the receipt's `submitter` field
     /// - `executor_signature` is present (chain prerequisite)
+    ///
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_submitter_ack(
         &self,
         submitter_did: &icn_identity::Did,
@@ -451,6 +456,9 @@ impl ExecutionReceipt {
     /// Enforces that:
     /// - `self.attester` is `Some` and matches `attester_did`
     /// - Both prior signatures are present (chain prerequisite)
+    ///
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_attester(&self, attester_did: &icn_identity::Did) -> Result<(), ComputeError> {
         let hash_hex = self.receipt_hash_hex();
         match &self.attester {
@@ -489,7 +497,9 @@ impl ExecutionReceipt {
     ///
     /// This hash uniquely identifies a receipt and appears in all verification
     /// error messages, enabling operators to correlate failures with specific
-    /// receipts during settlement dispute investigation.
+    /// receipts during settlement dispute investigation. The same hash is used
+    /// as the key in `SettlementMessage::Dispute`, so grep-ing logs for a
+    /// dispute's `receipt_hash` will surface the corresponding verification error.
     fn receipt_hash_hex(&self) -> String {
         hex::encode(self.receipt_hash())
     }
