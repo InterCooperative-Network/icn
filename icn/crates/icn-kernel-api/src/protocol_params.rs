@@ -151,6 +151,8 @@ impl ProtocolParameter {
     }
 
     /// Create a new protocol parameter (unchecked — for internal/test use).
+    ///
+    /// `updated_at` defaults to 0 because kernel-api does not depend on `icn_time`.
     pub fn new(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -519,8 +521,10 @@ impl ParameterScope {
     pub fn is_more_specific_than(&self, other: &ParameterScope) -> bool {
         matches!(
             (self, other),
-            (ParameterScope::Cooperative { .. }, ParameterScope::Federation { .. })
-                | (ParameterScope::Cooperative { .. }, ParameterScope::Global)
+            (
+                ParameterScope::Cooperative { .. },
+                ParameterScope::Federation { .. }
+            ) | (ParameterScope::Cooperative { .. }, ParameterScope::Global)
                 | (ParameterScope::Federation { .. }, ParameterScope::Global)
         )
     }
@@ -692,7 +696,10 @@ pub struct PendingParameterChange {
 }
 
 impl PendingParameterChange {
-    /// Create a new pending parameter change
+    /// Create a new pending parameter change.
+    ///
+    /// The `created_at` timestamp defaults to 0 because kernel-api does not
+    /// depend on `icn_time`. Chain `.with_created_at(ts)` to set a real value.
     pub fn new(
         id: impl Into<String>,
         parameter_id: impl Into<String>,
