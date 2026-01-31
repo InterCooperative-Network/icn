@@ -140,9 +140,8 @@ async fn test_enforcer_actor_with_gossip_deps() {
     }
 
     // Create enforcer with gossip-enabled deps
-    // Use small interval so startup jitter is 0 (jitter = interval/10)
     let config = ResourceEnforcerConfig {
-        check_interval_seconds: 1,
+        check_interval_seconds: 3600,
         batch_size: 100,
         enabled: true,
     };
@@ -243,9 +242,8 @@ async fn test_enforcer_with_violations_publishes_gossip() {
         });
     }
 
-    // Use small interval so startup jitter is 0 (jitter = interval/10)
     let config = ResourceEnforcerConfig {
-        check_interval_seconds: 1,
+        check_interval_seconds: 3600,
         batch_size: 100,
         enabled: true,
     };

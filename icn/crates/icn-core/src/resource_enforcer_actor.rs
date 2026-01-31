@@ -198,6 +198,7 @@ pub struct ResourceAccessEnforcerActor {
     config: ResourceEnforcerConfig,
     deps: ResourceEnforcerDeps,
     stats: EnforcementStats,
+    warned_empty: bool,
 }
 
 impl ResourceAccessEnforcerActor {
@@ -227,6 +228,7 @@ impl ResourceAccessEnforcerActor {
                 last_check_time: None,
                 error_count: 0,
             },
+            warned_empty: false,
         };
 
         tokio::spawn(async move {
@@ -243,8 +245,9 @@ impl ResourceAccessEnforcerActor {
                 config.check_interval_seconds, config.batch_size
             );
 
-            // Add startup jitter (0-10% of interval) to prevent thundering herd
-            // when multiple nodes start simultaneously
+            // Startup jitter (0-10% of interval) to prevent thundering herd
+            // when multiple nodes start simultaneously. Jitter gates periodic
+            // ticks but NOT message handling, so force_check() is always responsive.
             let jitter_secs = {
                 let max_jitter = config.check_interval_seconds / 10;
                 if max_jitter > 0 {
@@ -253,9 +256,12 @@ impl ResourceAccessEnforcerActor {
                     0
                 }
             };
+            let jitter_sleep = tokio::time::sleep(Duration::from_secs(jitter_secs));
+            tokio::pin!(jitter_sleep);
+            let mut jitter_done = jitter_secs == 0;
+
             if jitter_secs > 0 {
-                debug!("Applying startup jitter of {}s", jitter_secs);
-                tokio::time::sleep(Duration::from_secs(jitter_secs)).await;
+                debug!("Applying startup jitter of {jitter_secs}s");
             }
 
             // Periodic enforcement check
@@ -274,7 +280,12 @@ impl ResourceAccessEnforcerActor {
                         actor.handle_message(msg).await;
                     }
 
-                    _ = check_interval.tick() => {
+                    _ = &mut jitter_sleep, if !jitter_done => {
+                        jitter_done = true;
+                        debug!("Startup jitter complete, periodic checks enabled");
+                    }
+
+                    _ = check_interval.tick(), if jitter_done => {
                         if let Err(e) = actor.perform_enforcement_check().await {
                             error!("Enforcement check failed: {}", e);
                             actor.stats.error_count += 1;
@@ -323,9 +334,10 @@ impl ResourceAccessEnforcerActor {
 
         let resources_checked = resources.len();
 
-        if resources_checked == 0 && self.stats.checks_performed == 1 {
+        if resources_checked == 0 && !self.warned_empty {
+            self.warned_empty = true;
             warn!(
-                "LedgerService returned 0 enforceable resources on first check. \
+                "LedgerService returned 0 enforceable resources. \
                  Enforcement is a no-op until LedgerService is wired to a persistent store."
             );
         }
@@ -533,9 +545,8 @@ mod tests {
             }
         }
 
-        // Use small interval so startup jitter is 0 (jitter = interval/10)
         let config = ResourceEnforcerConfig {
-            check_interval_seconds: 1,
+            check_interval_seconds: 3600,
             batch_size: 100,
             enabled: true,
         };
@@ -624,9 +635,8 @@ mod tests {
         // Reset counter
         REVOKE_CALLS.store(0, Ordering::SeqCst);
 
-        // Use small interval so startup jitter is 0 (jitter = interval/10)
         let config = ResourceEnforcerConfig {
-            check_interval_seconds: 1,
+            check_interval_seconds: 3600,
             batch_size: 100,
             enabled: true,
         };

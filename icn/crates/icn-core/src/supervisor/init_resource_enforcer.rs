@@ -63,9 +63,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawn_resource_enforcer() {
-        // Use small interval so startup jitter is 0 (jitter = interval/10)
         let config = ResourceEnforcerConfig {
-            check_interval_seconds: 1,
+            check_interval_seconds: 3600,
             batch_size: 100,
             enabled: true,
         };
