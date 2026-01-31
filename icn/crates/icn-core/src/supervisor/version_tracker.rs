@@ -2,7 +2,7 @@
 //!
 //! Tracks peer versions, monitors adoption rates, and manages protocol upgrades.
 
-use icn_governance::proposal::Version;
+use icn_kernel_api::Version;
 use icn_identity::Did;
 use std::collections::HashMap;
 use tracing::info;

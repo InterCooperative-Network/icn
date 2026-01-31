@@ -44,6 +44,7 @@ pub mod services;
 pub mod state;
 pub mod time;
 pub mod types;
+pub mod version;
 
 // Re-export primary traits for convenience
 pub use authz::{
@@ -68,6 +69,7 @@ pub use services::{
 };
 pub use state::{BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy};
 pub use time::TimeService;
+pub use version::Version;
 
 // Re-export common types
 pub use types::*;

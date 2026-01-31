@@ -813,64 +813,8 @@ pub enum TreasuryApprovalType {
     Emergency,
 }
 
-/// Semantic version for protocol versioning
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct Version {
-    pub major: u32,
-    pub minor: u32,
-    pub patch: u32,
-}
-
-impl Version {
-    /// Create a new version
-    pub fn new(major: u32, minor: u32, patch: u32) -> Self {
-        Self {
-            major,
-            minor,
-            patch,
-        }
-    }
-
-    /// Parse version from string (e.g., "1.2.3")
-    pub fn parse(s: &str) -> Result<Self, String> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 3 {
-            return Err(format!("Invalid version format: {s}"));
-        }
-
-        let major = parts[0]
-            .parse::<u32>()
-            .map_err(|_| format!("Invalid major version: {}", parts[0]))?;
-        let minor = parts[1]
-            .parse::<u32>()
-            .map_err(|_| format!("Invalid minor version: {}", parts[1]))?;
-        let patch = parts[2]
-            .parse::<u32>()
-            .map_err(|_| format!("Invalid patch version: {}", parts[2]))?;
-
-        Ok(Self::new(major, minor, patch))
-    }
-
-    /// Check if this version is compatible with another
-    ///
-    /// Compatible means:
-    /// - Same major version (no breaking changes)
-    /// - Minor/patch can differ
-    pub fn is_compatible_with(&self, other: &Version) -> bool {
-        self.major == other.major
-    }
-
-    /// Check if this version has breaking changes vs another
-    pub fn has_breaking_changes_vs(&self, other: &Version) -> bool {
-        self.major != other.major
-    }
-}
-
-impl std::fmt::Display for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
-    }
-}
+/// Semantic version for protocol versioning (re-exported from kernel API)
+pub use icn_kernel_api::Version;
 
 /// Possible outcomes for a dispute resolution governance proposal
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
