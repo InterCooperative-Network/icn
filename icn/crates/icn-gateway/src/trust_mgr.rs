@@ -34,7 +34,9 @@ use icn_kernel_api::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, Policy
 use icn_trust::TrustScore;
 use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
@@ -100,6 +102,16 @@ pub struct TrustNetwork {
 /// Handle type for actor-backed trust graph
 pub type TrustGraphHandle = Arc<RwLock<TrustGraph>>;
 
+/// Default TTL for gateway-level trust score cache entries.
+///
+/// This is separate from the TrustGraph's internal LRU cache TTL (5 min).
+/// The gateway cache prevents redundant TrustGraph lock acquisitions for
+/// the same actor within the TTL window.
+const ORACLE_CACHE_TTL: Duration = Duration::from_secs(30);
+
+/// Maximum entries in the gateway-level trust score cache.
+const ORACLE_CACHE_MAX_ENTRIES: usize = 4096;
+
 /// Trust Manager for gateway
 ///
 /// Provides a simplified interface to the trust graph for API endpoints.
@@ -122,6 +134,9 @@ pub struct TrustManager {
     cached_oracle: Option<Arc<TrustPolicyOracle>>,
     /// Configurable default trust score
     default_trust_score: f64,
+    /// Generation counter — incremented on every edge mutation.
+    /// Shared with TrustPolicyOracle for version-aware cache invalidation.
+    generation: Arc<AtomicU64>,
 }
 
 impl TrustManager {
@@ -138,6 +153,7 @@ impl TrustManager {
             trust_service: None,
             cached_oracle: None,
             default_trust_score: DEFAULT_TRUST_SCORE,
+            generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -145,6 +161,12 @@ impl TrustManager {
     pub fn with_default_score(mut self, score: f64) -> Self {
         self.default_trust_score = score;
         self
+    }
+
+    /// Bump the generation counter. Called after any edge mutation so that
+    /// version-aware caches in TrustPolicyOracle detect staleness.
+    fn bump_generation(&self) {
+        self.generation.fetch_add(1, Ordering::Release);
     }
 
     /// Create a trust manager backed by the daemon's TrustGraph
@@ -160,6 +182,7 @@ impl TrustManager {
             trust_service: None,
             cached_oracle: None,
             default_trust_score: DEFAULT_TRUST_SCORE,
+            generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -179,6 +202,7 @@ impl TrustManager {
             trust_service: Some(trust_service),
             cached_oracle: None,
             default_trust_score: DEFAULT_TRUST_SCORE,
+            generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -216,12 +240,17 @@ impl TrustManager {
                 None
             },
             default_trust_score: self.default_trust_score,
+            generation: self.generation.clone(),
+            cache: DashMap::new(),
+            cache_ttl: ORACLE_CACHE_TTL,
         })
     }
 
     /// Get or create a cached oracle (for mutable contexts)
     ///
     /// This is more efficient than `as_oracle()` for repeated calls.
+    /// The oracle instance shares the generation counter with this TrustManager,
+    /// so edge mutations automatically invalidate stale cache entries.
     pub fn get_or_create_oracle(&mut self) -> Arc<TrustPolicyOracle> {
         self.cached_oracle
             .get_or_insert_with(|| {
@@ -234,6 +263,9 @@ impl TrustManager {
                         None
                     },
                     default_trust_score: self.default_trust_score,
+                    generation: self.generation.clone(),
+                    cache: DashMap::new(),
+                    cache_ttl: ORACLE_CACHE_TTL,
                 })
             })
             .clone()
@@ -261,9 +293,7 @@ impl TrustManager {
         note = "Use add_edge_async for async contexts to avoid blocking worker threads"
     )]
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
-        if let Some(ref handle) = self.trust_graph {
-            // Actor-backed mode: delegate to TrustGraph
-            // Use block_in_place to properly isolate blocking I/O
+        let result = if let Some(ref handle) = self.trust_graph {
             tokio::task::block_in_place(|| {
                 let mut graph = handle.blocking_write();
                 graph
@@ -271,16 +301,19 @@ impl TrustManager {
                     .map_err(|e| format!("TrustGraph error: {e}"))
             })
         } else {
-            // Standalone mode: in-memory storage
             let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
             self.edges.insert(key, edge);
             Ok(())
+        };
+        if result.is_ok() {
+            self.bump_generation();
         }
+        result
     }
 
     /// Add or update a trust edge (async version)
     pub async fn add_edge_async(&self, edge: TrustEdge) -> Result<(), String> {
-        if let Some(ref handle) = self.trust_graph {
+        let result = if let Some(ref handle) = self.trust_graph {
             let mut graph = handle.write().await;
             graph
                 .add_edge(edge)
@@ -289,7 +322,11 @@ impl TrustManager {
             let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
             self.edges.insert(key, edge);
             Ok(())
+        };
+        if result.is_ok() {
+            self.bump_generation();
         }
+        result
     }
 
     /// Add a trust edge from raw parts (f64 score)
@@ -367,8 +404,7 @@ impl TrustManager {
         note = "Use remove_edge_async for async contexts to avoid blocking worker threads"
     )]
     pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
-        if let Some(ref handle) = self.trust_graph {
-            // Actor-backed mode: delegate to TrustGraph
+        let result = if let Some(ref handle) = self.trust_graph {
             tokio::task::block_in_place(|| {
                 let mut graph = handle.blocking_write();
                 graph
@@ -376,19 +412,22 @@ impl TrustManager {
                     .map_err(|e| format!("TrustGraph error: {e}"))
             })
         } else {
-            // Standalone mode: in-memory storage
             let key = format!("{}:{}", from.as_str(), to.as_str());
             if self.edges.remove(&key).is_some() {
                 Ok(())
             } else {
                 Err("Trust edge not found".to_string())
             }
+        };
+        if result.is_ok() {
+            self.bump_generation();
         }
+        result
     }
 
     /// Remove a trust edge (async version)
     pub async fn remove_edge_async(&self, from: &Did, to: &Did) -> Result<(), String> {
-        if let Some(ref handle) = self.trust_graph {
+        let result = if let Some(ref handle) = self.trust_graph {
             let mut graph = handle.write().await;
             graph
                 .remove_edge(from, to)
@@ -400,7 +439,11 @@ impl TrustManager {
             } else {
                 Err("Trust edge not found".to_string())
             }
+        };
+        if result.is_ok() {
+            self.bump_generation();
         }
+        result
     }
 
     /// Get all edges from a DID (sync version)
@@ -925,15 +968,41 @@ impl TrustManager {
     }
 }
 
+/// A cached trust evaluation result with version-awareness.
+///
+/// Entries are valid only when:
+/// 1. The entry has not expired (TTL check)
+/// 2. The generation matches the current graph generation (no edge mutations since caching)
+struct CachedTrustDecision {
+    decision: PolicyDecision,
+    generation: u64,
+    computed_at: Instant,
+}
+
 /// Trust Policy Oracle implementation
 ///
 /// Adapts the `TrustGraph` to the `PolicyOracle` trait, allowing the kernel
 /// to query trust scores without unauthorized access to the graph structure.
+///
+/// Includes a version-aware TTL cache keyed by actor DID. Cache entries are
+/// invalidated when:
+/// - The TTL expires (configurable, default 30s)
+/// - The graph generation has changed (any edge mutation since caching)
+///
+/// This prevents serving stale trust scores after edge changes while avoiding
+/// redundant TrustGraph lock acquisitions for the same actor.
 pub struct TrustPolicyOracle {
     trust_graph: Option<TrustGraphHandle>,
     own_did: Option<Did>,
     standalone_edges: Option<Arc<DashMap<String, TrustEdge>>>,
     default_trust_score: f64,
+    /// Generation counter shared with TrustManager.
+    /// Incremented on every edge mutation for version-aware invalidation.
+    generation: Arc<AtomicU64>,
+    /// Version-aware TTL cache keyed by actor DID string.
+    cache: DashMap<String, CachedTrustDecision>,
+    /// Time-to-live for cached decisions.
+    cache_ttl: Duration,
 }
 
 impl TrustPolicyOracle {
@@ -1019,27 +1088,73 @@ fn compute_trust_from_edges_map(
     (direct_score * DIRECT_TRUST_WEIGHT + transitive_score * TRANSITIVE_TRUST_WEIGHT).min(1.0)
 }
 
+impl TrustPolicyOracle {
+    /// Check the version-aware cache for a valid entry.
+    ///
+    /// Returns `Some(decision)` if:
+    /// 1. Entry exists for this actor DID
+    /// 2. Entry was computed at the current generation (no edge mutations since)
+    /// 3. Entry has not expired (within TTL)
+    fn cache_get(&self, actor: &str) -> Option<PolicyDecision> {
+        let current_gen = self.generation.load(Ordering::Acquire);
+
+        if let Some(entry) = self.cache.get(actor) {
+            if entry.generation == current_gen && entry.computed_at.elapsed() < self.cache_ttl {
+                return Some(entry.decision.clone());
+            }
+            // Stale — will be overwritten on next insert
+        }
+        None
+    }
+
+    /// Insert a decision into the version-aware cache.
+    fn cache_put(&self, actor: String, decision: PolicyDecision) {
+        let current_gen = self.generation.load(Ordering::Acquire);
+
+        // Lazy eviction: if cache is too large, clear it.
+        // This is simpler than LRU for a DashMap and sufficient for gateway use.
+        if self.cache.len() > ORACLE_CACHE_MAX_ENTRIES {
+            self.cache.clear();
+            metrics::counter!("trust_oracle_cache_evictions_total").increment(1);
+        }
+
+        self.cache.insert(
+            actor,
+            CachedTrustDecision {
+                decision,
+                generation: current_gen,
+                computed_at: Instant::now(),
+            },
+        );
+    }
+
+    /// Get current cache size (for metrics/testing).
+    pub fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+}
+
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         let start = std::time::Instant::now();
 
         // 1. Check domain
         if request.domain().as_str() != "trust" {
-            // We don't handle other domains. In a chain-of-responsibility pattern,
-            // we should Allow (abstain) rather than Deny, to let other oracles handle it.
             return PolicyDecision::allow_with(ConstraintSet::new());
         }
 
-        // 2. Compute trust score
-        let target_str = request.actor(); // This is a String (icn_kernel_api::Did)
+        let target_str = request.actor();
 
+        // 2. Check version-aware cache
+        if let Some(cached) = self.cache_get(target_str) {
+            metrics::counter!("trust_oracle_cache_hits_total").increment(1);
+            return cached;
+        }
+        metrics::counter!("trust_oracle_cache_misses_total").increment(1);
+
+        // 3. Compute trust score (cache miss path)
         let score = if let Some(ref handle) = self.trust_graph {
-            // Convert String to icn_identity::Did
-            // If parse fails, treat as untrusted (default score)
             if let Ok(target_did) = target_str.parse::<Did>() {
-                // Actor-backed mode: usage of block_in_place is required because
-                // PolicyOracle::evaluate is synchronous but TrustGraph requires locking.
-                // We try try_read first to avoid block_in_place overhead and support single-threaded runtimes.
                 if let Ok(graph) = handle.try_read() {
                     graph.compute_trust_score(&target_did).unwrap_or_else(|e| {
                         warn!("TrustOracle compute error (try_read): {}", e);
@@ -1057,7 +1172,6 @@ impl PolicyOracle for TrustPolicyOracle {
                     })
                 }
             } else {
-                // Log warning and track metric when DID parsing fails
                 warn!(
                     "TrustOracle: Failed to parse actor DID '{}', using default trust score",
                     target_str
@@ -1066,21 +1180,13 @@ impl PolicyOracle for TrustPolicyOracle {
                 self.default_trust_score
             }
         } else {
-            // Standalone mode - works with Strings mostly
             self.compute_local(target_str)
         };
 
-        // 3. Construct constraints
+        // 4. Construct constraints (meaning firewall boundary)
         let mut constraints = ConstraintSet::new();
-
-        // Add trust score as custom constraint
         constraints = constraints.with_custom("trust_score", score.into());
 
-        // Add rate limiting based on score using threshold constants
-        // - Isolated: < TRUST_ISOLATED_MAX (0.1)
-        // - Known: TRUST_ISOLATED_MAX - TRUST_KNOWN_MAX
-        // - Partner: TRUST_KNOWN_MAX - TRUST_PARTNER_MAX
-        // - Federated: > TRUST_PARTNER_MAX
         let rate_limit = if score > TRUST_PARTNER_MAX {
             icn_kernel_api::RateLimit::new(200, 50) // Federated
         } else if score > TRUST_KNOWN_MAX {
@@ -1092,7 +1198,12 @@ impl PolicyOracle for TrustPolicyOracle {
         };
         constraints = constraints.with_rate_limit(rate_limit);
 
-        // Determine trust tier for metrics
+        let decision = PolicyDecision::allow_with(constraints);
+
+        // 5. Cache the result
+        self.cache_put(target_str.to_string(), decision.clone());
+
+        // 6. Record metrics
         let trust_tier = if score > TRUST_PARTNER_MAX {
             "federated"
         } else if score > TRUST_KNOWN_MAX {
@@ -1103,18 +1214,25 @@ impl PolicyOracle for TrustPolicyOracle {
             "isolated"
         };
 
-        // Record execution duration with tier label
         metrics::histogram!(
             "trust_oracle_evaluation_duration_seconds",
             "trust_tier" => trust_tier
         )
         .record(start.elapsed().as_secs_f64());
 
-        PolicyDecision::allow_with(constraints)
+        metrics::gauge!("trust_oracle_cache_size").set(self.cache.len() as f64);
+
+        decision
     }
 
     fn domain(&self) -> Domain {
         Domain::trust()
+    }
+
+    fn cache_ttl(&self) -> Duration {
+        // We manage our own version-aware cache, so tell the OracleRegistry
+        // not to double-cache our decisions.
+        Duration::ZERO
     }
 }
 
@@ -1526,5 +1644,160 @@ mod tests {
         } else {
             panic!("Expected Allow decision");
         }
+    }
+
+    // ============================================================================
+    // Version-Aware Cache Tests
+    // ============================================================================
+
+    /// Helper: create a trust policy request for a given actor DID.
+    fn trust_request(actor: &str) -> PolicyRequest {
+        use icn_kernel_api::{ActionKind, Domain};
+        PolicyRequest::new(actor.to_string(), ActionKind::Read, Domain::trust())
+    }
+
+    /// Helper: extract trust_score from a PolicyDecision's constraints.
+    fn extract_trust_score(decision: &PolicyDecision) -> f64 {
+        if let PolicyDecision::Allow { constraints } = decision {
+            if let Some(icn_kernel_api::ConstraintValue::Float(f)) =
+                constraints.custom.get("trust_score")
+            {
+                return f.into_inner();
+            }
+        }
+        panic!("Expected Allow decision with trust_score constraint");
+    }
+
+    #[test]
+    fn test_oracle_cache_hit_on_second_call() {
+        let mut manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        manager.set_perspective(alice.clone());
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6));
+        manager.add_edge(edge).unwrap();
+
+        let oracle = manager.get_or_create_oracle();
+
+        // First call: cache miss
+        let req = trust_request(bob.as_str());
+        let _d1 = oracle.evaluate(&req);
+        assert_eq!(oracle.cache_len(), 1);
+
+        // Second call: cache hit (same result)
+        let d2 = oracle.evaluate(&req);
+        assert_eq!(oracle.cache_len(), 1);
+
+        // Verify the decision is Allow with trust_score
+        let score = extract_trust_score(&d2);
+        assert!(score > 0.0, "Trust score should be positive");
+    }
+
+    #[test]
+    fn test_oracle_cache_invalidated_by_edge_mutation() {
+        let mut manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        manager.set_perspective(alice.clone());
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.3));
+        manager.add_edge(edge).unwrap();
+
+        let oracle = manager.get_or_create_oracle();
+
+        // Populate cache
+        let req = trust_request(bob.as_str());
+        let d1 = oracle.evaluate(&req);
+
+        // Mutate edge — bumps generation
+        let edge2 = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9));
+        manager.add_edge(edge2).unwrap();
+
+        // Next evaluate should miss cache (generation changed)
+        let d2 = oracle.evaluate(&req);
+
+        // Both should be Allow, but the score should differ
+        // (standalone mode uses in-memory edges, so the new score is visible)
+        let s1 = extract_trust_score(&d1);
+        let s2 = extract_trust_score(&d2);
+        // s2 should reflect the updated edge (0.9 * DIRECT_WEIGHT)
+        assert!(
+            (s2 - s1).abs() > 0.01,
+            "Scores should differ after edge mutation: s1={s1}, s2={s2}"
+        );
+    }
+
+    #[test]
+    fn test_oracle_cache_ttl_expiration() {
+        let oracle = Arc::new(TrustPolicyOracle {
+            trust_graph: None,
+            own_did: None,
+            standalone_edges: Some(Arc::new(DashMap::new())),
+            default_trust_score: 0.5,
+            generation: Arc::new(AtomicU64::new(0)),
+            cache: DashMap::new(),
+            cache_ttl: Duration::from_millis(50), // Very short TTL for testing
+        });
+
+        let req = trust_request("did:icn:test");
+        let _ = oracle.evaluate(&req);
+        assert_eq!(oracle.cache_len(), 1);
+
+        // Cache hit before expiry
+        assert!(oracle.cache_get("did:icn:test").is_some());
+
+        // Wait for TTL to expire
+        std::thread::sleep(Duration::from_millis(60));
+
+        // Cache miss after expiry
+        assert!(oracle.cache_get("did:icn:test").is_none());
+    }
+
+    #[test]
+    fn test_oracle_cache_ttl_returns_zero() {
+        let oracle = TrustManager::new().as_oracle();
+        assert_eq!(
+            oracle.cache_ttl(),
+            Duration::ZERO,
+            "TrustPolicyOracle should return ZERO cache_ttl (self-managed cache)"
+        );
+    }
+
+    #[test]
+    fn test_oracle_non_trust_domain_bypasses_cache() {
+        let mut manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        manager.set_perspective(alice);
+
+        let oracle = manager.get_or_create_oracle();
+
+        // Non-trust domain request
+        use icn_kernel_api::{ActionKind, Domain};
+        let req = PolicyRequest::new(
+            "did:icn:someone".to_string(),
+            ActionKind::Read,
+            Domain::new("governance"),
+        );
+
+        let _ = oracle.evaluate(&req);
+        // Non-trust domain should not populate the trust cache
+        assert_eq!(oracle.cache_len(), 0);
+    }
+
+    #[test]
+    fn test_generation_counter_increments_on_mutations() {
+        let manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        assert_eq!(manager.generation.load(Ordering::Acquire), 0);
+
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5));
+        manager.add_edge(edge).unwrap();
+        assert_eq!(manager.generation.load(Ordering::Acquire), 1);
+
+        manager.remove_edge(&alice, &bob).unwrap();
+        assert_eq!(manager.generation.load(Ordering::Acquire), 2);
     }
 }
