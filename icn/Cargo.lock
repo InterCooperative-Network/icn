@@ -3269,6 +3269,7 @@ dependencies = [
  "icn-kernel-api",
  "icn-ledger",
  "icn-store",
+ "metrics",
  "parking_lot 0.12.5",
  "tokio",
  "tracing",

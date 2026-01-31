@@ -365,6 +365,13 @@ pub enum GovernanceEvent {
 /// - Record ledger events
 ///
 /// The kernel NEVER interprets ledger rules - it just enforces constraints.
+///
+/// # Sync/Async Note
+///
+/// Methods are synchronous for ergonomic kernel integration. Implementations
+/// using async locks (e.g. `tokio::RwLock`) should use
+/// `tokio::task::block_in_place()` to bridge sync/async contexts safely.
+/// This requires a multi-threaded tokio runtime.
 pub trait LedgerService: Send + Sync {
     /// Get the PolicyOracle for ledger authorization
     ///

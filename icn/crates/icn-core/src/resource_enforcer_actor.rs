@@ -323,6 +323,13 @@ impl ResourceAccessEnforcerActor {
 
         let resources_checked = resources.len();
 
+        if resources_checked == 0 && self.stats.checks_performed == 1 {
+            warn!(
+                "LedgerService returned 0 enforceable resources on first check. \
+                 Enforcement is a no-op until LedgerService is wired to a persistent store."
+            );
+        }
+
         // Identify and process resources with idle violations
         let mut revocations = 0;
 
@@ -526,8 +533,9 @@ mod tests {
             }
         }
 
+        // Use small interval so startup jitter is 0 (jitter = interval/10)
         let config = ResourceEnforcerConfig {
-            check_interval_seconds: 3600,
+            check_interval_seconds: 1,
             batch_size: 100,
             enabled: true,
         };
@@ -548,6 +556,96 @@ mod tests {
 
         let stats = handle.get_stats().await.unwrap();
         assert_eq!(stats.total_revocations, 1);
+
+        let _ = shutdown_tx.send(());
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    /// Verify that partial revocation failures don't abort the entire check.
+    /// If one resource fails to revoke, the actor should continue and revoke others.
+    #[tokio::test]
+    async fn test_partial_revocation_failure() {
+        use icn_kernel_api::services::{LedgerService, ResourceAccessInfo};
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        static REVOKE_CALLS: AtomicU32 = AtomicU32::new(0);
+
+        struct PartialFailLedger;
+        impl LedgerService for PartialFailLedger {
+            fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+                unimplemented!()
+            }
+            fn balance(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn credit_limit(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn record_event(&self, _: icn_kernel_api::services::LedgerEvent) {}
+            fn list_enforceable_resources(
+                &self,
+                _current_time: u64,
+            ) -> Result<Vec<ResourceAccessInfo>, String> {
+                let violation = Some(icn_kernel_api::services::IdleViolationInfo {
+                    idle_seconds: 999,
+                    max_idle_seconds: 100,
+                });
+                Ok(vec![
+                    ResourceAccessInfo {
+                        resource_id: "res-fail".to_string(),
+                        holder: "did:icn:holder1".to_string(),
+                        granted_at: 0,
+                        is_revoked: false,
+                        idle_violation: violation.clone(),
+                    },
+                    ResourceAccessInfo {
+                        resource_id: "res-ok".to_string(),
+                        holder: "did:icn:holder2".to_string(),
+                        granted_at: 0,
+                        is_revoked: false,
+                        idle_violation: violation,
+                    },
+                ])
+            }
+            fn revoke_resource_access(
+                &self,
+                req: &icn_kernel_api::services::RevokeResourceAccessRequest,
+            ) -> Result<(), String> {
+                let call = REVOKE_CALLS.fetch_add(1, Ordering::SeqCst);
+                if req.resource_id == "res-fail" {
+                    Err("simulated failure".to_string())
+                } else {
+                    let _ = call;
+                    Ok(())
+                }
+            }
+        }
+
+        // Reset counter
+        REVOKE_CALLS.store(0, Ordering::SeqCst);
+
+        // Use small interval so startup jitter is 0 (jitter = interval/10)
+        let config = ResourceEnforcerConfig {
+            check_interval_seconds: 1,
+            batch_size: 100,
+            enabled: true,
+        };
+        let deps = ResourceEnforcerDeps {
+            ledger_service: Arc::new(PartialFailLedger),
+            gossip_handle: None,
+        };
+
+        let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+        let shutdown_rx = shutdown_tx.subscribe();
+        let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
+
+        let result = handle.force_check().await.unwrap();
+        // Both resources checked, but only 1 successfully revoked
+        assert_eq!(result.resources_checked, 2);
+        assert_eq!(result.revocations, 1);
+
+        // Both revocations were attempted
+        assert_eq!(REVOKE_CALLS.load(Ordering::SeqCst), 2);
 
         let _ = shutdown_tx.send(());
         tokio::time::sleep(Duration::from_millis(100)).await;

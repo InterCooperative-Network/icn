@@ -140,8 +140,9 @@ async fn test_enforcer_actor_with_gossip_deps() {
     }
 
     // Create enforcer with gossip-enabled deps
+    // Use small interval so startup jitter is 0 (jitter = interval/10)
     let config = ResourceEnforcerConfig {
-        check_interval_seconds: 3600,
+        check_interval_seconds: 1,
         batch_size: 100,
         enabled: true,
     };
@@ -171,6 +172,103 @@ async fn test_enforcer_actor_with_gossip_deps() {
     assert_eq!(stats.checks_performed, 1);
 
     // Signal shutdown
+    let _ = shutdown_tx.send(());
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+}
+
+/// Test that enforcement with violating resources publishes revocation events to gossip.
+#[tokio::test]
+async fn test_enforcer_with_violations_publishes_gossip() {
+    use icn_core::resource_enforcer_actor::{
+        ResourceAccessEnforcerActor, ResourceEnforcerConfig, ResourceEnforcerDeps,
+    };
+    use icn_kernel_api::services::{LedgerService, ResourceAccessInfo};
+
+    /// LedgerService that returns resources with idle violations
+    struct ViolatingLedgerService;
+
+    impl LedgerService for ViolatingLedgerService {
+        fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+            unimplemented!("not needed for enforcer integration tests")
+        }
+
+        fn balance(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn credit_limit(&self, _account: &icn_kernel_api::types::Did, _currency: &str) -> i64 {
+            0
+        }
+
+        fn record_event(&self, _event: icn_kernel_api::services::LedgerEvent) {}
+
+        fn list_enforceable_resources(
+            &self,
+            _current_time: u64,
+        ) -> Result<Vec<ResourceAccessInfo>, String> {
+            Ok(vec![ResourceAccessInfo {
+                resource_id: "idle-resource-1".to_string(),
+                holder: "did:icn:test_holder".to_string(),
+                granted_at: 0,
+                is_revoked: false,
+                idle_violation: Some(icn_kernel_api::services::IdleViolationInfo {
+                    idle_seconds: 7 * 24 * 3600,
+                    max_idle_seconds: 5 * 24 * 3600,
+                }),
+            }])
+        }
+
+        fn revoke_resource_access(
+            &self,
+            _req: &icn_kernel_api::services::RevokeResourceAccessRequest,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    // Create gossip actor with revocation topic
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did();
+    let gossip_handle = GossipActor::spawn(did.clone(), None);
+
+    {
+        let mut gossip = gossip_handle.write().await;
+        gossip.create_topic(icn_gossip::types::Topic {
+            name: RESOURCE_REVOCATIONS_TOPIC.to_string(),
+            acl: icn_gossip::types::AccessControl::Public,
+            scope: icn_gossip::types::Scope::Global,
+            min_trust_threshold: None,
+            retention: std::time::Duration::from_secs(86400 * 7),
+            max_entries: 1000,
+        });
+    }
+
+    // Use small interval so startup jitter is 0 (jitter = interval/10)
+    let config = ResourceEnforcerConfig {
+        check_interval_seconds: 1,
+        batch_size: 100,
+        enabled: true,
+    };
+
+    let deps = ResourceEnforcerDeps {
+        ledger_service: Arc::new(ViolatingLedgerService),
+        gossip_handle: Some(gossip_handle.clone()),
+    };
+
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+    let shutdown_rx = shutdown_tx.subscribe();
+    let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
+
+    // Force a check — should revoke the idle resource and publish to gossip
+    let result = handle.force_check().await.expect("Failed to force check");
+    assert_eq!(result.resources_checked, 1);
+    assert_eq!(result.revocations, 1);
+
+    // Verify stats
+    let stats = handle.get_stats().await.expect("Failed to get stats");
+    assert_eq!(stats.total_revocations, 1);
+    assert_eq!(stats.checks_performed, 1);
+
     let _ = shutdown_tx.send(());
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 }
