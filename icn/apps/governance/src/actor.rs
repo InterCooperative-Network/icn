@@ -26,7 +26,7 @@ use icn_governance::{
     VoteChoice, VoteTally,
 };
 
-use crate::events::{EventBus, SystemEvent};
+use icn_kernel_api::events::{EventEmitter, SystemEvent};
 
 /// Gossip topic for governance messages
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
@@ -896,7 +896,7 @@ pub struct GovernanceActor {
     profile: GovernanceProfile,
     event_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledGovernanceEvent>>>>,
     cancel_tx: mpsc::UnboundedSender<ProposalId>,
-    event_bus: Option<Arc<EventBus>>,
+    event_bus: Option<Arc<dyn EventEmitter>>,
     /// Protocol parameter store for governable parameters (Phase 20)
     protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
 }
@@ -908,7 +908,7 @@ impl GovernanceActor {
         store: Arc<dyn Store>,
         gossip: Arc<RwLock<GossipActor>>,
         resolver: Arc<dyn MembershipResolver + Send + Sync>,
-        event_bus: Option<Arc<EventBus>>,
+        event_bus: Option<Arc<dyn EventEmitter>>,
     ) -> Result<GovernanceHandle> {
         info!("Spawning GovernanceActor for DID: {}", did);
 
