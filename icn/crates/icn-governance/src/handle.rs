@@ -9,7 +9,6 @@ use crate::{
     MembershipConfig, PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalPayload,
     ProtocolParameter, Timestamp, VoteChoice, VoteTally,
 };
-use icn_entity::EntityId;
 
 /// Trait for governance operations exposed to RPC layer
 ///
@@ -158,8 +157,8 @@ pub trait GovernanceOps: Send + Sync {
     async fn get_effective_protocol_parameter(
         &self,
         id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
+        coop_id: Option<&str>,
+        fed_id: Option<&str>,
     ) -> Result<Option<ProtocolParameter>>;
 
     /// Get the change history for a protocol parameter

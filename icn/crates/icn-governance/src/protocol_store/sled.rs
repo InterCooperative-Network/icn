@@ -6,10 +6,9 @@
 use super::state::*;
 use crate::protocol::{
     ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, PendingChangeId,
-    PendingChangeStatus, PendingParameterChange, ProtocolParameter,
+    PendingChangeStatus, PendingParameterChange, ProtocolParameter, ProtocolParameterStore,
 };
 use anyhow::Result;
-use icn_entity::EntityId;
 use tracing::{debug, warn};
 
 impl ProtocolParameterStore for SledParameterStore {
@@ -24,12 +23,14 @@ impl ProtocolParameterStore for SledParameterStore {
     fn get_effective(
         &self,
         id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
+        coop_id: Option<&str>,
+        fed_id: Option<&str>,
     ) -> Result<Option<ProtocolParameter>> {
         // Try cooperative scope first
         if let Some(coop) = coop_id {
-            let scope = ParameterScope::Cooperative { id: coop.clone() };
+            let scope = ParameterScope::Cooperative {
+                id: coop.to_string(),
+            };
             let key = Self::scoped_param_key(&scope, id);
             if let Some(bytes) = self.db.get(&key)? {
                 return Ok(Some(Self::deserialize_param(&bytes)?));
@@ -38,7 +39,9 @@ impl ProtocolParameterStore for SledParameterStore {
 
         // Try federation scope
         if let Some(fed) = fed_id {
-            let scope = ParameterScope::Federation { id: fed.clone() };
+            let scope = ParameterScope::Federation {
+                id: fed.to_string(),
+            };
             let key = Self::scoped_param_key(&scope, id);
             if let Some(bytes) = self.db.get(&key)? {
                 return Ok(Some(Self::deserialize_param(&bytes)?));

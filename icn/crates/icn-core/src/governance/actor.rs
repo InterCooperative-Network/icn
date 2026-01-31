@@ -17,7 +17,6 @@ use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_store::Store;
 
-use icn_entity::EntityId;
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
@@ -376,8 +375,8 @@ impl GovernanceHandle {
     pub fn get_effective_protocol_parameter(
         &self,
         id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
+        coop_id: Option<&str>,
+        fed_id: Option<&str>,
     ) -> Result<Option<ProtocolParameter>> {
         match &self.protocol_params {
             Some(store) => store.get_effective(id, coop_id, fed_id),
@@ -449,9 +448,9 @@ impl GovernanceHandle {
     pub fn get_thresholds_from_params(
         &self,
         payload: &ProposalPayload,
-        coop_id: Option<&EntityId>,
+        coop_id: Option<&str>,
     ) -> Option<icn_governance::ProposalThresholds> {
-        use icn_governance::protocol::ParameterValue;
+        use icn_kernel_api::protocol_params::ParameterValue;
 
         let store = self.protocol_params.as_ref()?;
 
@@ -732,10 +731,16 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 
             // Validate entity exists if scope references an entity
             if let Some(ref scope) = proposal.scope {
-                if let Some(entity_id) = scope.entity_id() {
+                if let Some(entity_id_str) = scope.entity_id_str() {
+                    let entity_id: icn_entity::EntityId = entity_id_str.parse().map_err(|e| {
+                        anyhow::anyhow!(
+                            "Cannot create ProtocolChange proposal: invalid entity ID '{}': {e}",
+                            entity_id_str
+                        )
+                    })?;
                     match &self.entity_registry {
                         Some(registry) => {
-                            match registry.exists(entity_id) {
+                            match registry.exists(&entity_id) {
                                 Ok(true) => {} // Entity exists, proceed
                                 Ok(false) => {
                                     bail!(
@@ -871,8 +876,8 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn get_effective_protocol_parameter(
         &self,
         id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
+        coop_id: Option<&str>,
+        fed_id: Option<&str>,
     ) -> Result<Option<ProtocolParameter>> {
         Self::get_effective_protocol_parameter(self, id, coop_id, fed_id)
     }
@@ -1042,9 +1047,9 @@ impl GovernanceActor {
     fn get_thresholds_from_params(
         &self,
         payload: &ProposalPayload,
-        coop_id: Option<&icn_entity::EntityId>,
+        coop_id: Option<&str>,
     ) -> Option<icn_governance::ProposalThresholds> {
-        use icn_governance::protocol::ParameterValue;
+        use icn_kernel_api::protocol_params::ParameterValue;
 
         let store = self.protocol_params.as_ref()?;
 

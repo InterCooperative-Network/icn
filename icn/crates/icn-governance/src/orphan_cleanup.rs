@@ -39,7 +39,6 @@
 use crate::protocol::ParameterScope;
 use crate::protocol_store::ProtocolParameterStore;
 use anyhow::Result;
-use icn_entity::EntityId;
 use std::future::Future;
 use tracing::{debug, info, warn};
 
@@ -96,7 +95,7 @@ pub struct OrphanDetail {
     /// The orphaned scope
     pub scope: ParameterScope,
     /// The entity ID that no longer exists
-    pub missing_entity_id: EntityId,
+    pub missing_entity_id: String,
     /// Whether deletion was attempted
     pub deletion_attempted: bool,
     /// Whether deletion succeeded (None if not attempted)
@@ -136,7 +135,7 @@ pub async fn cleanup_orphan_parameters<F, Fut>(
     config: OrphanCleanupConfig,
 ) -> Result<OrphanCleanupResult>
 where
-    F: Fn(&EntityId) -> Fut,
+    F: Fn(&str) -> Fut,
     Fut: Future<Output = bool>,
 {
     let mut result = OrphanCleanupResult {
@@ -275,7 +274,7 @@ pub fn cleanup_orphan_parameters_sync<F>(
     config: OrphanCleanupConfig,
 ) -> Result<OrphanCleanupResult>
 where
-    F: Fn(&EntityId) -> bool,
+    F: Fn(&str) -> bool,
 {
     let mut result = OrphanCleanupResult {
         dry_run: !config.delete_orphans,
@@ -405,7 +404,7 @@ pub async fn count_orphan_parameters<F, Fut>(
     entity_exists: F,
 ) -> Result<usize>
 where
-    F: Fn(&EntityId) -> Fut,
+    F: Fn(&str) -> Fut,
     Fut: Future<Output = bool>,
 {
     let scoped_params = store.list_scoped_parameters()?;
@@ -469,7 +468,7 @@ mod tests {
     #[test]
     fn test_all_entities_exist() {
         let store = InMemoryParameterStore::new();
-        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let coop_id = "entity:icn:cooperative:test-coop".to_string();
 
         // Create global param that allows overrides
         store
@@ -495,8 +494,8 @@ mod tests {
     #[test]
     fn test_detect_orphans() {
         let store = InMemoryParameterStore::new();
-        let coop_id = EntityId::cooperative("deleted-coop").unwrap();
-        let fed_id = EntityId::federation("deleted-fed").unwrap();
+        let coop_id = "entity:icn:cooperative:deleted-coop".to_string();
+        let fed_id = "entity:icn:federation:deleted-fed".to_string();
 
         // Create global param that allows overrides
         store
@@ -530,7 +529,7 @@ mod tests {
     #[test]
     fn test_delete_orphans() {
         let store = InMemoryParameterStore::new();
-        let coop_id = EntityId::cooperative("deleted-coop").unwrap();
+        let coop_id = "entity:icn:cooperative:deleted-coop".to_string();
 
         // Create global param that allows overrides
         store
@@ -566,8 +565,8 @@ mod tests {
     #[test]
     fn test_partial_orphans() {
         let store = InMemoryParameterStore::new();
-        let existing_coop = EntityId::cooperative("existing-coop").unwrap();
-        let deleted_coop = EntityId::cooperative("deleted-coop").unwrap();
+        let existing_coop = "entity:icn:cooperative:existing-coop".to_string();
+        let deleted_coop = "entity:icn:cooperative:deleted-coop".to_string();
 
         let existing_entities: HashSet<String> =
             [existing_coop.as_str().to_string()].into_iter().collect();
@@ -595,7 +594,7 @@ mod tests {
         // Delete only the orphan
         let result = cleanup_orphan_parameters_sync(
             &store,
-            |id| existing_entities.contains(id.as_str()),
+            |id| existing_entities.contains(id),
             OrphanCleanupConfig::default(),
         )
         .unwrap();
@@ -623,7 +622,7 @@ mod tests {
 
         // Create 5 orphan scoped overrides
         for i in 0..5 {
-            let coop_id = EntityId::cooperative(&format!("deleted-coop-{i}")).unwrap();
+            let coop_id = format!("entity:icn:cooperative:deleted-coop-{i}");
             let scoped = test_param("test.limit", (i + 1) * 100)
                 .with_scope(ParameterScope::Cooperative { id: coop_id });
             store.set(scoped, None, None).unwrap();
@@ -652,7 +651,7 @@ mod tests {
     #[tokio::test]
     async fn test_async_cleanup() {
         let store = InMemoryParameterStore::new();
-        let coop_id = EntityId::cooperative("deleted-coop").unwrap();
+        let coop_id = "entity:icn:cooperative:deleted-coop".to_string();
 
         store
             .set(test_param_with_override("test.async", 100), None, None)
@@ -681,7 +680,7 @@ mod tests {
             .unwrap();
 
         for i in 0..3 {
-            let coop_id = EntityId::cooperative(&format!("deleted-coop-{i}")).unwrap();
+            let coop_id = format!("entity:icn:cooperative:deleted-coop-{i}");
             let scoped = test_param("test.count", (i + 1) * 100)
                 .with_scope(ParameterScope::Cooperative { id: coop_id });
             store.set(scoped, None, None).unwrap();

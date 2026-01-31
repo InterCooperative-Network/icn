@@ -287,7 +287,7 @@ fn test_protocol_change_proposal_structure() {
         "Higher quorum for this cooperative",
     )
     .with_scope(ParameterScope::Cooperative {
-        id: icn_entity::EntityId::cooperative("test-coop").unwrap(),
+        id: "test-coop".to_string(),
     });
 
     assert!(
@@ -421,19 +421,21 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ Global quorum set to 50");
 
     // 2. Set federation-level override
-    let fed_id = icn_entity::EntityId::federation("workers-fed").unwrap();
+    let fed_id = "workers-fed";
     let mut fed_param = governance_test_param("quorum", 60);
     fed_param.version = 0; // Start fresh for scoped version
-    fed_param.scope = ParameterScope::Federation { id: fed_id.clone() };
+    fed_param.scope = ParameterScope::Federation {
+        id: fed_id.to_string(),
+    };
     store.set(fed_param, None, None)?;
     info!("✓ Federation 'workers-fed' quorum override set to 60");
 
     // 3. Set cooperative-level override
-    let coop_id = icn_entity::EntityId::cooperative("tech-coop").unwrap();
+    let coop_id = "tech-coop";
     let mut coop_param = governance_test_param("quorum", 75);
     coop_param.version = 0; // Start fresh for scoped version
     coop_param.scope = ParameterScope::Cooperative {
-        id: coop_id.clone(),
+        id: coop_id.to_string(),
     };
     store.set(coop_param, None, None)?;
     info!("✓ Cooperative 'tech-coop' quorum override set to 75");
@@ -448,7 +450,7 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ No scope context -> global value (50)");
 
     // 5. Test scope resolution - federation only
-    let fed_only = store.get_effective("governance.quorum", None, Some(&fed_id))?;
+    let fed_only = store.get_effective("governance.quorum", None, Some(fed_id))?;
     assert_eq!(
         fed_only.as_ref().map(|p| &p.value),
         Some(&ParameterValue::Integer(60)),
@@ -457,7 +459,7 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ Federation context -> federation override (60)");
 
     // 6. Test scope resolution - cooperative overrides federation
-    let coop_override = store.get_effective("governance.quorum", Some(&coop_id), Some(&fed_id))?;
+    let coop_override = store.get_effective("governance.quorum", Some(coop_id), Some(fed_id))?;
     assert_eq!(
         coop_override.as_ref().map(|p| &p.value),
         Some(&ParameterValue::Integer(75)),
@@ -466,7 +468,7 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ Cooperative + Federation context -> cooperative override (75)");
 
     // 7. Test scope resolution - cooperative without federation context
-    let coop_only = store.get_effective("governance.quorum", Some(&coop_id), None)?;
+    let coop_only = store.get_effective("governance.quorum", Some(coop_id), None)?;
     assert_eq!(
         coop_only.as_ref().map(|p| &p.value),
         Some(&ParameterValue::Integer(75)),
@@ -475,8 +477,8 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ Cooperative context alone -> cooperative override (75)");
 
     // 8. Test scope resolution - unknown cooperative falls back to federation
-    let other_coop = icn_entity::EntityId::cooperative("other-coop").unwrap();
-    let fallback = store.get_effective("governance.quorum", Some(&other_coop), Some(&fed_id))?;
+    let other_coop = "other-coop";
+    let fallback = store.get_effective("governance.quorum", Some(other_coop), Some(fed_id))?;
     assert_eq!(
         fallback.as_ref().map(|p| &p.value),
         Some(&ParameterValue::Integer(60)),
@@ -485,9 +487,9 @@ fn test_protocol_change_scope_resolution() -> Result<()> {
     info!("✓ Unknown coop + Federation -> falls back to federation (60)");
 
     // 9. Test scope resolution - unknown everything falls back to global
-    let other_fed = icn_entity::EntityId::federation("other-fed").unwrap();
+    let other_fed = "other-fed";
     let global_fallback =
-        store.get_effective("governance.quorum", Some(&other_coop), Some(&other_fed))?;
+        store.get_effective("governance.quorum", Some(other_coop), Some(other_fed))?;
     assert_eq!(
         global_fallback.as_ref().map(|p| &p.value),
         Some(&ParameterValue::Integer(50)),
@@ -532,7 +534,6 @@ fn test_protocol_change_scope_override_not_allowed() -> Result<()> {
     info!("✓ Created global parameter with allow_override=false");
 
     // Attempt to create a cooperative override
-    let coop_id = icn_entity::EntityId::cooperative("rebel-coop").unwrap();
     let mut override_param = ProtocolParameter {
         id: "governance.strict".to_string(),
         name: "Strict Parameter".to_string(),
@@ -545,7 +546,9 @@ fn test_protocol_change_scope_override_not_allowed() -> Result<()> {
             requires_restart: false,
             allow_override: false,
         },
-        scope: ParameterScope::Cooperative { id: coop_id },
+        scope: ParameterScope::Cooperative {
+            id: "rebel-coop".to_string(),
+        },
         updated_at: 0,
         updated_by: None,
         version: 0, // Must match stored version for update
@@ -569,8 +572,9 @@ fn test_protocol_change_scope_override_not_allowed() -> Result<()> {
     info!("✓ Cooperative override correctly rejected");
 
     // Attempt federation override - should also be rejected
-    let fed_id = icn_entity::EntityId::federation("rebel-fed").unwrap();
-    override_param.scope = ParameterScope::Federation { id: fed_id };
+    override_param.scope = ParameterScope::Federation {
+        id: "rebel-fed".to_string(),
+    };
 
     let result = store.set(override_param, Some("rogue-proposal-2".to_string()), None);
 

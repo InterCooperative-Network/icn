@@ -314,8 +314,9 @@ async fn spawn_actors_with_identity(
     let treasury_manager_handle = handles.treasury_manager;
     let contract_runtime_handle = handles.contract_runtime;
     let contract_actor_handle = handles.contract_actor;
-    let protocol_parameter_store_from_daemon: Arc<dyn icn_governance::ProtocolParameterStore> =
-        handles.protocol_parameter_store;
+    let protocol_parameter_store_from_daemon: Arc<
+        dyn icn_kernel_api::protocol_params::ProtocolParameterStore,
+    > = handles.protocol_parameter_store;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -1036,7 +1037,7 @@ async fn spawn_background_tasks(
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
     network_handle: &icn_net::NetworkHandle,
     did: &icn_identity::Did,
-    protocol_parameter_store: Arc<dyn icn_governance::ProtocolParameterStore>,
+    protocol_parameter_store: Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
     ledger_store: Arc<icn_store::SledStore>,
     ledger_service: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     shutdown_tx: &ShutdownTx,

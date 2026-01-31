@@ -7,11 +7,10 @@
 //! - Constants and helper functions
 
 use crate::protocol::{
-    ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, PendingChangeId,
+    ParameterChange, ParameterScope, ParameterValidationError, PendingChangeId,
     PendingParameterChange, ProtocolParameter, KNOWN_PARAMETER_CATEGORIES,
 };
 use anyhow::Result;
-use icn_entity::EntityId;
 use sled::Db;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -179,172 +178,8 @@ pub(crate) fn warn_unknown_category(id: &str) {
 /// - Triggers investigation before reaching concerning levels (~50KB+ of history)
 pub const GLOBAL_HISTORY_WARNING_THRESHOLD: usize = 10_000;
 
-// ============================================================================
-// ProtocolParameterStore Trait
-// ============================================================================
-
-/// Trait for protocol parameter storage operations
-pub trait ProtocolParameterStore: Send + Sync {
-    /// Get a parameter by ID (global scope)
-    fn get(&self, id: &str) -> Result<Option<ProtocolParameter>>;
-
-    /// Get a parameter with scope resolution
-    ///
-    /// Resolves the effective value by checking scopes in order:
-    /// Cooperative > Federation > Global
-    fn get_effective(
-        &self,
-        id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
-    ) -> Result<Option<ProtocolParameter>>;
-
-    /// Set a parameter value
-    ///
-    /// Records the change in history if proposal_id is provided.
-    fn set(
-        &self,
-        param: ProtocolParameter,
-        proposal_id: Option<String>,
-        changed_by: Option<String>,
-    ) -> Result<()>;
-
-    /// List all parameters (global scope only)
-    fn list(&self) -> Result<Vec<ProtocolParameter>>;
-
-    /// List all parameters in a category
-    fn list_by_category(&self, category: &str) -> Result<Vec<ProtocolParameter>>;
-
-    /// Get change history for a parameter
-    fn get_history(&self, id: &str) -> Result<Vec<ParameterChange>>;
-
-    /// Get paginated change history for a parameter
-    ///
-    /// Returns history entries in chronological order (oldest first).
-    /// Use `offset` to skip entries and `limit` to cap the result size.
-    /// Also returns the total count for pagination UI.
-    ///
-    /// # Arguments
-    /// - `id`: Parameter ID
-    /// - `offset`: Number of entries to skip (for pagination)
-    /// - `limit`: Maximum entries to return
-    ///
-    /// # Returns
-    /// Tuple of (entries, total_count)
-    ///
-    /// # Performance Note
-    ///
-    /// Current implementation is O(n) where n is total history entries for the parameter.
-    /// All entries are loaded, sorted, and then paginated. This is acceptable because:
-    /// - Per-parameter history is bounded by `MAX_HISTORY_ENTRIES_PER_PARAM` (100)
-    /// - Auto-pruning on each `set()` prevents unbounded growth
-    ///
-    /// For parameters with high change frequency across many scopes, consider using
-    /// `prune_history()` to reduce history size before pagination.
-    fn get_history_paginated(
-        &self,
-        id: &str,
-        offset: usize,
-        limit: usize,
-    ) -> Result<(Vec<ParameterChange>, usize)>;
-
-    /// Prune old history entries, keeping only the last `max_entries` per parameter
-    ///
-    /// Returns the number of entries removed.
-    ///
-    /// # Arguments
-    /// - `id`: Parameter ID whose history to prune
-    /// - `max_entries`: Minimum entries to keep (must be >= 1 to prevent accidental
-    ///   complete deletion; use `delete()` to remove a parameter entirely)
-    ///
-    /// # Errors
-    /// Returns an error if `max_entries` is 0 to prevent accidental data loss.
-    fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize>;
-
-    /// Delete a parameter (for testing/admin only)
-    fn delete(&self, id: &str) -> Result<()>;
-
-    /// Check if a parameter exists
-    fn exists(&self, id: &str) -> Result<bool>;
-
-    /// Count total parameters
-    fn count(&self) -> Result<usize>;
-
-    /// Count total history entries across all parameters
-    ///
-    /// This is useful for monitoring global history accumulation.
-    fn total_history_count(&self) -> Result<usize>;
-
-    /// Validate a new value against a parameter's constraints
-    fn validate(
-        &self,
-        id: &str,
-        new_value: &ParameterValue,
-    ) -> Result<(), ParameterValidationError>;
-
-    // ========================================
-    // Scoped Parameter Operations (for cleanup)
-    // ========================================
-
-    /// List all scoped (non-global) parameters
-    ///
-    /// Returns all parameters that have a scope other than Global
-    /// (i.e., Federation or Cooperative scoped overrides).
-    /// This is useful for orphan detection and cleanup.
-    fn list_scoped_parameters(&self) -> Result<Vec<ProtocolParameter>>;
-
-    /// Delete a specific scoped parameter by ID and scope
-    ///
-    /// Removes a scoped override without affecting the global parameter.
-    /// Returns Ok(true) if the parameter was deleted, Ok(false) if not found.
-    ///
-    /// # Arguments
-    /// - `id`: The parameter ID (e.g., "governance.min_quorum")
-    /// - `scope`: The specific scope to delete (must not be Global)
-    ///
-    /// # Errors
-    /// Returns an error if scope is Global (use `delete()` for that).
-    fn delete_scoped_parameter(&self, id: &str, scope: &ParameterScope) -> Result<bool>;
-
-    // ========================================
-    // Pending Change Methods (Delayed Execution)
-    // ========================================
-
-    /// Add a pending parameter change for delayed execution
-    ///
-    /// The change will be stored and applied when the scheduler runs
-    /// after `effective_at` timestamp.
-    fn add_pending_change(&self, change: PendingParameterChange) -> Result<()>;
-
-    /// Get a pending change by ID
-    fn get_pending_change(&self, id: &PendingChangeId) -> Result<Option<PendingParameterChange>>;
-
-    /// List all pending changes (all statuses)
-    fn list_pending_changes(&self) -> Result<Vec<PendingParameterChange>>;
-
-    /// List pending changes for a specific parameter
-    fn list_pending_changes_for_parameter(
-        &self,
-        parameter_id: &str,
-    ) -> Result<Vec<PendingParameterChange>>;
-
-    /// Get all pending changes that are due (effective_at <= timestamp)
-    ///
-    /// Returns only changes with status `Pending` that should be applied.
-    /// Results are ordered by `effective_at` (earliest first) for consistent processing.
-    fn get_changes_due_before(&self, timestamp: u64) -> Result<Vec<PendingParameterChange>>;
-
-    /// Update a pending change (e.g., mark as applied, superseded)
-    fn update_pending_change(&self, change: PendingParameterChange) -> Result<()>;
-
-    /// Cancel a pending change
-    ///
-    /// Sets the status to `Cancelled` and records the reason.
-    fn cancel_pending_change(&self, id: &PendingChangeId, reason: &str) -> Result<()>;
-
-    /// Get count of active pending changes (status = Pending)
-    fn count_pending_changes(&self) -> Result<usize>;
-}
+// ProtocolParameterStore trait is defined in icn-kernel-api::protocol_params
+// and re-exported via crate::protocol
 
 // ============================================================================
 // InMemoryParameterStore State

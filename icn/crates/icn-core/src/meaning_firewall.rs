@@ -356,16 +356,16 @@ mod tests {
     ///
     /// Current state (2026-01-31):
     /// - governance_handlers.rs: 39 (proposal types, voting, treasury governance)
-    /// - governance/actor.rs: 29 (governance actor message types, body/proposal)
-    /// - lifecycle.rs: 4 (raw_handle extractions, fn signatures)
-    /// - background_tasks.rs: 4 (governance polling types)
+    /// - governance/actor.rs: 27 (governance actor message types, body/proposal)
     /// - init_governance.rs: 3 (GovernanceManager, GovernanceSled)
     /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
+    /// - actors.rs: 2 (CoreActorHandles governance handle)
     /// - init_gateway.rs: 1 (GovernanceManager import)
-    /// - actors.rs: 1 (CoreActorHandles governance handle)
+    /// - lifecycle.rs: 0 (migrated to kernel-api)
+    /// - background_tasks.rs: 0 (migrated to kernel-api)
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 80;
+        let expected: usize = 72;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(

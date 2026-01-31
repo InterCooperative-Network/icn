@@ -6,10 +6,9 @@
 use super::state::*;
 use crate::protocol::{
     ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, PendingChangeId,
-    PendingChangeStatus, PendingParameterChange, ProtocolParameter,
+    PendingChangeStatus, PendingParameterChange, ProtocolParameter, ProtocolParameterStore,
 };
 use anyhow::Result;
-use icn_entity::EntityId;
 use tracing::{debug, warn};
 
 impl ProtocolParameterStore for InMemoryParameterStore {
@@ -24,8 +23,8 @@ impl ProtocolParameterStore for InMemoryParameterStore {
     fn get_effective(
         &self,
         id: &str,
-        coop_id: Option<&EntityId>,
-        fed_id: Option<&EntityId>,
+        coop_id: Option<&str>,
+        fed_id: Option<&str>,
     ) -> Result<Option<ProtocolParameter>> {
         let scoped = self
             .scoped_params
@@ -34,7 +33,7 @@ impl ProtocolParameterStore for InMemoryParameterStore {
 
         // Try cooperative scope first
         if let Some(coop) = coop_id {
-            let key = (format!("coop:{}", coop.as_str()), id.to_string());
+            let key = (format!("coop:{coop}"), id.to_string());
             if let Some(param) = scoped.get(&key) {
                 return Ok(Some(param.clone()));
             }
@@ -42,7 +41,7 @@ impl ProtocolParameterStore for InMemoryParameterStore {
 
         // Try federation scope
         if let Some(fed) = fed_id {
-            let key = (format!("fed:{}", fed.as_str()), id.to_string());
+            let key = (format!("fed:{fed}"), id.to_string());
             if let Some(param) = scoped.get(&key) {
                 return Ok(Some(param.clone()));
             }

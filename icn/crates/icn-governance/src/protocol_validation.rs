@@ -190,7 +190,6 @@ mod tests {
     use crate::protocol::{
         ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter,
     };
-    use icn_entity::EntityId;
 
     fn make_param(id: &str, value: i64, version: u64, allow_override: bool) -> ProtocolParameter {
         ProtocolParameter {
@@ -214,7 +213,7 @@ mod tests {
 
     fn coop_scope(name: &str) -> ParameterScope {
         ParameterScope::Cooperative {
-            id: EntityId::cooperative(name).expect("valid coop name"),
+            id: name.to_string(),
         }
     }
 
