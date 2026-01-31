@@ -483,7 +483,11 @@ impl ExecutionReceipt {
 
     // -- Internal helpers ---------------------------------------------------
 
-    /// Hex-encoded receipt hash for use in error messages.
+    /// Hex-encoded receipt hash for use in error messages and log correlation.
+    ///
+    /// This hash uniquely identifies a receipt and appears in all verification
+    /// error messages, enabling operators to correlate failures with specific
+    /// receipts during settlement dispute investigation.
     fn receipt_hash_hex(&self) -> String {
         hex::encode(self.receipt_hash())
     }
@@ -1194,7 +1198,7 @@ mod tests {
         r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
         let err = r.verify_submitter_ack(kp.did()).unwrap_err();
         assert!(
-            err.to_string().contains(&hex::encode(r.receipt_hash())),
+            err.to_string().contains(&hash_hex),
             "submitter error should contain receipt hash, got: {err}"
         );
 
@@ -1202,8 +1206,28 @@ mod tests {
         r.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
         let err = r.verify_attester(kp.did()).unwrap_err();
         assert!(
-            err.to_string().contains(&hex::encode(r.receipt_hash())),
+            err.to_string().contains(&hash_hex),
             "attester error should contain receipt hash, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_receipt_hash_stable_across_signature_changes() {
+        // Receipt hash is computed from non-signature fields only.
+        // Adding/changing signatures must not alter the hash.
+        let r = sample_receipt();
+        let hash_before = r.receipt_hash();
+
+        let mut r_signed = r.clone();
+        r_signed.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        r_signed.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
+        r_signed.attester = Some("did:icn:z6MkAttester".to_string());
+        r_signed.attester_signature = Some(SignatureBytes::from([0x33; 64]));
+
+        assert_eq!(
+            hash_before,
+            r_signed.receipt_hash(),
+            "receipt hash must be stable regardless of signature state"
         );
     }
 
