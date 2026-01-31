@@ -196,17 +196,17 @@ The constraint engine model distinguishes between **enforcement mechanisms** (ke
 
 This separation ensures the kernel remains predictable and auditable while allowing cooperative governance to adapt policies to changing needs.
 
-### Component Organization
+### Functional Component Map (Not a Sequential Stack)
 
-While the constraint engine model describes the **conceptual architecture**, the actual implementation organizes components into these functional areas:
+While the constraint engine model describes the **conceptual architecture**, the actual implementation organizes components into these functional areas. These are not layered in the OSI sense—Policy Oracles and Kernel can interact with the same substrate services:
 
-- **Identity (§1)**: DID, Ed25519, keystore
+- **Identity (§1)**: DID, Ed25519, keystore — substrate service
 - **Trust Graph (§2)**: Web-of-participation scores → **Policy Oracle**
-- **Transport (§3)**: QUIC/TLS, mDNS, NAT traversal → **Kernel**
+- **Transport (§3)**: QUIC/TLS, mDNS, NAT traversal → **Kernel** substrate service
 - **Ledger (§4)**: Mutual credit, double-entry → **Policy Oracle**
 - **Contracts (§5)**: CCL interpreter, capabilities → **Policy Oracle**
-- **Gossip (§6)**: Causal sync, anti-entropy → **Kernel**
-- **Storage (§7)**: Sled, persistent state
+- **Gossip (§6)**: Causal sync, anti-entropy → **Kernel** substrate service
+- **Storage (§7)**: Sled, persistent state — substrate service
 - **Security (§8)**: Production hardening
 - **Distributed Compute (§11)**: Trust-gated task execution → **Policy Oracle**
 
@@ -224,12 +224,12 @@ While the constraint engine model describes the **conceptual architecture**, the
 
 ### Definition
 
-- **Kernel layer** (pure enforcement):
+- **Kernel** (pure enforcement):
   - Networking transport, gossip plumbing, actor runtime, constraint enforcement, message validation.
   - Knows: DIDs, cert bindings, timestamps, constraints, capabilities, resource budgets.
   - Does **not** know: trust graphs, governance rules, ledger semantics, compute placement rules, community/entity domain objects.
 
-- **App layer** (meaning + policy):
+- **App / Policy Oracles** (meaning + policy):
   - Trust graph, governance, ledger, CCL semantics, compute policy, federation/domain mappings, gateways/RPC.
   - Implements boundary traits and converts domain state into kernel constraints.
 
