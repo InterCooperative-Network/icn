@@ -154,7 +154,6 @@ impl LedgerService for LedgerServiceImpl {
     fn revoke_resource_access(&self, _req: &RevokeResourceAccessRequest) -> Result<(), String> {
         // TODO(PR 3.2): Wire SledResourceAccessStore when init_ledger moves
         // to apps/ledger.
-        // TODO(PR 3.2): Wire SledResourceAccessStore
         Err("Resource access revocation not supported".to_string())
     }
 }

@@ -388,7 +388,7 @@ impl ResourceAccessEnforcerActor {
                     self.publish_revocation(&event).await;
 
                     revocations += 1;
-                    metrics::counter!("icn_resource_access_revoked_total").increment(1);
+                    icn_obs::metrics::resource_enforcer::access_revoked_inc();
                 }
             }
         }
@@ -402,10 +402,9 @@ impl ResourceAccessEnforcerActor {
         );
 
         // Update metrics
-        metrics::counter!("icn_resource_enforcer_checks_total").increment(1);
-        metrics::counter!("icn_resource_enforcer_resources_checked_total")
-            .increment(resources_checked as u64);
-        metrics::counter!("icn_resource_enforcer_revocations_total").increment(revocations as u64);
+        icn_obs::metrics::resource_enforcer::checks_total_inc();
+        icn_obs::metrics::resource_enforcer::resources_checked_inc(resources_checked as u64);
+        icn_obs::metrics::resource_enforcer::revocations_total_inc(revocations as u64);
 
         Ok(EnforcementResult {
             resources_checked,
@@ -427,11 +426,7 @@ impl ResourceAccessEnforcerActor {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to serialize revocation event: {}", e);
-                metrics::counter!(
-                    "icn_resource_revocation_gossip_failures_total",
-                    "reason" => "serialization"
-                )
-                .increment(1);
+                icn_obs::metrics::resource_enforcer::gossip_failure_inc("serialization");
                 return;
             }
         };
@@ -439,18 +434,14 @@ impl ResourceAccessEnforcerActor {
         let mut gossip = gossip_handle.write().await;
         if let Err(e) = gossip.publish(RESOURCE_REVOCATIONS_TOPIC, serialized).await {
             warn!("Failed to publish revocation to gossip: {}", e);
-            metrics::counter!(
-                "icn_resource_revocation_gossip_failures_total",
-                "reason" => "publish"
-            )
-            .increment(1);
+            icn_obs::metrics::resource_enforcer::gossip_failure_inc("publish");
         } else {
             info!(
                 resource_id = %event.resource_id,
                 holder = %event.holder,
                 "Published revocation event to gossip"
             );
-            metrics::counter!("icn_resource_revocation_gossip_published_total").increment(1);
+            icn_obs::metrics::resource_enforcer::gossip_published_inc();
         }
     }
 }
