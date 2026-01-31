@@ -319,6 +319,7 @@ impl ResourceAccessEnforcerActor {
     /// Queries the ledger for enforceable resources, identifies idle violations,
     /// revokes violating resources, and publishes revocation events.
     async fn perform_enforcement_check(&mut self) -> Result<EnforcementResult> {
+        let check_start = tokio::time::Instant::now();
         let current_time = icn_time::current_timestamp_secs();
         debug!("Starting enforcement check at timestamp {}", current_time);
 
@@ -405,6 +406,9 @@ impl ResourceAccessEnforcerActor {
         icn_obs::metrics::resource_enforcer::checks_total_inc();
         icn_obs::metrics::resource_enforcer::resources_checked_inc(resources_checked as u64);
         icn_obs::metrics::resource_enforcer::revocations_total_inc(revocations as u64);
+        icn_obs::metrics::resource_enforcer::check_duration_observe(
+            check_start.elapsed().as_secs_f64(),
+        );
 
         Ok(EnforcementResult {
             resources_checked,
@@ -647,6 +651,96 @@ mod tests {
 
         // Both revocations were attempted
         assert_eq!(REVOKE_CALLS.load(Ordering::SeqCst), 2);
+
+        let _ = shutdown_tx.send(());
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    /// Verify that 1000+ resources are processed correctly across batches.
+    /// Exercises the chunked iteration path and confirms stats accumulate.
+    #[tokio::test]
+    async fn test_large_batch_processing() {
+        use icn_kernel_api::services::{LedgerService, ResourceAccessInfo};
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        static LARGE_REVOKE_COUNT: AtomicU32 = AtomicU32::new(0);
+
+        struct LargeBatchLedger;
+        impl LedgerService for LargeBatchLedger {
+            fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+                unimplemented!()
+            }
+            fn balance(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn credit_limit(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn record_event(&self, _: icn_kernel_api::services::LedgerEvent) {}
+            fn list_enforceable_resources(
+                &self,
+                _current_time: u64,
+            ) -> Result<Vec<ResourceAccessInfo>, String> {
+                let violation = Some(icn_kernel_api::services::IdleViolationInfo {
+                    idle_seconds: 999,
+                    max_idle_seconds: 100,
+                });
+                // Return 1500 resources: 1000 with violations, 500 already revoked
+                let mut resources = Vec::with_capacity(1500);
+                for i in 0..1000 {
+                    resources.push(ResourceAccessInfo {
+                        resource_id: format!("res-{i}"),
+                        holder: format!("did:icn:holder-{i}"),
+                        granted_at: 0,
+                        is_revoked: false,
+                        idle_violation: violation.clone(),
+                    });
+                }
+                for i in 1000..1500 {
+                    resources.push(ResourceAccessInfo {
+                        resource_id: format!("res-{i}"),
+                        holder: format!("did:icn:holder-{i}"),
+                        granted_at: 0,
+                        is_revoked: true,
+                        idle_violation: violation.clone(),
+                    });
+                }
+                Ok(resources)
+            }
+            fn revoke_resource_access(
+                &self,
+                _req: &icn_kernel_api::services::RevokeResourceAccessRequest,
+            ) -> Result<(), String> {
+                LARGE_REVOKE_COUNT.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        LARGE_REVOKE_COUNT.store(0, Ordering::SeqCst);
+
+        let config = ResourceEnforcerConfig {
+            check_interval_seconds: 3600,
+            batch_size: 200, // 1500 resources / 200 = 8 batches
+            enabled: true,
+        };
+        let deps = ResourceEnforcerDeps {
+            ledger_service: Arc::new(LargeBatchLedger),
+            gossip_handle: None,
+        };
+
+        let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+        let shutdown_rx = shutdown_tx.subscribe();
+        let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
+
+        let result = handle.force_check().await.unwrap();
+        // All 1500 resources checked, but only the 1000 non-revoked ones get revoked
+        assert_eq!(result.resources_checked, 1500);
+        assert_eq!(result.revocations, 1000);
+        assert_eq!(LARGE_REVOKE_COUNT.load(Ordering::SeqCst), 1000);
+
+        let stats = handle.get_stats().await.unwrap();
+        assert_eq!(stats.resources_checked, 1500);
+        assert_eq!(stats.total_revocations, 1000);
 
         let _ = shutdown_tx.send(());
         tokio::time::sleep(Duration::from_millis(100)).await;

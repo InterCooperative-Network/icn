@@ -3,7 +3,7 @@
 //! Metrics for monitoring the resource access enforcement actor,
 //! including enforcement checks, revocations, and gossip publication.
 
-use metrics::{counter, describe_counter};
+use metrics::{counter, describe_counter, describe_histogram, histogram};
 
 /// Initialize resource enforcer metric descriptions
 pub fn init_descriptions() {
@@ -31,6 +31,10 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_resource_revocation_gossip_failures_total",
         "Total number of failed attempts to publish revocation events to gossip (by reason label)"
+    );
+    describe_histogram!(
+        "icn_resource_enforcer_check_duration_seconds",
+        "Duration of each enforcement check cycle in seconds"
     );
 }
 
@@ -63,4 +67,9 @@ pub fn gossip_published_inc() {
 pub fn gossip_failure_inc(reason: &str) {
     counter!("icn_resource_revocation_gossip_failures_total", "reason" => reason.to_string())
         .increment(1);
+}
+
+/// Record enforcement check duration in seconds
+pub fn check_duration_observe(seconds: f64) {
+    histogram!("icn_resource_enforcer_check_duration_seconds").record(seconds);
 }
