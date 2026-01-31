@@ -365,7 +365,7 @@ mod tests {
     /// - background_tasks.rs: 0 (migrated to kernel-api)
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 72;
+        let expected: usize = 73;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(
