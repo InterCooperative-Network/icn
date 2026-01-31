@@ -396,18 +396,23 @@ impl ExecutionReceipt {
     ///
     /// Enforces that `executor_did` matches the receipt's `executor` field,
     /// preventing verification against a DID that doesn't match the claimed identity.
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_executor(&self, executor_did: &icn_identity::Did) -> Result<(), ComputeError> {
+        let hash_hex = self.receipt_hash_hex();
         if executor_did.to_string() != self.executor {
             return Err(ComputeError::InvalidSignature(format!(
-                "DID mismatch: receipt claims executor={}, but verifying against {}",
-                self.executor, executor_did
+                "DID mismatch: receipt {} claims executor={}, but verifying against {}",
+                hash_hex, self.executor, executor_did
             )));
         }
-        let sig = self
-            .executor_signature
-            .as_ref()
-            .ok_or_else(|| ComputeError::InvalidSignature("executor signature missing".into()))?;
-        self.verify_sig(executor_did, sig, &self.executor_sign_payload())
+        let sig = self.executor_signature.as_ref().ok_or_else(|| {
+            ComputeError::InvalidSignature(format!(
+                "executor signature missing (receipt {})",
+                hash_hex
+            ))
+        })?;
+        self.verify_sig(executor_did, sig, &self.executor_sign_payload(), &hash_hex)
     }
 
     /// Verify the submitter's acknowledgement signature against the given DID.
@@ -415,26 +420,35 @@ impl ExecutionReceipt {
     /// Enforces that:
     /// - `submitter_did` matches the receipt's `submitter` field
     /// - `executor_signature` is present (chain prerequisite)
+    ///
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_submitter_ack(
         &self,
         submitter_did: &icn_identity::Did,
     ) -> Result<(), ComputeError> {
+        let hash_hex = self.receipt_hash_hex();
         if submitter_did.to_string() != self.submitter {
             return Err(ComputeError::InvalidSignature(format!(
-                "DID mismatch: receipt claims submitter={}, but verifying against {}",
-                self.submitter, submitter_did
+                "DID mismatch: receipt {} claims submitter={}, but verifying against {}",
+                hash_hex, self.submitter, submitter_did
             )));
         }
         if self.executor_signature.is_none() {
-            return Err(ComputeError::InvalidSignature(
-                "cannot verify submitter ack: executor signature missing".into(),
-            ));
+            return Err(ComputeError::InvalidSignature(format!(
+                "cannot verify submitter ack: executor signature missing (receipt {})",
+                hash_hex
+            )));
         }
-        let sig = self
-            .submitter_ack
-            .as_ref()
-            .ok_or_else(|| ComputeError::InvalidSignature("submitter ack missing".into()))?;
-        self.verify_sig(submitter_did, sig, &self.submitter_sign_payload())
+        let sig = self.submitter_ack.as_ref().ok_or_else(|| {
+            ComputeError::InvalidSignature(format!("submitter ack missing (receipt {})", hash_hex))
+        })?;
+        self.verify_sig(
+            submitter_did,
+            sig,
+            &self.submitter_sign_payload(),
+            &hash_hex,
+        )
     }
 
     /// Verify the attester's signature against the given DID.
@@ -442,33 +456,53 @@ impl ExecutionReceipt {
     /// Enforces that:
     /// - `self.attester` is `Some` and matches `attester_did`
     /// - Both prior signatures are present (chain prerequisite)
+    ///
+    /// All error messages include the hex-encoded receipt hash for correlation
+    /// with settlement disputes.
     pub fn verify_attester(&self, attester_did: &icn_identity::Did) -> Result<(), ComputeError> {
+        let hash_hex = self.receipt_hash_hex();
         match &self.attester {
             None => {
-                return Err(ComputeError::InvalidSignature(
-                    "cannot verify attester: attester DID not set on receipt".into(),
-                ));
+                return Err(ComputeError::InvalidSignature(format!(
+                    "cannot verify attester: attester DID not set on receipt {}",
+                    hash_hex
+                )));
             }
             Some(claimed) if claimed != &attester_did.to_string() => {
                 return Err(ComputeError::InvalidSignature(format!(
-                    "DID mismatch: receipt claims attester={claimed}, but verifying against {attester_did}"
+                    "DID mismatch: receipt {} claims attester={claimed}, but verifying against {attester_did}",
+                    hash_hex
                 )));
             }
             _ => {}
         }
         if self.executor_signature.is_none() || self.submitter_ack.is_none() {
-            return Err(ComputeError::InvalidSignature(
-                "cannot verify attester: prior signatures missing".into(),
-            ));
+            return Err(ComputeError::InvalidSignature(format!(
+                "cannot verify attester: prior signatures missing (receipt {})",
+                hash_hex
+            )));
         }
-        let sig = self
-            .attester_signature
-            .as_ref()
-            .ok_or_else(|| ComputeError::InvalidSignature("attester signature missing".into()))?;
-        self.verify_sig(attester_did, sig, &self.attester_sign_payload())
+        let sig = self.attester_signature.as_ref().ok_or_else(|| {
+            ComputeError::InvalidSignature(format!(
+                "attester signature missing (receipt {})",
+                hash_hex
+            ))
+        })?;
+        self.verify_sig(attester_did, sig, &self.attester_sign_payload(), &hash_hex)
     }
 
     // -- Internal helpers ---------------------------------------------------
+
+    /// Hex-encoded receipt hash for use in error messages and log correlation.
+    ///
+    /// This hash uniquely identifies a receipt and appears in all verification
+    /// error messages, enabling operators to correlate failures with specific
+    /// receipts during settlement dispute investigation. The same hash is used
+    /// as the key in `SettlementMessage::Dispute`, so grep-ing logs for a
+    /// dispute's `receipt_hash` will surface the corresponding verification error.
+    fn receipt_hash_hex(&self) -> String {
+        hex::encode(self.receipt_hash())
+    }
 
     fn executor_sign_payload(&self) -> Vec<u8> {
         let base = self.signing_payload();
@@ -519,17 +553,22 @@ impl ExecutionReceipt {
         did: &icn_identity::Did,
         sig_bytes: &SignatureBytes,
         payload: &[u8],
+        receipt_hash_hex: &str,
     ) -> Result<(), ComputeError> {
         use ed25519_dalek::Verifier;
 
         let verifying_key = did.to_verifying_key().map_err(|e| {
-            ComputeError::InvalidSignature(format!("cannot extract public key from DID: {e}"))
+            ComputeError::InvalidSignature(format!(
+                "cannot extract public key from DID: {e} (receipt {receipt_hash_hex})"
+            ))
         })?;
 
         let signature = ed25519_dalek::Signature::from_bytes(sig_bytes.as_bytes());
 
         verifying_key.verify(payload, &signature).map_err(|e| {
-            ComputeError::InvalidSignature(format!("signature verification failed: {e}"))
+            ComputeError::InvalidSignature(format!(
+                "signature verification failed: {e} (receipt {receipt_hash_hex})"
+            ))
         })?;
 
         Ok(())
@@ -1153,6 +1192,56 @@ mod tests {
     }
 
     // -- Wire format tests ---
+
+    #[test]
+    fn test_verification_errors_include_receipt_hash() {
+        let mut r = sample_receipt();
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let hash_hex = hex::encode(r.receipt_hash());
+
+        // Missing executor signature
+        let err = r.verify_executor(kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains(&hash_hex),
+            "executor error should contain receipt hash, got: {err}"
+        );
+
+        // Set fake executor sig so we can test submitter path
+        r.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        let err = r.verify_submitter_ack(kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains(&hash_hex),
+            "submitter error should contain receipt hash, got: {err}"
+        );
+
+        // Missing attester DID
+        r.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
+        let err = r.verify_attester(kp.did()).unwrap_err();
+        assert!(
+            err.to_string().contains(&hash_hex),
+            "attester error should contain receipt hash, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_receipt_hash_stable_across_signature_changes() {
+        // Receipt hash is computed from non-signature fields only.
+        // Adding/changing signatures must not alter the hash.
+        let r = sample_receipt();
+        let hash_before = r.receipt_hash();
+
+        let mut r_signed = r.clone();
+        r_signed.executor_signature = Some(SignatureBytes::from([0x11; 64]));
+        r_signed.submitter_ack = Some(SignatureBytes::from([0x22; 64]));
+        r_signed.attester = Some("did:icn:z6MkAttester".to_string());
+        r_signed.attester_signature = Some(SignatureBytes::from([0x33; 64]));
+
+        assert_eq!(
+            hash_before,
+            r_signed.receipt_hash(),
+            "receipt hash must be stable regardless of signature state"
+        );
+    }
 
     #[test]
     fn test_settlement_message_icn_encoding_roundtrip() {
