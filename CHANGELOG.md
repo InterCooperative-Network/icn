@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Remove icn-trust from icn-core (2026-01-31)
+
+**Tier 1 Kernel/App Separation** (PR #977):
+
+Remove `icn-trust` as a production dependency of `icn-core`, routing all trust operations through the `TrustService` trait in `icn-kernel-api`. This enforces the meaning firewall: the kernel never imports domain-specific trust types.
+
+- Extend `TrustService` with `ingest_attestation`, `recover_identity`, `get_edges`, `submit_attestation`, `revoke_trust`
+- Replace `TrustGraph` usage across all supervisor modules with `Arc<dyn TrustService>`
+- Normalize `get_edges` output to `{ target_did, score, labels }` matching RPC contract
+- Add DID format validation in `trust.compute` RPC handler
+- Strip domain-specific gossip functions from `trust_propagation.rs` (rate limiter retained)
+- Net -575 lines across 20 files
+
+**Breaking**: `TrustService` is now required for compute actor initialization. Custom runtime users must register a `TrustService` via `ServiceRegistry`. The daemon already does this.
+
 ### Added - Complete Daemon Service Wiring (2026-01-30)
 
 **Wire GovernanceService and LedgerService into daemon** (PR #968, closes #908, #909):

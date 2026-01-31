@@ -10,14 +10,11 @@
 
 use std::sync::Arc;
 
-use icn_identity::Did;
-use icn_trust::{TrustEdge, TrustScore};
-
 use crate::context::RpcContext;
 use crate::server::RpcServer;
 use crate::types::RpcResponse;
 
-/// Handle trust.add RPC call - add a trust edge
+/// Handle trust.add RPC call - submit a trust attestation
 pub async fn handle_trust_add(
     id: u64,
     params: &serde_json::Value,
@@ -32,10 +29,10 @@ pub async fn handle_trust_add(
         );
     }
 
-    let trust_graph = match state.trust_handle() {
-        Some(handle) => handle,
+    let trust_service = match state.trust_service() {
+        Some(svc) => svc,
         None => {
-            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+            return RpcResponse::error(id, -32000, "Trust service not available".to_string());
         }
     };
 
@@ -58,38 +55,18 @@ pub async fn handle_trust_add(
         return RpcResponse::error(id, -32602, "Score must be between 0.0 and 1.0".to_string());
     }
 
-    // Parse target DID
-    let target_did = match Did::from_str(&params.target_did) {
-        Ok(d) => d,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
-        }
-    };
+    let labels = params.label.into_iter().collect::<Vec<_>>();
 
-    let mut graph = trust_graph.write().await;
-    let own_did = graph.own_did().clone();
-
-    // Validate and create the trust score
-    let score = match TrustScore::new(params.score) {
-        Ok(s) => s,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid trust score: {e}"));
-        }
-    };
-
-    // Create the trust edge
-    let mut edge = TrustEdge::new(own_did, target_did, score);
-    if let Some(label) = params.label {
-        edge = edge.with_label(label);
-    }
-
-    match graph.add_edge(edge) {
-        Ok(()) => RpcResponse::success(id, serde_json::json!({"success": true})),
-        Err(e) => RpcResponse::internal_error(id, e),
+    // Returned bytes are the serialized attestation for gossip broadcast;
+    // gossip propagation is handled by the trust app's subscription loop,
+    // not by the RPC handler.
+    match trust_service.submit_attestation(&params.target_did, params.score, labels) {
+        Ok(_attestation_bytes) => RpcResponse::success(id, serde_json::json!({"success": true})),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to add trust: {e}")),
     }
 }
 
-/// Handle trust.remove RPC call - remove a trust edge
+/// Handle trust.remove RPC call - revoke trust for a target
 pub async fn handle_trust_remove(
     id: u64,
     params: &serde_json::Value,
@@ -104,10 +81,10 @@ pub async fn handle_trust_remove(
         );
     }
 
-    let trust_graph = match state.trust_handle() {
-        Some(handle) => handle,
+    let trust_service = match state.trust_service() {
+        Some(svc) => svc,
         None => {
-            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+            return RpcResponse::error(id, -32000, "Trust service not available".to_string());
         }
     };
 
@@ -123,19 +100,9 @@ pub async fn handle_trust_remove(
         }
     };
 
-    // Parse target DID
-    let target_did = match Did::from_str(&params.target_did) {
-        Ok(d) => d,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
-        }
-    };
-
-    let mut graph = trust_graph.write().await;
-    let own_did = graph.own_did().clone();
-    match graph.remove_edge(&own_did, &target_did) {
-        Ok(()) => RpcResponse::success(id, serde_json::json!({"success": true})),
-        Err(e) => RpcResponse::internal_error(id, e),
+    match trust_service.revoke_trust(&params.target_did) {
+        Ok(_bytes) => RpcResponse::success(id, serde_json::json!({"success": true})),
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to remove trust: {e}")),
     }
 }
 
@@ -152,31 +119,23 @@ pub async fn handle_trust_list(
             "trust.list called"
         );
     }
-    let trust_graph = match state.trust_handle() {
-        Some(handle) => handle,
+    let trust_service = match state.trust_service() {
+        Some(svc) => svc,
         None => {
-            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+            return RpcResponse::error(id, -32000, "Trust service not available".to_string());
         }
     };
 
-    let graph = trust_graph.read().await;
-    let own_did = graph.own_did().clone();
-    match graph.get_outgoing_edges(&own_did) {
-        Ok(edges) => {
-            let result: Vec<serde_json::Value> = edges
-                .iter()
-                .map(|e| {
-                    serde_json::json!({
-                        "target_did": e.target.to_string(),
-                        "score": e.score,
-                        "labels": e.labels,
-                    })
-                })
-                .collect();
-            RpcResponse::success(id, serde_json::json!(result))
+    // Get the node's own DID for listing outgoing edges
+    let own_did = match state.own_keypair() {
+        Some(kp) => kp.did().to_string(),
+        None => {
+            return RpcResponse::error(id, -32000, "Node keypair not available".to_string());
         }
-        Err(e) => RpcResponse::internal_error(id, e),
-    }
+    };
+
+    let edges = trust_service.get_edges(&own_did);
+    RpcResponse::success(id, serde_json::json!(edges))
 }
 
 /// Handle trust.compute RPC call - compute trust score for a target DID
@@ -193,10 +152,10 @@ pub async fn handle_trust_compute(
             "trust.compute called"
         );
     }
-    let trust_graph = match state.trust_handle() {
-        Some(handle) => handle,
+    let trust_service = match state.trust_service() {
+        Some(svc) => svc,
         None => {
-            return RpcResponse::error(id, -32000, "Trust graph not available".to_string());
+            return RpcResponse::error(id, -32000, "Trust service not available".to_string());
         }
     };
 
@@ -212,17 +171,10 @@ pub async fn handle_trust_compute(
         }
     };
 
-    // Parse target DID
-    let target_did = match Did::from_str(&params.target_did) {
-        Ok(d) => d,
-        Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid target DID: {e}"));
-        }
-    };
-
-    let graph = trust_graph.read().await;
-    match graph.compute_trust_score(&target_did) {
-        Ok(score) => RpcResponse::success(id, serde_json::json!({"score": score})),
-        Err(e) => RpcResponse::internal_error(id, e),
+    if !params.target_did.starts_with("did:icn:") {
+        return RpcResponse::error(id, -32602, "Invalid DID format".to_string());
     }
+
+    let score = trust_service.trust_score(&params.target_did);
+    RpcResponse::success(id, serde_json::json!({"score": score}))
 }

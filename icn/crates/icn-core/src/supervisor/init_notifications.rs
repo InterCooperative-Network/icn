@@ -16,7 +16,6 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Type aliases for common handle types
-pub type TrustGraphHandle = Arc<RwLock<icn_trust::TrustGraph>>;
 pub type LedgerHandle = Arc<RwLock<icn_ledger::Ledger>>;
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ContractActorHandle = Arc<RwLock<icn_ccl::ContractActor>>;
@@ -30,14 +29,13 @@ pub type FederationGossipHandle = Arc<icn_federation::FederationGossipHandler>;
 pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::AttestationRateLimiter>;
 pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
 pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
-pub type EvidenceValidatorHandle = Arc<icn_trust::EvidenceValidator>;
 pub type EntityHandleType = icn_entity::EntityHandle;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
 pub struct NotificationDeps {
-    /// Trust graph for attestation handling
-    pub trust_graph: TrustGraphHandle,
+    /// Trust service for attestation ingestion and identity recovery
+    pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// This node's DID
     pub own_did: Did,
     /// Contract actor for deployment handling
@@ -74,30 +72,48 @@ pub struct NotificationDeps {
     pub contract_registry: ContractRegistryHolder,
     /// NAT dial configuration
     pub nat_dial_config: NatDialConfig,
-    /// Evidence validator for trust attestation verification
-    pub evidence_validator: Option<EvidenceValidatorHandle>,
     /// Entity handle for entity registry operations
     pub entity_handle: Option<EntityHandleType>,
 }
 
-/// Handle trust attestation entries
-pub async fn handle_trust_attestation(
+/// Handle trust attestation entries via TrustService
+pub async fn handle_trust_attestation_via_service(
     entry: &GossipEntry,
-    trust_graph: &TrustGraphHandle,
-    own_did: &Did,
+    forwarding_peer: &str,
+    trust_service: &Arc<dyn icn_kernel_api::services::TrustService>,
     rate_limiter: &AttestationRateLimiterHandle,
-    evidence_validator: Option<&EvidenceValidatorHandle>,
 ) {
-    if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
-        entry,
-        trust_graph,
-        own_did,
-        Some(rate_limiter.as_ref()),
-        evidence_validator.map(|v| v.as_ref()),
-    )
-    .await
-    {
-        warn!("Failed to handle trust attestation: {}", e);
+    // Extract data from gossip entry
+    let data = match entry.get_data() {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("Failed to decompress trust attestation: {}", e);
+            return;
+        }
+    };
+
+    // Apply rate limiting before forwarding to trust service
+    // Parse source DID from attestation for rate limiting
+    if let Ok(attestation) = serde_json::from_slice::<serde_json::Value>(&data) {
+        if let (Some(issuer), Some(subject)) = (
+            attestation.get("issuer").and_then(|v| v.as_str()),
+            attestation.get("subject").and_then(|v| v.as_str()),
+        ) {
+            if let (Ok(issuer_did), Ok(subject_did)) = (
+                issuer.parse::<icn_identity::Did>(),
+                subject.parse::<icn_identity::Did>(),
+            ) {
+                if let Err(reason) = rate_limiter.check(&issuer_did, &subject_did).await {
+                    warn!("Rate limited attestation: {}", reason);
+                    return;
+                }
+            }
+        }
+    }
+
+    let source = forwarding_peer.to_string();
+    if let Err(e) = trust_service.ingest_attestation(&data, &source) {
+        warn!("Failed to ingest trust attestation: {}", e);
     }
 }
 
@@ -152,7 +168,7 @@ pub async fn handle_contract_registry_message(
 pub async fn handle_identity_recovery(
     entry_data: Vec<u8>,
     recovery_store: Arc<dyn icn_store::Store>,
-    trust_graph: TrustGraphHandle,
+    trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     ledger: LedgerHandle,
 ) {
     match RecoveryMessage::from_bytes(&entry_data) {
@@ -168,7 +184,7 @@ pub async fn handle_identity_recovery(
                     warn!("Failed to handle recovery message: {}", e);
                 }
                 Ok(true) => {
-                    // Recovery was successfully finalized - update trust graph and ledger
+                    // Recovery was successfully finalized - update trust and ledger
                     if let RecoveryMessage::Finalized {
                         id,
                         old_did,
@@ -176,7 +192,7 @@ pub async fn handle_identity_recovery(
                         ..
                     } = &recovery_msg
                     {
-                        apply_recovery_finalization(id, old_did, new_did, &trust_graph, &ledger)
+                        apply_recovery_finalization(id, old_did, new_did, &trust_service, &ledger)
                             .await;
                     }
                 }
@@ -333,28 +349,33 @@ fn handle_recovery_message(
     }
 }
 
-/// Apply finalization effects to trust graph and ledger
+/// Apply finalization effects to trust service and ledger
 async fn apply_recovery_finalization(
     id: &str,
     old_did: &Did,
     new_did: &Did,
-    trust_graph: &TrustGraphHandle,
+    trust_service: &Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     ledger: &LedgerHandle,
 ) {
-    // Update trust graph
-    let mut trust = trust_graph.write().await;
-    match trust.map_did_recovery(old_did, new_did) {
-        Ok(count) => {
-            info!(
-                "Trust graph: migrated {} edges from {} to {}",
-                count, old_did, new_did
-            );
+    // Update trust via TrustService
+    if let Some(svc) = trust_service {
+        match svc.recover_identity(&old_did.to_string(), &new_did.to_string()) {
+            Ok(count) => {
+                info!(
+                    "Trust service: migrated {} edges from {} to {}",
+                    count, old_did, new_did
+                );
+            }
+            Err(e) => {
+                warn!("Failed to migrate trust for recovery {}: {}", id, e);
+            }
         }
-        Err(e) => {
-            warn!("Failed to migrate trust graph for recovery {}: {}", id, e);
-        }
+    } else {
+        warn!(
+            "No TrustService available for recovery {} trust migration",
+            id
+        );
     }
-    drop(trust);
 
     // Update ledger
     let mut ledger_guard = ledger.write().await;
@@ -791,7 +812,7 @@ pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
 pub fn create_notification_callback(
     deps: NotificationDeps,
 ) -> icn_gossip::EntryNotificationCallback {
-    Arc::new(move |topic, entry, _subscriber_did| {
+    Arc::new(move |topic, entry, subscriber_did| {
         // Clone dependencies for the async task
         let deps = deps.clone();
         let topic = topic.to_string();
@@ -810,20 +831,16 @@ pub fn create_notification_callback(
 
         // Route based on topic
         if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
-            let trust_graph = deps.trust_graph.clone();
-            let own_did = deps.own_did.clone();
-            let rate_limiter = deps.attestation_rate_limiter.clone();
-            let evidence_validator = deps.evidence_validator.clone();
-            tokio::spawn(async move {
-                handle_trust_attestation(
-                    &entry,
-                    &trust_graph,
-                    &own_did,
-                    &rate_limiter,
-                    evidence_validator.as_ref(),
-                )
-                .await;
-            });
+            if let Some(trust_svc) = deps.trust_service.clone() {
+                let rate_limiter = deps.attestation_rate_limiter.clone();
+                let peer = subscriber_did.to_string();
+                tokio::spawn(async move {
+                    handle_trust_attestation_via_service(&entry, &peer, &trust_svc, &rate_limiter)
+                        .await;
+                });
+            } else {
+                warn!("Trust attestation received but no TrustService available");
+            }
         } else if topic == "contracts:deploy" {
             if let Some(data) = entry_data {
                 let contract_actor = deps.contract_actor.clone();
@@ -834,10 +851,10 @@ pub fn create_notification_callback(
         } else if topic == IDENTITY_RECOVERY_TOPIC {
             if let Some(data) = entry_data {
                 let recovery_store = deps.recovery_store.clone();
-                let trust_graph = deps.trust_graph.clone();
+                let trust_service = deps.trust_service.clone();
                 let ledger = deps.ledger.clone();
                 tokio::spawn(async move {
-                    handle_identity_recovery(data, recovery_store, trust_graph, ledger).await;
+                    handle_identity_recovery(data, recovery_store, trust_service, ledger).await;
                 });
             }
         } else if topic == NETWORK_CANDIDATES_TOPIC {

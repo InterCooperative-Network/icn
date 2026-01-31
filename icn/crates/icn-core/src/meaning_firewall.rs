@@ -189,7 +189,7 @@ mod tests {
             ("icn-gossip", 0), // CLEAN ✅
             ("icn-net", 0),    // CLEAN ✅
             ("icn-gateway", 3),
-            ("icn-ledger", 0),  // CLEAN ✅ (imports removed by #970)
+            ("icn-ledger", 0), // CLEAN ✅ (imports removed by #970)
         ];
 
         for &(crate_name, expected_count) in expected {

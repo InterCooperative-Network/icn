@@ -4,12 +4,12 @@
 //! providing a cleaner separation of concerns for distributed compute.
 
 use icn_identity::Did;
+use icn_kernel_api::services::TrustService;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// Type aliases for common handle types
-pub type TrustGraphHandle = Arc<RwLock<icn_trust::TrustGraph>>;
 pub type LedgerHandle = Arc<RwLock<icn_ledger::Ledger>>;
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ComputeHandleHolder = Arc<RwLock<Option<icn_compute::ComputeHandle>>>;
@@ -18,8 +18,8 @@ pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;
 /// Dependencies required for compute actor initialization
 #[derive(Clone)]
 pub struct ComputeDeps {
-    /// Trust graph for trust score lookups
-    pub trust_graph: TrustGraphHandle,
+    /// Trust service for trust score lookups (kernel/app separated)
+    pub trust_service: Arc<dyn TrustService>,
     /// Ledger for payment settlement
     pub ledger: LedgerHandle,
     /// Gossip handle for message routing
@@ -55,22 +55,8 @@ pub struct ComputeServices {
 }
 
 /// Create the trust callback for compute actor
-pub fn create_trust_callback(trust_graph: TrustGraphHandle) -> icn_compute::TrustCallback {
-    Arc::new(move |did_str: &str| {
-        let graph = trust_graph.clone();
-        let did_string = did_str.to_string();
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                let did: Did =
-                    match serde_json::from_value(serde_json::Value::String(did_string.clone())) {
-                        Ok(d) => d,
-                        Err(_) => return 0.0,
-                    };
-                let graph = graph.read().await;
-                graph.compute_trust_score(&did).unwrap_or(0.0)
-            })
-        })
-    })
+pub fn create_trust_callback(trust_service: Arc<dyn TrustService>) -> icn_compute::TrustCallback {
+    Arc::new(move |did_str: &str| trust_service.trust_score(&did_str.to_string()))
 }
 
 /// Create the send callback for routing compute messages through gossip
@@ -325,7 +311,7 @@ pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did:
 /// Returns the compute handle, dispute handle, event broadcaster, and policy manager.
 pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeServices> {
     // Create trust callback
-    let trust_callback = create_trust_callback(deps.trust_graph.clone());
+    let trust_callback = create_trust_callback(deps.trust_service.clone());
 
     // Create compute actor
     let mut compute_actor =

@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use crate::oracle::TrustPolicyOracle;
 
-/// Maximum reputation change per single event (25%).
-/// Used for both penalties (ProtocolViolation) and boosts (PositiveInteraction).
-const EVENT_WEIGHT_MULTIPLIER: f64 = 0.25;
+/// Maximum reputation score delta per single event (25%).
+/// Applied as a penalty for ProtocolViolation and as a boost for PositiveInteraction.
+const EVENT_SCORE_DELTA: f64 = 0.25;
 
 /// Trust service implementation
 ///
@@ -78,7 +78,7 @@ impl TrustService for TrustServiceImpl {
                     category = %category,
                     "Trust event: protocol violation"
                 );
-                let penalty = severity * EVENT_WEIGHT_MULTIPLIER;
+                let penalty = severity * EVENT_SCORE_DELTA;
                 let current = {
                     let graph = self.graph.read();
                     match graph.compute_trust_score(&identity_did) {
@@ -123,7 +123,7 @@ impl TrustService for TrustServiceImpl {
                     let graph = self.graph.read();
                     graph.compute_trust_score(&identity_did).unwrap_or(0.0)
                 };
-                let new_score = (current + weight * EVENT_WEIGHT_MULTIPLIER).min(1.0);
+                let new_score = (current + weight * EVENT_SCORE_DELTA).min(1.0);
                 debug_assert!(
                     (0.0..=1.0).contains(&new_score),
                     "Trust score out of bounds: {new_score}"

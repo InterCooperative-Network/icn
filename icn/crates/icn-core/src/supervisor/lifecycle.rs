@@ -110,7 +110,6 @@ pub async fn run_supervisor(
             compute: gateway_handles.compute,
             coop: gateway_handles.coop,
             community: gateway_handles.community,
-            trust_graph: gateway_handles.trust_graph,
             trust_service: gateway_handles.trust_service,
             governance: gateway_handles.governance,
             treasury: gateway_handles.treasury,
@@ -240,32 +239,12 @@ async fn spawn_actors_with_identity(
         node_profile.capacity.storage_mb_available,
     );
 
-    // Initialize trust graph, recovery store, and misbehavior detector
+    // Initialize recovery store and misbehavior detector.
     // Extract TrustService early so it can be wired into the MisbehaviorDetector.
     let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
 
-    // If service_registry provides a trust_graph handle, use it instead of creating a new one.
-    // This enables proper kernel/app separation where the daemon owns the TrustGraph.
-    let trust_services = if let Some(trust_graph_from_daemon) = service_registry.and_then(|r| {
-        r.raw_handle::<RwLock<icn_trust::TrustGraph>>(ServiceRegistry::TRUST_GRAPH_KEY)
-    }) {
-        info!("Using TrustGraph from daemon-provided ServiceRegistry");
-        super::init_trust::init_trust_services_with_graph(
-            config,
-            trust_graph_from_daemon,
-            trust_service_from_registry.clone(),
-        )
-        .await?
-    } else {
-        debug!("No TrustGraph in ServiceRegistry, creating internal one");
-        super::init_trust::init_trust_services(
-            config,
-            did.clone(),
-            trust_service_from_registry.clone(),
-        )
-        .await?
-    };
-    let trust_graph_handle = trust_services.trust_graph.clone();
+    let trust_services =
+        super::init_trust::init_trust_services(config, trust_service_from_registry.clone()).await?;
     let misbehavior_detector = trust_services.misbehavior_detector.clone();
     let recovery_store = trust_services.recovery_store.clone();
     let security_store = trust_services.security_store.clone();
@@ -372,14 +351,13 @@ async fn spawn_actors_with_identity(
     // Store handles for gateway integration
     gateway_handles.coop = Some(coop_handle);
     gateway_handles.community = Some(community_services.community_handle);
-    gateway_handles.trust_graph = Some(trust_graph_handle.clone());
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
 
-    // Spawn Identity actor (provides signing and trust graph access)
+    // Spawn Identity actor (provides signing and trust service access)
     let identity_handle = crate::identity::IdentityActor::spawn(
         identity_bundle.keypair()?,
-        trust_graph_handle.clone(),
+        trust_service_from_registry.clone(),
         shutdown_tx.clone(),
     );
 
@@ -391,7 +369,6 @@ async fn spawn_actors_with_identity(
         identity_bundle,
         &did,
         &gossip_handle,
-        &trust_graph_handle,
         &misbehavior_detector,
         shutdown_tx,
         &oracle_for_components,
@@ -471,7 +448,6 @@ async fn spawn_actors_with_identity(
         send_callback_services.send_callback,
         &network_handle,
         &did,
-        &trust_graph_handle,
         &contract_actor_handle,
         &recovery_store,
         &ledger_handle,
@@ -484,6 +460,7 @@ async fn spawn_actors_with_identity(
         &federation_handler_for_notifications,
         &contract_registry_holder,
         &entity_handle,
+        &trust_service_from_registry,
         config,
         shutdown_tx,
         background_tasks,
@@ -617,9 +594,12 @@ async fn spawn_actors_with_identity(
     info!("✓ Contract registry handle available for gossip routing");
 
     // Initialize compute actor
+    let trust_service_for_compute = trust_service_from_registry
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("TrustService required for compute actor"))?;
     let compute_services =
         super::init_compute::init_compute_services(super::init_compute::ComputeDeps {
-            trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service_for_compute,
             ledger: ledger_handle.clone(),
             gossip_handle: gossip_handle.clone(),
             own_did: did.clone(),
@@ -662,7 +642,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             governance_handle,
             compute_handle,
-            trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service_from_registry.clone(),
             dispute_manager: dispute_manager_handle,
             federation_registry: federation_registry_for_rpc,
             policy_oracle: Some(oracle_for_components.clone()),
@@ -775,7 +755,6 @@ async fn spawn_network_actor(
     identity_bundle: &IdentityBundle,
     did: &icn_identity::Did,
     gossip_handle: &Arc<RwLock<icn_gossip::GossipActor>>,
-    _trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
     misbehavior_detector: &Arc<RwLock<icn_security::MisbehaviorDetector>>,
     shutdown_tx: &ShutdownTx,
     policy_oracle: &Arc<dyn icn_kernel_api::authz::PolicyOracle>,
@@ -883,7 +862,6 @@ async fn configure_gossip_actor(
     send_callback: icn_gossip::SendMessageCallback,
     network_handle: &icn_net::NetworkHandle,
     did: &icn_identity::Did,
-    trust_graph_handle: &Arc<RwLock<icn_trust::TrustGraph>>,
     contract_actor_handle: &Arc<RwLock<icn_ccl::ContractActor>>,
     recovery_store: &Arc<dyn icn_store::Store>,
     ledger_handle: &Arc<RwLock<icn_ledger::Ledger>>,
@@ -896,6 +874,7 @@ async fn configure_gossip_actor(
     federation_handler: &Option<Arc<icn_federation::FederationGossipHandler>>,
     contract_registry_holder: &Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>,
     entity_handle: &icn_entity::EntityHandle,
+    trust_service: &Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     config: &Config,
     shutdown_tx: &ShutdownTx,
     background_tasks: &mut JoinSet<()>,
@@ -917,15 +896,10 @@ async fn configure_gossip_actor(
     let attestation_rate_limiter =
         Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
 
-    // Create evidence validator
-    let evidence_validator = Some(Arc::new(icn_trust::EvidenceValidator::new(
-        recovery_store.clone(),
-    )));
-
     // Create notification callback
     let notification_callback = super::init_notifications::create_notification_callback(
         super::init_notifications::NotificationDeps {
-            trust_graph: trust_graph_handle.clone(),
+            trust_service: trust_service.clone(),
             own_did: did.clone(),
             contract_actor: contract_actor_handle.clone(),
             recovery_store: recovery_store.clone(),
@@ -944,7 +918,6 @@ async fn configure_gossip_actor(
             attestation_rate_limiter,
             contract_registry: contract_registry_holder.clone(),
             nat_dial_config: config.network.nat_dial.clone(),
-            evidence_validator,
             entity_handle: Some(entity_handle.clone()), // Pass entity handle for gossip sync
         },
     );

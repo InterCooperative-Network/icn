@@ -13,10 +13,10 @@ use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_gossip::GossipActor;
 use icn_kernel_api::authz::PolicyOracle;
+use icn_kernel_api::services::TrustService;
 use icn_ledger::{DisputeManager, Ledger};
 use icn_net::NetworkHandle;
 use icn_rpc::RpcServer;
-use icn_trust::TrustGraph;
 
 use crate::governance::GovernanceHandle;
 
@@ -28,8 +28,8 @@ pub struct RpcDeps {
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub governance_handle: GovernanceHandle,
     pub compute_handle: ComputeHandle,
-    /// Trust graph for trust-based operations (deprecated: use policy_oracle instead)
-    pub trust_graph: Arc<RwLock<TrustGraph>>,
+    /// Trust service for trust-based operations
+    pub trust_service: Option<Arc<dyn TrustService>>,
     pub dispute_manager: Arc<RwLock<DisputeManager>>,
     pub federation_registry: Option<Arc<icn_federation::CooperativeRegistry>>,
     /// Optional policy oracle for trust-based rate limiting.
@@ -98,7 +98,9 @@ pub fn spawn_rpc_server(
     let compute_handle_for_gateway = deps.compute_handle.clone();
     rpc_server.set_compute_handle(deps.compute_handle);
 
-    rpc_server.set_trust_handle(deps.trust_graph);
+    if let Some(trust_svc) = deps.trust_service {
+        rpc_server.set_trust_service(trust_svc);
+    }
     rpc_server.set_dispute_manager(deps.dispute_manager);
 
     if let Some(registry) = deps.federation_registry {
