@@ -143,6 +143,8 @@ Now that we understand what ICN does as a whole system, we can examine its **arc
 
 ICN implements a **constraint enforcement architecture** where applications and governance systems (Policy Oracles) translate domain semantics (trust relationships, governance rules, membership criteria) into generic constraints that the kernel enforces blindly.
 
+**What the kernel is:** The kernel defines and enforces bounded resource and integrity mechanisms (rate limiting, replay protection, signature verification, capability and credit gates); it does not compute or interpret domain semantics.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    CONSTRAINT ENFORCEMENT (Kernel)                   │

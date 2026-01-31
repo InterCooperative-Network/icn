@@ -56,9 +56,18 @@ ICN implements a constraint enforcement architecture where Policy Oracles (apps/
 
 ---
 
-## System Components
+## Functional Component Map (Not a Layer Stack)
 
 The implementation organizes ICN's subsystems into functional areas. Note: "layer" terminology below is descriptive (e.g., "transport layer security") — ICN is **not** an OSI-like strictly layered stack. Instead, Policy Oracles translate domain semantics into constraints that the kernel enforces.
+
+### Substrate Services (Consumed by Both Kernel and Oracles)
+
+These services do not decide policy; they provide integrity and replication primitives:
+
+- **Transport** (`icn-net`): QUIC/TLS sessions, message authentication, mDNS discovery
+- **Gossip** (`icn-gossip`): Topic-based replication, anti-entropy, causal ordering
+- **Storage** (`icn-store`): Sled embedded database, transactional updates
+- **Identity** (`icn-identity`): DID management, keystore, signature verification
 
 ```
 ┌────────────────────────────────────────────────────────────────┐

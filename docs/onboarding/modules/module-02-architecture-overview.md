@@ -45,7 +45,7 @@ ICN provides foundational capabilities that applications build on:
 - **Coordination**: How do we agree? (gossip + contracts)
 - **Economics**: How do we exchange value? (mutual credit)
 
-Think of ICN as the "operating system" for cooperative applications.
+Think of ICN as the enforcement substrate for cooperative applications: it provides mechanisms; governance decides how to use them.
 
 ### 2. ICN's Major Subsystems
 
