@@ -6,9 +6,8 @@
 //!
 //! # Architecture
 //! - Runs as a background task with configurable interval
-//! - Queries storage for all ResourceAccess entries
-//! - Validates each against idle period rules
-//! - Auto-revokes access that exceeds max_idle_period_seconds
+//! - Queries the LedgerService for enforceable resources with idle violations
+//! - Revokes resources that exceed max_idle_period_seconds
 //! - Emits revocation events for audit trail
 //! - Publishes revocations to gossip topic for cluster-wide notification
 //!
@@ -21,12 +20,15 @@
 //! }
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use rand::Rng;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use tokio::time::{interval, Duration, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
+
+use icn_kernel_api::services::LedgerService;
+use icn_kernel_api::types::Did;
 
 use crate::runtime::ShutdownRx;
 
@@ -100,8 +102,8 @@ impl ResourceEnforcerConfig {
 pub struct RevocationEvent {
     /// Resource ID that was revoked
     pub resource_id: String,
-    /// Entity whose access was revoked
-    pub holder: icn_entity::EntityId,
+    /// DID of the entity whose access was revoked
+    pub holder: Did,
     /// Reason for revocation
     pub reason: String,
     /// Timestamp when revoked
@@ -180,30 +182,21 @@ impl ResourceEnforcerHandle {
     }
 }
 
-/// Storage interface for ResourceAccess entries
-///
-/// This trait abstracts the storage layer to allow for testing
-/// and different storage backends.
-pub trait ResourceAccessStore: Send + Sync {
-    /// List all resource access entries
-    ///
-    /// Returns a list of (resource_id, ResourceAccess) pairs.
-    /// In a real implementation, this would query the persistent store.
-    fn list_all(&self) -> Result<Vec<(String, icn_ledger::ResourceAccess)>>;
-
-    /// Update a resource access entry after revocation
-    fn update(&mut self, resource_id: &str, access: &icn_ledger::ResourceAccess) -> Result<()>;
-
-    /// Emit a revocation event for audit trail
-    fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()>;
+/// Dependencies for spawning the resource enforcer actor
+pub struct ResourceEnforcerDeps {
+    /// The ledger service used to query and revoke resource access
+    pub ledger_service: Arc<dyn LedgerService>,
+    /// Optional gossip handle for publishing revocations cluster-wide
+    pub gossip_handle: Option<Arc<tokio::sync::RwLock<icn_gossip::GossipActor>>>,
 }
 
 /// Resource Access Enforcer Actor
 ///
-/// Periodically checks resource access entries and revokes idle ones.
+/// Periodically checks resource access entries and revokes idle ones
+/// using the LedgerService interface.
 pub struct ResourceAccessEnforcerActor {
     config: ResourceEnforcerConfig,
-    store: Arc<RwLock<dyn ResourceAccessStore>>,
+    deps: ResourceEnforcerDeps,
     stats: EnforcementStats,
 }
 
@@ -212,21 +205,21 @@ impl ResourceAccessEnforcerActor {
     ///
     /// # Arguments
     /// * `config` - Enforcement configuration
-    /// * `store` - Storage backend for ResourceAccess entries
+    /// * `deps` - Dependencies (LedgerService, optional gossip)
     /// * `shutdown_rx` - Shutdown signal receiver
     ///
     /// # Returns
     /// Handle for interacting with the actor
     pub fn spawn(
         config: ResourceEnforcerConfig,
-        store: Arc<RwLock<dyn ResourceAccessStore>>,
+        deps: ResourceEnforcerDeps,
         mut shutdown_rx: ShutdownRx,
     ) -> ResourceEnforcerHandle {
         let (tx, mut rx) = mpsc::channel::<EnforcerActorMsg>(32);
 
         let mut actor = ResourceAccessEnforcerActor {
             config: config.clone(),
-            store,
+            deps,
             stats: EnforcementStats {
                 checks_performed: 0,
                 resources_checked: 0,
@@ -310,20 +303,10 @@ impl ResourceAccessEnforcerActor {
         }
     }
 
-    /// Perform an enforcement check on all resource access entries
+    /// Perform an enforcement check using LedgerService
     ///
-    /// This method batches updates to reduce lock contention. It first identifies
-    /// all resources that need revocation during a read phase, then acquires the
-    /// write lock once to perform all updates together.
-    ///
-    /// # Performance Note
-    ///
-    /// Currently, `list_all()` loads all resources into memory before processing.
-    /// The `batch_size` config only affects the iteration chunk size for CPU-bound
-    /// work, not memory usage. For deployments with 10K+ resources, consider:
-    /// - Adding pagination support to [`ResourceAccessStore::list_all`]
-    /// - Implementing cursor-based iteration
-    /// - Monitoring memory usage via metrics
+    /// Queries the ledger for enforceable resources, identifies idle violations,
+    /// revokes violating resources, and publishes revocation events.
     async fn perform_enforcement_check(&mut self) -> Result<EnforcementResult> {
         let current_time = icn_time::current_timestamp_secs();
         debug!("Starting enforcement check at timestamp {}", current_time);
@@ -331,85 +314,64 @@ impl ResourceAccessEnforcerActor {
         self.stats.checks_performed += 1;
         self.stats.last_check_time = Some(current_time);
 
-        // Phase 1: Read all resources and identify which need revocation
-        let store_read = self.store.read().await;
-        let all_resources = store_read
-            .list_all()
-            .context("Failed to list resource access entries")?;
-        drop(store_read);
+        // Query LedgerService for all enforceable resources with idle status
+        let resources = self
+            .deps
+            .ledger_service
+            .list_enforceable_resources(current_time)
+            .map_err(|e| anyhow::anyhow!("Failed to list enforceable resources: {e}"))?;
 
-        let resources_checked = all_resources.len();
+        let resources_checked = resources.len();
 
-        // Collect resources that need revocation (resource_id, updated_access, event)
-        let mut pending_revocations: Vec<(String, icn_ledger::ResourceAccess, RevocationEvent)> =
-            Vec::new();
+        // Identify and process resources with idle violations
+        let mut revocations = 0;
 
-        // Process in batches to identify revocations
-        // Note: We iterate by reference first, only cloning resources that need revocation.
-        // This avoids cloning every resource, which is important for large collections.
-        for chunk in all_resources.chunks(self.config.batch_size) {
-            for (resource_id, access) in chunk.iter() {
-                // Skip already revoked resources
-                if access.is_revoked() {
+        for chunk in resources.chunks(self.config.batch_size) {
+            for resource in chunk {
+                if resource.is_revoked {
                     continue;
                 }
 
-                // Validate against anti-speculation rules
-                if let Err(icn_ledger::AccessError::IdleTooLong {
-                    idle_seconds,
-                    max_idle_seconds,
-                }) = access.validate_rules(current_time)
-                {
-                    // Clone only when revocation is needed
-                    let mut access_clone = access.clone();
-
-                    // Revoke the access
+                if let Some(ref violation) = resource.idle_violation {
                     let reason = format!(
                         "Automatically revoked: idle for {}s (max: {}s)",
-                        idle_seconds, max_idle_seconds
+                        violation.idle_seconds, violation.max_idle_seconds
                     );
 
                     info!(
                         "Revoking access for resource '{}' (holder: {}): {}",
-                        resource_id, access_clone.holder, reason
+                        resource.resource_id, resource.holder, reason
                     );
 
-                    access_clone.revoke(reason.clone());
-
-                    // Prepare revocation event
-                    let event = RevocationEvent {
-                        resource_id: resource_id.clone(),
-                        holder: access_clone.holder.clone(),
-                        reason,
-                        timestamp: current_time,
-                        idle_seconds,
+                    // Revoke via LedgerService
+                    let req = icn_kernel_api::services::RevokeResourceAccessRequest {
+                        resource_id: resource.resource_id.clone(),
+                        reason: reason.clone(),
                     };
 
-                    pending_revocations.push((resource_id.clone(), access_clone, event));
+                    if let Err(e) = self.deps.ledger_service.revoke_resource_access(&req) {
+                        warn!(
+                            "Failed to revoke resource '{}': {}",
+                            resource.resource_id, e
+                        );
+                        continue;
+                    }
+
+                    // Publish revocation event to gossip
+                    let event = RevocationEvent {
+                        resource_id: resource.resource_id.clone(),
+                        holder: resource.holder.clone(),
+                        reason,
+                        timestamp: current_time,
+                        idle_seconds: violation.idle_seconds,
+                    };
+
+                    self.publish_revocation(&event).await;
+
+                    revocations += 1;
+                    metrics::counter!("icn_resource_access_revoked_total").increment(1);
                 }
             }
-        }
-
-        let revocations = pending_revocations.len();
-
-        // Phase 2: Acquire write lock once and apply all revocations
-        if !pending_revocations.is_empty() {
-            let mut store_write = self.store.write().await;
-
-            for (resource_id, access, event) in pending_revocations {
-                store_write
-                    .update(&resource_id, &access)
-                    .context("Failed to update resource access")?;
-
-                store_write
-                    .emit_revocation(event)
-                    .context("Failed to emit revocation event")?;
-
-                // Update per-revocation metrics
-                metrics::counter!("icn_resource_access_revoked_total").increment(1);
-            }
-
-            drop(store_write);
         }
 
         self.stats.resources_checked += resources_checked as u64;
@@ -420,7 +382,7 @@ impl ResourceAccessEnforcerActor {
             resources_checked, revocations
         );
 
-        // Update metrics - using counters for cumulative tracking
+        // Update metrics
         metrics::counter!("icn_resource_enforcer_checks_total").increment(1);
         metrics::counter!("icn_resource_enforcer_resources_checked_total")
             .increment(resources_checked as u64);
@@ -432,71 +394,51 @@ impl ResourceAccessEnforcerActor {
             timestamp: current_time,
         })
     }
+
+    /// Publish a revocation event to gossip for cluster-wide notification.
+    ///
+    /// Best-effort: if gossip is unavailable, the event is logged but not retried.
+    async fn publish_revocation(&self, event: &RevocationEvent) {
+        let gossip_handle = match &self.deps.gossip_handle {
+            Some(h) => h.clone(),
+            None => return,
+        };
+
+        let serialized = match serde_json::to_vec(event) {
+            Ok(data) => data,
+            Err(e) => {
+                warn!("Failed to serialize revocation event: {}", e);
+                metrics::counter!(
+                    "icn_resource_revocation_gossip_failures_total",
+                    "reason" => "serialization"
+                )
+                .increment(1);
+                return;
+            }
+        };
+
+        let mut gossip = gossip_handle.write().await;
+        if let Err(e) = gossip.publish(RESOURCE_REVOCATIONS_TOPIC, serialized).await {
+            warn!("Failed to publish revocation to gossip: {}", e);
+            metrics::counter!(
+                "icn_resource_revocation_gossip_failures_total",
+                "reason" => "publish"
+            )
+            .increment(1);
+        } else {
+            info!(
+                resource_id = %event.resource_id,
+                holder = %event.holder,
+                "Published revocation event to gossip"
+            );
+            metrics::counter!("icn_resource_revocation_gossip_published_total").increment(1);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_entity::EntityId;
-    use icn_identity::KeyPair;
-    use icn_ledger::{AccessModel, AntiSpeculationRules, ResourceAccess};
-    use std::collections::HashMap;
-    use std::sync::Mutex;
-
-    /// Mock storage for testing
-    struct MockResourceAccessStore {
-        resources: Mutex<HashMap<String, ResourceAccess>>,
-        events: Mutex<Vec<RevocationEvent>>,
-    }
-
-    impl MockResourceAccessStore {
-        fn new() -> Self {
-            Self {
-                resources: Mutex::new(HashMap::new()),
-                events: Mutex::new(Vec::new()),
-            }
-        }
-
-        fn add_resource(&self, id: String, access: ResourceAccess) {
-            self.resources.lock().map(|mut r| r.insert(id, access)).ok();
-        }
-
-        #[allow(dead_code)]
-        fn get_events(&self) -> Vec<RevocationEvent> {
-            self.events.lock().map(|e| e.clone()).unwrap_or_default()
-        }
-    }
-
-    impl ResourceAccessStore for MockResourceAccessStore {
-        fn list_all(&self) -> Result<Vec<(String, ResourceAccess)>> {
-            let resources = self
-                .resources
-                .lock()
-                .map_err(|e| anyhow::anyhow!("Failed to lock resources: {}", e))?;
-            Ok(resources
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect())
-        }
-
-        fn update(&mut self, resource_id: &str, access: &ResourceAccess) -> Result<()> {
-            let mut resources = self
-                .resources
-                .lock()
-                .map_err(|e| anyhow::anyhow!("Failed to lock resources: {}", e))?;
-            resources.insert(resource_id.to_string(), access.clone());
-            Ok(())
-        }
-
-        fn emit_revocation(&mut self, event: RevocationEvent) -> Result<()> {
-            let mut events = self
-                .events
-                .lock()
-                .map_err(|e| anyhow::anyhow!("Failed to lock events: {}", e))?;
-            events.push(event);
-            Ok(())
-        }
-    }
 
     #[test]
     fn test_config_defaults() {
@@ -525,216 +467,89 @@ mod tests {
         assert_eq!(config.enabled, deserialized.enabled);
     }
 
+    #[test]
+    fn test_revocation_event_serialization() {
+        let event = RevocationEvent {
+            resource_id: "test-resource".to_string(),
+            holder: "did:icn:abc123".to_string(),
+            reason: "Idle too long".to_string(),
+            timestamp: 1000000,
+            idle_seconds: 86400,
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        let deserialized: RevocationEvent = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(event.resource_id, deserialized.resource_id);
+        assert_eq!(event.holder, deserialized.holder);
+        assert_eq!(event.idle_seconds, deserialized.idle_seconds);
+    }
+
+    /// Verify that the actor works correctly when gossip_handle is None.
+    /// Enforcement should still occur; revocations are just not broadcast.
     #[tokio::test]
-    async fn test_enforcement_check_idle_revocation() {
-        let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
+    async fn test_enforce_without_gossip() {
+        use icn_kernel_api::services::{LedgerService, ResourceAccessInfo};
 
-        // Create a resource with strict idle rules (7 days)
-        let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
-        let mut access = ResourceAccess::new(
-            "test-resource-001".to_string(),
-            entity.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 90 * 24 * 3600, // 90 days
-                renewable: true,
-                max_accumulated: 4,
-            },
-        )
-        .with_rules(AntiSpeculationRules::strict()); // 7-day idle limit
-
-        // Record usage at grant time
-        access
-            .record_usage(access.granted_at, "Initial use".to_string())
-            .unwrap();
-
-        // Add to mock store
-        store
-            .write()
-            .await
-            .add_resource("test-resource-001".to_string(), access.clone());
-
-        // Fast-forward time by 8 days (exceeds 7-day limit)
-        // Note: In a real test, we'd need to mock icn_time::current_timestamp_secs()
-        // For now, we test the logic manually
-
-        let current_time = access.granted_at + 8 * 24 * 3600;
-
-        // Manually test the validation logic
-        let validation_result = access.validate_rules(current_time);
-        assert!(validation_result.is_err());
-
-        if let Err(icn_ledger::AccessError::IdleTooLong { idle_seconds, .. }) = validation_result {
-            assert!(idle_seconds >= 7 * 24 * 3600);
-        } else {
-            panic!("Expected IdleTooLong error");
+        struct StubLedger;
+        impl LedgerService for StubLedger {
+            fn oracle(&self) -> Arc<dyn icn_kernel_api::authz::PolicyOracle> {
+                unimplemented!()
+            }
+            fn balance(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn credit_limit(&self, _: &icn_kernel_api::types::Did, _: &str) -> i64 {
+                0
+            }
+            fn record_event(&self, _: icn_kernel_api::services::LedgerEvent) {}
+            fn list_enforceable_resources(
+                &self,
+                _current_time: u64,
+            ) -> Result<Vec<ResourceAccessInfo>, String> {
+                Ok(vec![ResourceAccessInfo {
+                    resource_id: "res-1".to_string(),
+                    holder: "did:icn:holder1".to_string(),
+                    granted_at: 0,
+                    is_revoked: false,
+                    idle_violation: Some(icn_kernel_api::services::IdleViolationInfo {
+                        idle_seconds: 999,
+                        max_idle_seconds: 100,
+                    }),
+                }])
+            }
+            fn revoke_resource_access(
+                &self,
+                _req: &icn_kernel_api::services::RevokeResourceAccessRequest,
+            ) -> Result<(), String> {
+                Ok(())
+            }
         }
-    }
 
-    #[tokio::test]
-    async fn test_enforcement_skip_already_revoked() {
-        let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
-
-        let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
-        let mut access = ResourceAccess::new(
-            "test-resource-002".to_string(),
-            entity.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 30 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        );
-
-        // Already revoke it
-        access.revoke("Previously revoked".to_string());
-        assert!(access.is_revoked());
-
-        store
-            .write()
-            .await
-            .add_resource("test-resource-002".to_string(), access.clone());
-
-        // Enforcement should skip this resource (verified by checking is_revoked)
-        assert!(access.is_revoked());
-    }
-
-    /// End-to-end integration test with tokio time mocking.
-    ///
-    /// Tests the full actor lifecycle: spawn → periodic tick → enforcement check → revocation.
-    /// Uses `start_paused = true` to control time advancement and verify periodic behavior.
-    #[tokio::test(start_paused = true)]
-    async fn test_periodic_enforcement_integration() {
-        use tokio::sync::broadcast;
-        use tokio::time::Duration;
-
-        // Create mock store
-        let store = Arc::new(RwLock::new(MockResourceAccessStore::new()));
-
-        // Create a resource that is already past its idle limit
-        // Set granted_at to 30 days ago (relative to current system time)
-        let current_time = icn_time::current_timestamp_secs();
-        let thirty_days_ago = current_time.saturating_sub(30 * 24 * 3600);
-
-        let entity = EntityId::from_did(KeyPair::generate().unwrap().did());
-        let mut access = ResourceAccess::new(
-            "idle-resource".to_string(),
-            entity.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 90 * 24 * 3600, // 90 days
-                renewable: true,
-                max_accumulated: 4,
-            },
-        )
-        .with_rules(AntiSpeculationRules::strict()); // 7-day idle limit
-
-        // Override granted_at and record last usage 30 days ago
-        // This makes the resource idle for 30 days, exceeding the 7-day limit
-        access.granted_at = thirty_days_ago;
-        access
-            .record_usage(thirty_days_ago, "Initial use".to_string())
-            .unwrap();
-
-        // Add to store
-        store
-            .write()
-            .await
-            .add_resource("idle-resource".to_string(), access);
-
-        // Also add a recently-used resource that should NOT be revoked
-        let entity2 = EntityId::from_did(KeyPair::generate().unwrap().did());
-        let mut active_access = ResourceAccess::new(
-            "active-resource".to_string(),
-            entity2.clone(),
-            AccessModel::UseAccess {
-                duration_seconds: 90 * 24 * 3600,
-                renewable: true,
-                max_accumulated: 4,
-            },
-        )
-        .with_rules(AntiSpeculationRules::strict());
-
-        // Record recent usage (just now)
-        active_access
-            .record_usage(current_time, "Recent use".to_string())
-            .unwrap();
-
-        store
-            .write()
-            .await
-            .add_resource("active-resource".to_string(), active_access);
-
-        // Create shutdown channel
-        let (shutdown_tx, shutdown_rx) = broadcast::channel::<()>(1);
-
-        // Spawn actor with short interval (5 seconds for test)
         let config = ResourceEnforcerConfig {
-            check_interval_seconds: 5,
+            check_interval_seconds: 3600,
             batch_size: 100,
             enabled: true,
         };
 
-        let handle = ResourceAccessEnforcerActor::spawn(config, store.clone(), shutdown_rx);
+        let deps = ResourceEnforcerDeps {
+            ledger_service: Arc::new(StubLedger),
+            gossip_handle: None, // No gossip — should not panic
+        };
 
-        // Allow initial startup jitter to complete (max 0.5s jitter for 5s interval)
-        // Advance time past the jitter
-        tokio::time::advance(Duration::from_secs(1)).await;
-        tokio::task::yield_now().await;
+        let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
+        let shutdown_rx = shutdown_tx.subscribe();
+        let handle = ResourceAccessEnforcerActor::spawn(config, deps, shutdown_rx);
 
-        // Advance time past the first interval tick (5 seconds)
-        tokio::time::advance(Duration::from_secs(6)).await;
-        tokio::task::yield_now().await;
+        // Force a check — should revoke 1 resource without crashing on None gossip
+        let result = handle.force_check().await.unwrap();
+        assert_eq!(result.resources_checked, 1);
+        assert_eq!(result.revocations, 1);
 
-        // Give the actor time to process
-        tokio::time::advance(Duration::from_millis(100)).await;
-        tokio::task::yield_now().await;
-
-        // Verify stats show at least one check was performed
         let stats = handle.get_stats().await.unwrap();
-        assert!(
-            stats.checks_performed >= 1,
-            "Expected at least 1 check, got {}",
-            stats.checks_performed
-        );
+        assert_eq!(stats.total_revocations, 1);
 
-        // Verify the idle resource was revoked
-        let store_read = store.read().await;
-        let resources = store_read.list_all().unwrap();
-        drop(store_read);
-
-        let idle_resource = resources
-            .iter()
-            .find(|(id, _)| id == "idle-resource")
-            .map(|(_, access)| access);
-        let active_resource = resources
-            .iter()
-            .find(|(id, _)| id == "active-resource")
-            .map(|(_, access)| access);
-
-        assert!(
-            idle_resource.is_some(),
-            "Idle resource should still exist in store"
-        );
-        assert!(
-            idle_resource.unwrap().is_revoked(),
-            "Idle resource should be revoked"
-        );
-
-        assert!(
-            active_resource.is_some(),
-            "Active resource should still exist in store"
-        );
-        assert!(
-            !active_resource.unwrap().is_revoked(),
-            "Active resource should NOT be revoked"
-        );
-
-        // Verify revocation events were emitted
-        let events = store.read().await.events.lock().unwrap().clone();
-        assert_eq!(events.len(), 1, "Should have exactly 1 revocation event");
-        assert_eq!(events[0].resource_id, "idle-resource");
-        assert!(events[0].reason.contains("idle"));
-
-        // Clean shutdown
         let _ = shutdown_tx.send(());
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }

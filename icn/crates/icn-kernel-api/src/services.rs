@@ -385,6 +385,70 @@ pub trait LedgerService: Send + Sync {
     ///
     /// Called by the kernel when ledger-relevant actions occur.
     fn record_event(&self, event: LedgerEvent);
+
+    /// List resource access entries with their idle-violation status.
+    ///
+    /// The ledger service evaluates anti-speculation rules internally and
+    /// returns kernel-level DTOs. `current_time` is seconds since epoch.
+    ///
+    /// Default implementation returns an empty list (no resource access tracking).
+    fn list_enforceable_resources(
+        &self,
+        _current_time: u64,
+    ) -> Result<Vec<ResourceAccessInfo>, String> {
+        Ok(Vec::new())
+    }
+
+    /// Revoke resource access and persist the change.
+    ///
+    /// The ledger service handles the domain-level revocation logic
+    /// (updating internal state, audit trail, etc.).
+    ///
+    /// Default implementation returns an error (not supported).
+    fn revoke_resource_access(&self, _req: &RevokeResourceAccessRequest) -> Result<(), String> {
+        Err("Resource access revocation not supported".to_string())
+    }
+}
+
+// ============================================================================
+// Resource Access DTOs
+// ============================================================================
+
+/// A resource access entry as seen by the kernel.
+///
+/// This is a kernel-level view of resource access. The ledger service
+/// translates its internal `ResourceAccess` into this type so the kernel
+/// can enforce idle-resource revocation without importing domain types.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ResourceAccessInfo {
+    /// Unique identifier of the resource
+    pub resource_id: String,
+    /// DID of the resource holder
+    pub holder: Did,
+    /// Timestamp when access was granted (seconds since epoch)
+    pub granted_at: u64,
+    /// Whether the access has already been revoked
+    pub is_revoked: bool,
+    /// Present when the resource violates idle rules at the queried time
+    pub idle_violation: Option<IdleViolationInfo>,
+}
+
+/// Information about an idle rule violation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IdleViolationInfo {
+    /// How long the resource has been idle (seconds)
+    pub idle_seconds: u64,
+    /// Maximum allowed idle time (seconds)
+    pub max_idle_seconds: u64,
+}
+
+/// Request to revoke resource access.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RevokeResourceAccessRequest {
+    /// Resource to revoke
+    pub resource_id: String,
+    /// Reason for revocation (for audit trail)
+    pub reason: String,
 }
 
 /// Ledger events that the kernel can report
