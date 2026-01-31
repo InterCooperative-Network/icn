@@ -365,11 +365,9 @@ mod tests {
                     ..
                 } = event
                 {
-                    // Attempt to deserialize — this should fail for our test payload
-                    if payload.get("Text").is_none()
-                        && payload.get("ProtocolChange").is_none()
-                        && payload.get("Treasury").is_none()
-                    {
+                    // Check for invalid payload - in this test we specifically
+                    // emit {"NotAValidVariant": true} to simulate a deserialization failure
+                    if payload.get("NotAValidVariant").is_some() {
                         let bus = bus_for_sub1.clone();
                         let pid = proposal_id;
                         tokio::spawn(async move {
