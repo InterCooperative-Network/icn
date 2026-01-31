@@ -12,7 +12,7 @@ use icn_compute::{
     ComputeActor, CoopSchedulingPolicy, EnforcementMode, MemberQuota, PolicyManager, UsageTracker,
 };
 use icn_core::{EventBus, SystemEvent};
-use icn_governance::{ProposalId, ProposalPayload};
+use icn_governance::ProposalPayload;
 use icn_identity::KeyPair;
 use icn_store::{SledStore, Store};
 use std::sync::Arc;
@@ -66,12 +66,14 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
         event_bus.subscribe(Arc::new(move |event| {
             if let SystemEvent::ProposalAccepted {
                 proposal_id,
-                payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
+                payload,
                 decided_at,
                 ..
             } = event {
+                let Ok(ProposalPayload::SchedulingPolicy { coop_id, policy_json }) =
+                    serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
                 info!("📋 Executing scheduling policy proposal {}: update policy for {}",
-                      proposal_id.0, coop_id);
+                      proposal_id, coop_id);
 
                 // Spawn async task to apply policy update
                 let compute_handle = compute.clone();
@@ -83,17 +85,17 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
 
                     tokio::spawn(async move {
                         // IDEMPOTENCY CHECK: Skip if proposal already executed
-                        let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                        let audit_key = format!("gov:audit:policy:{}", prop_id);
                         match store.get(audit_key.as_bytes()) {
                             Ok(Some(_)) => {
-                                info!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
+                                info!("Policy proposal {} already executed, skipping duplicate", prop_id);
                                 return;
                             }
                             Ok(None) => {
                                 // Not executed yet, proceed
                             }
                             Err(e) => {
-                                eprintln!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
+                                eprintln!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id, e);
                                 eprintln!("   Refusing to execute to prevent potential duplicate");
                                 return;
                             }
@@ -106,11 +108,11 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
                                 match compute_handle.set_policy(policy.clone()).await {
                                     Ok(_) => {
                                         info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
-                                              prop_id.0, coop);
+                                              prop_id, coop);
 
                                         // Store audit trail
                                         let audit_record = serde_json::json!({
-                                            "proposal_id": prop_id.0,
+                                            "proposal_id": prop_id,
                                             "coop_id": coop,
                                             "decided_at": decision_time,
                                             "executed_at": std::time::SystemTime::now()
@@ -121,19 +123,19 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
 
                                         if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
                                             if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                eprintln!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
+                                                eprintln!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id, e);
                                             } else {
-                                                info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
+                                                info!("📋 Audit trail recorded for policy proposal {}", prop_id);
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        eprintln!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
+                                        eprintln!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id, e);
                                     }
                                 }
                             }
                             Err(e) => {
-                                eprintln!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
+                                eprintln!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id, e);
                             }
                         }
                     });
@@ -163,26 +165,26 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
     info!("Created test scheduling policy");
 
     // 6. Create and fire a ProposalAccepted event
-    let proposal_id = ProposalId::new("test-policy-proposal-123");
+    let proposal_id = "test-policy-proposal-123".to_string();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
 
-    let payload = ProposalPayload::SchedulingPolicy {
+    let payload = serde_json::to_value(&ProposalPayload::SchedulingPolicy {
         coop_id: "test-coop".to_string(),
         policy_json: policy_json.clone(),
-    };
+    }).unwrap();
 
     info!(
         "Firing ProposalAccepted event for proposal {}",
-        proposal_id.0
+        proposal_id
     );
 
     event_bus
         .emit(SystemEvent::ProposalAccepted {
             proposal_id: proposal_id.clone(),
             domain_id: "test-domain".to_string(),
-            payload,
+            payload: payload.clone(),
             decided_at: now,
         })
         .await;
@@ -203,12 +205,12 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
     info!("✅ Verified policy was applied to compute actor");
 
     // 9. Verify audit trail was stored
-    let audit_key = format!("gov:audit:policy:{}", proposal_id.0);
+    let audit_key = format!("gov:audit:policy:{}", proposal_id);
     let audit_data = gov_store.get(audit_key.as_bytes())?;
     assert!(audit_data.is_some(), "Audit trail should have been stored");
 
     let audit_json: serde_json::Value = serde_json::from_slice(&audit_data.unwrap())?;
-    assert_eq!(audit_json["proposal_id"], proposal_id.0);
+    assert_eq!(audit_json["proposal_id"], proposal_id);
     assert_eq!(audit_json["coop_id"], "test-coop");
 
     info!("✅ Verified audit trail was stored");
@@ -220,10 +222,10 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
         .emit(SystemEvent::ProposalAccepted {
             proposal_id: proposal_id.clone(),
             domain_id: "test-domain".to_string(),
-            payload: ProposalPayload::SchedulingPolicy {
+            payload: serde_json::to_value(&ProposalPayload::SchedulingPolicy {
                 coop_id: "test-coop".to_string(),
                 policy_json: policy_json.clone(),
-            },
+            }).unwrap(),
             decided_at: now,
         })
         .await;
@@ -283,15 +285,15 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
             .subscribe(Arc::new(move |event| {
                 if let SystemEvent::ProposalAccepted {
                     proposal_id,
-                    payload:
-                        ProposalPayload::SchedulingPolicy {
-                            coop_id,
-                            policy_json,
-                        },
+                    payload,
                     decided_at,
                     ..
                 } = event
                 {
+                    let Ok(ProposalPayload::SchedulingPolicy {
+                        coop_id,
+                        policy_json,
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
                     let compute_handle = compute.clone();
                     let prop_id = proposal_id.clone();
                     let store = audit_store.clone();
@@ -300,7 +302,7 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
                     let _decision_time = decided_at;
 
                     tokio::spawn(async move {
-                        let audit_key = format!("gov:audit:policy:{}", prop_id.0);
+                        let audit_key = format!("gov:audit:policy:{}", prop_id);
                         match store.get(audit_key.as_bytes()) {
                             Ok(Some(_)) => return,
                             Ok(None) => {}
@@ -322,7 +324,7 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
     };
 
     // 4. Fire an event with invalid JSON
-    let proposal_id = ProposalId::new("invalid-json-proposal");
+    let proposal_id = "invalid-json-proposal".to_string();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
@@ -331,10 +333,10 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
         .emit(SystemEvent::ProposalAccepted {
             proposal_id: proposal_id.clone(),
             domain_id: "test-domain".to_string(),
-            payload: ProposalPayload::SchedulingPolicy {
+            payload: serde_json::to_value(&ProposalPayload::SchedulingPolicy {
                 coop_id: "test-coop".to_string(),
                 policy_json: "{invalid json}".to_string(),
-            },
+            }).unwrap(),
             decided_at: now,
         })
         .await;
@@ -350,7 +352,7 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
     );
 
     // 7. Verify no audit trail was stored (execution failed)
-    let audit_key = format!("gov:audit:policy:{}", proposal_id.0);
+    let audit_key = format!("gov:audit:policy:{}", proposal_id);
     let audit_data = gov_store.get(audit_key.as_bytes())?;
     assert!(
         audit_data.is_none(),

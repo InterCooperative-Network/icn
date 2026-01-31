@@ -229,7 +229,7 @@ impl GovernanceEventHandler {
         if let Some(ref bus) = self.event_bus {
             let bus = bus.clone();
             let event = crate::events::SystemEvent::ProposalExecutionFailed {
-                proposal_id: proposal_id.clone(),
+                proposal_id: proposal_id.0.clone(),
                 proposal_type: proposal_type.to_string(),
                 error: error.to_string(),
                 failed_at: icn_time::current_timestamp_secs(),
@@ -4165,15 +4165,27 @@ pub fn create_governance_subscription(
                 domain_id,
                 ..
             } => {
-                handler.handle_proposal_accepted(
-                    proposal_id.clone(),
-                    payload.clone(),
-                    *decided_at,
-                    domain_id.clone(),
-                );
+                // Deserialize the payload back to ProposalPayload for dispatch
+                match serde_json::from_value::<icn_governance::ProposalPayload>(payload.clone()) {
+                    Ok(proposal_payload) => {
+                        handler.handle_proposal_accepted(
+                            icn_governance::ProposalId(proposal_id.clone()),
+                            proposal_payload,
+                            *decided_at,
+                            domain_id.clone(),
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to deserialize ProposalPayload for proposal {}: {}",
+                            proposal_id,
+                            e
+                        );
+                    }
+                }
             }
             SystemEvent::ProposalRejected { proposal_id, .. } => {
-                info!("❌ Proposal {} rejected - no action taken", proposal_id.0);
+                info!("❌ Proposal {} rejected - no action taken", proposal_id);
             }
             _ => {}
         }
@@ -4312,25 +4324,27 @@ pub fn create_policy_subscription(
 ) -> Arc<dyn Fn(crate::events::SystemEvent) + Send + Sync> {
     Arc::new(move |event| {
         use crate::events::SystemEvent;
-        use icn_governance::ProposalPayload;
 
         if let SystemEvent::ProposalAccepted {
             proposal_id,
-            payload:
-                ProposalPayload::SchedulingPolicy {
-                    coop_id,
-                    policy_json,
-                },
+            payload,
             decided_at,
             ..
         } = &event
         {
-            handler.handle_scheduling_policy(
-                proposal_id.clone(),
-                coop_id.clone(),
-                policy_json.clone(),
-                *decided_at,
-            );
+            // Deserialize and check if it's a SchedulingPolicy proposal
+            if let Ok(icn_governance::ProposalPayload::SchedulingPolicy {
+                coop_id,
+                policy_json,
+            }) = serde_json::from_value::<icn_governance::ProposalPayload>(payload.clone())
+            {
+                handler.handle_scheduling_policy(
+                    icn_governance::ProposalId(proposal_id.clone()),
+                    coop_id,
+                    policy_json,
+                    *decided_at,
+                );
+            }
         }
     })
 }

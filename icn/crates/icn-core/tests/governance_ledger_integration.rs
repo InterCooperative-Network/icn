@@ -77,12 +77,14 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         event_bus.subscribe(Arc::new(move |event| {
             if let SystemEvent::ProposalAccepted {
                 proposal_id,
-                payload: ProposalPayload::Budget { amount, recipient, currency, purpose: _ },
+                payload,
                 decided_at,
                 ..
             } = event {
+                let Ok(ProposalPayload::Budget { amount, recipient, currency, purpose: _ }) =
+                    serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
                 info!("📊 Executing budget proposal {}: {} {} to {}",
-                      proposal_id.0, amount, currency, recipient);
+                      proposal_id, amount, currency, recipient);
 
                 let ledger = ledger_clone.clone();
                 let prop_id = proposal_id.clone();
@@ -106,12 +108,12 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
                             match ledger_guard.append_entry(entry).await {
                                 Ok(entry_hash) => {
                                     info!("✅ Budget proposal {} executed: {} {} transferred to {}",
-                                          prop_id.0, amount, currency, recipient);
+                                          prop_id, amount, currency, recipient);
 
                                     // Store audit trail
-                                    let audit_key = format!("gov:audit:{}", prop_id.0);
+                                    let audit_key = format!("gov:audit:{}", prop_id);
                                     let audit_record = serde_json::json!({
-                                        "proposal_id": prop_id.0,
+                                        "proposal_id": prop_id,
                                         "ledger_entry_hash": hex::encode(entry_hash.0),
                                         "amount": amount,
                                         "currency": currency,
@@ -125,19 +127,19 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
 
                                     if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
                                         if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                            tracing::warn!("Failed to store audit trail for {}: {}", prop_id.0, e);
+                                            tracing::warn!("Failed to store audit trail for {}: {}", prop_id, e);
                                         } else {
-                                            info!("📋 Audit trail recorded for proposal {}", prop_id.0);
+                                            info!("📋 Audit trail recorded for proposal {}", prop_id);
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    tracing::warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id.0, e);
+                                    tracing::warn!("❌ Failed to append ledger entry for proposal {}: {}", prop_id, e);
                                 }
                             }
                         }
                         Err(e) => {
-                            tracing::warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id.0, e);
+                            tracing::warn!("❌ Failed to build ledger entry for proposal {}: {}", prop_id, e);
                         }
                     }
                 });
@@ -205,14 +207,14 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         .as_secs();
 
     let acceptance_event = SystemEvent::ProposalAccepted {
-        proposal_id: proposal_id.clone(),
+        proposal_id: proposal_id.0.clone(),
         domain_id: domain_id.0.clone(),
-        payload: ProposalPayload::Budget {
+        payload: serde_json::to_value(&ProposalPayload::Budget {
             amount: 5000,
             recipient: recipient_did.clone(),
             currency: "credits".to_string(),
             purpose: "Office supplies from Acme Corp".to_string(),
-        },
+        }).unwrap(),
         decided_at: now,
     };
 
@@ -325,18 +327,18 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
             .subscribe(Arc::new(move |event| match event {
                 SystemEvent::ProposalAccepted {
                     proposal_id,
-                    payload:
-                        ProposalPayload::Budget {
-                            amount,
-                            recipient,
-                            currency,
-                            ..
-                        },
+                    payload,
                     ..
                 } => {
+                    let Ok(ProposalPayload::Budget {
+                        amount,
+                        recipient,
+                        currency,
+                        ..
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
                     info!(
                         "📊 Executing budget proposal {}: {} {} to {}",
-                        proposal_id.0, amount, currency, recipient
+                        proposal_id, amount, currency, recipient
                     );
 
                     let ledger = ledger_clone.clone();
@@ -358,7 +360,7 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                     });
                 }
                 SystemEvent::ProposalRejected { proposal_id, .. } => {
-                    info!("❌ Proposal {} rejected - no action taken", proposal_id.0);
+                    info!("❌ Proposal {} rejected - no action taken", proposal_id);
                 }
                 _ => {}
             }))
@@ -400,7 +402,7 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
         .as_secs();
 
     let rejection_event = SystemEvent::ProposalRejected {
-        proposal_id: proposal_id.clone(),
+        proposal_id: proposal_id.0.clone(),
         domain_id: domain.id.0.clone(),
         decided_at: now,
     };

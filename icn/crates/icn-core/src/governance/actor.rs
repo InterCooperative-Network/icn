@@ -1524,13 +1524,16 @@ impl GovernanceActor {
                 if let Some(ref event_bus) = self.event_bus {
                     let event = match outcome_result {
                         DecisionOutcome::Accepted => SystemEvent::ProposalAccepted {
-                            proposal_id: proposal_id.clone(),
+                            proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
-                            payload: proposal.payload.clone(),
+                            payload: serde_json::to_value(&proposal.payload)
+                                .unwrap_or_else(|e| {
+                                    serde_json::Value::String(format!("serialization_error: {e}"))
+                                }),
                             decided_at: now,
                         },
                         _ => SystemEvent::ProposalRejected {
-                            proposal_id: proposal_id.clone(),
+                            proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
                             decided_at: now,
                         },
@@ -1574,7 +1577,7 @@ impl GovernanceActor {
                     let now = now_seconds();
                     event_bus
                         .emit(SystemEvent::ProposalRejected {
-                            proposal_id: proposal_id.clone(),
+                            proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
                             decided_at: now,
                         })
@@ -1624,13 +1627,16 @@ impl GovernanceActor {
                     let now = now_seconds();
                     let event = match forced_outcome {
                         ForcedOutcome::Accept => SystemEvent::ProposalAccepted {
-                            proposal_id: proposal_id.clone(),
+                            proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
-                            payload: proposal.payload.clone(),
+                            payload: serde_json::to_value(&proposal.payload)
+                                .unwrap_or_else(|e| {
+                                    serde_json::Value::String(format!("serialization_error: {e}"))
+                                }),
                             decided_at: now,
                         },
                         _ => SystemEvent::ProposalRejected {
-                            proposal_id: proposal_id.clone(),
+                            proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
                             decided_at: now,
                         },
