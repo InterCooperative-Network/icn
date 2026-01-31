@@ -171,6 +171,10 @@ pub async fn handle_trust_compute(
         }
     };
 
+    if !params.target_did.starts_with("did:icn:") {
+        return RpcResponse::error(id, -32602, "Invalid DID format".to_string());
+    }
+
     let score = trust_service.trust_score(&params.target_did);
     RpcResponse::success(id, serde_json::json!({"score": score}))
 }

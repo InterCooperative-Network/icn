@@ -58,6 +58,15 @@ impl TrustServiceImplTokio {
     }
 }
 
+/// Convert a TrustEdge to the RPC-facing { target_did, score, labels } shape.
+fn edge_to_rpc_value(edge: icn_trust::TrustEdge) -> serde_json::Value {
+    serde_json::json!({
+        "target_did": edge.target.to_string(),
+        "score": edge.score.value(),
+        "labels": edge.labels,
+    })
+}
+
 impl TrustService for TrustServiceImplTokio {
     fn oracle(&self) -> Arc<dyn PolicyOracle> {
         self.oracle.clone()
@@ -357,10 +366,7 @@ impl TrustService for TrustServiceImplTokio {
             rt.block_on(async {
                 let graph = self.graph.read().await;
                 match graph.get_outgoing_edges(&did) {
-                    Ok(edges) => edges
-                        .into_iter()
-                        .filter_map(|e| serde_json::to_value(&e).ok())
-                        .collect(),
+                    Ok(edges) => edges.into_iter().map(edge_to_rpc_value).collect(),
                     Err(_) => Vec::new(),
                 }
             })
@@ -378,11 +384,7 @@ impl TrustService for TrustServiceImplTokio {
                         let mut all_edges = Vec::new();
                         for did in dids {
                             if let Ok(edges) = graph.get_outgoing_edges(&did) {
-                                for edge in edges {
-                                    if let Ok(val) = serde_json::to_value(&edge) {
-                                        all_edges.push(val);
-                                    }
-                                }
+                                all_edges.extend(edges.into_iter().map(edge_to_rpc_value));
                             }
                         }
                         all_edges

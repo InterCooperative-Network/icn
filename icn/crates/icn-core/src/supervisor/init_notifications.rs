@@ -79,6 +79,7 @@ pub struct NotificationDeps {
 /// Handle trust attestation entries via TrustService
 pub async fn handle_trust_attestation_via_service(
     entry: &GossipEntry,
+    forwarding_peer: &str,
     trust_service: &Arc<dyn icn_kernel_api::services::TrustService>,
     rate_limiter: &AttestationRateLimiterHandle,
 ) {
@@ -110,7 +111,7 @@ pub async fn handle_trust_attestation_via_service(
         }
     }
 
-    let source = entry.author.to_string();
+    let source = forwarding_peer.to_string();
     if let Err(e) = trust_service.ingest_attestation(&data, &source) {
         warn!("Failed to ingest trust attestation: {}", e);
     }
@@ -811,7 +812,7 @@ pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
 pub fn create_notification_callback(
     deps: NotificationDeps,
 ) -> icn_gossip::EntryNotificationCallback {
-    Arc::new(move |topic, entry, _subscriber_did| {
+    Arc::new(move |topic, entry, subscriber_did| {
         // Clone dependencies for the async task
         let deps = deps.clone();
         let topic = topic.to_string();
@@ -832,8 +833,10 @@ pub fn create_notification_callback(
         if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
             if let Some(trust_svc) = deps.trust_service.clone() {
                 let rate_limiter = deps.attestation_rate_limiter.clone();
+                let peer = subscriber_did.to_string();
                 tokio::spawn(async move {
-                    handle_trust_attestation_via_service(&entry, &trust_svc, &rate_limiter).await;
+                    handle_trust_attestation_via_service(&entry, &peer, &trust_svc, &rate_limiter)
+                        .await;
                 });
             } else {
                 warn!("Trust attestation received but no TrustService available");

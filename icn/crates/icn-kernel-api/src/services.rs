@@ -159,10 +159,12 @@ pub trait TrustService: Send + Sync {
     /// Ingest a trust attestation from a peer.
     ///
     /// The kernel routes opaque attestation bytes to the trust service.
-    /// The trust service owns deserialization, signature verification,
-    /// rate limiting, and state updates.
+    /// The kernel may apply coarse rate limiting before calling this method,
+    /// but the trust service owns deserialization, signature verification,
+    /// and state updates.
     ///
-    /// `source` is the DID of the peer that forwarded this attestation.
+    /// `source` is the DID of the peer that forwarded this attestation
+    /// (the gossip subscriber, not necessarily the attestation issuer).
     /// The trust service decides whether to accept or reject it.
     ///
     /// Default implementation does nothing (no attestation support).
