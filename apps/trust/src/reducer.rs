@@ -13,7 +13,7 @@
 //!                                     ├── verify signatures
 //!                                     ├── filter expired
 //!                                     ├── deduplicate (issuer, subject, graph_type)
-//!                                     ├── compute weighted score
+//!                                     ├── compute average score
 //!                                     └── hash inputs for provenance
 //! ```
 
@@ -131,6 +131,7 @@ impl AttestationReducer {
             a.issuer
                 .to_string()
                 .cmp(&b.issuer.to_string())
+                .then_with(|| a.subject.to_string().cmp(&b.subject.to_string()))
                 .then_with(|| a.graph_type.as_str().cmp(b.graph_type.as_str()))
         });
 

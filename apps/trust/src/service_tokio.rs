@@ -124,6 +124,10 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
+    // TODO: Refactor to use `AttestationReducer` once the compute handler pipeline
+    // converts TrustEdges to TrustAttestations. Currently the reducer is used by
+    // the compute handler path; this method reimplements hash logic directly from
+    // the graph's edge storage for the service query path.
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
         tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
@@ -151,7 +155,15 @@ impl TrustService for TrustServiceImplTokio {
 
                 let input_count = input_edges.len() as u32;
 
-                // Compute deterministic hash over the input edges
+                // Compute deterministic hash over the input edges.
+                //
+                // NOTE: This hashes TrustEdges (storage format) while AttestationReducer
+                // hashes TrustAttestations (wire format). These two hash methods serve
+                // different purposes and should not be compared:
+                // - This method: live score provenance from the graph's current state
+                // - AttestationReducer: pure scoring from a set of attestations
+                // When the reducer is integrated into this method (see TODO below),
+                // both paths will use the same attestation-based hashing.
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
                 hasher.update(reducer::REDUCER_VERSION.as_bytes());
@@ -549,6 +561,80 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_epoch_starts_at_zero() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+        assert_eq!(service.epoch(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_epoch_increments_on_mutations() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+        assert_eq!(service.epoch(), 0);
+
+        // submit_attestation should bump epoch
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+        service
+            .submit_attestation(&target_did, 0.5, vec![])
+            .unwrap();
+        assert_eq!(service.epoch(), 1);
+
+        // record_event (ProtocolViolation) should bump epoch
+        service.record_event(
+            &target_did,
+            TrustEvent::ProtocolViolation {
+                severity: 0.5,
+                category: "test".to_string(),
+            },
+        );
+        assert_eq!(service.epoch(), 2);
+
+        // revoke_trust should bump epoch
+        service.revoke_trust(&target_did).unwrap();
+        assert_eq!(service.epoch(), 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_detailed_returns_enriched_result() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // Unknown actor returns zero score with epoch
+        let result = service.trust_score_detailed(&target_did);
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.epoch, 0);
+        assert_eq!(result.input_count, 0);
+        assert_eq!(result.reducer_version, reducer::REDUCER_VERSION);
+
+        // After adding a trust edge, detailed result should reflect it
+        service
+            .submit_attestation(&target_did, 0.8, vec![])
+            .unwrap();
+        let result = service.trust_score_detailed(&target_did);
+        assert!(result.score > 0.0, "score should be non-zero after edge");
+        assert_eq!(result.epoch, 1);
+        assert_eq!(result.input_count, 1);
+        assert_ne!(result.inputs_hash, [0u8; 32], "hash should be non-zero");
+        assert!(result.computed_at > 0, "timestamp should be set");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_detailed_invalid_did() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let bad_did = icn_kernel_api::types::Did::from("not-a-valid-did".to_string());
+        let result = service.trust_score_detailed(&bad_did);
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.input_count, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_submit_attestation_is_signed() {
         let (graph, keypair) = create_test_graph();
         let service = TrustServiceImplTokio::new(graph, keypair);
@@ -693,5 +779,6 @@ mod tests {
             "Attestation with spoofed issuer must be rejected, got: {:?}",
             result
         );
+
     }
 }
