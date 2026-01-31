@@ -43,6 +43,8 @@ use icn_kernel_api::services::ServiceRegistry;
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
 
+pub use actors::BootstrapHandles;
+
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {
     config: Config,
@@ -53,6 +55,11 @@ pub struct Supervisor {
     /// When provided, services from this registry are used instead of
     /// creating internal implementations. This enables kernel/app separation.
     service_registry: Option<ServiceRegistry>,
+    /// Optional typed domain handles from daemon
+    ///
+    /// These carry concrete domain objects (ledger, contract runtime, etc.)
+    /// that the supervisor wires into actors during initialization.
+    bootstrap_handles: Option<BootstrapHandles>,
 }
 
 impl Supervisor {
@@ -62,12 +69,14 @@ impl Supervisor {
         identity_bundle: Option<IdentityBundle>,
         shutdown_tx: ShutdownTx,
         service_registry: Option<ServiceRegistry>,
+        bootstrap_handles: Option<BootstrapHandles>,
     ) -> Self {
         Supervisor {
             config,
             identity_bundle,
             shutdown_tx,
             service_registry,
+            bootstrap_handles,
         }
     }
 
@@ -78,6 +87,7 @@ impl Supervisor {
             self.identity_bundle,
             self.shutdown_tx,
             self.service_registry,
+            self.bootstrap_handles,
         )
         .await
     }

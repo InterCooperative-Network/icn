@@ -7,6 +7,7 @@ use tokio::sync::broadcast;
 use tracing::info;
 
 use crate::config::Config;
+use crate::supervisor::BootstrapHandles;
 
 /// Shutdown signal broadcaster
 pub type ShutdownTx = broadcast::Sender<()>;
@@ -23,6 +24,11 @@ pub struct Runtime {
     /// creating its own. This enables proper kernel/app separation where
     /// the daemon constructs domain services from app crates.
     service_registry: Option<ServiceRegistry>,
+    /// Optional typed domain handles from the daemon
+    ///
+    /// These carry concrete domain objects (ledger, contract runtime, etc.)
+    /// that the supervisor wires into actors during initialization.
+    bootstrap_handles: Option<BootstrapHandles>,
 }
 
 impl Runtime {
@@ -35,6 +41,7 @@ impl Runtime {
             identity_bundle,
             shutdown_tx,
             service_registry: None,
+            bootstrap_handles: None,
         }
     }
 
@@ -54,6 +61,16 @@ impl Runtime {
     /// ```
     pub fn with_services(mut self, registry: ServiceRegistry) -> Self {
         self.service_registry = Some(registry);
+        self
+    }
+
+    /// Set typed domain handles for supervisor initialization
+    ///
+    /// These handles carry concrete domain objects (ledger, contract runtime,
+    /// parameter store, etc.) that the daemon creates and the supervisor
+    /// wires into actors.
+    pub fn with_bootstrap_handles(mut self, handles: BootstrapHandles) -> Self {
+        self.bootstrap_handles = Some(handles);
         self
     }
 
@@ -82,6 +99,7 @@ impl Runtime {
             self.identity_bundle,
             self.shutdown_tx.clone(),
             self.service_registry,
+            self.bootstrap_handles,
         );
 
         // Run supervisor

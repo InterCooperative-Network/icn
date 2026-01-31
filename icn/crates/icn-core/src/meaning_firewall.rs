@@ -292,7 +292,7 @@ mod tests {
     /// - actors.rs: 1 (CoreActorHandles LedgerHandle type)
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        let expected: usize = 31;
+        let expected: usize = 28;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(
@@ -326,7 +326,7 @@ mod tests {
     /// - actors.rs: 2 (BootstrapHandles placeholder — from B3 when merged)
     #[test]
     fn strict_core_ccl_reference_ratchet() {
-        let expected: usize = 34;
+        let expected: usize = 32;
         let actual = count_imports_in_crate("icn-core", "icn_ccl::");
 
         assert!(
@@ -365,7 +365,7 @@ mod tests {
     /// - actors.rs: 1 (CoreActorHandles governance handle)
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 84;
+        let expected: usize = 83;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(

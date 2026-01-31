@@ -43,3 +43,36 @@ pub struct EventSubscriptionHandles {
     pub governance_event_subscription: Option<crate::events::SubscriptionHandle>,
     pub policy_governance_subscription: Option<crate::events::SubscriptionHandle>,
 }
+
+/// Typed handles for domain objects passed from daemon to supervisor.
+///
+/// This replaces the type-erased `raw_handles` HashMap that was previously
+/// on `ServiceRegistry`. Each field is a concrete, typed handle — no
+/// `Any` downcasting required.
+///
+/// The daemon constructs these objects (opening sled stores, initializing
+/// ledger services, etc.) and passes them to the supervisor. The supervisor
+/// wires them into actors during initialization.
+///
+/// **Note**: `TrustGraph` is intentionally absent — all kernel components
+/// (MisbehaviorDetector, ReplicationManager, StorageChallenge, RPC) have
+/// migrated to the `TrustService` trait on `ServiceRegistry`. The daemon
+/// passes trust via `ServiceRegistry::with_trust()` instead.
+///
+/// See `icn-kernel-api::services::ServiceRegistry` for trait-based abstractions.
+pub struct BootstrapHandles {
+    /// Pre-initialized ledger handle.
+    pub ledger: Arc<RwLock<icn_ledger::Ledger>>,
+    /// Shared sled store for ledger (prevents double-open due to exclusive flock).
+    pub ledger_store: Arc<icn_store::SledStore>,
+    /// Dispute manager for payment dispute resolution.
+    pub dispute_manager: Arc<RwLock<icn_ledger::DisputeManager>>,
+    /// Treasury manager for cooperative treasury operations.
+    pub treasury_manager: Arc<RwLock<icn_ledger::TreasuryManager>>,
+    /// Contract runtime for CCL execution.
+    pub contract_runtime: Arc<RwLock<icn_ccl::ContractRuntime>>,
+    /// Contract actor for contract lifecycle management.
+    pub contract_actor: Arc<RwLock<icn_ccl::ContractActor>>,
+    /// Protocol parameter store (concrete type for sled-backed governance params).
+    pub protocol_parameter_store: Arc<icn_governance::SledParameterStore>,
+}
