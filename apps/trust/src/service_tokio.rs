@@ -11,16 +11,18 @@
 //! tokio runtime.
 
 use icn_kernel_api::authz::PolicyOracle;
-use icn_kernel_api::services::{TrustEvent, TrustService};
+use icn_kernel_api::services::{TrustEvent, TrustScoreResult, TrustService};
 use icn_trust::TrustGraph;
 
 /// Maximum reputation score delta per single event (25%).
 /// Applied as a penalty for ProtocolViolation and as a boost for PositiveInteraction.
 const EVENT_SCORE_DELTA: f64 = 0.25;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::oracle_tokio::TrustPolicyOracleTokio;
+use crate::reducer;
 
 /// Trust service implementation for tokio locks.
 ///
@@ -32,6 +34,10 @@ pub struct TrustServiceImplTokio {
     own_did: icn_identity::Did,
     /// Keypair for signing outgoing attestations.
     keypair: icn_identity::KeyPair,
+    /// Monotonic epoch counter — incremented on each state mutation
+    /// (new edge, removed edge, trust event). Used by `TrustScoreResult`
+    /// so caches can detect when scores may have changed.
+    epoch: Arc<AtomicU64>,
 }
 
 impl TrustServiceImplTokio {
@@ -46,7 +52,42 @@ impl TrustServiceImplTokio {
             oracle,
             own_did,
             keypair,
+            epoch: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Get the current epoch (for testing/diagnostics)
+    pub fn epoch(&self) -> u64 {
+        self.epoch.load(Ordering::Relaxed)
+    }
+
+    /// Increment the epoch counter (called on state mutations)
+    fn bump_epoch(&self) {
+        self.epoch.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Return a zero-valued TrustScoreResult (for error/unknown cases).
+    ///
+    /// Falls back to `computed_at = 0` if the system clock is before Unix epoch,
+    /// which would indicate a misconfigured system clock.
+    fn empty_score_result(&self) -> TrustScoreResult {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0); // Pre-epoch clock → 0 (misconfigured system)
+        TrustScoreResult {
+            score: 0.0,
+            epoch: self.epoch.load(Ordering::Relaxed),
+            computed_at: now,
+            input_count: 0,
+            inputs_hash: [0u8; 32],
+            reducer_version: reducer::REDUCER_VERSION.to_string(),
+        }
+    }
+
+    /// Parse a kernel-api DID into an identity DID.
+    fn parse_kernel_did(did: &icn_kernel_api::types::Did) -> Option<icn_identity::Did> {
+        did.to_string().parse().ok()
     }
 
     /// Get direct access to the TrustGraph
@@ -78,9 +119,8 @@ impl TrustService for TrustServiceImplTokio {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
-                // Convert from kernel Did to identity Did using FromStr
-                if let Ok(identity_did) = actor.to_string().parse::<icn_identity::Did>() {
-                    graph.compute_trust_score(&identity_did).unwrap_or(0.0)
+                if let Some(identity_did) = Self::parse_kernel_did(actor) {
+                    graph.compute_trust_score(&identity_did).unwrap_or(0.0) // Unknown actors start at zero trust
                 } else {
                     0.0
                 }
@@ -88,10 +128,82 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
+    // TODO(#1000): Refactor to use `AttestationReducer` once the compute handler
+    // pipeline converts TrustEdges to TrustAttestations. Currently the reducer is
+    // used by the compute handler path; this method reimplements hash logic directly
+    // from the graph's edge storage for the service query path.
+    fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.graph.read().await;
+                let identity_did = match Self::parse_kernel_did(actor) {
+                    Some(d) => d,
+                    None => return self.empty_score_result(),
+                };
+
+                let score = graph.compute_trust_score(&identity_did).unwrap_or(0.0); // Unknown actors start at zero trust
+
+                // Collect edges pointing to this actor to derive input count + hash
+                let input_edges = graph
+                    .get_all_known_dids()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|did| {
+                        graph
+                            .get_outgoing_edges(&did)
+                            .ok()
+                            .and_then(|edges| edges.into_iter().find(|e| e.target == identity_did))
+                    })
+                    .collect::<Vec<_>>();
+
+                let input_count = input_edges.len() as u32;
+
+                // Compute deterministic hash over the input edges.
+                //
+                // NOTE: This hashes TrustEdges (storage format) while AttestationReducer
+                // hashes TrustAttestations (wire format). These two hash methods serve
+                // different purposes and should not be compared:
+                // - This method: live score provenance from the graph's current state
+                // - AttestationReducer: pure scoring from a set of attestations
+                // When the reducer is integrated into this method (see TODO below),
+                // both paths will use the same attestation-based hashing.
+                use sha2::{Digest, Sha256};
+                let mut hasher = Sha256::new();
+                hasher.update(reducer::REDUCER_VERSION.as_bytes());
+                // Sort by source DID for determinism
+                let mut sorted = input_edges;
+                sorted.sort_by(|a, b| a.source.to_string().cmp(&b.source.to_string()));
+                for edge in &sorted {
+                    hasher.update(edge.source.as_str().as_bytes());
+                    hasher.update(edge.target.as_str().as_bytes());
+                    hasher.update(edge.score.value().to_le_bytes());
+                    hasher.update(edge.created_at.to_le_bytes());
+                    hasher.update(edge.graph_type.as_str().as_bytes());
+                }
+                let inputs_hash: [u8; 32] = hasher.finalize().into();
+
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+
+                TrustScoreResult {
+                    score,
+                    epoch: self.epoch.load(Ordering::Relaxed),
+                    computed_at: now,
+                    input_count,
+                    inputs_hash,
+                    reducer_version: reducer::REDUCER_VERSION.to_string(),
+                }
+            })
+        })
+    }
+
     fn record_event(&self, actor: &icn_kernel_api::types::Did, event: TrustEvent) {
-        let identity_did = match actor.to_string().parse::<icn_identity::Did>() {
-            Ok(did) => did,
-            Err(_) => {
+        let identity_did = match Self::parse_kernel_did(actor) {
+            Some(did) => did,
+            None => {
                 tracing::warn!(actor = %actor, "Invalid DID format, ignoring trust event");
                 return;
             }
@@ -113,14 +225,9 @@ impl TrustService for TrustServiceImplTokio {
                     rt.block_on(async {
                         let current = {
                             let graph = self.graph.read().await;
-                            match graph.compute_trust_score(&identity_did) {
-                                Ok(score) => score,
-                                Err(_) => {
-                                    // Unknown actors start at 0.0 trust — penalty
-                                    // still creates a trust edge recording the violation.
-                                    0.0
-                                }
-                            }
+                            // Unknown actors start at 0.0 trust — penalty
+                            // still creates a trust edge recording the violation.
+                            graph.compute_trust_score(&identity_did).unwrap_or(0.0)
                         };
                         let new_score = (current - penalty).max(0.0);
                         debug_assert!(
@@ -140,6 +247,7 @@ impl TrustService for TrustServiceImplTokio {
                                 e
                             );
                         } else {
+                            self.bump_epoch();
                             tracing::debug!(
                                 actor = %actor,
                                 current = current,
@@ -183,6 +291,7 @@ impl TrustService for TrustServiceImplTokio {
                                 e
                             );
                         } else {
+                            self.bump_epoch();
                             tracing::debug!(
                                 actor = %actor,
                                 new_score = new_score,
@@ -270,6 +379,7 @@ impl TrustService for TrustServiceImplTokio {
                 }
 
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
+                self.bump_epoch();
 
                 tracing::info!(
                     "Applied remote trust attestation: {} -> {} (score: {})",
@@ -338,6 +448,7 @@ impl TrustService for TrustServiceImplTokio {
             rt.block_on(async {
                 let mut graph = self.graph.write().await;
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
+                self.bump_epoch();
                 // Sign attestation before gossip broadcast
                 let mut attestation = icn_trust::TrustAttestation::from_trust_edge(&edge);
                 attestation
@@ -360,6 +471,7 @@ impl TrustService for TrustServiceImplTokio {
                 graph
                     .remove_edge(&self.own_did, &target_did)
                     .map_err(|e| format!("{e}"))?;
+                self.bump_epoch();
                 // Return empty bytes (no gossip message for revocation currently)
                 Ok(Vec::new())
             })
@@ -410,7 +522,6 @@ impl TrustService for TrustServiceImplTokio {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::services::TrustService as _;
 
     fn create_test_graph() -> (Arc<RwLock<TrustGraph>>, icn_identity::KeyPair) {
         let store = icn_store::SledStore::temporary().unwrap();
@@ -434,7 +545,7 @@ mod tests {
         let unknown_keypair = icn_identity::KeyPair::generate().unwrap();
         let unknown_did = icn_kernel_api::types::Did::from(unknown_keypair.did().to_string());
         let score = service.trust_score(&unknown_did);
-        assert!(score >= 0.0 && score <= 1.0);
+        assert!((0.0..=1.0).contains(&score));
 
         // Should return an oracle
         let _oracle = service.oracle();
@@ -451,6 +562,80 @@ mod tests {
         // Unknown actors should get 0.0 trust
         let score = service.trust_score(&unknown_did);
         assert_eq!(score, 0.0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_epoch_starts_at_zero() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+        assert_eq!(service.epoch(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_epoch_increments_on_mutations() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+        assert_eq!(service.epoch(), 0);
+
+        // submit_attestation should bump epoch
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+        service
+            .submit_attestation(&target_did, 0.5, vec![])
+            .unwrap();
+        assert_eq!(service.epoch(), 1);
+
+        // record_event (ProtocolViolation) should bump epoch
+        service.record_event(
+            &target_did,
+            TrustEvent::ProtocolViolation {
+                severity: 0.5,
+                category: "test".to_string(),
+            },
+        );
+        assert_eq!(service.epoch(), 2);
+
+        // revoke_trust should bump epoch
+        service.revoke_trust(&target_did).unwrap();
+        assert_eq!(service.epoch(), 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_detailed_returns_enriched_result() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // Unknown actor returns zero score with epoch
+        let result = service.trust_score_detailed(&target_did);
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.epoch, 0);
+        assert_eq!(result.input_count, 0);
+        assert_eq!(result.reducer_version, reducer::REDUCER_VERSION);
+
+        // After adding a trust edge, detailed result should reflect it
+        service
+            .submit_attestation(&target_did, 0.8, vec![])
+            .unwrap();
+        let result = service.trust_score_detailed(&target_did);
+        assert!(result.score > 0.0, "score should be non-zero after edge");
+        assert_eq!(result.epoch, 1);
+        assert_eq!(result.input_count, 1);
+        assert_ne!(result.inputs_hash, [0u8; 32], "hash should be non-zero");
+        assert!(result.computed_at > 0, "timestamp should be set");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_detailed_invalid_did() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let bad_did = icn_kernel_api::types::Did::from("not-a-valid-did".to_string());
+        let result = service.trust_score_detailed(&bad_did);
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.input_count, 0);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -598,5 +783,6 @@ mod tests {
             "Attestation with spoofed issuer must be rejected, got: {:?}",
             result
         );
+
     }
 }

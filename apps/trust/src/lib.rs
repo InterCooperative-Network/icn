@@ -34,6 +34,7 @@
 
 pub mod oracle;
 pub mod oracle_tokio;
+pub mod reducer;
 pub mod service;
 pub mod service_tokio;
 
