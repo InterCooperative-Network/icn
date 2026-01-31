@@ -6,20 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
 
-ICN (Intercooperative Network) is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer implementing a constraint enforcement architecture where:
+ICN (Intercooperative Network) is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer for cooperatives, communities, and federations to coordinate without central servers.
 
-- **Policy Oracles (Apps)** translate domain semantics (trust, governance, ledger rules) into generic constraints
-- **Kernel** enforces those constraints (rate limits, capabilities, credit gates) without understanding their origin
-- This separation ensures the kernel remains predictable while cooperative governance adapts policies
+ICN implements a **constraint enforcement architecture** where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This ensures the kernel remains predictable while cooperative governance adapts policies.
 
-### Core Components
+### Core Subsystems
 
-- **Identity Layer**: Decentralized identifiers (DIDs) with Ed25519 cryptography
-- **Trust Graph**: Web-of-participation based trust computation (→ Policy Oracle)
-- **Networking**: QUIC/TLS secure sessions with mDNS discovery (→ Kernel)
-- **Cooperative Contracts**: CCL (Cooperative Contract Language) execution (→ Policy Oracle)
-- **Mutual Credit Ledger**: Double-entry accounting with Merkle-DAG (→ Policy Oracle)
-- **P2P Coordination**: Gossip protocol with trust-gated topics (→ Kernel)
+- **Identity**: Decentralized identifiers (DIDs) with Ed25519 cryptography
+- **Trust Graph**: Web-of-participation trust computation → **Policy Oracle**
+- **Networking**: QUIC/TLS secure sessions with mDNS discovery → **Kernel**
+- **Ledger**: Mutual credit with double-entry accounting → **Policy Oracle**
+- **Contracts**: CCL (Cooperative Contract Language) execution → **Policy Oracle**
+- **Gossip**: Topic-based replication with causal ordering → **Kernel**
+- **Governance**: Democratic proposals and voting → **Policy Oracle**
+- **Compute**: Trust-gated distributed task execution → **Policy Oracle**
 
 ## Live Deployment
 

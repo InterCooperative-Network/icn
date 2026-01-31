@@ -3,9 +3,9 @@
 
 > **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
 
-## Constraint Engine Model
+## The Constraint Engine Model
 
-ICN implements a constraint enforcement architecture where Policy Oracles (apps) translate domain semantics into generic constraints that the kernel enforces blindly:
+ICN implements a constraint enforcement architecture where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This diagram illustrates the enforcement boundary inside the broader substrate:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -20,10 +20,10 @@ ICN implements a constraint enforcement architecture where Policy Oracles (apps)
 └─────────────────────────────────────────────────────────────────────┘
          ▲              ▲           ▲            ▲           ▲
          │              │           │            │           │
-    ConstraintSet {
-      rate_limit: 20/s,      // ← value from PolicyOracle
-      credit_ceiling: 1000,  // ← value from PolicyOracle
-      capabilities: [...]    // ← value from PolicyOracle
+    ConstraintSet {                              // Illustrative example
+      rate_limit: 20/s,      // ← value from Policy Oracle
+      credit_ceiling: 1000,  // ← value from Policy Oracle
+      capabilities: [...]    // ← value from Policy Oracle
     }
          │              │           │            │           │
 ┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
@@ -45,18 +45,20 @@ ICN implements a constraint enforcement architecture where Policy Oracles (apps)
 | **Rate limiting** | Mechanism exists | Values decided (20/s vs 100/s) |
 | **Credit gating** | Mechanism exists | Ceiling decided (1000 vs 5000) |
 | **Capability gating** | Mechanism exists | Grants decided |
-| **Replay guard** | Mechanism exists | N/A (no tunable values) |
-| **Transport auth** | Mechanism exists | N/A (no tunable values) |
+| **Replay guard** | Mechanism exists | Typically fixed |
+| **Transport auth** | Mechanism exists | Typically fixed |
 
 **Critical Property:**
 - Governance can change **what** the rate limit is
 - Governance **cannot** remove **that** rate limiting exists
 
+**Boundary rule:** Anything that outputs constraint values is a Policy Oracle; anything that validates or enforces constraints is kernel (even if they live near each other in code).
+
 ---
 
-## Component Organization
+## System Components
 
-The implementation organizes components into functional areas. Note: "layer" terminology below is descriptive (e.g., "transport layer security") — ICN is **not** an OSI-like strictly layered stack. Instead, policy oracles translate domain semantics into constraints that the kernel enforces.
+The implementation organizes ICN's subsystems into functional areas. Note: "layer" terminology below is descriptive (e.g., "transport layer security") — ICN is **not** an OSI-like strictly layered stack. Instead, Policy Oracles translate domain semantics into constraints that the kernel enforces.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
