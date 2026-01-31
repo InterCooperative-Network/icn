@@ -215,12 +215,30 @@ async fn spawn_actors_with_identity(
 
     let did = identity_bundle.did().clone();
 
-    // Extract daemon-provided ledger handles from ServiceRegistry early
-    // (needed before ledger init which happens before governance init)
+    // Extract pre-initialized ledger handles from ServiceRegistry.
+    // These were created by icn_ledger_app::init::init_ledger_services() in the daemon.
     let ledger_from_daemon: Option<Arc<RwLock<icn_ledger::Ledger>>> = service_registry
         .and_then(|r| r.raw_handle::<RwLock<icn_ledger::Ledger>>(ServiceRegistry::LEDGER_KEY));
     let ledger_store_from_daemon: Option<Arc<icn_store::SledStore>> = service_registry
         .and_then(|r| r.raw_handle::<icn_store::SledStore>(ServiceRegistry::LEDGER_STORE_KEY));
+    let dispute_manager_from_daemon: Option<Arc<RwLock<icn_ledger::DisputeManager>>> =
+        service_registry.and_then(|r| {
+            r.raw_handle::<RwLock<icn_ledger::DisputeManager>>(ServiceRegistry::DISPUTE_MANAGER_KEY)
+        });
+    let treasury_manager_from_daemon: Option<Arc<RwLock<icn_ledger::TreasuryManager>>> =
+        service_registry.and_then(|r| {
+            r.raw_handle::<RwLock<icn_ledger::TreasuryManager>>(
+                ServiceRegistry::TREASURY_MANAGER_KEY,
+            )
+        });
+    let contract_runtime_from_daemon: Option<Arc<RwLock<icn_ccl::ContractRuntime>>> =
+        service_registry.and_then(|r| {
+            r.raw_handle::<RwLock<icn_ccl::ContractRuntime>>(ServiceRegistry::CONTRACT_RUNTIME_KEY)
+        });
+    let contract_actor_from_daemon: Option<Arc<RwLock<icn_ccl::ContractActor>>> = service_registry
+        .and_then(|r| {
+            r.raw_handle::<RwLock<icn_ccl::ContractActor>>(ServiceRegistry::CONTRACT_ACTOR_KEY)
+        });
 
     // Create NodeProfile with hardware sensing (Phase 17)
     let node_profile = crate::node::create_node_profile(
@@ -301,28 +319,37 @@ async fn spawn_actors_with_identity(
     let gossip_store = gossip_services.gossip_store.clone();
     let loaded_snapshot = gossip_services.loaded_snapshot;
 
-    // Initialize ledger and contract services
-    // Pass TrustService for kernel/app separation if available
-    let ledger_services = super::init_ledger::init_ledger_services(
-        config,
-        did.clone(),
-        super::init_ledger::LedgerDeps {
-            gossip_handle: gossip_handle.clone(),
-            misbehavior_detector: misbehavior_detector.clone(),
-            trust_service: trust_service_from_registry.clone(),
-            ledger_handle: ledger_from_daemon,
-            ledger_store: ledger_store_from_daemon,
-        },
-    )
-    .await?;
+    // Extract pre-initialized ledger handles from ServiceRegistry.
+    // Ledger services were created in the daemon by icn_ledger_app::init::init_ledger_services().
+    let ledger_handle =
+        ledger_from_daemon.ok_or_else(|| anyhow::anyhow!("Ledger not in ServiceRegistry"))?;
+    let dispute_manager_handle = dispute_manager_from_daemon
+        .ok_or_else(|| anyhow::anyhow!("DisputeManager not in ServiceRegistry"))?;
+    let treasury_manager_handle = treasury_manager_from_daemon
+        .ok_or_else(|| anyhow::anyhow!("TreasuryManager not in ServiceRegistry"))?;
+    let contract_runtime_handle = contract_runtime_from_daemon
+        .ok_or_else(|| anyhow::anyhow!("ContractRuntime not in ServiceRegistry"))?;
+    let contract_actor_handle = contract_actor_from_daemon
+        .ok_or_else(|| anyhow::anyhow!("ContractActor not in ServiceRegistry"))?;
+    let ledger_store = ledger_store_from_daemon
+        .ok_or_else(|| anyhow::anyhow!("LedgerStore not in ServiceRegistry"))?;
+
+    // Wire runtime handles into the pre-initialized Ledger.
+    // These depend on gossip/trust which are only available after gossip init.
+    {
+        let mut ledger = ledger_handle.write().await;
+        ledger.set_gossip(gossip_handle.clone());
+        ledger.set_misbehavior_detector(misbehavior_detector.clone());
+        if let Some(trust_service) = trust_service_from_registry.clone() {
+            ledger.set_trust_service(trust_service);
+            info!("Ledger wired with TrustService");
+        } else {
+            info!("Ledger initialized without TrustService (trust validation disabled)");
+        }
+    }
+    info!("Ledger runtime handles wired");
     icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
     icn_obs::metrics::supervisor::actor_active_set("ledger", true);
-    let ledger_handle = ledger_services.ledger_handle.clone();
-    let dispute_manager_handle = ledger_services.dispute_manager.clone();
-    let treasury_manager_handle = ledger_services.treasury_manager.clone();
-    let contract_runtime_handle = ledger_services.contract_runtime.clone();
-    let contract_actor_handle = ledger_services.contract_actor.clone();
-    let ledger_store = ledger_services.ledger_store.clone();
 
     // Initialize cooperative services
     let coop_services =

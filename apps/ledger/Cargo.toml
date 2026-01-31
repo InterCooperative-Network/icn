@@ -19,9 +19,15 @@ icn-identity = { path = "../../icn/crates/icn-identity" }
 # Storage
 icn-store = { path = "../../icn/crates/icn-store" }
 
+# Contract execution (for ContractRuntime, ContractActor, CharterValidator)
+icn-ccl = { path = "../../icn/crates/icn-ccl" }
+
+# Observability (for treasury validation metrics)
+icn-obs = { path = "../../icn/crates/icn-obs" }
+
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
-tokio = { version = "1", features = ["sync", "rt"] }
+tokio = { version = "1", features = ["sync", "rt", "time"] }
 
 # Error handling
 anyhow = "1.0"

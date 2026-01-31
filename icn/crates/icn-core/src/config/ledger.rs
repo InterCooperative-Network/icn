@@ -1,9 +1,9 @@
 //! Ledger configuration
 //!
-//! Configuration for the mutual credit ledger, exchange rate oracle,
-//! and witness signatures for material transactions.
+//! Pure serde configuration structs for the mutual credit ledger, exchange rate
+//! oracle, and witness signatures. No `icn-ledger` types are imported here.
+//! Conversion to domain types happens in `apps/ledger/src/config.rs`.
 
-use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -113,91 +113,6 @@ impl Default for WitnessSettings {
     }
 }
 
-impl WitnessSettings {
-    /// Convert to the icn-ledger WitnessConfig type
-    ///
-    /// Returns an error if the configuration is invalid (e.g., quorum policy
-    /// without required/witnesses fields, or invalid DID format).
-    pub fn to_witness_config(&self) -> Result<icn_ledger::WitnessConfig, WitnessConfigError> {
-        let policy = match self.default_policy.to_lowercase().as_str() {
-            "none" => icn_ledger::WitnessPolicy::None,
-            "counterparty" => icn_ledger::WitnessPolicy::Counterparty,
-            "all_parties" | "allparties" => icn_ledger::WitnessPolicy::AllParties,
-            "quorum" => {
-                let required = self
-                    .quorum_required
-                    .ok_or(WitnessConfigError::MissingField(
-                        "quorum_required for quorum policy",
-                    ))?;
-                let witness_strs =
-                    self.quorum_witnesses
-                        .as_ref()
-                        .ok_or(WitnessConfigError::MissingField(
-                            "quorum_witnesses for quorum policy",
-                        ))?;
-
-                let mut witnesses = Vec::with_capacity(witness_strs.len());
-                let mut seen_dids = std::collections::HashSet::new();
-                for did_str in witness_strs {
-                    let did = Did::from_str(did_str).map_err(|e| {
-                        WitnessConfigError::InvalidDid(did_str.clone(), e.to_string())
-                    })?;
-                    if !seen_dids.insert(did.clone()) {
-                        return Err(WitnessConfigError::DuplicateWitness(did_str.clone()));
-                    }
-                    witnesses.push(did);
-                }
-
-                if (required as usize) > witnesses.len() {
-                    return Err(WitnessConfigError::QuorumTooLarge {
-                        required,
-                        available: witnesses.len(),
-                    });
-                }
-
-                icn_ledger::WitnessPolicy::Quorum {
-                    required,
-                    witnesses,
-                }
-            }
-            other => return Err(WitnessConfigError::InvalidPolicy(other.to_string())),
-        };
-
-        Ok(icn_ledger::WitnessConfig {
-            default_policy: policy,
-            threshold: self.threshold,
-            collection_timeout_secs: self.collection_timeout_secs,
-            min_witness_trust: self.min_witness_trust,
-        })
-    }
-}
-
-/// Error when converting WitnessSettings to WitnessConfig
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum WitnessConfigError {
-    /// Invalid policy string
-    #[error(
-        "Invalid witness policy '{0}'. Valid options: none, counterparty, quorum, all_parties"
-    )]
-    InvalidPolicy(String),
-
-    /// Missing required field for quorum policy
-    #[error("Missing required field: {0}")]
-    MissingField(&'static str),
-
-    /// Invalid DID format
-    #[error("Invalid DID '{0}': {1}")]
-    InvalidDid(String, String),
-
-    /// Duplicate witness in quorum configuration
-    #[error("Duplicate witness DID in quorum configuration: '{0}'")]
-    DuplicateWitness(String),
-
-    /// Quorum requires more signatures than available witnesses
-    #[error("Quorum requires {required} signatures but only {available} witnesses configured")]
-    QuorumTooLarge { required: u32, available: usize },
-}
-
 /// Configuration for the exchange rate oracle
 ///
 /// This configuration controls how exchange rates are validated and
@@ -292,20 +207,6 @@ impl Default for OracleNodeConfig {
     }
 }
 
-impl OracleNodeConfig {
-    /// Convert to the icn-ledger OracleConfig type
-    pub fn to_oracle_config(&self) -> icn_ledger::oracle::OracleConfig {
-        icn_ledger::oracle::OracleConfig {
-            default_ttl_secs: self.default_ttl_secs,
-            min_sources_for_consensus: self.min_sources_for_consensus,
-            outlier_threshold: self.outlier_threshold,
-            staleness_threshold_secs: self.staleness_threshold_secs,
-            default_suspicious_rate_threshold: self.default_suspicious_rate_threshold,
-            suspicious_rate_thresholds: self.suspicious_rate_thresholds.clone(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,7 +261,6 @@ default_suspicious_rate_threshold = 500.0
 
     #[test]
     fn test_partial_config() {
-        // Test that we can provide only some fields and get defaults for others
         let toml_str = r#"
 default_suspicious_rate_threshold = 2000.0
 
@@ -370,19 +270,15 @@ default_suspicious_rate_threshold = 2000.0
 
         let config: OracleNodeConfig = toml::from_str(toml_str).unwrap();
 
-        // Custom values
         assert!((config.default_suspicious_rate_threshold - 2000.0).abs() < f64::EPSILON);
         assert_eq!(
             config.suspicious_rate_thresholds.get("BTC:USD"),
             Some(&150000.0)
         );
 
-        // Default values
         assert_eq!(config.default_ttl_secs, 3600);
         assert_eq!(config.min_sources_for_consensus, 1);
     }
-
-    // Witness Settings Tests (Issue #676)
 
     #[test]
     fn test_witness_settings_defaults() {
@@ -414,10 +310,7 @@ collection_timeout_secs = 600
     fn test_ledger_config_with_witness_defaults() {
         let config = LedgerConfig::default();
 
-        // Oracle defaults
         assert_eq!(config.oracle.default_ttl_secs, 3600);
-
-        // Witness defaults
         assert_eq!(config.witness.default_policy, "none");
         assert!(config.witness.threshold.is_none());
     }

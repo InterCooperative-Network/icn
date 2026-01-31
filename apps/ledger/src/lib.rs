@@ -33,6 +33,7 @@
 //! abstraction that the kernel can use without domain knowledge.
 
 pub mod config;
+pub mod init;
 pub mod oracle;
 pub mod service;
 
