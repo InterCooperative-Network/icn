@@ -299,8 +299,14 @@ async fn spawn_actors_with_identity(
 
     // Extract pre-initialized domain handles from BootstrapHandles.
     // These were created by icn_ledger_app::init::init_ledger_services() in the daemon.
-    let handles = bootstrap_handles
-        .ok_or_else(|| anyhow::anyhow!("BootstrapHandles not provided by daemon"))?;
+    let handles = bootstrap_handles.ok_or_else(|| {
+        anyhow::anyhow!(
+            "BootstrapHandles not provided by daemon. When running with an identity, \
+             the daemon must configure the runtime via Runtime::with_bootstrap_handles(...) \
+             and supply ledger, ledger_store, dispute_manager, treasury_manager, \
+             contract_runtime, contract_actor, and protocol_parameter_store handles."
+        )
+    })?;
     let ledger_handle = handles.ledger;
     let ledger_store = handles.ledger_store;
     let dispute_manager_handle = handles.dispute_manager;

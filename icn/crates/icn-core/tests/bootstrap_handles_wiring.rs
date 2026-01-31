@@ -1,8 +1,12 @@
 //! Bootstrap Handles Wiring Integration Tests
 //!
-//! Verifies that daemon-provided handles (governance parameter store, ledger)
-//! can be correctly shared via typed fields, preventing double sled opens
-//! and avoiding type-erased downcasting.
+//! Verifies that daemon-provided handles can be correctly shared via typed
+//! fields, preventing double sled opens and avoiding type-erased downcasting.
+//!
+//! Current coverage:
+//! - Parameter store Arc upcast and trait-object sharing
+//! - Mutation propagation across cloned Arc handles
+//! - Sled exclusive lock prevents double-open (motivating BootstrapHandles)
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
