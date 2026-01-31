@@ -721,9 +721,10 @@ impl TrustGraph {
 
     /// Remove a trust edge
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
-        // Collect transitive targets BEFORE removing the edge, since
-        // remove deletes the edge from storage and we need the target's
-        // outgoing edges for transitive invalidation.
+        // Invalidate caches and derived state related to this target before
+        // removing the edge from storage. This ordering is for semantic clarity
+        // (treat invalidation as part of the mutation), not because the target's
+        // outgoing edges would be unavailable afterward.
         self.invalidate_affected(target);
 
         let key = self.edge_key(source, target);
@@ -786,7 +787,6 @@ impl TrustGraph {
         Ok(trusted_dids)
     }
 
-    /// Clear the trust score cache
     /// Invalidate cached scores for a DID and all transitively affected DIDs.
     ///
     /// When edge X→target changes, target's score is directly affected.
@@ -803,20 +803,29 @@ impl TrustGraph {
 
         // Invalidate transitive targets: DIDs that target has outgoing edges to.
         // These scores may depend on trust flowing through `target`.
-        if let Ok(outgoing) = self.get_outgoing_edges(target) {
-            for edge in &outgoing {
-                self.cache.invalidate(&edge.target);
+        match self.get_outgoing_edges(target) {
+            Ok(outgoing) => {
+                for edge in &outgoing {
+                    self.cache.invalidate(&edge.target);
+                }
+                if !outgoing.is_empty() {
+                    debug!(
+                        "Transitive cache invalidation: {} + {} downstream DIDs",
+                        target,
+                        outgoing.len()
+                    );
+                }
             }
-            if !outgoing.is_empty() {
+            Err(e) => {
                 debug!(
-                    "Transitive cache invalidation: {} + {} downstream DIDs",
-                    target,
-                    outgoing.len()
+                    "Failed to get outgoing edges during cache invalidation for {}: {}",
+                    target, e
                 );
             }
         }
     }
 
+    /// Clear the entire trust score cache.
     pub fn clear_cache(&self) {
         self.cache.clear();
     }
