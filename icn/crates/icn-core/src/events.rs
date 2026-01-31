@@ -240,10 +240,9 @@ mod tests {
         let event = SystemEvent::ProposalAccepted {
             proposal_id: "test-proposal".to_string(),
             domain_id: "test-domain".to_string(),
-            payload: serde_json::to_value(&icn_governance::ProposalPayload::Text {
-                body: "Test proposal".to_string(),
-            })
-            .unwrap(),
+            payload: serde_json::json!({
+                "Text": { "body": "Test proposal" }
+            }),
             decided_at: 1234567890,
         };
 
@@ -335,10 +334,9 @@ mod tests {
         let event = SystemEvent::ProposalAccepted {
             proposal_id: "test".to_string(),
             domain_id: "test".to_string(),
-            payload: serde_json::to_value(&icn_governance::ProposalPayload::Text {
-                body: "test".to_string(),
-            })
-            .unwrap(),
+            payload: serde_json::json!({
+                "Text": { "body": "test" }
+            }),
             decided_at: 1234567890,
         };
 
@@ -368,7 +366,10 @@ mod tests {
                 } = event
                 {
                     // Attempt to deserialize — this should fail for our test payload
-                    if serde_json::from_value::<icn_governance::ProposalPayload>(payload).is_err() {
+                    if payload.get("Text").is_none()
+                        && payload.get("ProtocolChange").is_none()
+                        && payload.get("Treasury").is_none()
+                    {
                         let bus = bus_for_sub1.clone();
                         let pid = proposal_id;
                         tokio::spawn(async move {
