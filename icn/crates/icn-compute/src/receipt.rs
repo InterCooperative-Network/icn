@@ -436,12 +436,14 @@ impl ExecutionReceipt {
             )));
         }
         let sig = self.submitter_ack.as_ref().ok_or_else(|| {
-            ComputeError::InvalidSignature(format!(
-                "submitter ack missing (receipt {})",
-                hash_hex
-            ))
+            ComputeError::InvalidSignature(format!("submitter ack missing (receipt {})", hash_hex))
         })?;
-        self.verify_sig(submitter_did, sig, &self.submitter_sign_payload(), &hash_hex)
+        self.verify_sig(
+            submitter_did,
+            sig,
+            &self.submitter_sign_payload(),
+            &hash_hex,
+        )
     }
 
     /// Verify the attester's signature against the given DID.
