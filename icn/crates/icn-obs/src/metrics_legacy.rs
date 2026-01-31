@@ -2258,6 +2258,24 @@ pub mod scalability {
         counter!("icn_scalability_trust_cache_invalidations_total").increment(1);
     }
 
+    /// Record a transitive cache invalidation event.
+    ///
+    /// Emitted when an edge mutation triggers one-hop-out invalidation
+    /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
+    pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
+        counter!("icn_scalability_trust_cache_transitive_invalidations_total")
+            .increment(downstream_count);
+    }
+
+    /// Record a cache invalidation error (storage failure during transitive lookup).
+    ///
+    /// When `get_outgoing_edges` fails during `invalidate_affected`, the direct
+    /// target is still invalidated but transitive targets may remain stale until
+    /// TTL expiry. Monitor this metric to detect storage issues.
+    pub fn trust_cache_invalidation_errors_inc() {
+        counter!("icn_scalability_trust_cache_invalidation_errors_total").increment(1);
+    }
+
     pub fn trust_cache_size_set(size: usize) {
         gauge!("icn_scalability_trust_cache_size").set(size as f64);
     }
