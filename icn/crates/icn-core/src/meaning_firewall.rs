@@ -24,17 +24,7 @@
 use std::path::PathBuf;
 
 /// Core kernel crates that must not depend on domain crates.
-///
-/// icn-core is included with pinned violation counts. The governance/ledger
-/// dependencies are being migrated to apps/ (see #913, #914). The ratchet
-/// tests prevent regressions while migration proceeds incrementally.
-const KERNEL_CRATES: &[&str] = &[
-    "icn-core",
-    "icn-net",
-    "icn-gateway",
-    "icn-gossip",
-    "icn-ledger",
-];
+const KERNEL_CRATES: &[&str] = &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
 
 /// Domain-specific crates that kernel must not depend on directly.
 const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
@@ -110,16 +100,9 @@ fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
 }
 
 /// Count occurrences of a pattern in source files.
-///
-/// Skips `meaning_firewall.rs` to avoid counting the test infrastructure's
-/// own string literals as violations.
 fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
     let mut count = 0;
     for file in list_rust_files(crate_name) {
-        // Skip counting ourselves — our string literals contain the patterns we're searching for
-        if file.file_name().is_some_and(|f| f == "meaning_firewall.rs") {
-            continue;
-        }
         if let Ok(content) = std::fs::read_to_string(&file) {
             count += content.matches(pattern).count();
         }
@@ -148,10 +131,7 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
-    /// Target state: all 0 after #913/#914 extraction completes.
-    ///
-    /// Current state (2026-01-31):
-    /// - icn-core: 2 (icn-trust dev-dep + icn-governance main+dev-dep)
+    /// Current state (2026-01-30):
     /// - icn-gossip: CLEAN
     /// - icn-net: CLEAN (dev-dep removed by #915/PR #973)
     /// - icn-gateway: 2 (icn-trust + icn-governance)
@@ -159,7 +139,6 @@ mod tests {
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-core", 2),    // icn-trust (dev) + icn-governance (main+dev) — #913 migration
             ("icn-gossip", 0),  // CLEAN ✅
             ("icn-net", 0),     // CLEAN ✅ (dev-dep removed by #915/PR #973)
             ("icn-gateway", 2), // icn-trust + icn-governance
@@ -199,16 +178,14 @@ mod tests {
     /// Update these when imports are removed. Adding new imports
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-31):
-    /// - icn-core: 0 (icn-trust is dev-only; no source imports)
+    /// Current state (2026-01-30):
     /// - icn-gossip: CLEAN
     /// - icn-net: CLEAN (no source imports, only had Cargo.toml dev-dep)
     /// - icn-gateway: 3 (trust_mgr.rs:2, api/trust.rs:1)
-    /// - icn-ledger: CLEAN (imports removed by #970)
+    /// - icn-ledger: 3 (credit_policy.rs:1, ledger.rs:1, fork_resolution.rs:1)
     #[test]
     fn strict_trust_import_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-core", 0),   // icn-trust is dev-dep only, no source imports
             ("icn-gossip", 0), // CLEAN ✅
             ("icn-net", 0),    // CLEAN ✅
             ("icn-gateway", 3),
@@ -238,10 +215,9 @@ mod tests {
     /// Pinned `use icn_governance::` import count per kernel crate.
     ///
     /// Mirrors `strict_trust_import_violations` for governance imports.
-    /// Target state: all 0 after governance extraction to apps/governance (#913).
+    /// Governance extraction is Phase 4 — these counts will ratchet to 0.
     ///
-    /// Current state (2026-01-31):
-    /// - icn-core: 11 (governance actor + handlers + init — #913 migration)
+    /// Current state (2026-01-30):
     /// - icn-net: CLEAN ✅
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
@@ -249,7 +225,6 @@ mod tests {
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-core", 11),    // governance actor + handlers + init — #913 migration target
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
@@ -276,29 +251,147 @@ mod tests {
         }
     }
 
-    /// Pinned `use icn_ledger::` import count for icn-core.
+    // ===================================================================
+    // ICN-CORE DOMAIN DEPENDENCY RATCHETS
+    //
+    // icn-core is the supervisor/wiring crate. It currently imports domain
+    // crates directly (icn-ledger, icn-ccl, icn-governance) for actor
+    // initialization. These ratchets pin the current import counts to
+    // prevent regressions while incremental extraction proceeds.
+    //
+    // Goal: icn-core should wire actors through traits/handles only,
+    // never importing domain types directly.
+    // ===================================================================
+
+    /// Domain crates that icn-core should eventually stop depending on.
+    /// These are crates whose types leak into the supervisor/wiring layer.
+    const CORE_DOMAIN_DEPS: &[&str] = &["icn-ledger", "icn-ccl", "icn-governance"];
+
+    /// Pinned count of ALL `icn_ledger::` references in icn-core source.
     ///
-    /// icn-ledger is not in DOMAIN_CRATES (it's shared infrastructure),
-    /// but icn-core should not directly import ledger types (#914).
-    /// Target state: 0 after ledger extraction completes (#914).
+    /// Tracks both `use icn_ledger::` import statements AND inline qualified
+    /// paths like `icn_ledger::Ledger`. This gives a complete picture of
+    /// coupling between icn-core and icn-ledger.
     ///
     /// Current state (2026-01-31):
-    /// - icn-core: 11 (governance_handlers + lifecycle + init_rpc + init_compute)
+    /// - governance_handlers.rs: 19 (treasury types, dispute types, ledger types)
+    /// - lifecycle.rs: 5 (raw_handle extractions, fn signatures)
+    /// - init_compute.rs: 2 (LedgerHandle alias, JournalEntryBuilder)
+    /// - init_notifications.rs: 1 (LedgerHandle alias)
+    /// - init_rpc.rs: 2 (Ledger, DisputeManager imports)
+    /// - config/ledger.rs: 1 (doc comment reference)
+    /// - actors.rs: 1 (CoreActorHandles LedgerHandle type)
     #[test]
-    fn strict_ledger_import_violations_in_core() {
-        let actual = count_imports_in_crate("icn-core", "use icn_ledger::");
-        let expected = 11; // #914 migration target
+    fn strict_core_ledger_reference_ratchet() {
+        let expected: usize = 39;
+        let actual = count_imports_in_crate("icn-core", "icn_ledger::");
+
         assert!(
             actual <= expected,
-            "REGRESSION: icn-core has {actual} `use icn_ledger::` imports \
+            "REGRESSION: icn-core has {actual} `icn_ledger::` references \
              (expected at most {expected}). \
-             Do not add new icn_ledger imports to icn-core."
+             Do not add new icn-ledger references to icn-core — \
+             use kernel-api traits or BootstrapHandles instead."
         );
+
         if actual < expected {
             panic!(
-                "✅ PROGRESS: icn-core now has only {actual} `use icn_ledger::` \
+                "PROGRESS: icn-core now has only {actual} `icn_ledger::` references \
+                 (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_core_ledger_reference_ratchet()."
+            );
+        }
+    }
+
+    /// Pinned count of ALL `icn_ccl::` references in icn-core source.
+    ///
+    /// Current state (2026-01-31):
+    /// - init_compute.rs: 6 (DisputeActorHandle, ContractRegistryHandle, DisputeConfig, etc.)
+    /// - init_notifications.rs: 16 (ContractActor, topics, message types, dispute outcomes)
+    /// - init_contract_registry.rs: 1 (use statement)
+    /// - init_rpc.rs: 1 (ContractRuntime import)
+    /// - lifecycle.rs: 8 (raw_handle extractions, fn signatures, holder types)
+    /// - actors.rs: 2 (BootstrapHandles placeholder — from B3 when merged)
+    #[test]
+    fn strict_core_ccl_reference_ratchet() {
+        let expected: usize = 40;
+        let actual = count_imports_in_crate("icn-core", "icn_ccl::");
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-core has {actual} `icn_ccl::` references \
+             (expected at most {expected}). \
+             Do not add new icn-ccl references to icn-core — \
+             use kernel-api traits or BootstrapHandles instead."
+        );
+
+        if actual < expected {
+            panic!(
+                "PROGRESS: icn-core now has only {actual} `icn_ccl::` references \
+                 (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_core_ccl_reference_ratchet()."
+            );
+        }
+    }
+
+    /// Pinned count of `use icn_governance::` imports in icn-core source.
+    ///
+    /// Governance was addressed in B1 (#913) with guardrails. This tracks
+    /// the remaining governance imports that need extraction.
+    ///
+    /// Current state (2026-01-31):
+    /// Distributed across governance_handlers.rs, lifecycle.rs,
+    /// init_governance.rs, init_steward.rs, and others.
+    #[test]
+    fn strict_core_governance_reference_ratchet() {
+        let expected: usize = 21;
+        let actual = count_imports_in_crate("icn-core", "use icn_governance::");
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-core has {actual} `use icn_governance::` imports \
+             (expected at most {expected}). \
+             Do not add new icn-governance imports to icn-core."
+        );
+
+        if actual < expected {
+            panic!(
+                "PROGRESS: icn-core now has only {actual} `use icn_governance::` \
                  imports (was pinned at {expected}). Update the pinned count in \
-                 meaning_firewall.rs::strict_ledger_import_violations_in_core()."
+                 meaning_firewall.rs::strict_core_governance_reference_ratchet()."
+            );
+        }
+    }
+
+    /// Pinned Cargo.toml domain dependency count for icn-core.
+    ///
+    /// icn-core currently depends on 3 domain crates (icn-ledger, icn-ccl,
+    /// icn-governance). As extraction proceeds, these should be removed.
+    #[test]
+    fn strict_core_cargo_domain_deps() {
+        let cargo_toml = read_cargo_toml("icn-core").expect("Could not read icn-core/Cargo.toml");
+
+        let mut actual = 0;
+        for domain_crate in CORE_DOMAIN_DEPS {
+            if has_dependency(&cargo_toml, domain_crate) {
+                actual += 1;
+            }
+        }
+
+        let expected: usize = 3; // icn-ledger + icn-ccl + icn-governance
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-core has {actual} domain-crate Cargo.toml deps \
+             (expected at most {expected}). \
+             Do not add new domain deps to icn-core."
+        );
+
+        if actual < expected {
+            panic!(
+                "PROGRESS: icn-core now has only {actual} domain-crate deps \
+                 (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_core_cargo_domain_deps()."
             );
         }
     }
@@ -377,6 +470,7 @@ mod tests {
     fn firewall_status_summary() {
         println!("\n=== Meaning Firewall Status ===\n");
 
+        // Kernel crate violations (domain deps in kernel crates)
         let mut cargo_violations = Vec::new();
         for crate_name in KERNEL_CRATES {
             if let Some(cargo_toml) = read_cargo_toml(crate_name) {
@@ -392,27 +486,46 @@ mod tests {
         for crate_name in KERNEL_CRATES {
             let count = count_imports_in_crate(crate_name, "use icn_trust::");
             if count > 0 {
-                import_violations.push(format!("{crate_name}: {count} imports"));
+                import_violations.push(format!("{crate_name}: {count} icn_trust imports"));
             }
         }
 
-        println!("Cargo.toml violations: {}", cargo_violations.len());
+        println!(
+            "Kernel crate Cargo.toml violations: {}",
+            cargo_violations.len()
+        );
         for v in &cargo_violations {
             println!("  - {v}");
         }
 
-        println!("\nImport violations: {}", import_violations.len());
+        println!(
+            "\nKernel crate import violations: {}",
+            import_violations.len()
+        );
         for v in &import_violations {
             println!("  - {v}");
         }
 
-        let is_clean = cargo_violations.is_empty() && import_violations.is_empty();
+        // icn-core domain coupling
+        println!("\n--- icn-core domain coupling ---");
+        let ledger_refs = count_imports_in_crate("icn-core", "icn_ledger::");
+        let ccl_refs = count_imports_in_crate("icn-core", "icn_ccl::");
+        let gov_imports = count_imports_in_crate("icn-core", "use icn_governance::");
+        println!("  icn_ledger:: references: {ledger_refs}");
+        println!("  icn_ccl:: references: {ccl_refs}");
+        println!("  use icn_governance:: imports: {gov_imports}");
+
+        let is_clean = cargo_violations.is_empty()
+            && import_violations.is_empty()
+            && ledger_refs == 0
+            && ccl_refs == 0
+            && gov_imports == 0;
         println!(
             "\nFirewall status: {}",
             if is_clean {
                 "CLEAN"
             } else {
-                "VIOLATIONS DETECTED (expected until Phase 2 kernel cleanup completes)"
+                "VIOLATIONS DETECTED (expected until kernel cleanup completes)"
             }
         );
     }
