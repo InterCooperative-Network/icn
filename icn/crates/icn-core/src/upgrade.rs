@@ -6,8 +6,8 @@
 //! - Deadline enforcement for deprecated versions
 //! - Metrics for upgrade progress
 
-use icn_governance::proposal::{ProposalPayload, Version};
 use icn_identity::Did;
+use icn_kernel_api::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -344,27 +344,26 @@ impl Default for UpgradeCoordinator {
     }
 }
 
-/// Convert a governance ProtocolUpgrade proposal into a PendingUpgrade
-pub fn proposal_to_pending_upgrade(
-    proposal: &ProposalPayload,
+/// Create a `PendingUpgrade` from primitive values.
+///
+/// This replaces the former `proposal_to_pending_upgrade` which took
+/// `ProposalPayload` (an icn-governance type). Callers that have a
+/// `ProposalPayload` should destructure it and pass the fields directly.
+pub fn create_pending_upgrade(
+    version: Version,
+    deadline: u64,
+    breaking_changes: Vec<String>,
+    migration_guide: Option<String>,
+    min_required_version: Option<Version>,
     approved_at: u64,
-) -> Result<PendingUpgrade, String> {
-    match proposal {
-        ProposalPayload::ProtocolUpgrade {
-            version,
-            breaking_changes,
-            migration_guide,
-            deadline,
-            min_required_version,
-        } => Ok(PendingUpgrade {
-            version: version.clone(),
-            deadline: *deadline,
-            breaking_changes: breaking_changes.clone(),
-            migration_guide: migration_guide.clone(),
-            min_required_version: min_required_version.clone(),
-            approved_at,
-        }),
-        _ => Err("Not a ProtocolUpgrade proposal".to_string()),
+) -> PendingUpgrade {
+    PendingUpgrade {
+        version,
+        deadline,
+        breaking_changes,
+        migration_guide,
+        min_required_version,
+        approved_at,
     }
 }
 

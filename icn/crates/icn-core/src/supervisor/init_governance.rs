@@ -88,7 +88,7 @@ pub async fn init_governance_services(
     info!("✓ Governance actor spawned at {}", gov_store_path.display());
 
     // Spawn UpgradeActor for network-wide upgrade coordination
-    let current_version = icn_governance::proposal::Version::new(
+    let current_version = icn_kernel_api::Version::new(
         crate::upgrade::CURRENT_VERSION.0,
         crate::upgrade::CURRENT_VERSION.1,
         crate::upgrade::CURRENT_VERSION.2,

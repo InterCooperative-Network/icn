@@ -3148,6 +3148,7 @@ dependencies = [
  "icn-entity",
  "icn-federation",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-obs",
  "icn-store",
