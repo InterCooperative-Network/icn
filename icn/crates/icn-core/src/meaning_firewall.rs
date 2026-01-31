@@ -107,10 +107,7 @@ fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
     let mut count = 0;
     for file in list_rust_files(crate_name) {
         // Skip this file — it contains the pattern strings as test literals
-        if file
-            .file_name()
-            .is_some_and(|n| n == "meaning_firewall.rs")
-        {
+        if file.file_name().is_some_and(|n| n == "meaning_firewall.rs") {
             continue;
         }
         if let Ok(content) = std::fs::read_to_string(&file) {
