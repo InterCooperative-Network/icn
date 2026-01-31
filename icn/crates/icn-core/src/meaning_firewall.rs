@@ -148,6 +148,8 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
+    /// Target state: all 0 after #913/#914 extraction completes.
+    ///
     /// Current state (2026-01-31):
     /// - icn-core: 2 (icn-trust dev-dep + icn-governance main+dev-dep)
     /// - icn-gossip: CLEAN
@@ -236,7 +238,7 @@ mod tests {
     /// Pinned `use icn_governance::` import count per kernel crate.
     ///
     /// Mirrors `strict_trust_import_violations` for governance imports.
-    /// Governance extraction is Phase 4 — these counts will ratchet to 0.
+    /// Target state: all 0 after governance extraction to apps/governance (#913).
     ///
     /// Current state (2026-01-31):
     /// - icn-core: 11 (governance actor + handlers + init — #913 migration)
@@ -278,7 +280,7 @@ mod tests {
     ///
     /// icn-ledger is not in DOMAIN_CRATES (it's shared infrastructure),
     /// but icn-core should not directly import ledger types (#914).
-    /// This ratchet tracks the migration progress.
+    /// Target state: 0 after ledger extraction completes (#914).
     ///
     /// Current state (2026-01-31):
     /// - icn-core: 11 (governance_handlers + lifecycle + init_rpc + init_compute)
