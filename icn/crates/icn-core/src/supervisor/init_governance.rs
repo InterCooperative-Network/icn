@@ -8,9 +8,9 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::config::Config;
-use icn_governance::{default_parameters, SledParameterStore};
-use icn_kernel_api::protocol_params::ProtocolParameterStore;
+use icn_governance_actor::{MembershipResolver, StaticMembershipResolver};
 use icn_identity::Did;
+use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_store::SledStore;
 
 /// Type alias for the event bus
@@ -30,8 +30,8 @@ pub struct GovernanceDeps {
     pub event_bus: EventBus,
     /// Shutdown signal receiver
     pub shutdown_rx: tokio::sync::broadcast::Receiver<()>,
-    /// Pre-created parameter store from daemon (avoids double sled open)
-    pub protocol_parameter_store: Option<Arc<dyn ProtocolParameterStore>>,
+    /// Pre-created parameter store from daemon (with defaults already loaded)
+    pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
 }
 
 /// Services returned from governance initialization
@@ -74,8 +74,8 @@ pub async fn init_governance_services(
     // Spawn Governance actor
     let gov_store_path = config.store_path().join("governance");
     let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
-    let gov_resolver: Arc<dyn icn_governance::MembershipResolver + Send + Sync> =
-        Arc::new(icn_governance::StaticMembershipResolver::new());
+    let gov_resolver: Arc<dyn MembershipResolver + Send + Sync> =
+        Arc::new(StaticMembershipResolver::new());
 
     let governance_handle = crate::governance::GovernanceActor::spawn(
         did.clone(),
@@ -123,46 +123,11 @@ pub async fn init_governance_services(
         dlq_store_path.display()
     );
 
-    // Initialize protocol parameter store (Phase 20)
-    let protocol_parameter_store: Arc<dyn ProtocolParameterStore> =
-        if let Some(store) = deps.protocol_parameter_store {
-            info!("Using daemon-provided protocol parameter store");
-            store
-        } else {
-            let param_store_path = config.protocol_params_path();
-            let param_db = sled::open(&param_store_path)?;
-            Arc::new(SledParameterStore::new(Arc::new(param_db))?)
-        };
-
-    // Load default parameters on first run (if store is empty)
+    // Protocol parameter store is provided by the daemon (with defaults already loaded)
+    let protocol_parameter_store = deps.protocol_parameter_store;
     {
-        let existing = protocol_parameter_store.list()?;
-        if existing.is_empty() {
-            info!("Loading default protocol parameters...");
-            let defaults = default_parameters();
-            let count = defaults.len();
-            for param in defaults {
-                protocol_parameter_store.set(param, None, None)?;
-            }
-            info!("✓ {} default protocol parameters initialized", count);
-
-            // Emit event for observability
-            let event = crate::events::SystemEvent::ProtocolParametersInitialized {
-                count,
-                initialized_at: icn_time::current_timestamp_secs(),
-            };
-            deps.event_bus.emit(event).await;
-        } else {
-            let count = existing.len();
-            info!("✓ Protocol parameter store loaded ({} parameters)", count);
-
-            // Emit event for observability
-            let event = crate::events::SystemEvent::ProtocolParametersLoaded {
-                count,
-                loaded_at: icn_time::current_timestamp_secs(),
-            };
-            deps.event_bus.emit(event).await;
-        }
+        let count = protocol_parameter_store.list()?.len();
+        info!("✓ Protocol parameter store ready ({} parameters)", count);
     }
 
     // Attach protocol parameter store to governance handle

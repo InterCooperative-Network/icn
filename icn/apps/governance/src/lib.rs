@@ -17,3 +17,8 @@
 pub mod actor;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+
+// Re-export governance types needed by supervisor initialization.
+// This allows icn-core to import from icn_governance_actor instead of
+// icn_governance directly, reducing direct governance coupling.
+pub use icn_governance::{MembershipResolver, StaticMembershipResolver};

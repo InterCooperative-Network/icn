@@ -520,7 +520,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             event_bus: event_bus.clone(),
             shutdown_rx: shutdown_tx.subscribe(),
-            protocol_parameter_store: Some(protocol_parameter_store_from_daemon),
+            protocol_parameter_store: protocol_parameter_store_from_daemon,
         },
     )
     .await?;
