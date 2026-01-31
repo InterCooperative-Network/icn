@@ -721,10 +721,10 @@ impl TrustGraph {
 
     /// Remove a trust edge
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
-        // Invalidate caches and derived state related to this target before
-        // removing the edge from storage. This ordering is for semantic clarity
-        // (treat invalidation as part of the mutation), not because the target's
-        // outgoing edges would be unavailable afterward.
+        // Invalidate caches before removing the edge from storage. This ordering
+        // is defensive: `get_outgoing_edges(target)` inside `invalidate_affected`
+        // can still read target's edges, ensuring transitive invalidations are
+        // complete even under concurrent edge deletion scenarios.
         self.invalidate_affected(target);
 
         let key = self.edge_key(source, target);
@@ -789,10 +789,10 @@ impl TrustGraph {
 
     /// Invalidate cached scores for a DID and all transitively affected DIDs.
     ///
-    /// When edge X→target changes, target's score is directly affected.
-    /// Additionally, any DID C where target→C exists may have a stale
-    /// score because the transitive path (X→target→C) changed. We
-    /// invalidate those one-hop-out DIDs as well.
+    /// When any edge with `target` as the target node changes (regardless of
+    /// source), `target`'s score is directly affected. Additionally, any DID C
+    /// where target→C exists may have a stale score because the transitive path
+    /// (source→target→C) changed. We invalidate those one-hop-out DIDs as well.
     ///
     /// This is bounded: we only go one hop out from `target`, not the
     /// full graph. The scoring algorithm is two-hop (direct + transitive),
@@ -812,8 +812,9 @@ impl TrustGraph {
                     let count = outgoing.len() as u64;
                     icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(count);
                     debug!(
-                        "Transitive cache invalidation: {} + {} downstream DIDs",
-                        target, count
+                        target = %target,
+                        downstream_count = count,
+                        "Transitive cache invalidation for {target}: {count} downstream DIDs",
                     );
                 }
             }
