@@ -600,46 +600,15 @@ pub trait CellService: Send + Sync {
 /// This allows the daemon to construct services and inject them into the kernel.
 /// The kernel never needs to know about concrete implementations.
 ///
-/// # Transition Handles
-///
-/// During the kernel/app separation migration, some components may still need
-/// direct access to domain objects (e.g., TrustGraph for MisbehaviorDetector).
-/// The `raw_handles` field provides type-erased storage for these transition
-/// needs. These should be removed as components are fully migrated.
-///
-/// # Raw Handle Type Pattern
-///
-/// `raw_handle<T>` requires `T: Sized`, so `dyn Trait` objects cannot be stored
-/// directly. Use the appropriate pattern based on the stored type:
-///
-/// **Concrete type with trait upcast** (when consumers need a trait object):
-/// ```ignore
-/// // Store: Arc<SledParameterStore> (concrete, Sized)
-/// registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, store);
-/// // Retrieve concrete, then upcast:
-/// let store: Arc<SledParameterStore> = registry.raw_handle(KEY)?;
-/// let trait_obj: Arc<dyn ProtocolParameterStore> = store;
-/// ```
-///
-/// **Wrapped type** (when the wrapper is Sized, e.g., `RwLock<T>`):
-/// ```ignore
-/// // Store and retrieve directly:
-/// registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
-/// let handle: Arc<RwLock<Ledger>> = registry.raw_handle(KEY)?;
-/// ```
+/// Concrete domain handles (ledger, contract runtime, parameter store, etc.)
+/// are passed separately via `BootstrapHandles` in `icn-core`, keeping this
+/// registry free of domain types.
 pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
     ledger: Option<Arc<dyn LedgerService>>,
     cell: Option<Arc<dyn CellService>>,
-    /// Type-erased handles for transition period
-    ///
-    /// Keys use string identifiers like "trust_graph", "ledger_handle", etc.
-    /// Values are type-erased via Any trait. The supervisor downcasts as needed.
-    ///
-    /// **This is a transition mechanism and should be removed when migration is complete.**
-    raw_handles: std::collections::HashMap<String, Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Default for ServiceRegistry {
@@ -649,26 +618,6 @@ impl Default for ServiceRegistry {
 }
 
 impl ServiceRegistry {
-    // Raw handle key constants — use these instead of string literals to prevent typos.
-    // A typo in the key results in silent `None` at runtime.
-
-    /// Key for `Arc<RwLock<TrustGraph>>` raw handle
-    pub const TRUST_GRAPH_KEY: &str = "trust_graph";
-    /// Key for `Arc<SledParameterStore>` raw handle (concrete type; upcast after retrieval)
-    pub const PROTOCOL_PARAM_STORE_KEY: &str = "protocol_parameter_store";
-    /// Key for `Arc<RwLock<Ledger>>` raw handle
-    pub const LEDGER_KEY: &str = "ledger";
-    /// Key for `Arc<SledStore>` raw handle (shared with DisputeManager/TreasuryManager)
-    pub const LEDGER_STORE_KEY: &str = "ledger_store";
-    /// Key for `Arc<RwLock<DisputeManager>>` raw handle
-    pub const DISPUTE_MANAGER_KEY: &str = "dispute_manager";
-    /// Key for `Arc<RwLock<TreasuryManager>>` raw handle
-    pub const TREASURY_MANAGER_KEY: &str = "treasury_manager";
-    /// Key for `Arc<RwLock<ContractRuntime>>` raw handle
-    pub const CONTRACT_RUNTIME_KEY: &str = "contract_runtime";
-    /// Key for `Arc<RwLock<ContractActor>>` raw handle
-    pub const CONTRACT_ACTOR_KEY: &str = "contract_actor";
-
     /// Create a new empty service registry
     pub fn new() -> Self {
         Self {
@@ -677,7 +626,6 @@ impl ServiceRegistry {
             governance: None,
             ledger: None,
             cell: None,
-            raw_handles: std::collections::HashMap::new(),
         }
     }
 
@@ -709,39 +657,6 @@ impl ServiceRegistry {
     pub fn with_cell(mut self, service: Arc<dyn CellService>) -> Self {
         self.cell = Some(service);
         self
-    }
-
-    /// Register a raw handle for transition period
-    ///
-    /// **This is a transition mechanism.** Use this to pass domain objects
-    /// (like TrustGraph handles) that some components still need directly.
-    /// These should be migrated to use proper service interfaces.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let trust_graph = Arc::new(RwLock::new(TrustGraph::new(...)));
-    /// registry = registry.with_raw_handle("trust_graph", trust_graph);
-    /// ```
-    pub fn with_raw_handle<T: Send + Sync + 'static>(mut self, key: &str, handle: Arc<T>) -> Self {
-        self.raw_handles.insert(key.to_string(), handle);
-        self
-    }
-
-    /// Get a raw handle by key, downcasting to the expected type
-    ///
-    /// **This is a transition mechanism.** Returns None if key doesn't exist
-    /// or type doesn't match.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let trust_graph: Option<Arc<RwLock<TrustGraph>>> = registry.raw_handle("trust_graph");
-    /// ```
-    pub fn raw_handle<T: Send + Sync + 'static>(&self, key: &str) -> Option<Arc<T>> {
-        self.raw_handles
-            .get(key)
-            .and_then(|any| any.clone().downcast::<T>().ok())
     }
 
     /// Get the trust service (if registered)

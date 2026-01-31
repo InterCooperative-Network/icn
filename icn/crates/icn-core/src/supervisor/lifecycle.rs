@@ -40,6 +40,7 @@ pub async fn run_supervisor(
     identity_bundle: Option<IdentityBundle>,
     shutdown_tx: ShutdownTx,
     service_registry: Option<ServiceRegistry>,
+    bootstrap_handles: Option<super::BootstrapHandles>,
 ) -> Result<()> {
     info!("Supervisor starting");
 
@@ -95,6 +96,7 @@ pub async fn run_supervisor(
             &mut event_subscriptions,
             &mut shutdown_handles,
             service_registry.as_ref(),
+            bootstrap_handles,
         )
         .await?
     } else {
@@ -210,35 +212,11 @@ async fn spawn_actors_with_identity(
     event_subscriptions: &mut EventSubscriptionHandles,
     shutdown_handles: &mut ShutdownHandles,
     service_registry: Option<&ServiceRegistry>,
+    bootstrap_handles: Option<super::BootstrapHandles>,
 ) -> Result<CoreActorHandles> {
     info!("Identity bundle available - spawning actors");
 
     let did = identity_bundle.did().clone();
-
-    // Extract pre-initialized ledger handles from ServiceRegistry.
-    // These were created by icn_ledger_app::init::init_ledger_services() in the daemon.
-    let ledger_from_daemon: Option<Arc<RwLock<icn_ledger::Ledger>>> = service_registry
-        .and_then(|r| r.raw_handle::<RwLock<icn_ledger::Ledger>>(ServiceRegistry::LEDGER_KEY));
-    let ledger_store_from_daemon: Option<Arc<icn_store::SledStore>> = service_registry
-        .and_then(|r| r.raw_handle::<icn_store::SledStore>(ServiceRegistry::LEDGER_STORE_KEY));
-    let dispute_manager_from_daemon: Option<Arc<RwLock<icn_ledger::DisputeManager>>> =
-        service_registry.and_then(|r| {
-            r.raw_handle::<RwLock<icn_ledger::DisputeManager>>(ServiceRegistry::DISPUTE_MANAGER_KEY)
-        });
-    let treasury_manager_from_daemon: Option<Arc<RwLock<icn_ledger::TreasuryManager>>> =
-        service_registry.and_then(|r| {
-            r.raw_handle::<RwLock<icn_ledger::TreasuryManager>>(
-                ServiceRegistry::TREASURY_MANAGER_KEY,
-            )
-        });
-    let contract_runtime_from_daemon: Option<Arc<RwLock<icn_ccl::ContractRuntime>>> =
-        service_registry.and_then(|r| {
-            r.raw_handle::<RwLock<icn_ccl::ContractRuntime>>(ServiceRegistry::CONTRACT_RUNTIME_KEY)
-        });
-    let contract_actor_from_daemon: Option<Arc<RwLock<icn_ccl::ContractActor>>> = service_registry
-        .and_then(|r| {
-            r.raw_handle::<RwLock<icn_ccl::ContractActor>>(ServiceRegistry::CONTRACT_ACTOR_KEY)
-        });
 
     // Create NodeProfile with hardware sensing (Phase 17)
     let node_profile = crate::node::create_node_profile(
@@ -319,20 +297,18 @@ async fn spawn_actors_with_identity(
     let gossip_store = gossip_services.gossip_store.clone();
     let loaded_snapshot = gossip_services.loaded_snapshot;
 
-    // Extract pre-initialized ledger handles from ServiceRegistry.
-    // Ledger services were created in the daemon by icn_ledger_app::init::init_ledger_services().
-    let ledger_handle =
-        ledger_from_daemon.ok_or_else(|| anyhow::anyhow!("Ledger not in ServiceRegistry"))?;
-    let dispute_manager_handle = dispute_manager_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("DisputeManager not in ServiceRegistry"))?;
-    let treasury_manager_handle = treasury_manager_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("TreasuryManager not in ServiceRegistry"))?;
-    let contract_runtime_handle = contract_runtime_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("ContractRuntime not in ServiceRegistry"))?;
-    let contract_actor_handle = contract_actor_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("ContractActor not in ServiceRegistry"))?;
-    let ledger_store = ledger_store_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("LedgerStore not in ServiceRegistry"))?;
+    // Extract pre-initialized domain handles from BootstrapHandles.
+    // These were created by icn_ledger_app::init::init_ledger_services() in the daemon.
+    let handles = bootstrap_handles
+        .ok_or_else(|| anyhow::anyhow!("BootstrapHandles not provided by daemon"))?;
+    let ledger_handle = handles.ledger;
+    let ledger_store = handles.ledger_store;
+    let dispute_manager_handle = handles.dispute_manager;
+    let treasury_manager_handle = handles.treasury_manager;
+    let contract_runtime_handle = handles.contract_runtime;
+    let contract_actor_handle = handles.contract_actor;
+    let protocol_parameter_store_from_daemon: Arc<dyn icn_governance::ProtocolParameterStore> =
+        handles.protocol_parameter_store;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -528,17 +504,7 @@ async fn spawn_actors_with_identity(
     let event_bus = Arc::new(crate::events::EventBus::new());
     info!("Event bus created");
 
-    // Extract daemon-provided parameter store from ServiceRegistry (if available).
-    // SledParameterStore is stored as concrete type since raw_handle requires Sized.
-    let protocol_parameter_store_from_daemon: Option<
-        Arc<dyn icn_governance::ProtocolParameterStore>,
-    > = service_registry
-        .and_then(|r| {
-            r.raw_handle::<icn_governance::SledParameterStore>(
-                ServiceRegistry::PROTOCOL_PARAM_STORE_KEY,
-            )
-        })
-        .map(|s| s as Arc<dyn icn_governance::ProtocolParameterStore>);
+    // Protocol parameter store was extracted from BootstrapHandles above.
 
     // Initialize governance services
     let governance_services = super::init_governance::init_governance_services(
@@ -548,7 +514,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             event_bus: event_bus.clone(),
             shutdown_rx: shutdown_tx.subscribe(),
-            protocol_parameter_store: protocol_parameter_store_from_daemon,
+            protocol_parameter_store: Some(protocol_parameter_store_from_daemon),
         },
     )
     .await?;
