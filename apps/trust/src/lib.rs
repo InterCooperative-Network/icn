@@ -94,13 +94,15 @@ pub fn create_service(
 ///
 /// # Arguments
 /// * `trust_graph` - The trust graph with tokio RwLock wrapper.
+/// * `keypair` - The node's keypair for signing outgoing attestations.
 ///
 /// # Panics
 /// If called outside of a tokio multi-threaded runtime context.
 pub fn create_service_tokio(
     trust_graph: Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
+    keypair: icn_identity::KeyPair,
 ) -> Arc<dyn icn_kernel_api::services::TrustService> {
-    Arc::new(TrustServiceImplTokio::new(trust_graph))
+    Arc::new(TrustServiceImplTokio::new(trust_graph, keypair))
 }
 
 #[cfg(test)]
