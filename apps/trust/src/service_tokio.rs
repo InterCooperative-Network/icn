@@ -30,22 +30,22 @@ pub struct TrustServiceImplTokio {
     graph: Arc<RwLock<TrustGraph>>,
     oracle: Arc<TrustPolicyOracleTokio>,
     own_did: icn_identity::Did,
+    /// Keypair for signing outgoing attestations.
+    keypair: icn_identity::KeyPair,
 }
 
 impl TrustServiceImplTokio {
-    /// Create a new trust service with the given TrustGraph
-    pub fn new(graph: Arc<RwLock<TrustGraph>>) -> Self {
-        let own_did = {
-            let rt = tokio::runtime::Handle::current();
-            tokio::task::block_in_place(|| {
-                rt.block_on(async { graph.read().await.own_did().clone() })
-            })
-        };
+    /// Create a new trust service with the given TrustGraph and keypair.
+    ///
+    /// The keypair is used to sign outgoing attestations before gossip broadcast.
+    pub fn new(graph: Arc<RwLock<TrustGraph>>, keypair: icn_identity::KeyPair) -> Self {
+        let own_did = keypair.did().clone();
         let oracle = Arc::new(TrustPolicyOracleTokio::new(graph.clone()));
         Self {
             graph,
             oracle,
             own_did,
+            keypair,
         }
     }
 
@@ -213,14 +213,17 @@ impl TrustService for TrustServiceImplTokio {
         let attestation: TrustAttestation =
             serde_json::from_slice(bytes).map_err(|e| format!("Invalid attestation: {e}"))?;
 
-        // Verify signature
+        // Verify signature — reject unsigned or invalid attestations
         if let Err(e) = attestation.verify() {
             tracing::warn!(
                 source = %source,
                 "Rejecting trust attestation with invalid signature: {} -> {} (error: {})",
                 attestation.issuer, attestation.subject, e
             );
-            return Ok(()); // Silently reject invalid signatures
+            return Err(format!(
+                "Invalid attestation signature from {} -> {}: {e}",
+                attestation.issuer, attestation.subject
+            ));
         }
 
         // Check if expired
@@ -330,8 +333,11 @@ impl TrustService for TrustServiceImplTokio {
             rt.block_on(async {
                 let mut graph = self.graph.write().await;
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
-                // Return serialized attestation for gossip broadcast
-                let attestation = icn_trust::TrustAttestation::from_trust_edge(&edge);
+                // Sign attestation before gossip broadcast
+                let mut attestation = icn_trust::TrustAttestation::from_trust_edge(&edge);
+                attestation
+                    .sign(&self.keypair)
+                    .map_err(|e| format!("Failed to sign attestation: {e}"))?;
                 serde_json::to_vec(&attestation).map_err(|e| format!("{e}"))
             })
         })
@@ -401,7 +407,7 @@ mod tests {
     use super::*;
     use icn_kernel_api::services::TrustService as _;
 
-    fn create_test_graph() -> (Arc<RwLock<TrustGraph>>, icn_identity::Did) {
+    fn create_test_graph() -> (Arc<RwLock<TrustGraph>>, icn_identity::KeyPair) {
         let store = icn_store::SledStore::temporary().unwrap();
         let store: Arc<dyn icn_store::Store> = Arc::new(store);
 
@@ -410,14 +416,14 @@ mod tests {
 
         (
             Arc::new(RwLock::new(TrustGraph::new(store, did.clone()))),
-            did,
+            keypair,
         )
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_trust_service_tokio_creation() {
-        let (graph, _did) = create_test_graph();
-        let service = TrustServiceImplTokio::new(graph);
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
 
         // Should have zero trust for unknown actors
         let unknown_keypair = icn_identity::KeyPair::generate().unwrap();
@@ -431,8 +437,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_trust_score_unknown_actor() {
-        let (graph, _did) = create_test_graph();
-        let service = TrustServiceImplTokio::new(graph);
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
 
         let unknown_keypair = icn_identity::KeyPair::generate().unwrap();
         let unknown_did = icn_kernel_api::types::Did::from(unknown_keypair.did().to_string());
@@ -440,5 +446,76 @@ mod tests {
         // Unknown actors should get 0.0 trust
         let score = service.trust_score(&unknown_did);
         assert_eq!(score, 0.0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_attestation_is_signed() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // Submit attestation — should be signed
+        let bytes = service
+            .submit_attestation(&target_did, 0.7, vec!["partner".into()])
+            .expect("submit_attestation should succeed");
+
+        // Deserialize and verify signature
+        let attestation: icn_trust::TrustAttestation =
+            serde_json::from_slice(&bytes).expect("should deserialize");
+        assert!(
+            !attestation.signature.is_empty(),
+            "Attestation must be signed before gossip broadcast"
+        );
+        attestation
+            .verify()
+            .expect("Attestation signature must be valid");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_unsigned_attestation() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create an unsigned attestation
+        let attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Unsigned attestations must be rejected, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_then_ingest_roundtrip() {
+        // Node A submits attestation, Node B ingests it
+        let (graph_a, keypair_a) = create_test_graph();
+        let service_a = TrustServiceImplTokio::new(graph_a, keypair_a);
+
+        let (graph_b, keypair_b) = create_test_graph();
+        let service_b = TrustServiceImplTokio::new(graph_b, keypair_b);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // Node A submits signed attestation
+        let bytes = service_a
+            .submit_attestation(&target_did, 0.8, vec!["validator".into()])
+            .expect("submit should succeed");
+
+        // Node B ingests it — should succeed because it's signed
+        let source_a = icn_kernel_api::types::Did::from(service_a.own_did.to_string());
+        service_b
+            .ingest_attestation(&bytes, &source_a)
+            .expect("ingest of signed attestation should succeed");
     }
 }

@@ -96,8 +96,12 @@ async fn build_service_registry(
         let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did.clone());
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
-        // Create TrustService from apps/trust
-        let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle.clone());
+        // Create TrustService from apps/trust (keypair is required for signing attestations)
+        let keypair = bundle.keypair().context(
+            "Cannot create TrustService: failed to extract keypair from identity bundle",
+        )?;
+        let trust_service =
+            icn_trust_app::create_service_tokio(trust_graph_handle.clone(), keypair);
         registry = registry.with_trust(trust_service);
 
         // Also pass raw TrustGraph handle for components that still need direct access
