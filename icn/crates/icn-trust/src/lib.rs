@@ -87,7 +87,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 /// Trust classification for a peer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -809,15 +809,16 @@ impl TrustGraph {
                     self.cache.invalidate(&edge.target);
                 }
                 if !outgoing.is_empty() {
+                    let count = outgoing.len() as u64;
+                    icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(count);
                     debug!(
                         "Transitive cache invalidation: {} + {} downstream DIDs",
-                        target,
-                        outgoing.len()
+                        target, count
                     );
                 }
             }
             Err(e) => {
-                debug!(
+                warn!(
                     "Failed to get outgoing edges during cache invalidation for {}: {}",
                     target, e
                 );

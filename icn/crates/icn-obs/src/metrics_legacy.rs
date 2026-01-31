@@ -2258,6 +2258,15 @@ pub mod scalability {
         counter!("icn_scalability_trust_cache_invalidations_total").increment(1);
     }
 
+    /// Record a transitive cache invalidation event.
+    ///
+    /// Emitted when an edge mutation triggers one-hop-out invalidation
+    /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
+    pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
+        counter!("icn_scalability_trust_cache_transitive_invalidations_total")
+            .increment(downstream_count);
+    }
+
     pub fn trust_cache_size_set(size: usize) {
         gauge!("icn_scalability_trust_cache_size").set(size as f64);
     }
