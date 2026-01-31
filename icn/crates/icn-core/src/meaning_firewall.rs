@@ -24,7 +24,11 @@
 use std::path::PathBuf;
 
 /// Core kernel crates that must not depend on domain crates.
-const KERNEL_CRATES: &[&str] = &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
+///
+/// icn-core is included with pinned violation counts. The governance/ledger
+/// dependencies are being migrated to apps/ (see #913, #914). The ratchet
+/// tests prevent regressions while migration proceeds incrementally.
+const KERNEL_CRATES: &[&str] = &["icn-core", "icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
 
 /// Domain-specific crates that kernel must not depend on directly.
 const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
@@ -100,9 +104,19 @@ fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
 }
 
 /// Count occurrences of a pattern in source files.
+///
+/// Skips `meaning_firewall.rs` to avoid counting the test infrastructure's
+/// own string literals as violations.
 fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
     let mut count = 0;
     for file in list_rust_files(crate_name) {
+        // Skip counting ourselves — our string literals contain the patterns we're searching for
+        if file
+            .file_name()
+            .is_some_and(|f| f == "meaning_firewall.rs")
+        {
+            continue;
+        }
         if let Ok(content) = std::fs::read_to_string(&file) {
             count += content.matches(pattern).count();
         }
@@ -131,7 +145,8 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-01-31):
+    /// - icn-core: 2 (icn-trust dev-dep + icn-governance main+dev-dep)
     /// - icn-gossip: CLEAN
     /// - icn-net: CLEAN (dev-dep removed by #915/PR #973)
     /// - icn-gateway: 2 (icn-trust + icn-governance)
@@ -139,6 +154,7 @@ mod tests {
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
+            ("icn-core", 2),    // icn-trust (dev) + icn-governance (main+dev) — #913 migration
             ("icn-gossip", 0),  // CLEAN ✅
             ("icn-net", 0),     // CLEAN ✅ (dev-dep removed by #915/PR #973)
             ("icn-gateway", 2), // icn-trust + icn-governance
@@ -178,7 +194,8 @@ mod tests {
     /// Update these when imports are removed. Adding new imports
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-01-31):
+    /// - icn-core: 0 (icn-trust is dev-only; no source imports)
     /// - icn-gossip: CLEAN
     /// - icn-net: CLEAN (no source imports, only had Cargo.toml dev-dep)
     /// - icn-gateway: 3 (trust_mgr.rs:2, api/trust.rs:1)
@@ -186,6 +203,7 @@ mod tests {
     #[test]
     fn strict_trust_import_violations() {
         let expected: &[(&str, usize)] = &[
+            ("icn-core", 0),   // icn-trust is dev-dep only, no source imports
             ("icn-gossip", 0), // CLEAN ✅
             ("icn-net", 0),    // CLEAN ✅
             ("icn-gateway", 3),
@@ -217,7 +235,8 @@ mod tests {
     /// Mirrors `strict_trust_import_violations` for governance imports.
     /// Governance extraction is Phase 4 — these counts will ratchet to 0.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-01-31):
+    /// - icn-core: 11 (governance actor + handlers + init — #913 migration)
     /// - icn-net: CLEAN ✅
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
@@ -225,6 +244,7 @@ mod tests {
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
+            ("icn-core", 11),    // governance actor + handlers + init — #913 migration target
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
@@ -248,6 +268,33 @@ mod tests {
                      meaning_firewall.rs::strict_governance_import_violations()."
                 );
             }
+        }
+    }
+
+    /// Pinned `use icn_ledger::` import count for icn-core.
+    ///
+    /// icn-ledger is not in DOMAIN_CRATES (it's shared infrastructure),
+    /// but icn-core should not directly import ledger types (#914).
+    /// This ratchet tracks the migration progress.
+    ///
+    /// Current state (2026-01-31):
+    /// - icn-core: 11 (governance_handlers + lifecycle + init_rpc + init_compute)
+    #[test]
+    fn strict_ledger_import_violations_in_core() {
+        let actual = count_imports_in_crate("icn-core", "use icn_ledger::");
+        let expected = 11; // #914 migration target
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-core has {actual} `use icn_ledger::` imports \
+             (expected at most {expected}). \
+             Do not add new icn_ledger imports to icn-core."
+        );
+        if actual < expected {
+            panic!(
+                "✅ PROGRESS: icn-core now has only {actual} `use icn_ledger::` \
+                 imports (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_ledger_import_violations_in_core()."
+            );
         }
     }
 
