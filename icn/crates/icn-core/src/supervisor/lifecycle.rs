@@ -223,9 +223,7 @@ async fn spawn_actors_with_identity(
         .and_then(|r| r.raw_handle::<icn_store::SledStore>(ServiceRegistry::LEDGER_STORE_KEY));
     let dispute_manager_from_daemon: Option<Arc<RwLock<icn_ledger::DisputeManager>>> =
         service_registry.and_then(|r| {
-            r.raw_handle::<RwLock<icn_ledger::DisputeManager>>(
-                ServiceRegistry::DISPUTE_MANAGER_KEY,
-            )
+            r.raw_handle::<RwLock<icn_ledger::DisputeManager>>(ServiceRegistry::DISPUTE_MANAGER_KEY)
         });
     let treasury_manager_from_daemon: Option<Arc<RwLock<icn_ledger::TreasuryManager>>> =
         service_registry.and_then(|r| {
@@ -235,9 +233,7 @@ async fn spawn_actors_with_identity(
         });
     let contract_runtime_from_daemon: Option<Arc<RwLock<icn_ccl::ContractRuntime>>> =
         service_registry.and_then(|r| {
-            r.raw_handle::<RwLock<icn_ccl::ContractRuntime>>(
-                ServiceRegistry::CONTRACT_RUNTIME_KEY,
-            )
+            r.raw_handle::<RwLock<icn_ccl::ContractRuntime>>(ServiceRegistry::CONTRACT_RUNTIME_KEY)
         });
     let contract_actor_from_daemon: Option<Arc<RwLock<icn_ccl::ContractActor>>> = service_registry
         .and_then(|r| {
@@ -325,8 +321,8 @@ async fn spawn_actors_with_identity(
 
     // Extract pre-initialized ledger handles from ServiceRegistry.
     // Ledger services were created in the daemon by icn_ledger_app::init::init_ledger_services().
-    let ledger_handle = ledger_from_daemon
-        .ok_or_else(|| anyhow::anyhow!("Ledger not in ServiceRegistry"))?;
+    let ledger_handle =
+        ledger_from_daemon.ok_or_else(|| anyhow::anyhow!("Ledger not in ServiceRegistry"))?;
     let dispute_manager_handle = dispute_manager_from_daemon
         .ok_or_else(|| anyhow::anyhow!("DisputeManager not in ServiceRegistry"))?;
     let treasury_manager_handle = treasury_manager_from_daemon

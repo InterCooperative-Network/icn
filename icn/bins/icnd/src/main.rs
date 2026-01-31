@@ -158,7 +158,8 @@ async fn build_service_registry(
         let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
         registry = registry.with_ledger(ledger_service);
         registry = registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle.clone());
-        registry = registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store.clone());
+        registry =
+            registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store.clone());
 
         // Initialize ledger services (oracle, witness, membership, credit, dispute,
         // treasury, contracts). Config→primitive mapping stays in the daemon binary.
@@ -180,7 +181,11 @@ async fn build_service_registry(
         )
         .context("Invalid witness configuration")?;
         let ledger_services = icn_ledger_app::init::init_ledger_services(
-            ledger_handle, ledger_store, own_did.clone(), oracle_config, witness_config,
+            ledger_handle,
+            ledger_store,
+            own_did.clone(),
+            oracle_config,
+            witness_config,
         )
         .await
         .context("Failed to initialize ledger services")?;
