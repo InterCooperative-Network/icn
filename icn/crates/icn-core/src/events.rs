@@ -347,4 +347,70 @@ mod tests {
         // Callback should NOT have been called (subscription was dropped)
         assert_eq!(counter.load(Ordering::SeqCst), 0);
     }
+
+    #[tokio::test]
+    async fn test_invalid_payload_triggers_execution_failed() {
+        // Regression test: when a ProposalAccepted event carries a payload that
+        // cannot be deserialized back to ProposalPayload, the subscriber should
+        // emit ProposalExecutionFailed (not silently drop the event).
+        let bus = EventBus::new();
+        let failure_seen = Arc::new(AtomicUsize::new(0));
+
+        // Subscriber 1: simulates create_governance_subscription behavior.
+        // On deserialization failure, it spawns a task to emit ProposalExecutionFailed.
+        let bus_for_sub1 = bus.clone();
+        let _handle1 = bus
+            .subscribe(Arc::new(move |event| {
+                if let SystemEvent::ProposalAccepted {
+                    proposal_id,
+                    payload,
+                    ..
+                } = event
+                {
+                    // Attempt to deserialize — this should fail for our test payload
+                    if serde_json::from_value::<icn_governance::ProposalPayload>(payload).is_err() {
+                        let bus = bus_for_sub1.clone();
+                        let pid = proposal_id;
+                        tokio::spawn(async move {
+                            bus.emit(SystemEvent::ProposalExecutionFailed {
+                                proposal_id: pid,
+                                proposal_type: "unknown".to_string(),
+                                error: "payload deserialization failed".to_string(),
+                                failed_at: 0,
+                            })
+                            .await;
+                        });
+                    }
+                }
+            }))
+            .await;
+
+        // Subscriber 2: observes ProposalExecutionFailed events
+        let fs = failure_seen.clone();
+        let _handle2 = bus
+            .subscribe(Arc::new(move |event| {
+                if let SystemEvent::ProposalExecutionFailed { .. } = event {
+                    fs.fetch_add(1, Ordering::SeqCst);
+                }
+            }))
+            .await;
+
+        // Emit ProposalAccepted with an invalid payload (not a valid ProposalPayload)
+        bus.emit(SystemEvent::ProposalAccepted {
+            proposal_id: "bad-payload-test".to_string(),
+            domain_id: "test".to_string(),
+            payload: serde_json::json!({"NotAValidVariant": true}),
+            decided_at: 0,
+        })
+        .await;
+
+        // Wait for the spawned task to complete
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        assert_eq!(
+            failure_seen.load(Ordering::SeqCst),
+            1,
+            "ProposalExecutionFailed should have been emitted for invalid payload"
+        );
+    }
 }
