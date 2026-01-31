@@ -6,8 +6,8 @@
 //! - Deadline enforcement for deprecated versions
 //! - Metrics for upgrade progress
 
-use icn_kernel_api::Version;
 use icn_identity::Did;
+use icn_kernel_api::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
