@@ -57,8 +57,11 @@ pub async fn handle_trust_add(
 
     let labels = params.label.into_iter().collect::<Vec<_>>();
 
+    // Returned bytes are the serialized attestation for gossip broadcast;
+    // gossip propagation is handled by the trust app's subscription loop,
+    // not by the RPC handler.
     match trust_service.submit_attestation(&params.target_did, params.score, labels) {
-        Ok(_bytes) => RpcResponse::success(id, serde_json::json!({"success": true})),
+        Ok(_attestation_bytes) => RpcResponse::success(id, serde_json::json!({"success": true})),
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to add trust: {e}")),
     }
 }
