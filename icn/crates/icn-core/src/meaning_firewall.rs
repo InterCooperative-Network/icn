@@ -360,7 +360,7 @@ mod tests {
     /// - governance_handlers/protocol.rs: 7 (protocol change handlers)
     /// - governance_handlers/federation.rs: 3 (federation handlers)
     /// - governance/actor.rs: 0 (extracted to apps/governance icn-governance-actor)
-    /// - init_governance.rs: 3 (GovernanceManager, GovernanceSled)
+    /// - init_governance.rs: 0 (imports routed through icn-governance-actor)
     /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
     /// - actors.rs: 2 (CoreActorHandles governance handle)
     /// - init_gateway.rs: 1 (GovernanceManager import)

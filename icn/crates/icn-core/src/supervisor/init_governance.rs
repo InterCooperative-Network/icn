@@ -8,7 +8,8 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::config::Config;
-use icn_governance::{default_parameters, ProtocolParameterStore, SledParameterStore};
+use icn_governance::{default_parameters, SledParameterStore};
+use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_identity::Did;
 use icn_store::SledStore;
 
