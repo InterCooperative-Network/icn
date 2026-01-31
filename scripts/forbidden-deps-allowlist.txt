@@ -10,6 +10,7 @@
 #
 # Wave 2 targets: supervisor refactoring (icn-core)
 # These will be removed when supervisor uses AppRuntime instead of direct init
+icn-core->icn-trust
 icn-core->icn-governance
 icn-core->icn-ledger
 icn-core->icn-ccl

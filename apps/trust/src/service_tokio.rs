@@ -268,11 +268,7 @@ impl TrustService for TrustServiceImplTokio {
 
                 // If this attestation is about us, log it specially
                 if edge.target == self.own_did {
-                    tracing::info!(
-                        "Received trust from {}: score {}",
-                        edge.source,
-                        edge.score,
-                    );
+                    tracing::info!("Received trust from {}: score {}", edge.source, edge.score,);
                 }
 
                 Ok(())
@@ -332,10 +328,7 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
-    fn revoke_trust(
-        &self,
-        target: &icn_kernel_api::types::Did,
-    ) -> Result<Vec<u8>, String> {
+    fn revoke_trust(&self, target: &icn_kernel_api::types::Did) -> Result<Vec<u8>, String> {
         let target_did: icn_identity::Did = target
             .parse()
             .map_err(|e| format!("Invalid target DID: {e}"))?;
