@@ -104,12 +104,18 @@ pub type TrustGraphHandle = Arc<RwLock<TrustGraph>>;
 
 /// Default TTL for gateway-level trust score cache entries.
 ///
-/// This is separate from the TrustGraph's internal LRU cache TTL (5 min).
-/// The gateway cache prevents redundant TrustGraph lock acquisitions for
-/// the same actor within the TTL window.
+/// 30s is chosen to balance freshness with lock contention reduction.
+/// This is shorter than TrustGraph's internal LRU cache (5 min) to ensure
+/// gateway-level decisions don't become staler than the underlying graph.
+/// Combined with generation-based invalidation, this provides dual protection:
+/// mutations invalidate immediately, TTL bounds staleness from missed events.
 const ORACLE_CACHE_TTL: Duration = Duration::from_secs(30);
 
 /// Maximum entries in the gateway-level trust score cache.
+///
+/// 4096 actors × ~100 bytes/entry ≈ 400KB memory footprint.
+/// Exceeding this triggers full cache clear (lazy eviction).
+/// If evictions are frequent in production, increase this limit.
 const ORACLE_CACHE_MAX_ENTRIES: usize = 4096;
 
 /// Trust Manager for gateway
@@ -293,40 +299,42 @@ impl TrustManager {
         note = "Use add_edge_async for async contexts to avoid blocking worker threads"
     )]
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
-        let result = if let Some(ref handle) = self.trust_graph {
+        if let Some(ref handle) = self.trust_graph {
             tokio::task::block_in_place(|| {
                 let mut graph = handle.blocking_write();
-                graph
+                let result = graph
                     .add_edge(edge)
-                    .map_err(|e| format!("TrustGraph error: {e}"))
+                    .map_err(|e| format!("TrustGraph error: {e}"));
+                if result.is_ok() {
+                    self.bump_generation();
+                }
+                result
             })
         } else {
             let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
             self.edges.insert(key, edge);
-            Ok(())
-        };
-        if result.is_ok() {
             self.bump_generation();
+            Ok(())
         }
-        result
     }
 
     /// Add or update a trust edge (async version)
     pub async fn add_edge_async(&self, edge: TrustEdge) -> Result<(), String> {
-        let result = if let Some(ref handle) = self.trust_graph {
+        if let Some(ref handle) = self.trust_graph {
             let mut graph = handle.write().await;
-            graph
+            let result = graph
                 .add_edge(edge)
-                .map_err(|e| format!("TrustGraph error: {e}"))
+                .map_err(|e| format!("TrustGraph error: {e}"));
+            if result.is_ok() {
+                self.bump_generation();
+            }
+            result
         } else {
             let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
             self.edges.insert(key, edge);
-            Ok(())
-        };
-        if result.is_ok() {
             self.bump_generation();
+            Ok(())
         }
-        result
     }
 
     /// Add a trust edge from raw parts (f64 score)
@@ -404,46 +412,48 @@ impl TrustManager {
         note = "Use remove_edge_async for async contexts to avoid blocking worker threads"
     )]
     pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
-        let result = if let Some(ref handle) = self.trust_graph {
+        if let Some(ref handle) = self.trust_graph {
             tokio::task::block_in_place(|| {
                 let mut graph = handle.blocking_write();
-                graph
+                let result = graph
                     .remove_edge(from, to)
-                    .map_err(|e| format!("TrustGraph error: {e}"))
+                    .map_err(|e| format!("TrustGraph error: {e}"));
+                if result.is_ok() {
+                    self.bump_generation();
+                }
+                result
             })
         } else {
             let key = format!("{}:{}", from.as_str(), to.as_str());
             if self.edges.remove(&key).is_some() {
+                self.bump_generation();
                 Ok(())
             } else {
                 Err("Trust edge not found".to_string())
             }
-        };
-        if result.is_ok() {
-            self.bump_generation();
         }
-        result
     }
 
     /// Remove a trust edge (async version)
     pub async fn remove_edge_async(&self, from: &Did, to: &Did) -> Result<(), String> {
-        let result = if let Some(ref handle) = self.trust_graph {
+        if let Some(ref handle) = self.trust_graph {
             let mut graph = handle.write().await;
-            graph
+            let result = graph
                 .remove_edge(from, to)
-                .map_err(|e| format!("TrustGraph error: {e}"))
+                .map_err(|e| format!("TrustGraph error: {e}"));
+            if result.is_ok() {
+                self.bump_generation();
+            }
+            result
         } else {
             let key = format!("{}:{}", from.as_str(), to.as_str());
             if self.edges.remove(&key).is_some() {
+                self.bump_generation();
                 Ok(())
             } else {
                 Err("Trust edge not found".to_string())
             }
-        };
-        if result.is_ok() {
-            self.bump_generation();
         }
-        result
     }
 
     /// Get all edges from a DID (sync version)
@@ -1114,8 +1124,9 @@ impl TrustPolicyOracle {
         // Lazy eviction: if cache is too large, clear it.
         // This is simpler than LRU for a DashMap and sufficient for gateway use.
         if self.cache.len() > ORACLE_CACHE_MAX_ENTRIES {
+            let evicted = self.cache.len() as u64;
             self.cache.clear();
-            metrics::counter!("trust_oracle_cache_evictions_total").increment(1);
+            metrics::counter!("trust_oracle_cache_evictions_total").increment(evicted);
         }
 
         self.cache.insert(
@@ -1148,6 +1159,12 @@ impl PolicyOracle for TrustPolicyOracle {
         // 2. Check version-aware cache
         if let Some(cached) = self.cache_get(target_str) {
             metrics::counter!("trust_oracle_cache_hits_total").increment(1);
+            metrics::gauge!("trust_oracle_cache_size").set(self.cache.len() as f64);
+            metrics::histogram!(
+                "trust_oracle_evaluation_duration_seconds",
+                "trust_tier" => "cache_hit",
+            )
+            .record(start.elapsed().as_secs_f64());
             return cached;
         }
         metrics::counter!("trust_oracle_cache_misses_total").increment(1);
@@ -1799,5 +1816,48 @@ mod tests {
 
         manager.remove_edge(&alice, &bob).unwrap();
         assert_eq!(manager.generation.load(Ordering::Acquire), 2);
+    }
+
+    #[tokio::test]
+    async fn test_oracle_cache_invalidated_by_async_edge_mutation() {
+        let mut manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        manager.set_perspective(alice.clone());
+        manager
+            .add_edge_async(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.3),
+            ))
+            .await
+            .unwrap();
+
+        let oracle = manager.get_or_create_oracle();
+
+        // Populate cache
+        let req = trust_request(bob.as_str());
+        let d1 = oracle.evaluate(&req);
+
+        // Mutate via async path — should bump generation
+        manager
+            .add_edge_async(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.9),
+            ))
+            .await
+            .unwrap();
+
+        // Next evaluate should miss cache (generation changed)
+        let d2 = oracle.evaluate(&req);
+
+        let s1 = extract_trust_score(&d1);
+        let s2 = extract_trust_score(&d2);
+        assert!(
+            (s2 - s1).abs() > 0.01,
+            "Scores should differ after async edge mutation: s1={s1}, s2={s2}"
+        );
     }
 }
