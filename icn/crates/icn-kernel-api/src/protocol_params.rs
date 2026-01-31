@@ -709,7 +709,7 @@ impl PendingParameterChange {
             effective_at,
             scope,
             proposal_id: proposal_id.into(),
-            created_at: 0, // Caller should set this
+            created_at: 0, // Use with_created_at() to set a real timestamp
             status: PendingChangeStatus::Pending,
             rationale: rationale.into(),
             superseded_by: None,
@@ -718,13 +718,31 @@ impl PendingParameterChange {
         }
     }
 
-    /// Generate a unique ID for a pending change
+    /// Set the creation timestamp (builder pattern).
+    ///
+    /// Since kernel-api does not depend on `icn_time`, callers that need
+    /// real timestamps should call this after `new()`.
+    pub fn with_created_at(mut self, created_at: u64) -> Self {
+        self.created_at = created_at;
+        self
+    }
+
+    /// Generate a unique ID for a pending change.
+    ///
+    /// The timestamp component is set to 0 in this kernel-api version because
+    /// kernel-api does not depend on `icn_time`. Callers needing timestamp-based
+    /// IDs should use `generate_id_with_timestamp` instead.
     pub fn generate_id(parameter_id: &str) -> String {
+        Self::generate_id_with_timestamp(parameter_id, 0)
+    }
+
+    /// Generate a unique ID for a pending change with a caller-provided timestamp.
+    pub fn generate_id_with_timestamp(parameter_id: &str, timestamp: u64) -> String {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
 
         let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
-        format!("pending:{parameter_id}:0:{counter:08x}")
+        format!("pending:{parameter_id}:{timestamp}:{counter:08x}")
     }
 
     /// Check if this change is due (effective_at <= current time)
@@ -732,10 +750,18 @@ impl PendingParameterChange {
         self.status == PendingChangeStatus::Pending && self.effective_at <= current_time
     }
 
-    /// Mark this change as applied
+    /// Mark this change as applied.
+    ///
+    /// The `applied_at` timestamp defaults to 0. Use `mark_applied_at()` to
+    /// provide a real timestamp from `icn_time::current_timestamp_secs()`.
     pub fn mark_applied(&mut self) {
+        self.mark_applied_at(0);
+    }
+
+    /// Mark this change as applied with a specific timestamp.
+    pub fn mark_applied_at(&mut self, timestamp: u64) {
         self.status = PendingChangeStatus::Applied;
-        self.applied_at = Some(0); // Caller should set timestamp
+        self.applied_at = Some(timestamp);
     }
 
     /// Mark this change as cancelled
