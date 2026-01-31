@@ -81,14 +81,9 @@ impl TrustService for TrustServiceImpl {
                 let penalty = severity * EVENT_SCORE_DELTA;
                 let current = {
                     let graph = self.graph.read();
-                    match graph.compute_trust_score(&identity_did) {
-                        Ok(score) => score,
-                        Err(_) => {
-                            // Unknown actors start at 0.0 trust — penalty still
-                            // creates a trust edge recording the violation.
-                            0.0
-                        }
-                    }
+                    // Unknown actors start at 0.0 trust — penalty still
+                    // creates a trust edge recording the violation.
+                    graph.compute_trust_score(&identity_did).unwrap_or(0.0)
                 };
                 let new_score = (current - penalty).max(0.0);
                 debug_assert!(
@@ -156,7 +151,6 @@ impl TrustService for TrustServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::services::TrustService as _;
 
     #[test]
     fn test_trust_service_creation() {
@@ -177,7 +171,7 @@ mod tests {
         let unknown_keypair = icn_identity::KeyPair::generate().unwrap();
         let unknown_did = icn_kernel_api::types::Did::from(unknown_keypair.did().to_string());
         let score = service.trust_score(&unknown_did);
-        assert!(score >= 0.0 && score <= 1.0);
+        assert!((0.0..=1.0).contains(&score));
 
         // Should return an oracle
         let _oracle = service.oracle();

@@ -113,6 +113,43 @@ impl std::fmt::Display for TrustClass {
     }
 }
 
+/// Enriched trust score with provenance metadata.
+///
+/// This is the kernel-safe counterpart of a "scored result" — it includes
+/// enough metadata to make caching safe (version + epoch) and debugging
+/// possible (input_count + computed_at) without leaking domain semantics.
+///
+/// The `reducer_version` field tracks which scoring algorithm produced this
+/// result. Cache consumers can use it to invalidate entries when the
+/// algorithm changes.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TrustScoreResult {
+    /// The computed trust score (0.0-1.0)
+    pub score: f64,
+    /// Monotonic epoch — incremented each time inputs change
+    pub epoch: u64,
+    /// Unix timestamp when this score was computed
+    pub computed_at: u64,
+    /// Number of attestation inputs that fed into this score
+    pub input_count: u32,
+    /// Hash of the inputs (for determinism verification)
+    ///
+    /// Two nodes with the same inputs_hash MUST produce the same score.
+    pub inputs_hash: [u8; 32],
+    /// Reducer algorithm version (e.g. "1.0.0")
+    ///
+    /// Changing the scoring algorithm increments this, signaling caches to
+    /// invalidate.
+    pub reducer_version: String,
+}
+
+impl TrustScoreResult {
+    /// Get the score value (convenience accessor)
+    pub fn value(&self) -> f64 {
+        self.score
+    }
+}
+
 /// Abstract trust service interface
 ///
 /// This trait provides trust-related functionality to the kernel without
@@ -147,6 +184,29 @@ pub trait TrustService: Send + Sync {
     /// The kernel may use this for routing decisions, but NEVER interprets
     /// the semantic meaning of the score.
     fn trust_score(&self, actor: &Did) -> f64;
+
+    /// Get enriched trust score with provenance metadata.
+    ///
+    /// Returns a `TrustScoreResult` that includes the score, epoch,
+    /// inputs hash, and reducer version. This is used by caches to
+    /// determine staleness and by auditors to verify determinism.
+    ///
+    /// Default implementation wraps `trust_score()` with minimal metadata.
+    fn trust_score_detailed(&self, actor: &Did) -> TrustScoreResult {
+        let score = self.trust_score(actor);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        TrustScoreResult {
+            score,
+            epoch: 0,
+            computed_at: now,
+            input_count: 0,
+            inputs_hash: [0u8; 32],
+            reducer_version: "0.0.0".to_string(),
+        }
+    }
 
     /// Check if an actor meets a minimum trust threshold
     ///
