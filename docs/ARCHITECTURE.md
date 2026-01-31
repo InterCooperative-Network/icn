@@ -5,6 +5,9 @@
 **Last Updated:** 2025-12-10
 
 **Abstract:**
+
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
 ICNd is a decentralized coordination substrate providing identity, trust computation, encrypted P2P transport, cooperative ledgering, contract execution, gossip-based synchronization, and a distributed compute fabric for federated cooperatives.
 
 This document captures architectural decisions, design tradeoffs, and the reasoning behind ICNd's implementation.
@@ -85,29 +88,74 @@ These principles ensure ICN remains decentralized, resilient, and aligned with c
 
 ---
 
-## ICN Layer Stack
+## ICN Constraint Engine Model
+
+ICN implements a **constraint enforcement architecture** where applications and governance systems translate domain semantics (trust relationships, governance rules, membership criteria) into generic constraints that the kernel enforces blindly.
 
 ```
-+------------------------------+
-|  Distributed Compute (§11)   |  Trust-gated task execution
-+------------------------------+
-|  Contracts (§5)              |  CCL interpreter, capabilities
-+------------------------------+
-|  Ledger (§4)                 |  Mutual credit, double-entry
-+------------------------------+
-|  Gossip (§6)                 |  Causal sync, anti-entropy
-+------------------------------+
-|  Trust Graph (§2)            |  Web-of-participation scores
-+------------------------------+
-|  Identity (§1)               |  DID, Ed25519, keystore
-+------------------------------+
-|  Transport (§3)              |  QUIC/TLS, mDNS, NAT traversal
-+------------------------------+
-|  Storage (§7) + Security(§8) |  Sled, production hardening
-+------------------------------+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {
+      rate_limit: 20/s,      // ← value from PolicyOracle
+      credit_ceiling: 1000,  // ← value from PolicyOracle
+      capabilities: [...]    // ← value from PolicyOracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-Each layer builds on the layers below it, with the distributed compute layer leveraging all substrate components.
+### Key Distinction: Mechanism vs. Policy
+
+The constraint engine model distinguishes between **enforcement mechanisms** (kernel) and **constraint values** (apps/governance):
+
+| | Kernel (Hard) | Apps/Governance (Meta) |
+|---|---|---|
+| **Rate limiting** | Mechanism exists | Values decided (20/s vs 100/s) |
+| **Credit gating** | Mechanism exists | Ceiling decided (1000 vs 5000) |
+| **Capability gating** | Mechanism exists | Grants decided |
+| **Replay guard** | Mechanism exists | N/A (no tunable values) |
+| **Transport auth** | Mechanism exists | N/A (no tunable values) |
+
+**Critical Property:**
+- Governance can change **what** the rate limit is (e.g., from 20/s to 100/s)
+- Governance **cannot** remove **that** rate limiting exists (enforcement mechanism is fixed)
+
+This separation ensures the kernel remains predictable and auditable while allowing cooperative governance to adapt policies to changing needs.
+
+### Component Organization
+
+While the constraint engine model describes the **conceptual architecture**, the actual implementation organizes components into these functional areas:
+
+- **Identity (§1)**: DID, Ed25519, keystore
+- **Trust Graph (§2)**: Web-of-participation scores (→ Policy Oracle)
+- **Transport (§3)**: QUIC/TLS, mDNS, NAT traversal (→ Kernel)
+- **Ledger (§4)**: Mutual credit, double-entry (→ Policy Oracle)
+- **Contracts (§5)**: CCL interpreter, capabilities (→ Policy Oracle)
+- **Gossip (§6)**: Causal sync, anti-entropy (→ Kernel)
+- **Storage (§7)**: Sled, persistent state
+- **Security (§8)**: Production hardening
+- **Distributed Compute (§11)**: Trust-gated task execution (→ Policy Oracle)
+
+**Note on terminology:** You'll see references to "layers" throughout this document in a descriptive sense (e.g., "transport layer security", "network layer"). This is legitimate technical terminology. What ICN is **not** is an OSI-like strictly layered stack where higher layers can only access lower layers through defined interfaces. Instead, ICN uses the constraint engine model where policy oracles (apps) translate domain semantics into constraints that the kernel enforces.
 
 ---
 

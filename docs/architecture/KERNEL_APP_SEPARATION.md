@@ -8,9 +8,13 @@
 
 ## Executive Summary
 
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
 ICN's kernel/app separation architecture enforces a strict boundary—the **Meaning Firewall**—between infrastructure mechanisms (kernel) and domain semantics (apps). This document describes the architectural principles, implementation patterns, and migration path for this separation.
 
 **Key Insight**: The kernel enforces constraints WITHOUT understanding their semantic origin. Trust scores, governance rules, and membership criteria are domain concepts that apps translate into generic constraints the kernel can enforce blindly.
+
+This is the **constraint engine model**: Policy Oracles (apps) decide constraint values → Kernel enforces constraints without knowing why.
 
 ---
 

@@ -1,7 +1,62 @@
 # ICN Visual Architecture Reference
 **Quick Reference for System Structure**
 
-## System Layers (Bottom-Up)
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+## Constraint Engine Model
+
+ICN implements a constraint enforcement architecture where Policy Oracles (apps) translate domain semantics into generic constraints that the kernel enforces blindly:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {
+      rate_limit: 20/s,      // ← value from PolicyOracle
+      credit_ceiling: 1000,  // ← value from PolicyOracle
+      capabilities: [...]    // ← value from PolicyOracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Distinction: Mechanism vs. Policy
+
+| | Kernel (Hard) | Apps/Governance (Meta) |
+|---|---|---|
+| **Rate limiting** | Mechanism exists | Values decided (20/s vs 100/s) |
+| **Credit gating** | Mechanism exists | Ceiling decided (1000 vs 5000) |
+| **Capability gating** | Mechanism exists | Grants decided |
+| **Replay guard** | Mechanism exists | N/A (no tunable values) |
+| **Transport auth** | Mechanism exists | N/A (no tunable values) |
+
+**Critical Property:**
+- Governance can change **what** the rate limit is
+- Governance **cannot** remove **that** rate limiting exists
+
+---
+
+## Component Organization
+
+The implementation organizes components into functional areas. Note: "layer" terminology below is descriptive (e.g., "transport layer security") — ICN is **not** an OSI-like strictly layered stack. Instead, policy oracles translate domain semantics into constraints that the kernel enforces.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐

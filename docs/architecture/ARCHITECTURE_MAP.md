@@ -7,7 +7,13 @@
 
 ## Executive Summary
 
-ICN (Intercooperative Network) is a **decentralized coordination substrate** providing identity, trust computation, encrypted P2P transport, cooperative ledgering, contract execution, gossip-based synchronization, and distributed compute fabric for federated cooperatives.
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+ICN (Intercooperative Network) is a **decentralized coordination substrate** implementing a constraint enforcement architecture where:
+
+- **Policy Oracles (Apps)** translate domain semantics (trust, governance, membership) into generic constraints
+- **Kernel** enforces those constraints (rate limits, capabilities, credit gates) without understanding their origin
+- This separation ensures the kernel remains predictable while cooperative governance adapts policies
 
 **Not a blockchain.** Not a federation server. A P2P coordination layer.
 
@@ -22,6 +28,43 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 ---
 
 ## System Architecture Overview
+
+ICN implements a **constraint enforcement architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {
+      rate_limit: 20/s,      // ← value from PolicyOracle
+      credit_ceiling: 1000,  // ← value from PolicyOracle
+      capabilities: [...]    // ← value from PolicyOracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Organization
+
+The implementation organizes components into functional areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
