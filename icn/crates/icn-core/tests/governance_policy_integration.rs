@@ -173,12 +173,10 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
     let payload = serde_json::to_value(&ProposalPayload::SchedulingPolicy {
         coop_id: "test-coop".to_string(),
         policy_json: policy_json.clone(),
-    }).unwrap();
+    })
+    .unwrap();
 
-    info!(
-        "Firing ProposalAccepted event for proposal {}",
-        proposal_id
-    );
+    info!("Firing ProposalAccepted event for proposal {}", proposal_id);
 
     event_bus
         .emit(SystemEvent::ProposalAccepted {
@@ -225,7 +223,8 @@ async fn test_scheduling_policy_proposal_execution() -> Result<()> {
             payload: serde_json::to_value(&ProposalPayload::SchedulingPolicy {
                 coop_id: "test-coop".to_string(),
                 policy_json: policy_json.clone(),
-            }).unwrap(),
+            })
+            .unwrap(),
             decided_at: now,
         })
         .await;
@@ -293,7 +292,10 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
                     let Ok(ProposalPayload::SchedulingPolicy {
                         coop_id,
                         policy_json,
-                    }) = serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone())
+                    else {
+                        return;
+                    };
                     let compute_handle = compute.clone();
                     let prop_id = proposal_id.clone();
                     let store = audit_store.clone();
@@ -336,7 +338,8 @@ async fn test_invalid_policy_json_handling() -> Result<()> {
             payload: serde_json::to_value(&ProposalPayload::SchedulingPolicy {
                 coop_id: "test-coop".to_string(),
                 policy_json: "{invalid json}".to_string(),
-            }).unwrap(),
+            })
+            .unwrap(),
             decided_at: now,
         })
         .await;

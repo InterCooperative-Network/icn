@@ -214,7 +214,8 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
             recipient: recipient_did.clone(),
             currency: "credits".to_string(),
             purpose: "Office supplies from Acme Corp".to_string(),
-        }).unwrap(),
+        })
+        .unwrap(),
         decided_at: now,
     };
 
@@ -335,7 +336,10 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                         recipient,
                         currency,
                         ..
-                    }) = serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone())
+                    else {
+                        return;
+                    };
                     info!(
                         "📊 Executing budget proposal {}: {} {} to {}",
                         proposal_id, amount, currency, recipient

@@ -55,7 +55,10 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                         recipient,
                         currency,
                         ..
-                    }) = serde_json::from_value::<ProposalPayload>(payload.clone()) else { return };
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone())
+                    else {
+                        return;
+                    };
                     info!(
                         "📊 Executing budget proposal {}: {} {} to {}",
                         proposal_id, amount, currency, recipient
@@ -138,7 +141,8 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
             recipient: recipient_did.clone(),
             currency: "credits".to_string(),
             purpose: "Test payment".to_string(),
-        }).unwrap(),
+        })
+        .unwrap(),
         decided_at: 1234567890,
     };
 
