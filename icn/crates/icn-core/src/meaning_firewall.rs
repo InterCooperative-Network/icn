@@ -362,7 +362,7 @@ mod tests {
     /// - governance/actor.rs: 0 (extracted to apps/governance icn-governance-actor)
     /// - init_governance.rs: 0 (imports routed through icn-governance-actor)
     /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
-    /// - actors.rs: 2 (CoreActorHandles governance handle)
+    /// - actors.rs: 1 (GatewayActorHandles governance handle)
     /// - init_gateway.rs: 1 (GovernanceManager import)
     /// - lifecycle.rs: 0 (migrated to kernel-api)
     /// - background_tasks.rs: 0 (migrated to kernel-api)
@@ -370,7 +370,7 @@ mod tests {
     /// The module splits add +2 refs (each submodule needs its own `use` statement).
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 47;
+        let expected: usize = 46;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(

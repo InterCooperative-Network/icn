@@ -207,7 +207,7 @@ async fn build_services(
         treasury_manager: ledger_services.treasury_manager,
         contract_runtime: ledger_services.contract_runtime,
         contract_actor: ledger_services.contract_actor,
-        protocol_parameter_store: parameter_store,
+        protocol_parameter_store: parameter_store.clone() as Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
     };
 
     Ok((registry, Some(bootstrap_handles)))

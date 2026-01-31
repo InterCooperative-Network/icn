@@ -73,6 +73,6 @@ pub struct BootstrapHandles {
     pub contract_runtime: Arc<RwLock<icn_ccl::ContractRuntime>>,
     /// Contract actor for contract lifecycle management.
     pub contract_actor: Arc<RwLock<icn_ccl::ContractActor>>,
-    /// Protocol parameter store (concrete type for sled-backed governance params).
-    pub protocol_parameter_store: Arc<icn_governance::SledParameterStore>,
+    /// Protocol parameter store for governable parameters.
+    pub protocol_parameter_store: Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
 }
