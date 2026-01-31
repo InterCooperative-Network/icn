@@ -28,7 +28,13 @@ use std::path::PathBuf;
 /// icn-core is included with pinned violation counts. The governance/ledger
 /// dependencies are being migrated to apps/ (see #913, #914). The ratchet
 /// tests prevent regressions while migration proceeds incrementally.
-const KERNEL_CRATES: &[&str] = &["icn-core", "icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
+const KERNEL_CRATES: &[&str] = &[
+    "icn-core",
+    "icn-net",
+    "icn-gateway",
+    "icn-gossip",
+    "icn-ledger",
+];
 
 /// Domain-specific crates that kernel must not depend on directly.
 const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
@@ -111,10 +117,7 @@ fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
     let mut count = 0;
     for file in list_rust_files(crate_name) {
         // Skip counting ourselves — our string literals contain the patterns we're searching for
-        if file
-            .file_name()
-            .is_some_and(|f| f == "meaning_firewall.rs")
-        {
+        if file.file_name().is_some_and(|f| f == "meaning_firewall.rs") {
             continue;
         }
         if let Ok(content) = std::fs::read_to_string(&file) {
@@ -199,7 +202,7 @@ mod tests {
     /// - icn-gossip: CLEAN
     /// - icn-net: CLEAN (no source imports, only had Cargo.toml dev-dep)
     /// - icn-gateway: 3 (trust_mgr.rs:2, api/trust.rs:1)
-    /// - icn-ledger: 3 (credit_policy.rs:1, ledger.rs:1, fork_resolution.rs:1)
+    /// - icn-ledger: CLEAN (imports removed by #970)
     #[test]
     fn strict_trust_import_violations() {
         let expected: &[(&str, usize)] = &[
