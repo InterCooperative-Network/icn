@@ -157,6 +157,8 @@ While the constraint engine model describes the **conceptual architecture**, the
 
 **Note on terminology:** You'll see references to "layers" throughout this document in a descriptive sense (e.g., "transport layer security", "network layer"). This is legitimate technical terminology. What ICN is **not** is an OSI-like strictly layered stack where higher layers can only access lower layers through defined interfaces. Instead, ICN uses the constraint engine model where policy oracles (apps) translate domain semantics into constraints that the kernel enforces.
 
+**Why the old layered diagram existed:** Earlier documentation used a traditional layered stack diagram for pedagogical purposes—it was easier to explain "transport → identity → trust → gossip → ledger" as a sequential stack. However, this mental model was imprecise and has been replaced by the constraint engine/lattice model, which more accurately captures how ICN actually works.
+
 ---
 
 ## Kernel/App Separation
