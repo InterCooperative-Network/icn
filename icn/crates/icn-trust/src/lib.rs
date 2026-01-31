@@ -1,4 +1,18 @@
 //! ICN Trust - Trust graph management and policy enforcement
+//!
+//! ## Cache Invalidation Strategy
+//!
+//! Trust scores are cached with a configurable TTL (default 5 minutes in the
+//! LRU cache). When trust edges change, affected scores must be invalidated
+//! immediately to prevent stale trust decisions (security issue #878).
+//!
+//! **Invalidation scope**: When edge A→B changes:
+//! 1. **Direct**: Invalidate B's cached score
+//! 2. **Transitive**: Invalidate all C where B→C exists
+//!
+//! This is bounded to one hop beyond the modified edge, which is sufficient
+//! for our two-hop scoring algorithm (direct + one level of transitivity).
+//! See [`TrustGraph::invalidate_affected`] for implementation details.
 #![allow(missing_docs)]
 // Prevent panics in production code paths
 #![deny(clippy::unwrap_used)]
@@ -797,6 +811,15 @@ impl TrustGraph {
     /// This is bounded: we only go one hop out from `target`, not the
     /// full graph. The scoring algorithm is two-hop (direct + transitive),
     /// so one additional hop of invalidation is sufficient.
+    ///
+    /// # Thread safety
+    ///
+    /// This method must be called while the caller holds a write lock on the
+    /// `TrustGraph` (or equivalent exclusive access). This prevents a TOCTOU
+    /// race where a concurrent reader could compute and cache a score using
+    /// stale edges between the store mutation and cache invalidation. The
+    /// actor model in `icn-core` guarantees serial message processing, so
+    /// this is satisfied in production. Tests must ensure exclusive access.
     fn invalidate_affected(&self, target: &Did) {
         // Always invalidate the direct target
         self.cache.invalidate(target);
@@ -805,11 +828,16 @@ impl TrustGraph {
         // These scores may depend on trust flowing through `target`.
         match self.get_outgoing_edges(target) {
             Ok(outgoing) => {
+                let mut count = 0u64;
                 for edge in &outgoing {
+                    // Skip self-loops (A→A) — already invalidated above
+                    if edge.target == *target {
+                        continue;
+                    }
                     self.cache.invalidate(&edge.target);
+                    count += 1;
                 }
-                if !outgoing.is_empty() {
-                    let count = outgoing.len() as u64;
+                if count > 0 {
                     icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(count);
                     debug!(
                         target = %target,
@@ -819,6 +847,7 @@ impl TrustGraph {
                 }
             }
             Err(e) => {
+                icn_obs::metrics::scalability::trust_cache_invalidation_errors_inc();
                 warn!(
                     "Failed to get outgoing edges during cache invalidation for {}: {}",
                     target, e
