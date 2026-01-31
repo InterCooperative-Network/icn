@@ -11,7 +11,7 @@
 //! Vec<TrustAttestation>  ───>  AttestationReducer::reduce()  ───>  ReducedScore
 //!                                     │
 //!                                     ├── verify signatures
-//!                                     ├── filter expired
+//!                                     ├── filter expired + future-dated
 //!                                     ├── deduplicate (issuer, subject, graph_type)
 //!                                     ├── compute average score
 //!                                     └── hash inputs for provenance
@@ -25,6 +25,13 @@ use sha2::{Digest, Sha256};
 /// Bump this when the scoring algorithm changes. Cache consumers compare
 /// this against cached entries to detect stale results.
 pub const REDUCER_VERSION: &str = "1.0.0";
+
+/// Maximum clock skew tolerance for future-dated attestations (5 minutes).
+///
+/// Attestations with `created_at` more than this far ahead of `now` are
+/// rejected. This prevents a malicious node from creating attestations with
+/// far-future timestamps that persist longer than intended.
+const CLOCK_SKEW_TOLERANCE_SECS: u64 = 300;
 
 /// Result of reducing a set of attestations into a single score.
 ///
@@ -75,7 +82,8 @@ impl AttestationReducer {
     ///
     /// # Algorithm
     ///
-    /// 1. **Filter**: Remove attestations with invalid signatures or that are expired.
+    /// 1. **Filter**: Remove attestations with invalid signatures, expired, or future-dated
+    ///    (beyond clock skew tolerance).
     /// 2. **Deduplicate**: For each `(issuer, subject, graph_type)` triple, keep only
     ///    the "winning" attestation using `should_supersede()` ordering.
     /// 3. **Score**: Compute the arithmetic mean of the surviving attestation scores.
@@ -87,11 +95,21 @@ impl AttestationReducer {
     /// Given the same set of attestations and the same `now` timestamp,
     /// `reduce()` ALWAYS returns the same `ReducedScore`, regardless of
     /// input ordering.
+    ///
+    /// **Platform caveat**: Floating-point division (`sum / count`) may produce
+    /// slightly different results across CPU architectures (x86 vs ARM) or
+    /// compiler optimization levels. The determinism guarantee holds within
+    /// the same platform and compiler version. Cross-platform determinism
+    /// would require fixed-point arithmetic (tracked as future work).
     pub fn reduce(&self, attestations: &[TrustAttestation]) -> ReducedScore {
-        // Step 1: Filter — only verified, non-expired attestations
+        // Step 1: Filter — only verified, non-expired, non-future attestations
         let valid: Vec<&TrustAttestation> = attestations
             .iter()
-            .filter(|a| a.verify().is_ok() && !a.is_expired(self.now))
+            .filter(|a| {
+                a.verify().is_ok()
+                    && !a.is_expired(self.now)
+                    && a.created_at <= self.now + CLOCK_SKEW_TOLERANCE_SECS
+            })
             .collect();
 
         if valid.is_empty() {
@@ -316,6 +334,62 @@ mod tests {
 
         assert_eq!(result.score, 0.0);
         assert_eq!(result.input_count, 0);
+    }
+
+    #[test]
+    fn all_invalid_attestations_return_zero() {
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        // One unsigned, one expired, one tampered — all invalid
+        let now = 3_000_000u64; // far enough for 30-day TTL to expire created_at=1
+
+        let mut unsigned = TrustAttestation::new(alice.did().clone(), target.did().clone(), 0.5);
+        unsigned.created_at = now - 100;
+
+        let expired = make_signed(&alice, target.did(), 0.8, 1); // created_at=1, expired long ago
+
+        let mut tampered = make_signed(&alice, target.did(), 0.7, now - 100);
+        tampered.score = 0.99; // invalidate signature
+
+        let reducer = AttestationReducer::new(now);
+        let result = reducer.reduce(&[unsigned, expired, tampered]);
+
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.input_count, 0);
+        assert_eq!(result.inputs_hash, [0u8; 32]);
+    }
+
+    #[test]
+    fn future_dated_attestations_are_filtered() {
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        let now = 10_000u64;
+        // Created 1 hour in the future (well beyond 5-minute tolerance)
+        let att = make_signed(&alice, target.did(), 0.8, now + 3600);
+
+        let reducer = AttestationReducer::new(now);
+        let result = reducer.reduce(&[att]);
+
+        assert_eq!(result.score, 0.0);
+        assert_eq!(result.input_count, 0);
+    }
+
+    #[test]
+    fn within_clock_skew_tolerance_accepted() {
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        let now = 10_000u64;
+        // Created 2 minutes in the future (within 5-minute tolerance)
+        let att = make_signed(&alice, target.did(), 0.8, now + 120);
+
+        let reducer = AttestationReducer::new(now);
+        let result = reducer.reduce(&[att]);
+
+        assert_eq!(result.input_count, 1);
+        assert!((result.score - 0.8).abs() < 0.001);
     }
 
     // ====================================================================

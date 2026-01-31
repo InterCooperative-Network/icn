@@ -85,6 +85,11 @@ impl TrustServiceImplTokio {
         }
     }
 
+    /// Parse a kernel-api DID into an identity DID.
+    fn parse_kernel_did(did: &icn_kernel_api::types::Did) -> Option<icn_identity::Did> {
+        did.to_string().parse().ok()
+    }
+
     /// Get direct access to the TrustGraph
     ///
     /// This is for use by other domain apps that need TrustGraph access.
@@ -114,9 +119,10 @@ impl TrustService for TrustServiceImplTokio {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
-                // Convert from kernel Did to identity Did using FromStr
-                if let Ok(identity_did) = actor.to_string().parse::<icn_identity::Did>() {
-                    graph.compute_trust_score(&identity_did).unwrap_or(0.0)
+                if let Some(identity_did) = Self::parse_kernel_did(actor) {
+                    graph
+                        .compute_trust_score(&identity_did)
+                        .unwrap_or(0.0) // Unknown actors start at zero trust
                 } else {
                     0.0
                 }
@@ -133,12 +139,14 @@ impl TrustService for TrustServiceImplTokio {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
-                let identity_did = match actor.to_string().parse::<icn_identity::Did>() {
-                    Ok(d) => d,
-                    Err(_) => return self.empty_score_result(),
+                let identity_did = match Self::parse_kernel_did(actor) {
+                    Some(d) => d,
+                    None => return self.empty_score_result(),
                 };
 
-                let score = graph.compute_trust_score(&identity_did).unwrap_or(0.0);
+                let score = graph
+                    .compute_trust_score(&identity_did)
+                    .unwrap_or(0.0); // Unknown actors start at zero trust
 
                 // Collect edges pointing to this actor to derive input count + hash
                 let input_edges = graph
@@ -197,9 +205,9 @@ impl TrustService for TrustServiceImplTokio {
     }
 
     fn record_event(&self, actor: &icn_kernel_api::types::Did, event: TrustEvent) {
-        let identity_did = match actor.to_string().parse::<icn_identity::Did>() {
-            Ok(did) => did,
-            Err(_) => {
+        let identity_did = match Self::parse_kernel_did(actor) {
+            Some(did) => did,
+            None => {
                 tracing::warn!(actor = %actor, "Invalid DID format, ignoring trust event");
                 return;
             }
