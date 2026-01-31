@@ -53,6 +53,13 @@ pub struct EventSubscriptionHandles {
 /// The daemon constructs these objects (opening sled stores, initializing
 /// ledger services, etc.) and passes them to the supervisor. The supervisor
 /// wires them into actors during initialization.
+///
+/// **Note**: `TrustGraph` is intentionally absent — all kernel components
+/// (MisbehaviorDetector, ReplicationManager, StorageChallenge, RPC) have
+/// migrated to the `TrustService` trait on `ServiceRegistry`. The daemon
+/// passes trust via `ServiceRegistry::with_trust()` instead.
+///
+/// See `icn-kernel-api::services::ServiceRegistry` for trait-based abstractions.
 pub struct BootstrapHandles {
     /// Pre-initialized ledger handle.
     pub ledger: Arc<RwLock<icn_ledger::Ledger>>,

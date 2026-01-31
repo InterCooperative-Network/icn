@@ -302,9 +302,10 @@ async fn spawn_actors_with_identity(
     let handles = bootstrap_handles.ok_or_else(|| {
         anyhow::anyhow!(
             "BootstrapHandles not provided by daemon. When running with an identity, \
-             the daemon must configure the runtime via Runtime::with_bootstrap_handles(...) \
-             and supply ledger, ledger_store, dispute_manager, treasury_manager, \
-             contract_runtime, contract_actor, and protocol_parameter_store handles."
+             the daemon must call Runtime::with_bootstrap_handles(...) to supply \
+             ledger, ledger_store, dispute_manager, treasury_manager, contract_runtime, \
+             contract_actor, and protocol_parameter_store handles. This requires a \
+             successfully unlocked identity bundle."
         )
     })?;
     let ledger_handle = handles.ledger;
