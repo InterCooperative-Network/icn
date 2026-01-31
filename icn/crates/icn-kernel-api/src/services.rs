@@ -155,6 +155,72 @@ pub trait TrustService: Send + Sync {
     /// Called by the kernel when violations are detected. The trust service
     /// decides how to update trust scores based on the event type.
     fn record_event(&self, actor: &Did, event: TrustEvent);
+
+    /// Ingest a trust attestation from a peer.
+    ///
+    /// The kernel routes opaque attestation bytes to the trust service.
+    /// The trust service owns deserialization, signature verification,
+    /// rate limiting, and state updates.
+    ///
+    /// `source` is the DID of the peer that forwarded this attestation.
+    /// The trust service decides whether to accept or reject it.
+    ///
+    /// Default implementation does nothing (no attestation support).
+    fn ingest_attestation(&self, _bytes: &[u8], _source: &Did) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Recover identity: migrate trust state from old DID to new DID.
+    ///
+    /// Called when an identity recovery is finalized. The trust service
+    /// decides how to transfer trust relationships.
+    ///
+    /// Returns the number of relationships migrated.
+    /// Default implementation does nothing.
+    fn recover_identity(&self, _old_did: &Did, _new_did: &Did) -> Result<usize, String> {
+        Ok(0)
+    }
+
+    /// Get trust edges for a DID (read-only, for API/admin queries).
+    ///
+    /// Returns serialized edge data as JSON. The kernel does not interpret
+    /// the structure — it just routes it to API consumers.
+    ///
+    /// Default implementation returns an empty list.
+    fn get_edges(&self, _actor: &Did) -> Vec<serde_json::Value> {
+        Vec::new()
+    }
+
+    /// Get all edges in the trust graph (read-only, for API/admin queries).
+    ///
+    /// Returns serialized edge data as JSON.
+    /// Default implementation returns an empty list.
+    fn get_all_edges(&self) -> Vec<serde_json::Value> {
+        Vec::new()
+    }
+
+    /// Submit a trust attestation from this node to a target.
+    ///
+    /// The trust service creates, signs, and stores the attestation.
+    /// Returns serialized attestation bytes for gossip broadcast.
+    ///
+    /// Default implementation returns an error.
+    fn submit_attestation(
+        &self,
+        _target: &Did,
+        _score: f64,
+        _labels: Vec<String>,
+    ) -> Result<Vec<u8>, String> {
+        Err("Attestation submission not supported".to_string())
+    }
+
+    /// Remove trust relationship with a target.
+    ///
+    /// Returns serialized revocation bytes for gossip broadcast.
+    /// Default implementation returns an error.
+    fn revoke_trust(&self, _target: &Did) -> Result<Vec<u8>, String> {
+        Err("Trust revocation not supported".to_string())
+    }
 }
 
 /// Trust-affecting events that the kernel can report

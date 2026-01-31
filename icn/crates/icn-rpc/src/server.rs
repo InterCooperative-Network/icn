@@ -49,10 +49,10 @@ use icn_coop::CoopHandle;
 use icn_federation::CooperativeRegistry;
 use icn_governance::GovernanceOps;
 use icn_identity::Did;
+use icn_kernel_api::services::TrustService;
 use icn_ledger::{DisputeManager, Ledger};
 use icn_net::{NetworkHandle, RateLimiter};
 use icn_store::Store;
-use icn_trust::TrustGraph;
 
 use crate::auth::{required_scope_for_method, RpcAuthManager, RpcTokenClaims};
 use crate::context::RpcContext;
@@ -103,7 +103,7 @@ pub struct RpcServer {
     governance_handle: Option<Box<dyn GovernanceOps>>,
     compute_handle: Option<ComputeHandle>,
     compute_service: Option<Arc<icn_api::ComputeService>>,
-    trust_handle: Option<Arc<RwLock<TrustGraph>>>,
+    trust_service: Option<Arc<dyn TrustService>>,
     store_handle: Option<Arc<dyn Store>>,
     dispute_manager: Option<Arc<RwLock<DisputeManager>>>,
     federation_registry: Option<Arc<CooperativeRegistry>>,
@@ -128,7 +128,7 @@ impl RpcServer {
             governance_handle: None,
             compute_handle: None,
             compute_service: None,
-            trust_handle: None,
+            trust_service: None,
             store_handle: None,
             dispute_manager: None,
             federation_registry: None,
@@ -155,7 +155,7 @@ impl RpcServer {
             governance_handle: None,
             compute_handle: None,
             compute_service: None,
-            trust_handle: None,
+            trust_service: None,
             store_handle: None,
             dispute_manager: None,
             federation_registry: None,
@@ -251,9 +251,9 @@ impl RpcServer {
         self.compute_service = Some(Arc::new(icn_api::ComputeService::new(handle)));
     }
 
-    /// Set the trust graph handle (called after TrustGraph initializes)
-    pub fn set_trust_handle(&mut self, handle: Arc<RwLock<TrustGraph>>) {
-        self.trust_handle = Some(handle);
+    /// Set the trust service (called after trust app initializes)
+    pub fn set_trust_service(&mut self, service: Arc<dyn TrustService>) {
+        self.trust_service = Some(service);
     }
 
     /// Set the store handle (for recovery events and other persistent data)
@@ -285,9 +285,9 @@ impl RpcServer {
     // Accessor methods for handler modules
     // =========================================================================
 
-    /// Get trust graph handle (for handler modules)
-    pub fn trust_handle(&self) -> Option<&Arc<RwLock<TrustGraph>>> {
-        self.trust_handle.as_ref()
+    /// Get trust service (for handler modules)
+    pub fn trust_service(&self) -> Option<&Arc<dyn TrustService>> {
+        self.trust_service.as_ref()
     }
 
     /// Get network handle (for handler modules)

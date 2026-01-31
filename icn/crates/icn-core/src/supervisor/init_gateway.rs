@@ -8,7 +8,6 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::config::GatewayConfig;
@@ -24,8 +23,6 @@ pub struct GatewayHandles {
     pub coop: Option<icn_coop::CoopHandle>,
     /// Community handle for civic features
     pub community: Option<icn_community::CommunityHandle>,
-    /// Trust graph for trust queries (deprecated, use trust_service instead)
-    pub trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
     /// Trust service for trust queries (kernel/app separated)
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Governance handle for governance operations
@@ -92,7 +89,6 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let compute_handle = handles.compute;
     let coop_handle = handles.coop;
     let community_handle = handles.community;
-    let trust_graph_handle = handles.trust_graph;
     let trust_service_handle = handles.trust_service;
     let governance_handle = handles.governance;
     let treasury_handle = handles.treasury;
@@ -132,11 +128,8 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
                 gateway_server = gateway_server.with_community_handle(handle);
             }
 
-            // Prefer TrustService for kernel/app separation, fall back to TrustGraph
             if let Some(service) = trust_service_handle {
                 gateway_server = gateway_server.with_trust_service(service);
-            } else if let Some(handle) = trust_graph_handle {
-                gateway_server = gateway_server.with_trust_handle(handle);
             }
 
             if let Some(handle) = governance_handle {

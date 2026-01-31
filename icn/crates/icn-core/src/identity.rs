@@ -1,17 +1,18 @@
-//! Identity actor - manages node identity, signing, and trust graph
+//! Identity actor - manages node identity and signing
 //!
 //! The IdentityActor provides a centralized interface for:
 //! - Node identity (DID and signing operations)
-//! - Trust graph queries and mutations
+//! - Trust queries (via TrustService)
 //!
-//! It uses a shared TrustGraph handle to ensure consistency with other actors.
+//! Trust operations are delegated to the TrustService trait, maintaining
+//! kernel/app separation (no direct TrustGraph access).
 
 use anyhow::{Context, Result};
 use icn_identity::{Did, KeyPair};
+use icn_kernel_api::services::TrustService;
 use icn_kernel_api::TrustClass;
-use icn_trust::TrustGraph;
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::sync::{mpsc, oneshot};
 use tracing::{info, warn};
 
 use crate::runtime::ShutdownTx;
@@ -144,20 +145,20 @@ impl IdentityHandle {
 /// Identity actor state
 pub struct IdentityActor {
     keypair: KeyPair,
-    trust_graph: Arc<RwLock<TrustGraph>>,
+    trust_service: Option<Arc<dyn TrustService>>,
     rx: mpsc::Receiver<IdentityMsg>,
 }
 
 impl IdentityActor {
-    /// Start the identity actor with a shared trust graph
+    /// Start the identity actor with an optional trust service
     ///
     /// # Arguments
     /// - `keypair`: The node's Ed25519 keypair
-    /// - `trust_graph`: Shared trust graph handle (used by gossip, network, etc.)
+    /// - `trust_service`: Optional trust service for trust queries/mutations
     /// - `shutdown_tx`: Broadcast channel for shutdown coordination
     pub fn spawn(
         keypair: KeyPair,
-        trust_graph: Arc<RwLock<TrustGraph>>,
+        trust_service: Option<Arc<dyn TrustService>>,
         shutdown_tx: ShutdownTx,
     ) -> IdentityHandle {
         let did = keypair.did().clone();
@@ -169,7 +170,7 @@ impl IdentityActor {
         // Create actor
         let actor = IdentityActor {
             keypair,
-            trust_graph,
+            trust_service,
             rx,
         };
 
@@ -224,15 +225,21 @@ impl IdentityActor {
             }
 
             IdentityMsg::GetTrustScore { did, response } => {
-                let graph = self.trust_graph.read().await;
-                let result = graph.compute_trust_score(&did);
+                let result = match &self.trust_service {
+                    Some(svc) => Ok(svc.trust_score(&did.to_string())),
+                    None => Err(anyhow::anyhow!("Trust service not available")),
+                };
                 let _ = response.send(result);
             }
 
             IdentityMsg::GetTrustClass { did, response } => {
-                let graph = self.trust_graph.read().await;
-                // Get trust score and convert to kernel-api TrustClass
-                let result = graph.compute_trust_score(&did).map(TrustClass::from_score);
+                let result = match &self.trust_service {
+                    Some(svc) => {
+                        let score = svc.trust_score(&did.to_string());
+                        Ok(TrustClass::from_score(score))
+                    }
+                    None => Err(anyhow::anyhow!("Trust service not available")),
+                };
                 let _ = response.send(result);
             }
 
@@ -242,29 +249,24 @@ impl IdentityActor {
                 labels,
                 response,
             } => {
-                // Validate and convert score to TrustScore
-                let trust_score = match icn_trust::TrustScore::new(score) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        let _ = response.send(Err(anyhow::anyhow!("Invalid trust score: {}", e)));
-                        return;
-                    }
+                let result = match &self.trust_service {
+                    Some(svc) => svc
+                        .submit_attestation(&target.to_string(), score, labels)
+                        .map(|_bytes| ())
+                        .map_err(|e| anyhow::anyhow!("{e}")),
+                    None => Err(anyhow::anyhow!("Trust service not available")),
                 };
-                let mut edge =
-                    icn_trust::TrustEdge::new(self.keypair.did().clone(), target, trust_score);
-
-                for label in labels {
-                    edge = edge.with_label(label);
-                }
-
-                let mut graph = self.trust_graph.write().await;
-                let result = graph.add_edge(edge);
                 let _ = response.send(result);
             }
 
             IdentityMsg::RemoveTrustEdge { target, response } => {
-                let mut graph = self.trust_graph.write().await;
-                let result = graph.remove_edge(&self.keypair.did().clone(), &target);
+                let result = match &self.trust_service {
+                    Some(svc) => svc
+                        .revoke_trust(&target.to_string())
+                        .map(|_bytes| ())
+                        .map_err(|e| anyhow::anyhow!("{e}")),
+                    None => Err(anyhow::anyhow!("Trust service not available")),
+                };
                 let _ = response.send(result);
             }
         }
@@ -274,19 +276,62 @@ impl IdentityActor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_store::SledStore;
+    use icn_kernel_api::authz::{
+        ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest,
+    };
     use tokio::sync::broadcast;
+
+    /// Mock trust service for tests
+    struct MockTrustService;
+
+    impl TrustService for MockTrustService {
+        fn oracle(&self) -> Arc<dyn PolicyOracle> {
+            struct MockOracle;
+            impl PolicyOracle for MockOracle {
+                fn evaluate(&self, _req: &PolicyRequest) -> PolicyDecision {
+                    PolicyDecision::Allow {
+                        constraints: ConstraintSet::default(),
+                    }
+                }
+                fn domain(&self) -> Domain {
+                    Domain::trust()
+                }
+            }
+            Arc::new(MockOracle)
+        }
+
+        fn trust_score(&self, _actor: &icn_kernel_api::types::Did) -> f64 {
+            0.56 // Simulates 0.8 direct * 0.7 weight
+        }
+
+        fn record_event(
+            &self,
+            _actor: &icn_kernel_api::types::Did,
+            _event: icn_kernel_api::services::TrustEvent,
+        ) {
+        }
+
+        fn submit_attestation(
+            &self,
+            _target: &icn_kernel_api::types::Did,
+            _score: f64,
+            _labels: Vec<String>,
+        ) -> Result<Vec<u8>, String> {
+            Ok(Vec::new())
+        }
+
+        fn revoke_trust(&self, _target: &icn_kernel_api::types::Did) -> Result<Vec<u8>, String> {
+            Ok(Vec::new())
+        }
+    }
 
     #[tokio::test]
     async fn test_identity_actor_get_did() {
         let keypair = KeyPair::generate().unwrap();
         let expected_did = keypair.did().clone();
 
-        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary().unwrap());
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, expected_did.clone())));
-
         let (shutdown_tx, _) = broadcast::channel(1);
-        let handle = IdentityActor::spawn(keypair, trust_graph, shutdown_tx);
+        let handle = IdentityActor::spawn(keypair, None, shutdown_tx);
 
         // Test cached DID access
         assert_eq!(handle.did(), &expected_did);
@@ -299,13 +344,9 @@ mod tests {
     #[tokio::test]
     async fn test_identity_actor_sign() {
         let keypair = KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
-
-        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary().unwrap());
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, did.clone())));
 
         let (shutdown_tx, _) = broadcast::channel(1);
-        let handle = IdentityActor::spawn(keypair.clone(), trust_graph, shutdown_tx);
+        let handle = IdentityActor::spawn(keypair.clone(), None, shutdown_tx);
 
         let message = b"test message".to_vec();
         let signature = handle.sign(message.clone()).await.unwrap();
@@ -321,27 +362,23 @@ mod tests {
     #[tokio::test]
     async fn test_identity_actor_trust_operations() {
         let keypair = KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
 
-        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary().unwrap());
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, did.clone())));
+        let trust_service: Arc<dyn TrustService> = Arc::new(MockTrustService);
 
         let (shutdown_tx, _) = broadcast::channel(1);
-        let handle = IdentityActor::spawn(keypair, trust_graph, shutdown_tx);
+        let handle = IdentityActor::spawn(keypair.clone(), Some(trust_service), shutdown_tx);
 
         // Create a target DID
         let target_keypair = KeyPair::generate().unwrap();
         let target_did = target_keypair.did().clone();
 
-        // Add trust edge
+        // Add trust edge (via TrustService)
         handle
             .add_trust_edge(target_did.clone(), 0.8, vec!["test".to_string()])
             .await
             .unwrap();
 
-        // Get trust score
-        // Note: TrustGraph uses weighted average (70% direct, 30% transitive)
-        // With direct=0.8 and transitive=0.0, expected score = 0.8 * 0.7 = 0.56
+        // Get trust score (mock returns 0.56)
         let score = handle.get_trust_score(target_did.clone()).await.unwrap();
         assert!((score - 0.56).abs() < 0.01, "Expected 0.56, got {score}");
 
@@ -349,11 +386,7 @@ mod tests {
         let class = handle.get_trust_class(target_did.clone()).await.unwrap();
         assert_eq!(class, TrustClass::Partner);
 
-        // Remove trust edge
-        handle.remove_trust_edge(target_did.clone()).await.unwrap();
-
-        // Score should now be 0 (unknown)
-        let score = handle.get_trust_score(target_did).await.unwrap();
-        assert_eq!(score, 0.0);
+        // Remove trust edge (via TrustService)
+        handle.remove_trust_edge(target_did).await.unwrap();
     }
 }

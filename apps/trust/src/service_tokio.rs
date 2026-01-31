@@ -192,6 +192,213 @@ impl TrustService for TrustServiceImplTokio {
             }
         }
     }
+
+    fn ingest_attestation(
+        &self,
+        bytes: &[u8],
+        source: &icn_kernel_api::types::Did,
+    ) -> Result<(), String> {
+        use icn_trust::TrustAttestation;
+
+        // Deserialize
+        let attestation: TrustAttestation =
+            serde_json::from_slice(bytes).map_err(|e| format!("Invalid attestation: {e}"))?;
+
+        // Verify signature
+        if let Err(e) = attestation.verify() {
+            tracing::warn!(
+                source = %source,
+                "Rejecting trust attestation with invalid signature: {} -> {} (error: {})",
+                attestation.issuer, attestation.subject, e
+            );
+            return Ok(()); // Silently reject invalid signatures
+        }
+
+        // Check if expired
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        if attestation.is_expired(now) {
+            tracing::warn!(
+                source = %source,
+                "Received expired trust attestation: {} -> {}",
+                attestation.issuer, attestation.subject,
+            );
+            return Ok(()); // Silently reject expired attestations
+        }
+
+        // Convert to trust edge
+        let edge = attestation.to_trust_edge();
+
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let mut graph = self.graph.write().await;
+
+                // Check if we already have this edge — supersede check
+                match graph.get_edge(&edge.source, &edge.target) {
+                    Ok(Some(existing)) => {
+                        if !attestation
+                            .should_supersede(existing.created_at, existing.score.value())
+                        {
+                            tracing::debug!(
+                                "Rejecting outdated trust attestation: {} -> {}",
+                                edge.source,
+                                edge.target,
+                            );
+                            return Ok(());
+                        }
+                    }
+                    Ok(None) => { /* new edge */ }
+                    Err(e) => {
+                        tracing::warn!("Edge lookup error during attestation: {e}");
+                    }
+                }
+
+                graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
+
+                tracing::info!(
+                    "Applied remote trust attestation: {} -> {} (score: {})",
+                    edge.source,
+                    edge.target,
+                    edge.score,
+                );
+
+                // If this attestation is about us, log it specially
+                if edge.target == self.own_did {
+                    tracing::info!(
+                        "Received trust from {}: score {}",
+                        edge.source,
+                        edge.score,
+                    );
+                }
+
+                Ok(())
+            })
+        })
+    }
+
+    fn recover_identity(
+        &self,
+        old_did: &icn_kernel_api::types::Did,
+        new_did: &icn_kernel_api::types::Did,
+    ) -> Result<usize, String> {
+        let old: icn_identity::Did = old_did
+            .parse()
+            .map_err(|e| format!("Invalid old DID: {e}"))?;
+        let new: icn_identity::Did = new_did
+            .parse()
+            .map_err(|e| format!("Invalid new DID: {e}"))?;
+
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let mut graph = self.graph.write().await;
+                graph
+                    .map_did_recovery(&old, &new)
+                    .map_err(|e| format!("{e}"))
+            })
+        })
+    }
+
+    fn submit_attestation(
+        &self,
+        target: &icn_kernel_api::types::Did,
+        score: f64,
+        labels: Vec<String>,
+    ) -> Result<Vec<u8>, String> {
+        let target_did: icn_identity::Did = target
+            .parse()
+            .map_err(|e| format!("Invalid target DID: {e}"))?;
+
+        let trust_score =
+            icn_trust::TrustScore::new(score).map_err(|e| format!("Invalid trust score: {e}"))?;
+        let mut edge = icn_trust::TrustEdge::new(self.own_did.clone(), target_did, trust_score);
+        for label in labels {
+            edge = edge.with_label(label);
+        }
+
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let mut graph = self.graph.write().await;
+                graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
+                // Return serialized attestation for gossip broadcast
+                let attestation = icn_trust::TrustAttestation::from_trust_edge(&edge);
+                serde_json::to_vec(&attestation).map_err(|e| format!("{e}"))
+            })
+        })
+    }
+
+    fn revoke_trust(
+        &self,
+        target: &icn_kernel_api::types::Did,
+    ) -> Result<Vec<u8>, String> {
+        let target_did: icn_identity::Did = target
+            .parse()
+            .map_err(|e| format!("Invalid target DID: {e}"))?;
+
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let mut graph = self.graph.write().await;
+                graph
+                    .remove_edge(&self.own_did, &target_did)
+                    .map_err(|e| format!("{e}"))?;
+                // Return empty bytes (no gossip message for revocation currently)
+                Ok(Vec::new())
+            })
+        })
+    }
+
+    fn get_edges(&self, actor: &icn_kernel_api::types::Did) -> Vec<serde_json::Value> {
+        let did: icn_identity::Did = match actor.parse() {
+            Ok(d) => d,
+            Err(_) => return Vec::new(),
+        };
+
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.graph.read().await;
+                match graph.get_outgoing_edges(&did) {
+                    Ok(edges) => edges
+                        .into_iter()
+                        .filter_map(|e| serde_json::to_value(&e).ok())
+                        .collect(),
+                    Err(_) => Vec::new(),
+                }
+            })
+        })
+    }
+
+    fn get_all_edges(&self) -> Vec<serde_json::Value> {
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = self.graph.read().await;
+                // Get all known DIDs, then collect outgoing edges from each
+                match graph.get_all_known_dids() {
+                    Ok(dids) => {
+                        let mut all_edges = Vec::new();
+                        for did in dids {
+                            if let Ok(edges) = graph.get_outgoing_edges(&did) {
+                                for edge in edges {
+                                    if let Ok(val) = serde_json::to_value(&edge) {
+                                        all_edges.push(val);
+                                    }
+                                }
+                            }
+                        }
+                        all_edges
+                    }
+                    Err(_) => Vec::new(),
+                }
+            })
+        })
+    }
 }
 
 #[cfg(test)]

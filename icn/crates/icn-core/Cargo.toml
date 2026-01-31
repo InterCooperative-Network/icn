@@ -34,7 +34,6 @@ icn-kernel-api = { path = "../icn-kernel-api" }
 icn-entity = { path = "../icn-entity" }
 icn-identity.workspace = true
 icn-store.workspace = true
-icn-trust.workspace = true
 icn-net.workspace = true
 icn-rpc.workspace = true
 icn-gossip.workspace = true
@@ -59,6 +58,7 @@ hex = "0.4"
 tempfile = "3.24"
 sha2 = "0.10"
 icn-governance.workspace = true
+icn-trust.workspace = true
 portpicker.workspace = true
 # Enable test-util for time mocking in integration tests
 tokio = { version = "1.49", features = ["test-util"] }

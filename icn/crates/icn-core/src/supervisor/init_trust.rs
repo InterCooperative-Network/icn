@@ -1,43 +1,21 @@
-//! Trust graph and security initialization
+//! Security initialization (recovery store, misbehavior detector)
 //!
-//! Initializes the trust graph, recovery store, and Byzantine fault detection.
+//! The TrustGraph is owned by the trust app (apps/trust/) and provided to
+//! the kernel via TrustService in the ServiceRegistry. This module only
+//! initializes kernel-level security services.
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use icn_identity::Did;
 use icn_kernel_api::services::TrustService;
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
 use icn_store::SledStore;
-use icn_trust::TrustGraph;
 
 use crate::config::Config;
 
-/// Services initialized during trust setup
-///
-/// # Kernel/App Separation
-///
-/// This struct exposes `trust_graph` for app-layer operations (mutations like
-/// adding/removing trust edges). Kernel components should NOT use `trust_graph`
-/// directly - they should use `TrustService` from the `ServiceRegistry` instead.
-///
-/// The `trust_graph` field is exposed here because:
-/// - `IdentityActor` needs it for trust mutations (add_edge, remove_edge)
-/// - RPC handlers need it for trust API endpoints
-/// - `MisbehaviorDetector` applies penalties via `TrustService` (graph used for persistence)
-///
-/// For read-only trust queries in kernel components, use:
-/// ```ignore
-/// let trust_service = service_registry.trust();
-/// let score = trust_service.trust_score(&did);
-/// ```
+/// Services initialized during security setup
 pub struct TrustServices {
-    /// The trust graph for app-layer mutations (add/remove edges)
-    ///
-    /// **Note**: Kernel data-path components should use `TrustService` from
-    /// `ServiceRegistry` instead of accessing this directly.
-    pub trust_graph: Arc<RwLock<TrustGraph>>,
     /// Byzantine fault detector for misbehavior tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
     /// Store for social recovery events
@@ -46,53 +24,13 @@ pub struct TrustServices {
     pub security_store: Arc<dyn icn_store::Store>,
 }
 
-/// Initialize trust graph and security services
+/// Initialize security services (recovery store, misbehavior detector)
 ///
 /// Creates:
-/// - Trust graph with persistent storage
 /// - Recovery store for social recovery
 /// - Misbehavior detector with TrustService integration
 pub async fn init_trust_services(
     config: &Config,
-    did: Did,
-    trust_service: Option<Arc<dyn TrustService>>,
-) -> anyhow::Result<TrustServices> {
-    // Create trust graph
-    // Note: Phase 21 adds TrustGraphFacade for multi-graph support (Social, Economic, Technical).
-    // Currently using TrustGraph directly. Migration to TrustGraphFacade requires updating
-    // consumer type signatures. See docs/trust-multi-graph-migration.md for migration guide.
-    let trust_store_path = config.store_path().join("trust");
-    let trust_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&trust_store_path)?);
-    let trust_graph = TrustGraph::new(trust_store, did.clone());
-    let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
-
-    info!("Trust graph initialized at {}", trust_store_path.display());
-
-    init_trust_services_impl(config, trust_graph_handle, trust_service).await
-}
-
-/// Initialize trust services with an externally-provided TrustGraph
-///
-/// This variant is used when the daemon provides a TrustGraph via ServiceRegistry,
-/// enabling proper kernel/app separation where the daemon owns the TrustGraph.
-///
-/// Creates:
-/// - Recovery store for social recovery
-/// - Misbehavior detector with TrustService integration
-/// - Wires the provided TrustGraph for app-layer trust mutations via TrustService
-pub async fn init_trust_services_with_graph(
-    config: &Config,
-    trust_graph_handle: Arc<RwLock<TrustGraph>>,
-    trust_service: Option<Arc<dyn TrustService>>,
-) -> anyhow::Result<TrustServices> {
-    info!("Using daemon-provided TrustGraph for trust services");
-    init_trust_services_impl(config, trust_graph_handle, trust_service).await
-}
-
-/// Internal implementation for trust service initialization
-async fn init_trust_services_impl(
-    config: &Config,
-    trust_graph_handle: Arc<RwLock<TrustGraph>>,
     trust_service: Option<Arc<dyn TrustService>>,
 ) -> anyhow::Result<TrustServices> {
     // Create recovery store for social recovery events
@@ -138,7 +76,6 @@ async fn init_trust_services_impl(
     info!("Shared Byzantine fault detector created");
 
     Ok(TrustServices {
-        trust_graph: trust_graph_handle,
         misbehavior_detector,
         recovery_store,
         security_store,
@@ -191,13 +128,10 @@ mod tests {
             data_dir: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let did = keypair.did().clone();
 
-        let services = init_trust_services(&config, did, None).await.unwrap();
+        let services = init_trust_services(&config, None).await.unwrap();
 
         // Verify services were initialized (just check we can acquire locks)
-        let _graph = services.trust_graph.read().await;
         let _detector = services.misbehavior_detector.read().await;
     }
 
@@ -208,11 +142,9 @@ mod tests {
             data_dir: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let own_did = keypair.did().clone();
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+        let services = init_trust_services(&config, Some(mock_ts.clone()))
             .await
             .unwrap();
 
@@ -244,11 +176,9 @@ mod tests {
             data_dir: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let own_did = keypair.did().clone();
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+        let services = init_trust_services(&config, Some(mock_ts.clone()))
             .await
             .unwrap();
 
@@ -288,11 +218,9 @@ mod tests {
             data_dir: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-        let own_did = keypair.did().clone();
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, own_did, Some(mock_ts.clone()))
+        let services = init_trust_services(&config, Some(mock_ts.clone()))
             .await
             .unwrap();
 
