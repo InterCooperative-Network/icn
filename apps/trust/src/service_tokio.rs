@@ -221,8 +221,8 @@ impl TrustService for TrustServiceImplTokio {
                 attestation.issuer, attestation.subject, e
             );
             return Err(format!(
-                "Invalid attestation signature from {} -> {}: {e}",
-                attestation.issuer, attestation.subject
+                "Invalid attestation signature from {} -> {} (envelope source: {}): {e}",
+                attestation.issuer, attestation.subject, source
             ));
         }
 
@@ -311,6 +311,11 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
+    /// Submit a trust attestation and return Ed25519-signed bytes for gossip broadcast.
+    ///
+    /// The attestation is signed with the node's keypair before serialization.
+    /// Receiving nodes will verify the signature via `ingest_attestation()` before
+    /// applying to their trust graph — unsigned or tampered attestations are rejected.
     fn submit_attestation(
         &self,
         target: &icn_kernel_api::types::Did,
@@ -517,5 +522,81 @@ mod tests {
         service_b
             .ingest_attestation(&bytes, &source_a)
             .expect("ingest of signed attestation should succeed");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_tampered_attestation() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create a properly signed attestation, then tamper with the score
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
+        attestation.sign(&issuer).unwrap();
+        attestation.score = 0.99; // tamper after signing
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Tampered attestation must be rejected, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_expired_signed_attestation() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create a signed attestation that is already expired
+        // Default TTL is 30 days (2,592,000 seconds)
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
+        attestation.created_at = 1000; // ancient timestamp
+        attestation.sign(&issuer).unwrap();
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        // Expired attestations return Ok(()) — silently dropped, not an error
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_ok(),
+            "Expired attestations are silently dropped, not errors: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_spoofed_issuer() {
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair);
+
+        let alice = icn_identity::KeyPair::generate().unwrap();
+        let bob = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Alice signs a valid attestation, then changes issuer to Bob's DID
+        // (simulating an attacker trying to impersonate Bob)
+        let mut attestation =
+            icn_trust::TrustAttestation::new(alice.did().clone(), target.did().clone(), 0.5);
+        attestation.sign(&alice).unwrap();
+        attestation.issuer = bob.did().clone(); // spoof issuer after signing
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(alice.did().to_string());
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Attestation with spoofed issuer must be rejected, got: {:?}",
+            result
+        );
     }
 }
