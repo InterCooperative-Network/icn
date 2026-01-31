@@ -100,9 +100,19 @@ fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
 }
 
 /// Count occurrences of a pattern in source files.
+///
+/// Excludes `meaning_firewall.rs` itself to avoid counting string literals
+/// in ratchet tests and doc comments as false positives.
 fn count_imports_in_crate(crate_name: &str, pattern: &str) -> usize {
     let mut count = 0;
     for file in list_rust_files(crate_name) {
+        // Skip this file — it contains the pattern strings as test literals
+        if file
+            .file_name()
+            .is_some_and(|n| n == "meaning_firewall.rs")
+        {
+            continue;
+        }
         if let Ok(content) = std::fs::read_to_string(&file) {
             count += content.matches(pattern).count();
         }
@@ -283,7 +293,7 @@ mod tests {
     /// - actors.rs: 1 (CoreActorHandles LedgerHandle type)
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        let expected: usize = 39;
+        let expected: usize = 31;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(
@@ -314,7 +324,7 @@ mod tests {
     /// - actors.rs: 2 (BootstrapHandles placeholder — from B3 when merged)
     #[test]
     fn strict_core_ccl_reference_ratchet() {
-        let expected: usize = 40;
+        let expected: usize = 34;
         let actual = count_imports_in_crate("icn-core", "icn_ccl::");
 
         assert!(
@@ -334,8 +344,9 @@ mod tests {
         }
     }
 
-    /// Pinned count of `use icn_governance::` imports in icn-core source.
+    /// Pinned count of `use icn_governance::` import statements in icn-core source.
     ///
+    /// Only counts `use icn_governance::` imports, not all qualified references.
     /// Governance was addressed in B1 (#913) with guardrails. This tracks
     /// the remaining governance imports that need extraction.
     ///
@@ -343,8 +354,8 @@ mod tests {
     /// Distributed across governance_handlers.rs, lifecycle.rs,
     /// init_governance.rs, init_steward.rs, and others.
     #[test]
-    fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 21;
+    fn strict_core_governance_import_ratchet() {
+        let expected: usize = 11;
         let actual = count_imports_in_crate("icn-core", "use icn_governance::");
 
         assert!(
@@ -358,7 +369,7 @@ mod tests {
             panic!(
                 "PROGRESS: icn-core now has only {actual} `use icn_governance::` \
                  imports (was pinned at {expected}). Update the pinned count in \
-                 meaning_firewall.rs::strict_core_governance_reference_ratchet()."
+                 meaning_firewall.rs::strict_core_governance_import_ratchet()."
             );
         }
     }
