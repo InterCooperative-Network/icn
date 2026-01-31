@@ -127,6 +127,14 @@ impl std::fmt::Display for TrustClass {
 /// - Record trust-affecting events
 ///
 /// The kernel NEVER interprets trust scores - it just passes them through.
+///
+/// # Sync/Async Note
+///
+/// Methods are synchronous for ergonomic kernel integration. Implementations
+/// using async locks (e.g. `tokio::RwLock`) should use
+/// `tokio::task::block_in_place()` to bridge sync/async contexts safely.
+/// This requires a multi-threaded tokio runtime. Monitor lock contention
+/// via the `trust_oracle_block_in_place_total` metric.
 pub trait TrustService: Send + Sync {
     /// Get the PolicyOracle for this trust service
     ///
