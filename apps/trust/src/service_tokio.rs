@@ -120,9 +120,7 @@ impl TrustService for TrustServiceImplTokio {
             rt.block_on(async {
                 let graph = self.graph.read().await;
                 if let Some(identity_did) = Self::parse_kernel_did(actor) {
-                    graph
-                        .compute_trust_score(&identity_did)
-                        .unwrap_or(0.0) // Unknown actors start at zero trust
+                    graph.compute_trust_score(&identity_did).unwrap_or(0.0) // Unknown actors start at zero trust
                 } else {
                     0.0
                 }
@@ -130,10 +128,10 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
-    // TODO: Refactor to use `AttestationReducer` once the compute handler pipeline
-    // converts TrustEdges to TrustAttestations. Currently the reducer is used by
-    // the compute handler path; this method reimplements hash logic directly from
-    // the graph's edge storage for the service query path.
+    // TODO(#1000): Refactor to use `AttestationReducer` once the compute handler
+    // pipeline converts TrustEdges to TrustAttestations. Currently the reducer is
+    // used by the compute handler path; this method reimplements hash logic directly
+    // from the graph's edge storage for the service query path.
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
         tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
@@ -144,9 +142,7 @@ impl TrustService for TrustServiceImplTokio {
                     None => return self.empty_score_result(),
                 };
 
-                let score = graph
-                    .compute_trust_score(&identity_did)
-                    .unwrap_or(0.0); // Unknown actors start at zero trust
+                let score = graph.compute_trust_score(&identity_did).unwrap_or(0.0); // Unknown actors start at zero trust
 
                 // Collect edges pointing to this actor to derive input count + hash
                 let input_edges = graph

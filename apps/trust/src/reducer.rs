@@ -414,6 +414,26 @@ mod tests {
         assert!((result.score - 0.9).abs() < 0.001);
     }
 
+    #[test]
+    fn deterministic_identical_timestamp_and_score() {
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        let now = 10_000u64;
+        // Two attestations with identical timestamp and score from same issuer
+        let a = make_signed(&alice, target.did(), 0.7, now - 100);
+        let b = make_signed(&alice, target.did(), 0.7, now - 100);
+
+        let reducer = AttestationReducer::new(now);
+        let r1 = reducer.reduce(&[a.clone(), b.clone()]);
+        let r2 = reducer.reduce(&[b, a]);
+
+        // Same result regardless of input order
+        assert_eq!(r1.score, r2.score);
+        assert_eq!(r1.inputs_hash, r2.inputs_hash);
+        assert_eq!(r1.input_count, 1); // Deduped to one
+    }
+
     // ====================================================================
     // SCORING TESTS
     // ====================================================================
