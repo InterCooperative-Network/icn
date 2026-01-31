@@ -4181,6 +4181,11 @@ pub fn create_governance_subscription(
                             proposal_id,
                             e
                         );
+                        handler.emit_execution_failure(
+                            &icn_governance::ProposalId(proposal_id.clone()),
+                            "unknown",
+                            &format!("payload deserialization failed: {e}"),
+                        );
                     }
                 }
             }

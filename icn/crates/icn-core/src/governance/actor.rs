@@ -1523,15 +1523,28 @@ impl GovernanceActor {
                 // Emit event for downstream processing (e.g., ledger transactions)
                 if let Some(ref event_bus) = self.event_bus {
                     let event = match outcome_result {
-                        DecisionOutcome::Accepted => SystemEvent::ProposalAccepted {
-                            proposal_id: proposal_id.0.clone(),
-                            domain_id: proposal.domain_id.0.clone(),
-                            payload: serde_json::to_value(&proposal.payload)
-                                .unwrap_or_else(|e| {
-                                    serde_json::Value::String(format!("serialization_error: {e}"))
-                                }),
-                            decided_at: now,
-                        },
+                        DecisionOutcome::Accepted => {
+                            match serde_json::to_value(&proposal.payload) {
+                                Ok(payload) => SystemEvent::ProposalAccepted {
+                                    proposal_id: proposal_id.0.clone(),
+                                    domain_id: proposal.domain_id.0.clone(),
+                                    payload,
+                                    decided_at: now,
+                                },
+                                Err(e) => {
+                                    warn!(
+                                        "Failed to serialize payload for accepted proposal {}: {e}",
+                                        proposal_id.0
+                                    );
+                                    SystemEvent::ProposalExecutionFailed {
+                                        proposal_id: proposal_id.0.clone(),
+                                        proposal_type: proposal.payload.type_name().to_string(),
+                                        error: format!("payload serialization failed: {e}"),
+                                        failed_at: now,
+                                    }
+                                }
+                            }
+                        }
                         _ => SystemEvent::ProposalRejected {
                             proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
@@ -1626,15 +1639,28 @@ impl GovernanceActor {
                 if let Some(ref event_bus) = self.event_bus {
                     let now = now_seconds();
                     let event = match forced_outcome {
-                        ForcedOutcome::Accept => SystemEvent::ProposalAccepted {
-                            proposal_id: proposal_id.0.clone(),
-                            domain_id: proposal.domain_id.0.clone(),
-                            payload: serde_json::to_value(&proposal.payload)
-                                .unwrap_or_else(|e| {
-                                    serde_json::Value::String(format!("serialization_error: {e}"))
-                                }),
-                            decided_at: now,
-                        },
+                        ForcedOutcome::Accept => {
+                            match serde_json::to_value(&proposal.payload) {
+                                Ok(payload) => SystemEvent::ProposalAccepted {
+                                    proposal_id: proposal_id.0.clone(),
+                                    domain_id: proposal.domain_id.0.clone(),
+                                    payload,
+                                    decided_at: now,
+                                },
+                                Err(e) => {
+                                    warn!(
+                                        "Failed to serialize payload for force-accepted proposal {}: {e}",
+                                        proposal_id.0
+                                    );
+                                    SystemEvent::ProposalExecutionFailed {
+                                        proposal_id: proposal_id.0.clone(),
+                                        proposal_type: proposal.payload.type_name().to_string(),
+                                        error: format!("payload serialization failed: {e}"),
+                                        failed_at: now,
+                                    }
+                                }
+                            }
+                        }
                         _ => SystemEvent::ProposalRejected {
                             proposal_id: proposal_id.0.clone(),
                             domain_id: proposal.domain_id.0.clone(),
