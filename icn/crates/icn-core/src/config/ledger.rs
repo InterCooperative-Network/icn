@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Default suspicious rate threshold.
 ///
 /// Must match `icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD`.
-/// A compile-time drift guard in `icn-ledger-app` (apps/ledger) ensures this.
+/// A CI/unit-test drift guard in `icn-ledger-app` (apps/ledger) ensures this.
 const DEFAULT_SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
 
 /// Configuration for the ledger subsystem
@@ -318,9 +318,7 @@ mod tests {
         assert_eq!(config.oracle.min_sources_for_consensus, 1);
         assert!((config.oracle.outlier_threshold - 0.15).abs() < f64::EPSILON);
         assert_eq!(config.oracle.staleness_threshold_secs, 86400);
-        assert!(
-            (config.oracle.default_suspicious_rate_threshold - 1000.0).abs() < f64::EPSILON
-        );
+        assert!((config.oracle.default_suspicious_rate_threshold - 1000.0).abs() < f64::EPSILON);
         assert!(config.oracle.suspicious_rate_thresholds.is_empty());
     }
 

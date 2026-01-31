@@ -16,7 +16,7 @@ pub use icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD;
 pub enum WitnessConfigError {
     /// Invalid policy string
     #[error(
-        "Invalid witness policy '{0}'. Valid options: none, counterparty, quorum, all_parties"
+        "Invalid witness policy '{0}'. Valid options: none, counterparty, quorum, all_parties, allparties"
     )]
     InvalidPolicy(String),
 
@@ -58,17 +58,15 @@ pub fn build_witness_config(
             let required = quorum_required.ok_or(WitnessConfigError::MissingField(
                 "quorum_required for quorum policy",
             ))?;
-            let witness_strs =
-                quorum_witnesses.ok_or(WitnessConfigError::MissingField(
-                    "quorum_witnesses for quorum policy",
-                ))?;
+            let witness_strs = quorum_witnesses.ok_or(WitnessConfigError::MissingField(
+                "quorum_witnesses for quorum policy",
+            ))?;
 
             let mut witnesses = Vec::with_capacity(witness_strs.len());
             let mut seen_dids = std::collections::HashSet::new();
             for did_str in witness_strs {
-                let did = Did::from_str(did_str).map_err(|e| {
-                    WitnessConfigError::InvalidDid(did_str.clone(), e.to_string())
-                })?;
+                let did = Did::from_str(did_str)
+                    .map_err(|e| WitnessConfigError::InvalidDid(did_str.clone(), e.to_string()))?;
                 if !seen_dids.insert(did.clone()) {
                     return Err(WitnessConfigError::DuplicateWitness(did_str.clone()));
                 }
@@ -124,16 +122,15 @@ pub fn build_oracle_config(
 mod tests {
     use super::*;
 
-    // Drift guard: icn-core's serde default for this field is 1000.0.
+    // Drift guard: icn-core's inline default for this field is 1000.0.
     // If icn-ledger ever changes the constant, this test fails so we
-    // update the serde default in lockstep.
+    // update the inline default in lockstep.
     #[test]
     fn threshold_drift_guard() {
         assert!(
             (DEFAULT_SUSPICIOUS_RATE_THRESHOLD - 1000.0).abs() < f64::EPSILON,
-            "DEFAULT_SUSPICIOUS_RATE_THRESHOLD changed from 1000.0 to {}; \
-             update the serde default in icn-core/src/config/ledger.rs",
-            DEFAULT_SUSPICIOUS_RATE_THRESHOLD,
+            "DEFAULT_SUSPICIOUS_RATE_THRESHOLD changed from 1000.0 to {DEFAULT_SUSPICIOUS_RATE_THRESHOLD}; \
+             update the inline default in icn-core/src/config/ledger.rs",
         );
     }
 
@@ -273,9 +270,7 @@ mod tests {
         let oracle_config = build_oracle_config(3600, 1, 0.15, 86400, 500.0, thresholds);
 
         assert_eq!(oracle_config.default_ttl_secs, 3600);
-        assert!(
-            (oracle_config.default_suspicious_rate_threshold - 500.0).abs() < f64::EPSILON
-        );
+        assert!((oracle_config.default_suspicious_rate_threshold - 500.0).abs() < f64::EPSILON);
         assert_eq!(
             oracle_config.suspicious_rate_thresholds.get("USD:JPY"),
             Some(&200.0)
