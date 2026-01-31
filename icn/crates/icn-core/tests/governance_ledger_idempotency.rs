@@ -46,19 +46,22 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
             .subscribe(Arc::new(move |event| {
                 if let SystemEvent::ProposalAccepted {
                     proposal_id,
-                    payload:
-                        ProposalPayload::Budget {
-                            amount,
-                            recipient,
-                            currency,
-                            ..
-                        },
+                    payload,
                     ..
                 } = event
                 {
+                    let Ok(ProposalPayload::Budget {
+                        amount,
+                        recipient,
+                        currency,
+                        ..
+                    }) = serde_json::from_value::<ProposalPayload>(payload.clone())
+                    else {
+                        return;
+                    };
                     info!(
                         "📊 Executing budget proposal {}: {} {} to {}",
-                        proposal_id.0, amount, currency, recipient
+                        proposal_id, amount, currency, recipient
                     );
 
                     let ledger = ledger_clone.clone();
@@ -71,12 +74,12 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
 
                         // IDEMPOTENCY CHECK: Skip if proposal already executed
                         // Uses fail-safe pattern: refuse execution if cannot verify
-                        let audit_key = format!("gov:audit:{}", prop_id.0);
+                        let audit_key = format!("gov:audit:{}", prop_id);
                         match store.get(audit_key.as_bytes()) {
                             Ok(Some(_)) => {
                                 info!(
                                     "Proposal {} already executed, skipping duplicate event",
-                                    prop_id.0
+                                    prop_id
                                 );
                                 return;
                             }
@@ -87,7 +90,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                                 // Store read error: REFUSE to execute (fail-safe)
                                 eprintln!(
                                     "ERROR: Failed to check audit trail for proposal {}: {}",
-                                    prop_id.0, e
+                                    prop_id, e
                                 );
                                 eprintln!(
                                     "       Refusing to execute to prevent potential duplicate"
@@ -108,9 +111,9 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                                 info!("✅ Executed: {} {}", amount, currency);
 
                                 // Store audit trail
-                                let audit_key = format!("gov:audit:{}", prop_id.0);
+                                let audit_key = format!("gov:audit:{}", prop_id);
                                 let audit_record = serde_json::json!({
-                                    "proposal_id": prop_id.0,
+                                    "proposal_id": prop_id,
                                     "ledger_entry_hash": hex::encode(entry_hash.0),
                                     "amount": amount,
                                     "currency": currency,
@@ -129,16 +132,17 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
     };
 
     // Create proposal event
-    let proposal_id = icn_governance::ProposalId("test-proposal".to_string());
+    let proposal_id = "test-proposal".to_string();
     let event = SystemEvent::ProposalAccepted {
         proposal_id: proposal_id.clone(),
         domain_id: "test-domain".to_string(),
-        payload: ProposalPayload::Budget {
+        payload: serde_json::to_value(&ProposalPayload::Budget {
             amount: 5000,
             recipient: recipient_did.clone(),
             currency: "credits".to_string(),
             purpose: "Test payment".to_string(),
-        },
+        })
+        .unwrap(),
         decided_at: 1234567890,
     };
 

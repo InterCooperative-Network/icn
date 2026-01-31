@@ -3,7 +3,6 @@
 //! This module provides a simple event bus for coordinating actions across actors.
 //! Key use case: Governance proposals triggering ledger transactions or contract execution.
 
-use icn_governance::{ProposalId, ProposalPayload};
 use icn_identity::Did;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -14,20 +13,20 @@ use tracing::{debug, warn};
 pub enum SystemEvent {
     /// A governance proposal was accepted
     ProposalAccepted {
-        /// Unique identifier for the proposal
-        proposal_id: ProposalId,
+        /// Unique identifier for the proposal (was `ProposalId`)
+        proposal_id: String,
         /// Domain in which the proposal was made
         domain_id: String,
-        /// Payload describing the proposal action
-        payload: ProposalPayload,
+        /// Payload describing the proposal action (serialized `ProposalPayload`)
+        payload: serde_json::Value,
         /// Unix timestamp when the proposal was decided
         decided_at: u64,
     },
 
     /// A governance proposal was rejected or failed to reach quorum
     ProposalRejected {
-        /// Unique identifier for the proposal
-        proposal_id: ProposalId,
+        /// Unique identifier for the proposal (was `ProposalId`)
+        proposal_id: String,
         /// Domain in which the proposal was made
         domain_id: String,
         /// Unix timestamp when the proposal was decided
@@ -58,8 +57,8 @@ pub enum SystemEvent {
 
     /// A proposal execution failed (proposal was accepted but could not be applied)
     ProposalExecutionFailed {
-        /// Unique identifier for the proposal
-        proposal_id: ProposalId,
+        /// Unique identifier for the proposal (was `ProposalId`)
+        proposal_id: String,
         /// Type of the proposal (e.g., "protocol_change", "treasury")
         proposal_type: String,
         /// Human-readable error message
@@ -239,11 +238,12 @@ mod tests {
 
         // Emit event
         let event = SystemEvent::ProposalAccepted {
-            proposal_id: ProposalId("test-proposal".to_string()),
+            proposal_id: "test-proposal".to_string(),
             domain_id: "test-domain".to_string(),
-            payload: ProposalPayload::Text {
+            payload: serde_json::to_value(&icn_governance::ProposalPayload::Text {
                 body: "Test proposal".to_string(),
-            },
+            })
+            .unwrap(),
             decided_at: 1234567890,
         };
 
@@ -276,7 +276,7 @@ mod tests {
 
         // Emit event
         let event = SystemEvent::ProposalRejected {
-            proposal_id: ProposalId("rejected".to_string()),
+            proposal_id: "rejected".to_string(),
             domain_id: "domain".to_string(),
             decided_at: 9999,
         };
@@ -333,11 +333,12 @@ mod tests {
 
         // Emit event
         let event = SystemEvent::ProposalAccepted {
-            proposal_id: ProposalId("test".to_string()),
+            proposal_id: "test".to_string(),
             domain_id: "test".to_string(),
-            payload: ProposalPayload::Text {
+            payload: serde_json::to_value(&icn_governance::ProposalPayload::Text {
                 body: "test".to_string(),
-            },
+            })
+            .unwrap(),
             decided_at: 1234567890,
         };
 
@@ -345,5 +346,71 @@ mod tests {
 
         // Callback should NOT have been called (subscription was dropped)
         assert_eq!(counter.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_payload_triggers_execution_failed() {
+        // Regression test: when a ProposalAccepted event carries a payload that
+        // cannot be deserialized back to ProposalPayload, the subscriber should
+        // emit ProposalExecutionFailed (not silently drop the event).
+        let bus = EventBus::new();
+        let failure_seen = Arc::new(AtomicUsize::new(0));
+
+        // Subscriber 1: simulates create_governance_subscription behavior.
+        // On deserialization failure, it spawns a task to emit ProposalExecutionFailed.
+        let bus_for_sub1 = bus.clone();
+        let _handle1 = bus
+            .subscribe(Arc::new(move |event| {
+                if let SystemEvent::ProposalAccepted {
+                    proposal_id,
+                    payload,
+                    ..
+                } = event
+                {
+                    // Attempt to deserialize — this should fail for our test payload
+                    if serde_json::from_value::<icn_governance::ProposalPayload>(payload).is_err() {
+                        let bus = bus_for_sub1.clone();
+                        let pid = proposal_id;
+                        tokio::spawn(async move {
+                            bus.emit(SystemEvent::ProposalExecutionFailed {
+                                proposal_id: pid,
+                                proposal_type: "unknown".to_string(),
+                                error: "payload deserialization failed".to_string(),
+                                failed_at: 0,
+                            })
+                            .await;
+                        });
+                    }
+                }
+            }))
+            .await;
+
+        // Subscriber 2: observes ProposalExecutionFailed events
+        let fs = failure_seen.clone();
+        let _handle2 = bus
+            .subscribe(Arc::new(move |event| {
+                if let SystemEvent::ProposalExecutionFailed { .. } = event {
+                    fs.fetch_add(1, Ordering::SeqCst);
+                }
+            }))
+            .await;
+
+        // Emit ProposalAccepted with an invalid payload (not a valid ProposalPayload)
+        bus.emit(SystemEvent::ProposalAccepted {
+            proposal_id: "bad-payload-test".to_string(),
+            domain_id: "test".to_string(),
+            payload: serde_json::json!({"NotAValidVariant": true}),
+            decided_at: 0,
+        })
+        .await;
+
+        // Wait for the spawned task to complete
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        assert_eq!(
+            failure_seen.load(Ordering::SeqCst),
+            1,
+            "ProposalExecutionFailed should have been emitted for invalid payload"
+        );
     }
 }
