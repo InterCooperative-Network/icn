@@ -600,6 +600,14 @@ impl ServiceRegistry {
     pub const LEDGER_KEY: &str = "ledger";
     /// Key for `Arc<SledStore>` raw handle (shared with DisputeManager/TreasuryManager)
     pub const LEDGER_STORE_KEY: &str = "ledger_store";
+    /// Key for `Arc<RwLock<DisputeManager>>` raw handle
+    pub const DISPUTE_MANAGER_KEY: &str = "dispute_manager";
+    /// Key for `Arc<RwLock<TreasuryManager>>` raw handle
+    pub const TREASURY_MANAGER_KEY: &str = "treasury_manager";
+    /// Key for `Arc<RwLock<ContractRuntime>>` raw handle
+    pub const CONTRACT_RUNTIME_KEY: &str = "contract_runtime";
+    /// Key for `Arc<RwLock<ContractActor>>` raw handle
+    pub const CONTRACT_ACTOR_KEY: &str = "contract_actor";
 
     /// Create a new empty service registry
     pub fn new() -> Self {

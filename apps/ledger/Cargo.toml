@@ -25,6 +25,7 @@ tokio = { version = "1", features = ["sync", "rt"] }
 
 # Error handling
 anyhow = "1.0"
+thiserror = "2.0"
 
 # Logging
 tracing = "0.1"

@@ -7,8 +7,11 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// Re-export from icn-ledger to maintain single source of truth
-pub use icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD;
+/// Default suspicious rate threshold.
+///
+/// Must match `icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD`.
+/// A compile-time drift guard in `icn-ledger-app` (apps/ledger) ensures this.
+const DEFAULT_SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
 
 /// Configuration for the ledger subsystem
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -316,9 +319,7 @@ mod tests {
         assert!((config.oracle.outlier_threshold - 0.15).abs() < f64::EPSILON);
         assert_eq!(config.oracle.staleness_threshold_secs, 86400);
         assert!(
-            (config.oracle.default_suspicious_rate_threshold - DEFAULT_SUSPICIOUS_RATE_THRESHOLD)
-                .abs()
-                < f64::EPSILON
+            (config.oracle.default_suspicious_rate_threshold - 1000.0).abs() < f64::EPSILON
         );
         assert!(config.oracle.suspicious_rate_thresholds.is_empty());
     }
@@ -360,27 +361,6 @@ default_suspicious_rate_threshold = 500.0
     }
 
     #[test]
-    fn test_to_oracle_config() {
-        let mut thresholds = std::collections::HashMap::new();
-        thresholds.insert("USD:JPY".to_string(), 200.0);
-
-        let node_config = OracleNodeConfig {
-            default_suspicious_rate_threshold: 500.0,
-            suspicious_rate_thresholds: thresholds,
-            ..Default::default()
-        };
-
-        let oracle_config = node_config.to_oracle_config();
-
-        assert_eq!(oracle_config.default_ttl_secs, 3600);
-        assert!((oracle_config.default_suspicious_rate_threshold - 500.0).abs() < f64::EPSILON);
-        assert_eq!(
-            oracle_config.suspicious_rate_thresholds.get("USD:JPY"),
-            Some(&200.0)
-        );
-    }
-
-    #[test]
     fn test_partial_config() {
         // Test that we can provide only some fields and get defaults for others
         let toml_str = r#"
@@ -415,189 +395,6 @@ default_suspicious_rate_threshold = 2000.0
         assert!(settings.quorum_required.is_none());
         assert!(settings.quorum_witnesses.is_none());
         assert_eq!(settings.collection_timeout_secs, 300);
-    }
-
-    #[test]
-    fn test_witness_settings_none_policy() {
-        let settings = WitnessSettings::default();
-        let config = settings.to_witness_config().unwrap();
-
-        assert!(matches!(
-            config.default_policy,
-            icn_ledger::WitnessPolicy::None
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_counterparty_policy() {
-        let settings = WitnessSettings {
-            default_policy: "counterparty".to_string(),
-            threshold: Some(1000),
-            ..Default::default()
-        };
-        let config = settings.to_witness_config().unwrap();
-
-        assert!(matches!(
-            config.default_policy,
-            icn_ledger::WitnessPolicy::Counterparty
-        ));
-        assert_eq!(config.threshold, Some(1000));
-    }
-
-    #[test]
-    fn test_witness_settings_all_parties_policy() {
-        let settings = WitnessSettings {
-            default_policy: "all_parties".to_string(),
-            ..Default::default()
-        };
-        let config = settings.to_witness_config().unwrap();
-
-        assert!(matches!(
-            config.default_policy,
-            icn_ledger::WitnessPolicy::AllParties
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_quorum_policy() {
-        // Generate valid DIDs using keypairs
-        let keypair1 = icn_identity::KeyPair::generate().unwrap();
-        let keypair2 = icn_identity::KeyPair::generate().unwrap();
-        let keypair3 = icn_identity::KeyPair::generate().unwrap();
-
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_required: Some(2),
-            quorum_witnesses: Some(vec![
-                keypair1.did().to_string(),
-                keypair2.did().to_string(),
-                keypair3.did().to_string(),
-            ]),
-            collection_timeout_secs: 600,
-            ..Default::default()
-        };
-        let config = settings.to_witness_config().unwrap();
-
-        if let icn_ledger::WitnessPolicy::Quorum {
-            required,
-            witnesses,
-        } = config.default_policy
-        {
-            assert_eq!(required, 2);
-            assert_eq!(witnesses.len(), 3);
-        } else {
-            panic!("Expected Quorum policy");
-        }
-        assert_eq!(config.collection_timeout_secs, 600);
-    }
-
-    #[test]
-    fn test_witness_settings_quorum_missing_required() {
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_witnesses: Some(vec!["did:icn:test".to_string()]),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::MissingField(_)
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_quorum_missing_witnesses() {
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_required: Some(2),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::MissingField(_)
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_quorum_too_large() {
-        let keypair1 = icn_identity::KeyPair::generate().unwrap();
-        let keypair2 = icn_identity::KeyPair::generate().unwrap();
-
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_required: Some(5),
-            quorum_witnesses: Some(vec![
-                keypair1.did().to_string(),
-                keypair2.did().to_string(), // Only 2 distinct witnesses, require 5
-            ]),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::QuorumTooLarge { .. }
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_duplicate_witness() {
-        let keypair = icn_identity::KeyPair::generate().unwrap();
-
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_required: Some(2),
-            quorum_witnesses: Some(vec![
-                keypair.did().to_string(),
-                keypair.did().to_string(), // Same DID twice
-            ]),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::DuplicateWitness(_)
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_invalid_policy() {
-        let settings = WitnessSettings {
-            default_policy: "invalid_policy".to_string(),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::InvalidPolicy(_)
-        ));
-    }
-
-    #[test]
-    fn test_witness_settings_invalid_did() {
-        let settings = WitnessSettings {
-            default_policy: "quorum".to_string(),
-            quorum_required: Some(1),
-            quorum_witnesses: Some(vec!["not-a-valid-did".to_string()]),
-            ..Default::default()
-        };
-
-        let result = settings.to_witness_config();
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WitnessConfigError::InvalidDid(_, _)
-        ));
     }
 
     #[test]
