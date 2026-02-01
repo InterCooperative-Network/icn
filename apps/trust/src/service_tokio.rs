@@ -309,8 +309,25 @@ impl TrustService for TrustServiceImplTokio {
         use icn_trust::TrustAttestation;
 
         // Deserialize
-        let attestation: TrustAttestation =
-            serde_json::from_slice(bytes).map_err(|e| format!("Invalid attestation: {e}"))?;
+        let attestation: TrustAttestation = serde_json::from_slice(bytes)
+            .map_err(|e| {
+                icn_obs::metrics::trust::attestations_rejected_inc("malformed");
+                format!("Invalid attestation: {e}")
+            })?;
+
+        // Validate size limits EARLY (before expensive signature verification)
+        if let Err(e) = attestation.validate_size_limits() {
+            tracing::warn!(
+                source = %source,
+                "Rejecting attestation with excessive array sizes: {} -> {} ({})",
+                attestation.issuer, attestation.subject, e
+            );
+            icn_obs::metrics::trust::attestations_rejected_inc("size_limit");
+            return Err(format!(
+                "Size limit violation for attestation {} -> {}: {e}",
+                attestation.issuer, attestation.subject
+            ));
+        }
 
         // Verify signature — reject unsigned or invalid attestations
         if let Err(e) = attestation.verify() {
@@ -319,6 +336,8 @@ impl TrustService for TrustServiceImplTokio {
                 "Rejecting trust attestation with invalid signature: {} -> {} (error: {})",
                 attestation.issuer, attestation.subject, e
             );
+            icn_obs::metrics::trust::attestations_rejected_invalid_signature_inc();
+            icn_obs::metrics::trust::attestations_rejected_inc("unsigned");
             return Err(format!(
                 "Invalid attestation signature from {} -> {} (envelope source: {}): {e}",
                 attestation.issuer, attestation.subject, source
@@ -337,6 +356,8 @@ impl TrustService for TrustServiceImplTokio {
                 "Received expired trust attestation: {} -> {}",
                 attestation.issuer, attestation.subject,
             );
+            icn_obs::metrics::trust::attestations_rejected_expired_inc();
+            icn_obs::metrics::trust::attestations_rejected_inc("expired");
             return Ok(()); // Silently reject expired attestations
         }
 
@@ -395,6 +416,8 @@ impl TrustService for TrustServiceImplTokio {
                                 edge.source,
                                 edge.target,
                             );
+                            icn_obs::metrics::trust::attestations_rejected_outdated_inc();
+                            icn_obs::metrics::trust::attestations_rejected_inc("outdated");
                             return Ok(());
                         }
                     }
@@ -423,6 +446,9 @@ impl TrustService for TrustServiceImplTokio {
                         );
                     }
                 }
+
+                // Emit success metric
+                icn_obs::metrics::trust::attestations_ingested_inc();
 
                 tracing::info!(
                     "Applied remote trust attestation: {} -> {} (score: {})",
@@ -590,6 +616,9 @@ impl TrustService for TrustServiceImplTokio {
                 attestation
                     .sign(&self.keypair)
                     .map_err(|e| format!("Failed to sign attestation: {e}"))?;
+
+                // Emit metric for signed attestation (outbound)
+                icn_obs::metrics::trust::attestations_signed_inc();
 
                 serde_json::to_vec(&attestation).map_err(|e| format!("{e}"))
             })
@@ -1173,5 +1202,107 @@ mod tests {
             .expect("Revocation signature must be valid");
         assert_eq!(revocation.issuer, *keypair.did());
         assert_eq!(revocation.subject, *target.did());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_excessive_labels() {
+        // Test that attestations with too many labels are rejected
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair.clone(), store);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+
+        // Create attestation with MAX_LABELS + 1 labels
+        let mut attestation = icn_trust::TrustAttestation::new(
+            issuer.did().clone(),
+            target.did().clone(),
+            0.5,
+        );
+        for i in 0..=icn_trust::attestation::MAX_LABELS {
+            attestation.labels.push(format!("label_{}", i));
+        }
+        attestation.sign(&issuer).unwrap();
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many labels"
+        );
+        assert!(
+            result.unwrap_err().contains("Too many labels"),
+            "Error should mention label limit"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_rejects_excessive_evidence() {
+        // Test that attestations with too many evidence entries are rejected
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair.clone(), store);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+
+        // Create attestation with MAX_EVIDENCE + 1 evidence entries
+        let mut attestation = icn_trust::TrustAttestation::new(
+            issuer.did().clone(),
+            target.did().clone(),
+            0.5,
+        );
+        for i in 0..=icn_trust::attestation::MAX_EVIDENCE {
+            attestation.evidence.push(format!("evidence_{}", i));
+        }
+        attestation.sign(&issuer).unwrap();
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many evidence entries"
+        );
+        assert!(
+            result.unwrap_err().contains("Too many evidence"),
+            "Error should mention evidence limit"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_accepts_attestation_within_limits() {
+        // Test that attestations within size limits are accepted
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair.clone(), store);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+
+        // Create attestation with exactly MAX_LABELS and MAX_EVIDENCE
+        let mut attestation = icn_trust::TrustAttestation::new(
+            issuer.did().clone(),
+            target.did().clone(),
+            0.5,
+        );
+        for i in 0..icn_trust::attestation::MAX_LABELS {
+            attestation.labels.push(format!("label_{}", i));
+        }
+        for i in 0..icn_trust::attestation::MAX_EVIDENCE {
+            attestation.evidence.push(format!("evidence_{}", i));
+        }
+        attestation.sign(&issuer).unwrap();
+
+        let bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+
+        let result = service.ingest_attestation(&bytes, &source);
+        assert!(
+            result.is_ok(),
+            "Should accept attestation at size limits: {:?}",
+            result
+        );
     }
 }

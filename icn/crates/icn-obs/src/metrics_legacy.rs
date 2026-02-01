@@ -362,23 +362,31 @@ pub fn init_descriptions() {
         "Time to compress a vector clock"
     );
     describe_counter!(
-        "icn_scalability_trust_cache_hits_total",
+        "icn_trust_cache_hits_total",
         "Total number of trust cache hits"
     );
     describe_counter!(
-        "icn_scalability_trust_cache_misses_total",
+        "icn_trust_cache_misses_total",
         "Total number of trust cache misses"
     );
     describe_counter!(
-        "icn_scalability_trust_cache_expired_total",
+        "icn_trust_cache_expired_total",
         "Total number of expired trust cache entries"
     );
     describe_counter!(
-        "icn_scalability_trust_cache_invalidations_total",
+        "icn_trust_cache_invalidations_total",
         "Total number of trust cache invalidations"
     );
+    describe_counter!(
+        "icn_trust_cache_transitive_invalidations_total",
+        "Total number of transitive cache invalidations"
+    );
+    describe_counter!(
+        "icn_trust_cache_invalidation_errors_total",
+        "Total number of cache invalidation errors"
+    );
     describe_gauge!(
-        "icn_scalability_trust_cache_size",
+        "icn_trust_cache_size",
         "Current number of entries in trust cache"
     );
     describe_counter!(
@@ -544,6 +552,18 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_trust_attestations_broadcasted_total",
         "Total number of trust attestations broadcasted to network"
+    );
+    describe_counter!(
+        "icn_trust_attestation_ingested_total",
+        "Total number of trust attestations successfully ingested (accepted after validation)"
+    );
+    describe_counter!(
+        "icn_trust_attestation_signed_total",
+        "Total number of trust attestations signed at submission (outbound attestations)"
+    );
+    describe_counter!(
+        "icn_trust_attestation_rejections_total",
+        "Total number of trust attestations rejected during ingestion, labeled by rejection reason"
     );
     describe_counter!(
         "icn_trust_attestations_rejected_expired_total",
@@ -2243,19 +2263,19 @@ pub mod scalability {
 
     // Trust cache metrics
     pub fn trust_cache_hits_inc() {
-        counter!("icn_scalability_trust_cache_hits_total").increment(1);
+        counter!("icn_trust_cache_hits_total").increment(1);
     }
 
     pub fn trust_cache_misses_inc() {
-        counter!("icn_scalability_trust_cache_misses_total").increment(1);
+        counter!("icn_trust_cache_misses_total").increment(1);
     }
 
     pub fn trust_cache_expired_inc() {
-        counter!("icn_scalability_trust_cache_expired_total").increment(1);
+        counter!("icn_trust_cache_expired_total").increment(1);
     }
 
     pub fn trust_cache_invalidations_inc() {
-        counter!("icn_scalability_trust_cache_invalidations_total").increment(1);
+        counter!("icn_trust_cache_invalidations_total").increment(1);
     }
 
     /// Record a transitive cache invalidation event.
@@ -2263,7 +2283,7 @@ pub mod scalability {
     /// Emitted when an edge mutation triggers one-hop-out invalidation
     /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
     pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
-        counter!("icn_scalability_trust_cache_transitive_invalidations_total")
+        counter!("icn_trust_cache_transitive_invalidations_total")
             .increment(downstream_count);
     }
 
@@ -2273,11 +2293,11 @@ pub mod scalability {
     /// target is still invalidated but transitive targets may remain stale until
     /// TTL expiry. Monitor this metric to detect storage issues.
     pub fn trust_cache_invalidation_errors_inc() {
-        counter!("icn_scalability_trust_cache_invalidation_errors_total").increment(1);
+        counter!("icn_trust_cache_invalidation_errors_total").increment(1);
     }
 
     pub fn trust_cache_size_set(size: usize) {
-        gauge!("icn_scalability_trust_cache_size").set(size as f64);
+        gauge!("icn_trust_cache_size").set(size as f64);
     }
 
     // Batch verification metrics
@@ -2720,6 +2740,22 @@ pub mod trust {
         counter!("icn_trust_attestations_broadcasted_total").increment(1);
     }
 
+    pub fn attestations_ingested_inc() {
+        counter!("icn_trust_attestation_ingested_total").increment(1);
+    }
+
+    pub fn attestations_signed_inc() {
+        counter!("icn_trust_attestation_signed_total").increment(1);
+    }
+
+    pub fn attestations_rejected_inc(reason: &str) {
+        counter!(
+            "icn_trust_attestation_rejections_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
     pub fn attestations_rejected_expired_inc() {
         counter!("icn_trust_attestations_rejected_expired_total").increment(1);
     }
@@ -2737,7 +2773,8 @@ pub mod trust {
     }
 
     pub fn attestations_rejected_invalid_evidence_inc() {
-        counter!("icn_trust_attestations_rejected_invalid_evidence_total").increment(1);
+        counter!("icn_trust_attestation_rejections_total", "reason" => "invalid_evidence")
+            .increment(1);
     }
 
     pub fn attestations_new_inc() {

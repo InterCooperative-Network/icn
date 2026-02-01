@@ -105,6 +105,8 @@ pub async fn handle_trust_attestation_via_service(
             ) {
                 if let Err(reason) = rate_limiter.check(&issuer_did, &subject_did).await {
                     warn!("Rate limited attestation: {}", reason);
+                    icn_obs::metrics::trust::attestations_rejected_rate_limited_inc();
+                    icn_obs::metrics::trust::attestations_rejected_inc("rate_limited");
                     return;
                 }
             }
