@@ -569,6 +569,18 @@ async fn spawn_actors_with_identity(
             info!("✓ Federation components wired to governance event handler");
         }
 
+        // Create a proposal executor from the handler (Phase 4 Sprint 2)
+        // This demonstrates the ProposalExecutor trait interface.
+        // Future sprints will use this for actual dispatch instead of event subscription.
+        let handler_for_executor = handler.clone();
+        let _executor: Arc<dyn icn_kernel_api::services::ProposalExecutor> =
+            icn_governance_actor::create_executor(
+                super::governance_handlers::create_execution_callback(handler_for_executor),
+            );
+        // NOTE: Executor is created but not yet used for dispatch.
+        // Current dispatch still uses event subscription (create_governance_subscription).
+        // Sprint 3+ will replace event subscription with executor-based dispatch.
+
         event_bus
             .subscribe(super::governance_handlers::create_governance_subscription(
                 handler,

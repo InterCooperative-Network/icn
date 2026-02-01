@@ -820,6 +820,46 @@ pub fn create_governance_subscription(
     })
 }
 
+/// Create an execution callback from a GovernanceEventHandler
+///
+/// This bridges the kernel-api ProposalExecutor interface with the existing
+/// GovernanceEventHandler. The callback deserializes the JSON payload and
+/// delegates to the handler's handle_proposal_accepted method.
+///
+/// # Phase 4 Sprint 2
+///
+/// This is a temporary bridge. Future sprints will move handler logic into
+/// apps/governance, eliminating this callback pattern.
+pub fn create_execution_callback(
+    handler: GovernanceEventHandler,
+) -> icn_governance_actor::executor::ExecutionCallback {
+    Arc::new(
+        move |proposal_id: &str, payload: &serde_json::Value, decided_at: u64, domain_id: &str| {
+            // Deserialize the JSON payload to ProposalPayload
+            match serde_json::from_value::<ProposalPayload>(payload.clone()) {
+                Ok(proposal_payload) => {
+                    handler.handle_proposal_accepted(
+                        ProposalId(proposal_id.to_string()),
+                        proposal_payload,
+                        decided_at,
+                        domain_id.to_string(),
+                    );
+                    Ok(())
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to deserialize ProposalPayload: {}", e);
+                    error!(
+                        proposal_id = %proposal_id,
+                        error = %error_msg,
+                        "Proposal execution failed"
+                    );
+                    Err(error_msg)
+                }
+            }
+        },
+    )
+}
+
 /// Handler for scheduling policy governance events
 ///
 /// Separate from the main GovernanceEventHandler because it requires
