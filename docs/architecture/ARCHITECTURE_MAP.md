@@ -27,11 +27,15 @@ ICN implements a **constraint enforcement architecture** (the "constraint engine
 
 ### Component Organization
 
-The implementation organizes ICN's subsystems into functional areas:
+The implementation organizes ICN's subsystems into functional areas.
+
+> **Note:** This diagram groups crates by functional area, **not** by sequential OSI-like layers.
+> Components interact across areas freely; the kernel/oracle boundary (not vertical position)
+> is the architecturally significant split. See `ARCHITECTURE.md` for the constraint engine model.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                        APPLICATION LAYER                              │
+│                      APPLICATIONS & CLI                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ icn-console  │  │   icnctl     │  │    icnd      │               │
 │  │  (TUI App)   │  │  (CLI Mgmt)  │  │  (Daemon)    │               │
@@ -39,7 +43,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         GATEWAY LAYER                                 │
+│                        API BOUNDARY                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-gateway: REST + WebSocket API                           │   │
 │  │  - Authentication (JWT)                                       │   │
@@ -54,7 +58,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                      COORDINATION LAYER                               │
+│                POLICY ORACLES (Governance & Contracts)                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ icn-compute  │  │icn-governance│  │  icn-ccl     │               │
 │  │ Distributed  │  │ Democratic   │  │  Contract    │               │
@@ -63,7 +67,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                      SYNCHRONIZATION LAYER                            │
+│                     REPLICATION & GOSSIP                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-gossip: Topic-based Pub/Sub                              │   │
 │  │  - Push/Pull protocol                                         │   │
@@ -74,7 +78,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         LEDGER LAYER                                  │
+│                     ECONOMIC PRIMITIVES                               │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-ledger: Double-Entry Mutual Credit                       │   │
 │  │  - Merkle-DAG journal                                         │   │
@@ -86,7 +90,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         TRUST LAYER                                   │
+│                TRUST COMPUTATION (Policy Oracle)                       │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-trust: Web-of-Participation Graph                        │   │
 │  │  - Transitive trust computation                               │   │
@@ -97,7 +101,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         NETWORK LAYER                                 │
+│                          TRANSPORT                                    │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-net: QUIC/TLS Transport                                  │   │
 │  │  - DID-TLS binding (certificate verification)                 │   │
@@ -110,7 +114,7 @@ The implementation organizes ICN's subsystems into functional areas:
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         IDENTITY LAYER                                │
+│                      IDENTITY PRIMITIVES                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-identity: Decentralized Identifiers                      │   │
 │  │  - DID format: did:icn:<base58-pubkey>                        │   │

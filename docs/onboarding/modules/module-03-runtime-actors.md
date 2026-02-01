@@ -6,7 +6,7 @@
 
 This module teaches you how ICN starts up, manages long-running services, and coordinates graceful shutdown. Understanding the runtime and actor model is essential for contributing to any ICN subsystem.
 
-In the constraint engine model, the runtime and supervisor are part of the **kernel** (enforcement layer), while actors like Trust, Governance, and Ledger are **policy oracles** that translate domain semantics into constraints.
+In the constraint engine model, the runtime and supervisor are part of the **kernel** (enforcement mechanisms), while actors like Trust, Governance, and Ledger are **policy oracles** that translate domain semantics into constraints.
 
 ## Objectives
 - Trace the startup flow from `icnd` main to running actors

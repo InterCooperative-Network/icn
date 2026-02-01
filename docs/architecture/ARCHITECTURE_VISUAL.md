@@ -13,7 +13,7 @@ ICN implements a constraint enforcement architecture where Policy Oracles (apps/
 │  ┌─────────────────────────────────────────────────────────────────┐│
 │  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
 │  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
-│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
 │  └─────────────────────────────────────────────────────────────────┘│
 │                                                                      │
 │   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
