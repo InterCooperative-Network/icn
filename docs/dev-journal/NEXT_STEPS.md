@@ -387,14 +387,14 @@ After completing steps 1-7, you should have:
 
 1. **Commit frequently**: Each completed step should be a commit
 2. **Document as you go**: Add findings to gap tracking doc
-3. **Ask for help**: If stuck, create GitHub issue with `question` label
+3. **Ask for help**: If stuck, create a GitHub issue
 4. **Take breaks**: This is a marathon, not a sprint
 
 ---
 
 ## 📞 Support
 
-- **Questions**: Create issue with `question` label
+- **Questions**: Create a GitHub issue
 - **Bugs**: Create issue with `bug` label  
 - **Urgent**: Matt Faherty (see CONTRIBUTING.md)
 
