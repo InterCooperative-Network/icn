@@ -65,6 +65,7 @@
 
 pub mod anomaly;
 pub mod attestation;
+pub mod computation;
 pub mod evidence;
 pub mod evidence_validator;
 pub mod facade;
@@ -79,6 +80,7 @@ pub mod types;
 
 pub use anomaly::{anomalies_to_sybil_flags, TrustAnomaly, TrustGraphAnalyzer};
 pub use attestation::TrustAttestation;
+pub use computation::compute_trust_score;
 pub use evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
 };
@@ -606,33 +608,34 @@ impl TrustGraph {
         // Get transitive trust (via intermediates we trust)
         let own_edges = self.get_outgoing_edges(&self.own_did)?;
 
-        let mut transitive_sum = 0.0;
-        let mut transitive_count = 0;
+        // Build iterator of (intermediate_trust, indirect_trust) pairs
+        let intermediates: Vec<_> = own_edges
+            .into_iter()
+            .filter(|edge| edge.target != *target) // Skip if intermediate is the target
+            .filter_map(|intermediate_edge| {
+                // Get edge from intermediate to target
+                self.get_edge(&intermediate_edge.target, target)
+                    .ok()
+                    .flatten()
+                    .map(|indirect_edge| {
+                        (intermediate_edge.score.value(), indirect_edge.score.value())
+                    })
+            })
+            .collect();
 
-        for intermediate_edge in own_edges {
-            // Skip if intermediate is the target
-            if intermediate_edge.target == *target {
-                continue;
-            }
+        // Use shared computation algorithm
+        let final_score = crate::computation::compute_trust_score(
+            direct_score,
+            intermediates.iter().copied(),
+            weights,
+        );
 
-            // Get edge from intermediate to target
-            if let Some(indirect_edge) = self.get_edge(&intermediate_edge.target, target)? {
-                // Weight: trust in intermediate * trust from intermediate to target
-                let weight = intermediate_edge.score * indirect_edge.score;
-                transitive_sum += weight;
-                transitive_count += 1;
-            }
-        }
-
-        let transitive_score = if transitive_count > 0 {
-            transitive_sum / transitive_count as f64
+        // Compute transitive score for debug logging
+        let transitive_score = if !intermediates.is_empty() {
+            intermediates.iter().map(|(a, b)| a * b).sum::<f64>() / intermediates.len() as f64
         } else {
             0.0
         };
-
-        // Combine using provided weights
-        let final_score =
-            (direct_score * weights.direct + transitive_score * weights.transitive).min(1.0);
 
         debug!(
             "Trust score for {}: direct={}, transitive={}, final={} (weights: {}/{})",
