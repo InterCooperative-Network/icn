@@ -781,7 +781,8 @@ mod tests {
             icn_trust::TrustScore::unchecked(0.8),
             icn_trust::types::TrustGraphType::Social,
         );
-        edge1.created_at = now; // Override to ensure deterministic timestamp
+        // Override timestamp for deterministic test behavior (constructors use current time)
+        edge1.created_at = now;
 
         let mut edge2 = icn_trust::TrustEdge::new_typed(
             bob.did().clone(),
@@ -789,7 +790,8 @@ mod tests {
             icn_trust::TrustScore::unchecked(0.6),
             icn_trust::types::TrustGraphType::Social,
         );
-        edge2.created_at = now; // Override to ensure deterministic timestamp
+        // Override timestamp for deterministic test behavior (constructors use current time)
+        edge2.created_at = now;
 
         {
             let mut g = graph.write().await;
