@@ -411,6 +411,61 @@ pub enum GovernanceEvent {
     },
 }
 
+/// Abstract proposal executor interface
+///
+/// This trait provides a kernel-level interface for executing governance proposals
+/// without exposing proposal types, voting mechanisms, or governance semantics.
+///
+/// # The Meaning Firewall
+///
+/// The kernel sees proposals as opaque JSON blobs with string identifiers.
+/// The governance app interprets the JSON, executes domain logic, and returns
+/// a success/failure result. The kernel routes the result but never understands
+/// the proposal content.
+///
+/// # Implementation
+///
+/// Apps that provide governance functionality implement this trait. The kernel
+/// uses it to:
+/// - Execute proposals after they are accepted
+/// - Get execution results (success/failure with error messages)
+/// - Maintain separation between kernel dispatch and domain logic
+///
+/// The kernel NEVER interprets proposal payloads - it just routes them to the executor.
+pub trait ProposalExecutor: Send + Sync {
+    /// Execute a governance proposal
+    ///
+    /// The kernel calls this method when a proposal is accepted, passing:
+    /// - `proposal_id`: Opaque identifier for the proposal
+    /// - `payload`: Serialized proposal payload (opaque JSON)
+    /// - `decided_at`: Timestamp when the proposal was accepted (seconds since epoch)
+    /// - `domain_id`: Governance domain identifier (opaque string)
+    ///
+    /// The executor:
+    /// 1. Deserializes the payload
+    /// 2. Validates it against domain rules
+    /// 3. Executes the corresponding action (ledger transfer, parameter change, etc.)
+    /// 4. Returns success or failure with an error message
+    ///
+    /// # Error Handling
+    ///
+    /// Execution errors are returned as `Err(String)`. The kernel logs these
+    /// errors but does not interpret their meaning. The governance app decides
+    /// whether to retry, skip, or escalate failures.
+    ///
+    /// # Sync/Async Note
+    ///
+    /// This method is synchronous for ergonomic kernel integration. Implementations
+    /// may use `tokio::task::block_in_place()` if they need async operations.
+    fn execute_proposal(
+        &self,
+        proposal_id: &str,
+        payload: &serde_json::Value,
+        decided_at: u64,
+        domain_id: &str,
+    ) -> Result<(), String>;
+}
+
 /// Abstract ledger service interface
 ///
 /// This trait provides ledger-related functionality to the kernel without
@@ -607,6 +662,7 @@ pub struct ServiceRegistry {
     trust: Option<Arc<dyn TrustService>>,
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
+    proposal_executor: Option<Arc<dyn ProposalExecutor>>,
     ledger: Option<Arc<dyn LedgerService>>,
     cell: Option<Arc<dyn CellService>>,
 }
@@ -624,6 +680,7 @@ impl ServiceRegistry {
             trust: None,
             security: None,
             governance: None,
+            proposal_executor: None,
             ledger: None,
             cell: None,
         }
@@ -644,6 +701,12 @@ impl ServiceRegistry {
     /// Register a governance service
     pub fn with_governance(mut self, service: Arc<dyn GovernanceService>) -> Self {
         self.governance = Some(service);
+        self
+    }
+
+    /// Register a proposal executor
+    pub fn with_proposal_executor(mut self, executor: Arc<dyn ProposalExecutor>) -> Self {
+        self.proposal_executor = Some(executor);
         self
     }
 
@@ -672,6 +735,11 @@ impl ServiceRegistry {
     /// Get the governance service (if registered)
     pub fn governance(&self) -> Option<&Arc<dyn GovernanceService>> {
         self.governance.as_ref()
+    }
+
+    /// Get the proposal executor (if registered)
+    pub fn proposal_executor(&self) -> Option<&Arc<dyn ProposalExecutor>> {
+        self.proposal_executor.as_ref()
     }
 
     /// Get the ledger service (if registered)

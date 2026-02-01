@@ -3198,6 +3198,8 @@ dependencies = [
  "icn-kernel-api",
  "icn-store",
  "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -3584,7 +3586,6 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-store",
- "icn-time",
  "icn-trust",
  "parking_lot 0.12.5",
  "serde_json",
