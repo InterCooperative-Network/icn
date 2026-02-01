@@ -1144,10 +1144,8 @@ mod tests {
         // At boundary (time_diff = 300), condition is NOT > 300, so falls into tolerance window
         // Higher score should still win
         assert!(
-            boundary_high_score.should_supersede(
-                boundary_low_score.created_at,
-                boundary_low_score.score
-            ),
+            boundary_high_score
+                .should_supersede(boundary_low_score.created_at, boundary_low_score.score),
             "At tolerance boundary, higher score should supersede"
         );
     }
