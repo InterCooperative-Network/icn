@@ -32,9 +32,12 @@
 //! `LedgerService` trait from `icn-kernel-api`. This provides a clean
 //! abstraction that the kernel can use without domain knowledge.
 
+pub mod budgets;
 pub mod config;
+pub mod escrow;
 pub mod init;
 pub mod oracle;
+pub mod recurring;
 pub mod service;
 
 use std::sync::Arc;
@@ -42,6 +45,11 @@ use tokio::sync::RwLock;
 
 pub use oracle::LedgerPolicyOracle;
 pub use service::LedgerServiceImpl;
+
+// Re-export domain-specific types
+pub use budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
+pub use escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
+pub use recurring::{PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus};
 
 /// Create a LedgerPolicyOracle instance.
 ///

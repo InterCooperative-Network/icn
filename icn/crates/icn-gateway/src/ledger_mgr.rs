@@ -25,7 +25,7 @@ pub struct LedgerManager {
     /// Shared event emitter for ledger events (used by notification triggers)
     ledger_emitter: SharedEventEmitter,
     data_dir: Option<PathBuf>,
-    budget_store: Option<Arc<icn_store::budgets::BudgetStore>>,
+    budget_store: Option<Arc<icn_ledger_app::BudgetStore>>,
 }
 
 impl Default for LedgerManager {
@@ -115,7 +115,7 @@ impl LedgerManager {
     }
 
     /// Set the budget store for spending limits
-    pub fn set_budget_store(&mut self, budget_store: Arc<icn_store::budgets::BudgetStore>) {
+    pub fn set_budget_store(&mut self, budget_store: Arc<icn_ledger_app::BudgetStore>) {
         self.budget_store = Some(budget_store);
     }
 
