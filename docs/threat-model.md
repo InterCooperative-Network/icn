@@ -1,8 +1,8 @@
 # ICN Threat Model
 
-**Version**: 1.1
-**Date**: 2026-01-04
-**Status**: Updated for Pilot Deployment
+**Version**: 1.2
+**Date**: 2026-02-01
+**Status**: Updated for Trust Score Timing Analysis
 **Authors**: Security Review Team
 
 ## Executive Summary
@@ -410,6 +410,38 @@ This document provides a formal threat model for the InterCooperative Network (I
 | Threat | Description | Mitigation | Status |
 |--------|-------------|------------|--------|
 | TR-I1 | Enumerate trust relationships | ⚠️ Trust graph queryable | 🟡 By Design |
+| TR-I2 | `inputs_hash` timing attack | Raw timestamps in hash leak attestation arrival patterns | 🟡 Documented |
+
+**TR-I2 Details**: The `inputs_hash` field in `TrustScoreResult` (see `apps/trust/src/reducer.rs:211-222`) 
+includes raw `created_at` timestamps (Unix seconds) from trust attestations. When nodes exchange 
+`inputs_hash` values in P2P queries or gossip, an attacker can:
+
+1. **Temporal inference**: Observe hash changes to infer when new attestations arrive
+2. **Relationship correlation**: Correlate hash values across nodes to detect shared trust relationships
+3. **Network mapping**: Build a temporal map of trust network formation
+
+**Attack Scenario**: Alice attests trust for Bob at t=1000. Eve queries Alice's trust score for Bob 
+repeatedly. The `inputs_hash` changes at t=1000, revealing to Eve the exact moment Alice's attestation 
+arrived. If Eve queries multiple nodes and sees the same hash change pattern, Eve can infer Bob received 
+attestations from multiple parties simultaneously (coordination event).
+
+**Current Mitigation**: None. Timestamp precision is preserved for cache invalidation and deduplication.
+
+**Recommended Mitigations** (see GAP-M5):
+- **Option A**: Truncate `created_at` to hourly/daily buckets (e.g., `created_at - (created_at % 3600)`)
+  - Pros: Simple, maintains relative ordering for deduplication
+  - Cons: Reduces cache invalidation precision, may cause false deduplication within window
+- **Option B**: Hash only non-temporal fields, track timestamps separately
+  - Pros: Eliminates timing leak entirely
+  - Cons: Breaks determinism guarantee (same attestations → different hashes if arrival times differ)
+- **Option C**: Add random delay to hash propagation (traffic obfuscation)
+  - Pros: Preserves determinism, mitigates correlation attacks
+  - Cons: Adds latency, complex implementation
+
+**Cross-References**:
+- `icn-privacy` metadata protection primitives (traffic obfuscation - planned)
+- Trust score caching in `apps/trust/src/service_tokio.rs`
+- `TrustScoreResult` definition in `icn/crates/icn-kernel-api/src/services.rs:116-144`
 
 #### Denial of Service
 
@@ -784,6 +816,43 @@ This document provides a formal threat model for the InterCooperative Network (I
 | GAP-M2 | mDNS exposes local presence | Local network attackers see nodes | Add optional private discovery | Medium |
 | GAP-M3 | Subscription metadata visible | Topic structure reveals interests | Add encrypted topic names | Medium |
 | GAP-M4 | Votes visible during voting | Enables vote buying | Implement commit-reveal scheme | Medium |
+| GAP-M5 | Trust score `inputs_hash` timing leak | Raw timestamps reveal attestation arrival patterns | Truncate timestamps to coarser granularity or add traffic obfuscation | Low-Medium |
+
+**GAP-M5 Details**: The `inputs_hash` computation in the trust attestation reducer 
+(`apps/trust/src/reducer.rs:211-222`) includes raw Unix timestamps from attestations. 
+This creates a timing side-channel that allows adversaries to:
+
+- **Correlation Attack**: Query `inputs_hash` from multiple nodes. Identical hashes indicate nodes 
+  processed the same attestations with the same timestamps, revealing shared trust relationships.
+- **Temporal Attack**: Poll a target node's trust score repeatedly. Hash changes reveal the exact 
+  moment new attestations arrive, enabling network activity monitoring.
+- **Social Graph Mapping**: Combine timing data across nodes to build a temporal map of trust 
+  network formation (who attested for whom, and when).
+
+**Severity Rationale**: Medium risk because:
+- Requires persistent polling (detectable via rate limiting)
+- Limited scope (only reveals timing of trust graph changes, not content)
+- Mitigated by cooperative's transparency philosophy (trust graph is intentionally public)
+
+However, timing precision could enable targeted attacks:
+- Coordinated social engineering (attacker knows when target receives recommendations)
+- Vote manipulation (correlate attestations with governance proposals)
+- Sybil detection evasion (coordinate attestations to appear organic)
+
+**Decision Criteria for Mitigation**:
+1. **No action needed if**: Cooperatives accept that attestation timing is observable (transparency trade-off)
+2. **Timestamp truncation if**: Cooperatives need timing obfuscation without breaking cache invalidation
+3. **Traffic obfuscation if**: Cooperatives require strong unlinkability (enterprise/sensitive contexts)
+
+**Implementation Path**:
+- **Phase 1** (Low effort): Document trade-off in operator manual, add warning in API docs
+- **Phase 2** (Medium effort): Add configurable timestamp truncation (hourly/daily buckets)
+- **Phase 3** (High effort): Integrate with `icn-privacy` traffic obfuscation (random delays, cover traffic)
+
+**Related**:
+- Threat TR-I2 in Section 4.3 (Trust System - Information Disclosure)
+- `icn-privacy` traffic obfuscation module (planned)
+- Trust score caching and invalidation strategy
 
 ### 6.3 Low Priority Gaps
 
@@ -890,6 +959,12 @@ See [incident-response.md](incident-response.md) for K3s-specific incident proce
 
 ## Changelog
 
+- **2026-02-01**: Trust score timing attack documentation (v1.2)
+  - Added TR-I2 threat: `inputs_hash` timing side-channel
+  - Added GAP-M5 gap: Trust score timestamp precision leak
+  - Documented three mitigation options with trade-offs
+  - Cross-referenced with `icn-privacy` traffic obfuscation
+  - Related: Issue #999, PR #987
 - **2026-01-04**: Updated for pilot deployment (v1.1)
   - Added Byzantine Detection mitigations (Phase 18)
   - Added SDIS identity verification controls
