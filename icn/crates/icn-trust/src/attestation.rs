@@ -318,6 +318,10 @@ impl TrustAttestation {
     /// `true` if this attestation should supersede the other, `false` otherwise
     pub fn should_supersede(&self, other_created_at: u64, other_score: f64) -> bool {
         const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300; // 5 minutes
+        /// Score difference below which two scores are considered equal.
+        /// Chosen to absorb floating-point rounding while remaining well below
+        /// any meaningful trust difference.
+        const SCORE_EPSILON: f64 = 0.001;
 
         let time_diff = self.created_at as i64 - other_created_at as i64;
 
@@ -333,7 +337,7 @@ impl TrustAttestation {
 
         // Within tolerance window: use score as tiebreaker
         // Higher trust wins. If scores are equal, accept the newer one (even if within tolerance)
-        if (self.score - other_score).abs() < 0.001 {
+        if (self.score - other_score).abs() < SCORE_EPSILON {
             // Scores effectively equal - accept newer timestamp
             time_diff >= 0
         } else {
@@ -1147,6 +1151,44 @@ mod tests {
             boundary_high_score
                 .should_supersede(boundary_low_score.created_at, boundary_low_score.score),
             "At tolerance boundary, higher score should supersede"
+        );
+
+        // Case 3: Just OUTSIDE tolerance (301 seconds)
+        // At 301s the newer attestation is "clearly newer" so it wins regardless of score.
+        let just_outside = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.1, // Lower score
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 301, // Just outside tolerance
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let older_high = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        // 301s difference: newer wins regardless of lower score (replay protection)
+        assert!(
+            just_outside.should_supersede(older_high.created_at, older_high.score),
+            "Just outside tolerance (301s), newer should win even with lower score"
+        );
+
+        // Older cannot supersede newer outside tolerance
+        assert!(
+            !older_high.should_supersede(just_outside.created_at, just_outside.score),
+            "Just outside tolerance (301s), older should NOT supersede newer"
         );
     }
 }
