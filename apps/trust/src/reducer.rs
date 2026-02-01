@@ -16,6 +16,13 @@
 //!                                     ├── compute average score
 //!                                     └── hash inputs for provenance
 //! ```
+//!
+//! # Trust Boundaries
+//!
+//! - [`AttestationReducer::new()`]: Verifies Ed25519 signatures. Use for
+//!   attestations received over the network.
+//! - [`AttestationReducer::with_skip_verification()`]: Trusts the storage
+//!   layer. Use **only** for edges already validated at ingestion time.
 
 use icn_trust::TrustAttestation;
 use sha2::{Digest, Sha256};
