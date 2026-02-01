@@ -565,8 +565,6 @@ impl TrustGraphAnalyzer {
         graph: &TypedTrustGraph,
         scope: &crate::ScopeId,
     ) -> anyhow::Result<CentralizationMetrics> {
-        use std::collections::HashMap;
-
         // Get edges in scope
         let edges = graph.inner().get_edges_in_scope(scope)?;
 
@@ -604,7 +602,7 @@ impl TrustGraphAnalyzer {
         let top_10_percent_share = self.compute_top_concentration(&inbound_trust, 0.1);
 
         // Compute betweenness centrality
-        let betweenness = self.compute_betweenness_stats(&edges, &nodes);
+        let betweenness = self.compute_betweenness_stats(&edges);
 
         Ok(CentralizationMetrics {
             gini_coefficient: gini,
@@ -683,10 +681,7 @@ impl TrustGraphAnalyzer {
     fn compute_betweenness_stats(
         &self,
         edges: &[crate::TrustEdge],
-        _nodes: &HashSet<Did>,
     ) -> BetweennessStats {
-        use std::collections::HashMap;
-
         // Extract nodes from edges
         let mut nodes = HashSet::new();
         for edge in edges {
@@ -765,8 +760,6 @@ impl TrustGraphAnalyzer {
         start: &Did,
         adj: &HashMap<Did, Vec<Did>>,
     ) -> HashMap<Did, Vec<Did>> {
-        use std::collections::{HashMap, VecDeque};
-
         let mut paths: HashMap<Did, Vec<Did>> = HashMap::new();
         let mut visited: HashSet<Did> = HashSet::new();
         let mut queue: VecDeque<(Did, Vec<Did>)> = VecDeque::new();

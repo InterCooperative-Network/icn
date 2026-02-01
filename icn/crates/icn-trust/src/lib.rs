@@ -888,7 +888,7 @@ impl TrustGraph {
             .collect();
 
         // Use pathfinder with scope-filtered edges
-        // (Future: could create a scoped pathfinder)
+        // TODO: Could optimize with a scoped pathfinder implementation
         
         // Compute direct score
         let direct_score = scoped_edges
@@ -897,16 +897,31 @@ impl TrustGraph {
             .map(|e| e.score.value())
             .unwrap_or(0.0);
 
+        // Build a map for O(1) lookup of indirect edges
+        let edge_map: std::collections::HashMap<&Did, Vec<(&Did, f64)>> = {
+            let mut map: std::collections::HashMap<&Did, Vec<(&Did, f64)>> = std::collections::HashMap::new();
+            for edge in &scoped_edges {
+                map.entry(&edge.source)
+                    .or_default()
+                    .push((&edge.target, edge.score.value()));
+            }
+            map
+        };
+
         // Compute transitive scores through intermediaries
         let intermediates = scoped_edges
             .iter()
             .filter(|e| e.target != *target) // Don't count direct edge as transitive
             .filter_map(|e| {
-                // Look for edges from intermediate to target
-                scoped_edges
-                    .iter()
-                    .find(|indirect| indirect.source == e.target && indirect.target == *target)
-                    .map(|indirect| (e.score.value(), indirect.score.value()))
+                // Look for edges from intermediate to target using the map
+                edge_map
+                    .get(&e.target)
+                    .and_then(|targets| {
+                        targets
+                            .iter()
+                            .find(|(t, _)| *t == target)
+                            .map(|(_, score)| (e.score.value(), *score))
+                    })
             });
 
         let weights = crate::ScoringWeights::legacy();
