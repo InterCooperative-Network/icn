@@ -48,10 +48,11 @@ fn select_replica(&self, candidates: &[Did]) -> Did {
 
 **Correct Pattern**:
 ```rust
-// ✅ ALLOWED - kernel receives constraints from PolicyOracle
+// ✅ ALLOWED - kernel reads typed ConstraintSet fields, not custom keys
 fn select_replica(&self, candidates: &[Did], constraints: &ConstraintSet) -> Did {
-    let min_score = constraints.custom.get("min_trust_score")
-        .and_then(|v| v.as_float())
+    let min_score = constraints
+        .replica_selection
+        .min_trust_score
         .unwrap_or(0.0);
     // Kernel enforces the constraint without knowing WHY min_score=0.7
 }
@@ -80,16 +81,13 @@ pub fn authorize_action(
 
 **Correct Pattern**:
 ```rust
-// ✅ ALLOWED - accepting pure data
+// ✅ ALLOWED - kernel uses PolicyOracle decision, not domain lookups
 pub fn authorize_action(
     &self,
     actor: &Did,
-    constraints: &ConstraintSet,  // Pure data, no methods
+    decision: &PolicyDecision,  // Pre-computed by PolicyOracle
 ) -> bool {
-    constraints.custom.get("trust_score")
-        .and_then(|v| v.as_float())
-        .map(|score| score >= 0.4)
-        .unwrap_or(false)
+    matches!(decision, PolicyDecision::Allow { .. })
 }
 ```
 
@@ -280,7 +278,7 @@ fn should_replicate(&self, constraints: &ConstraintSet) -> bool {
 
 1. **Wave 1 (This Issue)**: Document contract, add CI enforcement
 2. **Waves 2-6**: Migrate existing violations to PolicyOracle pattern
-3. **Enforcement**: After Wave 1, CI MUST fail on new violations
+3. **Enforcement**: CI reports violations as advisory during migration (`continue-on-error: true`). After all waves complete, the job becomes a hard gate (`continue-on-error` removed)
 
 ---
 
@@ -974,12 +972,13 @@ The kernel/app separation is being executed in waves, with each wave building on
 
 | Wave | Tracking Issue | Status | Description |
 |------|----------------|--------|-------------|
-| **Wave 0** | [#1006](https://github.com/InterCooperative-Network/icn/issues/1006) | ✅ Complete | PolicyOracle infrastructure and bootstrap phases |
+| **Wave 0** | [#1006](https://github.com/InterCooperative-Network/icn/issues/1006) | ✅ Complete | Canonical Mental Model documentation |
 | **Wave 1** | [#1007](https://github.com/InterCooperative-Network/icn/issues/1007) | ✅ Complete | Firewall Contract documentation + CI enforcement |
-| **Wave 2** | [#1008](https://github.com/InterCooperative-Network/icn/issues/1008) | ⏳ Planned | Migrate rate limit values to ConstraintSet |
-| **Wave 3** | [#1010](https://github.com/InterCooperative-Network/icn/issues/1010) | ⏳ Planned | Migrate capability grants to ConstraintSet |
-| **Wave 4** | [#1011](https://github.com/InterCooperative-Network/icn/issues/1011) | ⏳ Planned | Migrate credit ceiling values to ConstraintSet |
-| **Wave 5** | [#1012](https://github.com/InterCooperative-Network/icn/issues/1012) | ⏳ Planned | Final cleanup and enforcement |
+| **Wave 2** | [#1008](https://github.com/InterCooperative-Network/icn/issues/1008) | ⏳ Planned | Scope-Bounded Trust: structural centralization prevention |
+| **Wave 3** | [#1009](https://github.com/InterCooperative-Network/icn/issues/1009) | ⏳ Planned | Attestation Model: canonical schema and dispute pathway |
+| **Wave 4** | [#1010](https://github.com/InterCooperative-Network/icn/issues/1010) | ⏳ Planned | Adversarial Model: threat documentation and chaos harness |
+| **Wave 5** | [#1011](https://github.com/InterCooperative-Network/icn/issues/1011) | ⏳ Planned | Constitutional Genesis: canonical bootstrap documentation |
+| **Wave 6** | [#1012](https://github.com/InterCooperative-Network/icn/issues/1012) | ⏳ Planned | Legibility Dashboards: UX spec for constraint visibility |
 
 **Wave 1 Deliverables** (✅ Complete as of 2026-02-01):
 - ✅ Firewall Contract section added to this document

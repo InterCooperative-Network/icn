@@ -11,6 +11,7 @@ Usage:
 Exit codes:
     0: No violations detected (firewall is intact)
     1: Violations detected (kernel imports forbidden domain crates)
+    2: Script error (e.g., cargo or JSON parsing failure)
 
 Tracking Issue: #1007 (Wave 1 Firewall Contract)
 """
