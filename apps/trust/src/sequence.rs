@@ -35,7 +35,7 @@ impl SequenceTracker {
     /// Used when creating outgoing attestations.
     pub async fn next_issuer_sequence(&self) -> Result<u64> {
         let key = format!("{}/issuer/{}", Self::SEQUENCE_PREFIX, self.own_did);
-        
+
         // Get current sequence or start at 0
         let current = match self.store.get(key.as_bytes())? {
             Some(bytes) => {
@@ -50,8 +50,7 @@ impl SequenceTracker {
 
         // Increment and store
         let next = current + 1;
-        self.store
-            .put(key.as_bytes(), &next.to_le_bytes())?;
+        self.store.put(key.as_bytes(), &next.to_le_bytes())?;
 
         Ok(next)
     }
@@ -61,7 +60,7 @@ impl SequenceTracker {
     /// Returns None if we've never seen an attestation from this issuer.
     pub async fn last_seen_sequence(&self, issuer: &Did) -> Result<Option<u64>> {
         let key = format!("{}/receiver/{}", Self::SEQUENCE_PREFIX, issuer);
-        
+
         match self.store.get(key.as_bytes())? {
             Some(bytes) => {
                 let slice: &[u8] = bytes.as_ref();
@@ -80,7 +79,7 @@ impl SequenceTracker {
     /// Returns an error if the sequence is not monotonically increasing.
     pub async fn update_last_seen(&self, issuer: &Did, sequence: u64) -> Result<()> {
         let key = format!("{}/receiver/{}", Self::SEQUENCE_PREFIX, issuer);
-        
+
         // Check if sequence is monotonically increasing
         if let Some(last_seen) = self.last_seen_sequence(issuer).await? {
             if sequence <= last_seen {
@@ -94,8 +93,7 @@ impl SequenceTracker {
         }
 
         // Store the new sequence
-        self.store
-            .put(key.as_bytes(), &sequence.to_le_bytes())?;
+        self.store.put(key.as_bytes(), &sequence.to_le_bytes())?;
 
         Ok(())
     }
@@ -165,14 +163,8 @@ mod tests {
         let tracker = SequenceTracker::new(store, alice.did().clone());
 
         // First attestation from Bob should be valid regardless of sequence
-        assert!(tracker
-            .validate_sequence(bob.did(), 1)
-            .await
-            .is_ok());
-        assert!(tracker
-            .validate_sequence(bob.did(), 5)
-            .await
-            .is_ok());
+        assert!(tracker.validate_sequence(bob.did(), 1).await.is_ok());
+        assert!(tracker.validate_sequence(bob.did(), 5).await.is_ok());
     }
 
     #[tokio::test]
@@ -186,22 +178,13 @@ mod tests {
         tracker.update_last_seen(bob.did(), 5).await.unwrap();
 
         // Sequence 6 should be valid
-        assert!(tracker
-            .validate_sequence(bob.did(), 6)
-            .await
-            .is_ok());
+        assert!(tracker.validate_sequence(bob.did(), 6).await.is_ok());
 
         // Sequence 5 should be invalid (replay)
-        assert!(tracker
-            .validate_sequence(bob.did(), 5)
-            .await
-            .is_err());
+        assert!(tracker.validate_sequence(bob.did(), 5).await.is_err());
 
         // Sequence 4 should be invalid (replay)
-        assert!(tracker
-            .validate_sequence(bob.did(), 4)
-            .await
-            .is_err());
+        assert!(tracker.validate_sequence(bob.did(), 4).await.is_err());
     }
 
     #[tokio::test]
@@ -217,10 +200,7 @@ mod tests {
         // Trying to update with sequence 9 should fail
         let result = tracker.update_last_seen(bob.did(), 9).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Replay attack"));
+        assert!(result.unwrap_err().to_string().contains("Replay attack"));
 
         // Last seen should still be 10
         let last = tracker.last_seen_sequence(bob.did()).await.unwrap();
@@ -241,10 +221,7 @@ mod tests {
         tracker.reset_issuer(bob.did()).await.unwrap();
 
         // Should be able to accept sequence 1 now
-        assert!(tracker
-            .validate_sequence(bob.did(), 1)
-            .await
-            .is_ok());
+        assert!(tracker.validate_sequence(bob.did(), 1).await.is_ok());
     }
 
     #[tokio::test]
@@ -260,21 +237,12 @@ mod tests {
         tracker.update_last_seen(carol.did(), 10).await.unwrap();
 
         // Bob's sequence 6 should be valid
-        assert!(tracker
-            .validate_sequence(bob.did(), 6)
-            .await
-            .is_ok());
+        assert!(tracker.validate_sequence(bob.did(), 6).await.is_ok());
 
         // Carol's sequence 11 should be valid
-        assert!(tracker
-            .validate_sequence(carol.did(), 11)
-            .await
-            .is_ok());
+        assert!(tracker.validate_sequence(carol.did(), 11).await.is_ok());
 
         // Bob's sequence 5 should be invalid
-        assert!(tracker
-            .validate_sequence(bob.did(), 5)
-            .await
-            .is_err());
+        assert!(tracker.validate_sequence(bob.did(), 5).await.is_err());
     }
 }
