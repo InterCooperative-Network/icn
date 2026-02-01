@@ -355,7 +355,10 @@ mod tests {
     /// Target state: 0 after governance extraction to apps/governance (#913).
     ///
     /// Current state (2026-01-31):
-    /// - governance_handlers.rs: 39 (proposal types, voting, treasury governance)
+    /// - governance_handlers/mod.rs: 22 (proposal dispatch, resource, membership, dispute, SDIS)
+    /// - governance_handlers/treasury.rs: 9 (treasury governance handlers)
+    /// - governance_handlers/protocol.rs: 7 (protocol change handlers)
+    /// - governance_handlers/federation.rs: 3 (federation handlers)
     /// - governance/actor.rs: 27 (governance actor message types, body/proposal)
     /// - init_governance.rs: 3 (GovernanceManager, GovernanceSled)
     /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
@@ -363,9 +366,11 @@ mod tests {
     /// - init_gateway.rs: 1 (GovernanceManager import)
     /// - lifecycle.rs: 0 (migrated to kernel-api)
     /// - background_tasks.rs: 0 (migrated to kernel-api)
+    ///
+    /// The module splits add +2 refs (each submodule needs its own `use` statement).
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 73;
+        let expected: usize = 74;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(
