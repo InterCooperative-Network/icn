@@ -168,11 +168,8 @@ impl TrustService for TrustServiceImplTokio {
                 let reducer = reducer::AttestationReducer::with_skip_verification(now);
                 let reduced = reducer.reduce(&attestations);
 
-                // Convert to TrustScoreResult with current epoch
-                let mut result = reduced.to_kernel_result(self.epoch.load(Ordering::Relaxed));
-                // Override computed_at to use current timestamp
-                result.computed_at = now;
-                result
+                // Convert to TrustScoreResult with current epoch and timestamp
+                reduced.to_kernel_result(self.epoch.load(Ordering::Relaxed), Some(now))
             })
         })
     }

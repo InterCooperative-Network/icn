@@ -218,15 +218,26 @@ impl AttestationReducer {
 
 impl ReducedScore {
     /// Convert to the kernel-api `TrustScoreResult` type.
-    pub fn to_kernel_result(&self, epoch: u64) -> icn_kernel_api::services::TrustScoreResult {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+    ///
+    /// # Parameters
+    ///
+    /// - `epoch`: Monotonic epoch counter for cache invalidation
+    /// - `computed_at`: Unix timestamp when this score was computed (optional, defaults to now)
+    pub fn to_kernel_result(
+        &self,
+        epoch: u64,
+        computed_at: Option<u64>,
+    ) -> icn_kernel_api::services::TrustScoreResult {
+        let timestamp = computed_at.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0)
+        });
         icn_kernel_api::services::TrustScoreResult {
             score: self.score,
             epoch,
-            computed_at: now,
+            computed_at: timestamp,
             input_count: self.input_count,
             inputs_hash: self.inputs_hash,
             reducer_version: self.reducer_version.clone(),
@@ -593,5 +604,29 @@ mod tests {
             deser.verify().is_ok(),
             "round-tripped attestation must verify"
         );
+    }
+
+    #[test]
+    fn skip_verification_accepts_unsigned_attestations() {
+        // Verify that skip_verification allows unsigned attestations from trusted sources
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        let now = 10_000u64;
+        // Create an unsigned attestation (mimics storage format without signatures)
+        let mut att = TrustAttestation::new(alice.did().clone(), target.did().clone(), 0.8);
+        att.created_at = now - 100;
+
+        // Normal reducer rejects unsigned
+        let normal_reducer = AttestationReducer::new(now);
+        let result_normal = normal_reducer.reduce(&[att.clone()]);
+        assert_eq!(result_normal.score, 0.0);
+        assert_eq!(result_normal.input_count, 0);
+
+        // skip_verification reducer accepts unsigned
+        let trusted_reducer = AttestationReducer::with_skip_verification(now);
+        let result_trusted = trusted_reducer.reduce(&[att]);
+        assert!((result_trusted.score - 0.8).abs() < 0.001);
+        assert_eq!(result_trusted.input_count, 1);
     }
 }
