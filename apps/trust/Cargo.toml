@@ -39,6 +39,7 @@ tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+icn-time = { path = "../../icn/crates/icn-time" }
 tempfile = "3"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"

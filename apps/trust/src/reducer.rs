@@ -16,6 +16,13 @@
 //!                                     ├── compute average score
 //!                                     └── hash inputs for provenance
 //! ```
+//!
+//! # Trust Boundaries
+//!
+//! - [`AttestationReducer::new()`]: Verifies Ed25519 signatures. Use for
+//!   attestations received over the network.
+//! - [`AttestationReducer::with_skip_verification()`]: Trusts the storage
+//!   layer. Use **only** for edges already validated at ingestion time.
 
 use icn_trust::TrustAttestation;
 use sha2::{Digest, Sha256};
@@ -61,12 +68,18 @@ pub struct AttestationReducer {
     /// Current time for expiration filtering (Unix seconds).
     /// Injected for determinism in tests.
     now: u64,
+    /// Skip signature verification (for trusted internal sources like graph storage).
+    /// Default: false (verify signatures).
+    skip_verification: bool,
 }
 
 impl AttestationReducer {
     /// Create a reducer with the given "current time" for expiry checks.
     pub fn new(now: u64) -> Self {
-        Self { now }
+        Self {
+            now,
+            skip_verification: false,
+        }
     }
 
     /// Create a reducer using the actual wall clock.
@@ -75,7 +88,22 @@ impl AttestationReducer {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        Self { now }
+        Self {
+            now,
+            skip_verification: false,
+        }
+    }
+
+    /// Create a reducer that skips signature verification.
+    ///
+    /// **WARNING**: Only use this for attestations from trusted internal sources
+    /// (e.g., graph storage) where signatures are not available but the data
+    /// integrity is already guaranteed by the storage layer.
+    pub fn with_skip_verification(now: u64) -> Self {
+        Self {
+            now,
+            skip_verification: true,
+        }
     }
 
     /// Reduce a set of attestations into a single score.
@@ -106,7 +134,7 @@ impl AttestationReducer {
         let valid: Vec<&TrustAttestation> = attestations
             .iter()
             .filter(|a| {
-                a.verify().is_ok()
+                (self.skip_verification || a.verify().is_ok())
                     && !a.is_expired(self.now)
                     && a.created_at <= self.now + CLOCK_SKEW_TOLERANCE_SECS
             })
@@ -197,15 +225,26 @@ impl AttestationReducer {
 
 impl ReducedScore {
     /// Convert to the kernel-api `TrustScoreResult` type.
-    pub fn to_kernel_result(&self, epoch: u64) -> icn_kernel_api::services::TrustScoreResult {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+    ///
+    /// # Parameters
+    ///
+    /// - `epoch`: Monotonic epoch counter for cache invalidation
+    /// - `computed_at`: Unix timestamp when this score was computed (optional, defaults to now)
+    pub fn to_kernel_result(
+        &self,
+        epoch: u64,
+        computed_at: Option<u64>,
+    ) -> icn_kernel_api::services::TrustScoreResult {
+        let timestamp = computed_at.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0)
+        });
         icn_kernel_api::services::TrustScoreResult {
             score: self.score,
             epoch,
-            computed_at: now,
+            computed_at: timestamp,
             input_count: self.input_count,
             inputs_hash: self.inputs_hash,
             reducer_version: self.reducer_version.clone(),
@@ -572,5 +611,29 @@ mod tests {
             deser.verify().is_ok(),
             "round-tripped attestation must verify"
         );
+    }
+
+    #[test]
+    fn skip_verification_accepts_unsigned_attestations() {
+        // Verify that skip_verification allows unsigned attestations from trusted sources
+        let alice = KeyPair::generate().unwrap();
+        let target = KeyPair::generate().unwrap();
+
+        let now = 10_000u64;
+        // Create an unsigned attestation (mimics storage format without signatures)
+        let mut att = TrustAttestation::new(alice.did().clone(), target.did().clone(), 0.8);
+        att.created_at = now - 100;
+
+        // Normal reducer rejects unsigned
+        let normal_reducer = AttestationReducer::new(now);
+        let result_normal = normal_reducer.reduce(&[att.clone()]);
+        assert_eq!(result_normal.score, 0.0);
+        assert_eq!(result_normal.input_count, 0);
+
+        // skip_verification reducer accepts unsigned
+        let trusted_reducer = AttestationReducer::with_skip_verification(now);
+        let result_trusted = trusted_reducer.reduce(&[att]);
+        assert!((result_trusted.score - 0.8).abs() < 0.001);
+        assert_eq!(result_trusted.input_count, 1);
     }
 }

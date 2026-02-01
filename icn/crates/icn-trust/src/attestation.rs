@@ -59,6 +59,11 @@ pub struct TrustAttestation {
 }
 
 impl TrustAttestation {
+    /// Large TTL used for non-expiring edges converted from storage.
+    /// `u64::MAX / 2` avoids overflow in arithmetic while remaining far
+    /// larger than any realistic expiration.
+    pub const NON_EXPIRING_TTL: u64 = u64::MAX / 2;
+
     /// Create a new unsigned attestation (defaults to Social graph type)
     ///
     /// Note: This returns an attestation with an empty signature.
@@ -425,7 +430,8 @@ impl TrustAttestation {
                         ttl
                     }
                 })
-                .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
+                // Large TTL for non-expiring edges so they survive is_expired() checks.
+                .unwrap_or(Self::NON_EXPIRING_TTL);
 
         // Convert typed evidence to string references for attestation
         let evidence: Vec<String> = edge
