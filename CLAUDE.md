@@ -4,14 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ICN (Intercooperative Network) is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer with:
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
 
-- **Identity Layer**: Decentralized identifiers (DIDs) with Ed25519 cryptography
-- **Trust Graph**: Web-of-participation based trust computation
-- **Networking**: QUIC/TLS secure sessions with mDNS discovery
-- **Cooperative Contracts**: CCL (Cooperative Contract Language) execution
-- **Mutual Credit Ledger**: Double-entry accounting with Merkle-DAG
-- **P2P Coordination**: Gossip protocol with trust-gated topics
+ICN (Intercooperative Network) is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer for cooperatives, communities, and federations to coordinate without central servers.
+
+ICN implements a **constraint enforcement architecture** where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This ensures the kernel remains predictable while cooperative governance adapts policies.
+
+### Core Subsystems
+
+- **Identity**: Decentralized identifiers (DIDs) with Ed25519 cryptography
+- **Trust Graph**: Web-of-participation trust computation → **Policy Oracle**
+- **Networking**: QUIC/TLS secure sessions with mDNS discovery → **Kernel**
+- **Ledger**: Mutual credit with double-entry accounting → **Policy Oracle**
+- **Contracts**: CCL (Cooperative Contract Language) execution → **Policy Oracle**
+- **Gossip**: Topic-based replication with causal ordering → **Kernel**
+- **Governance**: Democratic proposals and voting → **Policy Oracle**
+- **Compute**: Trust-gated distributed task execution → **Policy Oracle**
 
 ## Live Deployment
 

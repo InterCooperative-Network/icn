@@ -1,15 +1,13 @@
 # Module 2: ICN Architecture Overview
 
 ## Overview
-This module teaches you ICN's layered architecture—how the system is organized,
-why each layer exists, and how they work together. Understanding this architecture
-is essential for contributing to any part of the codebase.
+This module teaches you ICN's constraint engine architecture—how the system separates policy decisions (apps) from enforcement mechanisms (kernel). Understanding this architecture is essential for contributing to any part of the codebase.
 
 ## Objectives
 - Understand ICN's design principles and how they shape the system
-- Learn the complete layer stack from transport to distributed compute
-- Map each layer to its corresponding Rust crate
-- Understand how layers communicate via actor model
+- Learn the constraint engine model: apps decide → kernel enforces
+- Map components to their role as Policy Oracle or Kernel enforcement
+- Understand how components communicate via actor model
 - Know where to look when implementing or debugging features
 
 ## Prerequisites
@@ -47,9 +45,51 @@ ICN provides foundational capabilities that applications build on:
 - **Coordination**: How do we agree? (gossip + contracts)
 - **Economics**: How do we exchange value? (mutual credit)
 
-Think of ICN as the "operating system" for cooperative applications.
+Think of ICN as the enforcement substrate for cooperative applications: it provides mechanisms; governance decides how to use them.
 
-### 2. Design Principles
+### 2. ICN's Major Subsystems
+
+Before understanding ICN's architectural boundaries, you need to know what the system does as a whole:
+
+#### Identity
+Decentralized identifiers (DIDs) with Ed25519 signatures, X25519 encryption, Age-encrypted keystore. Establishes "who said this" and "who can do what."
+
+#### Network Transport
+QUIC/TLS secure sessions, mDNS discovery, NAT traversal, message authentication. Moves signed messages between nodes with DID-TLS binding.
+
+#### Replication & Gossip
+Eventual consistency through push/pull protocols, anti-entropy with Bloom filters, causal ordering via vector clocks, topic-based dissemination. Ensures shared state converges across the network.
+
+#### Trust Computation
+Web-of-participation scoring, transitive trust propagation, multi-graph support for different trust contexts. This is semantic and community-defined—trust scores inform access control and resource allocation.
+
+#### Ledger & Economics
+Mutual-credit accounting with double-entry bookkeeping, Merkle-DAG journal, credit limits and safety rails, fork detection and resolution. Enables value exchange without central currency.
+
+#### Contracts & Capabilities
+CCL (Cooperative Contract Language) interpreter with fuel metering, capability-based security model defining who can invoke what actions under which constraints.
+
+#### Governance
+Democratic policy-making through proposals and voting, domain-specific rules, membership criteria. Determines *what constraints should be enforced*.
+
+#### Distributed Compute
+Trust-gated task execution, intelligent scheduling based on trust/resources/economics, result verification. Enables cooperative task distribution.
+
+#### Runtime & Supervision
+Actor-based services using Tokio, lifecycle management, orchestration of startup/shutdown, inter-actor communication.
+
+### 3. How ICN Works: Typical Flow
+
+Here's how these subsystems work together:
+
+1. A node receives a **signed message** over QUIC/TLS transport
+2. The **kernel validates invariants**: authentication, replay protection, rate limits, capability gates, credit gates
+3. **State replication** through gossip moves validated events across the network
+4. **Policy subsystems** (trust, governance, ledger) compute semantic meanings from events
+5. Those meanings are expressed as **constraints** (rate limits, credit ceilings, capability grants)
+6. The **kernel enforces those constraints** on subsequent actions without understanding their semantic origin
+
+### 4. Design Principles
 
 ICN's architecture follows five foundational principles:
 
@@ -88,9 +128,88 @@ Cooperative governance makes policy democratic:
 
 ---
 
-## The ICN Layer Stack
+## The ICN Constraint Engine Model
 
-ICN is organized as a stack of layers, each building on the ones below:
+Now that you understand what ICN does as a complete system, we can examine its **architectural invariant**: the separation between policy decisions and enforcement mechanisms.
+
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+ICN implements a **constraint enforcement architecture** where applications and governance systems (Policy Oracles) translate domain semantics (trust relationships, governance rules, membership criteria) into generic constraints that the kernel enforces blindly.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {                              // Illustrative example
+      rate_limit: 20/s,      // ← value from Policy Oracle
+      credit_ceiling: 1000,  // ← value from Policy Oracle
+      capabilities: [...]    // ← value from Policy Oracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Distinction: Mechanism vs. Policy
+
+The constraint engine model distinguishes between **enforcement mechanisms** (kernel) and **constraint values** (apps/governance):
+
+| | Kernel (Hard) | Apps/Governance (Meta) |
+|---|---|---|
+| **Rate limiting** | Mechanism exists | Values decided (20/s vs 100/s) |
+| **Credit gating** | Mechanism exists | Ceiling decided (1000 vs 5000) |
+| **Capability gating** | Mechanism exists | Grants decided |
+| **Replay guard** | Mechanism exists | Typically fixed |
+| **Transport auth** | Mechanism exists | Typically fixed |
+
+**Critical Property:**
+- Governance can change **what** the rate limit is (e.g., from 20/s to 100/s)
+- Governance **cannot** remove **that** rate limiting exists (enforcement mechanism is fixed)
+
+**Boundary rule:** Anything that outputs constraint values is a Policy Oracle; anything that validates or enforces constraints is kernel (even if they live near each other in code). Many subsystems have both mechanism and policy surfaces—the boundary is determined by the data flow, not the crate structure.
+
+This separation ensures the kernel remains predictable and auditable while allowing cooperative governance to adapt policies to changing needs.
+
+---
+
+## Component Organization
+
+**Note:** The following sections describe functional components of ICN. You may see "layer" used descriptively (e.g., "transport layer security"), which is legitimate technical terminology. However, ICN is **not** an OSI-like strictly layered stack where higher layers only access lower layers through defined interfaces. Instead, ICN uses the constraint engine model where policy oracles translate domain semantics into constraints the kernel enforces.
+
+### Component Mapping
+
+The implementation organizes ICN's subsystems into functional areas:
+
+- **Identity** (`icn-identity`): DID, Ed25519, keystore
+- **Trust Graph** (`icn-trust`): Web-of-participation scores → **Policy Oracle**
+- **Transport** (`icn-net`): QUIC/TLS, mDNS, NAT traversal → **Kernel**
+- **Ledger** (`icn-ledger`): Mutual credit, double-entry → **Policy Oracle**
+- **Contracts** (`icn-ccl`): CCL interpreter, capabilities → **Policy Oracle**
+- **Gossip** (`icn-gossip`): Causal sync, anti-entropy → **Kernel**
+- **Distributed Compute** (`icn-compute`): Trust-gated task execution → **Policy Oracle**
+
+---
+
+## Detailed Component Reference
+
+The sections below provide details on each component. Remember: this is functional organization showing how subsystems work together, not a strictly layered stack where higher components can only access lower ones through defined interfaces.
 
 ```
 ┌────────────────────────────────────────────────────────┐

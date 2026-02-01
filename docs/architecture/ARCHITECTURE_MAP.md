@@ -7,9 +7,11 @@
 
 ## Executive Summary
 
-ICN (Intercooperative Network) is a **decentralized coordination substrate** providing identity, trust computation, encrypted P2P transport, cooperative ledgering, contract execution, gossip-based synchronization, and distributed compute fabric for federated cooperatives.
+ICN (Intercooperative Network) is a **decentralized coordination substrate** for cooperative organizations—a Rust P2P daemon that enables cooperatives, communities, and federations to coordinate identity, trust, governance, mutual-credit economics, contracts, replication, and compute without central servers or blockchain-style global consensus.
 
 **Not a blockchain.** Not a federation server. A P2P coordination layer.
+
+ICN implements a **constraint enforcement architecture** (the "constraint engine model") where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This architectural boundary ensures the kernel remains predictable while cooperative governance adapts policies. See `docs/ARCHITECTURE.md` for the complete conceptual model.
 
 ### Core Statistics
 - **25 Workspace Crates** (22 libraries + 3 binaries)
@@ -23,9 +25,17 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 
 ## System Architecture Overview
 
+### Component Organization
+
+The implementation organizes ICN's subsystems into functional areas.
+
+> **Note:** This diagram groups crates by functional area, **not** by sequential OSI-like layers.
+> Components interact across areas freely; the kernel/oracle boundary (not vertical position)
+> is the architecturally significant split. See `ARCHITECTURE.md` for the constraint engine model.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                        APPLICATION LAYER                              │
+│                      APPLICATIONS & CLI                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ icn-console  │  │   icnctl     │  │    icnd      │               │
 │  │  (TUI App)   │  │  (CLI Mgmt)  │  │  (Daemon)    │               │
@@ -33,7 +43,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         GATEWAY LAYER                                 │
+│                        API BOUNDARY                                   │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-gateway: REST + WebSocket API                           │   │
 │  │  - Authentication (JWT)                                       │   │
@@ -48,7 +58,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                      COORDINATION LAYER                               │
+│                POLICY ORACLES (Governance & Contracts)                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ icn-compute  │  │icn-governance│  │  icn-ccl     │               │
 │  │ Distributed  │  │ Democratic   │  │  Contract    │               │
@@ -57,7 +67,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                      SYNCHRONIZATION LAYER                            │
+│                     REPLICATION & GOSSIP                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-gossip: Topic-based Pub/Sub                              │   │
 │  │  - Push/Pull protocol                                         │   │
@@ -68,7 +78,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         LEDGER LAYER                                  │
+│                     ECONOMIC PRIMITIVES                               │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-ledger: Double-Entry Mutual Credit                       │   │
 │  │  - Merkle-DAG journal                                         │   │
@@ -80,7 +90,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         TRUST LAYER                                   │
+│                TRUST COMPUTATION (Policy Oracle)                       │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-trust: Web-of-Participation Graph                        │   │
 │  │  - Transitive trust computation                               │   │
@@ -91,7 +101,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         NETWORK LAYER                                 │
+│                          TRANSPORT                                    │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-net: QUIC/TLS Transport                                  │   │
 │  │  - DID-TLS binding (certificate verification)                 │   │
@@ -104,7 +114,7 @@ ICN (Intercooperative Network) is a **decentralized coordination substrate** pro
 └──────────────────────────────────────────────────────────────────────┘
                               │
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         IDENTITY LAYER                                │
+│                      IDENTITY PRIMITIVES                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │  icn-identity: Decentralized Identifiers                      │   │
 │  │  - DID format: did:icn:<base58-pubkey>                        │   │

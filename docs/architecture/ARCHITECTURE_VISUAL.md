@@ -1,7 +1,75 @@
 # ICN Visual Architecture Reference
 **Quick Reference for System Structure**
 
-## System Layers (Bottom-Up)
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+## The Constraint Engine Model
+
+ICN implements a constraint enforcement architecture where Policy Oracles (apps/governance) translate domain semantics into generic constraints that the kernel enforces blindly. This diagram illustrates the enforcement boundary inside the broader substrate:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                      │
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+         │              │           │            │           │
+    ConstraintSet {                              // Illustrative example
+      rate_limit: 20/s,      // ← value from Policy Oracle
+      credit_ceiling: 1000,  // ← value from Policy Oracle
+      capabilities: [...]    // ← value from Policy Oracle
+    }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│                                                                      │
+│   Apps/Governance DECIDE constraint values.                          │
+│   Kernel ENFORCES them without knowing why.                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Distinction: Mechanism vs. Policy
+
+| | Kernel (Hard) | Apps/Governance (Meta) |
+|---|---|---|
+| **Rate limiting** | Mechanism exists | Values decided (20/s vs 100/s) |
+| **Credit gating** | Mechanism exists | Ceiling decided (1000 vs 5000) |
+| **Capability gating** | Mechanism exists | Grants decided |
+| **Replay guard** | Mechanism exists | Typically fixed |
+| **Transport auth** | Mechanism exists | Typically fixed |
+
+**Critical Property:**
+- Governance can change **what** the rate limit is
+- Governance **cannot** remove **that** rate limiting exists
+
+**Boundary rule:** Anything that outputs constraint values is a Policy Oracle; anything that validates or enforces constraints is kernel (even if they live near each other in code).
+
+> **Important:** This boundary is conceptual, not physical. Many crates contain both kernel and oracle surfaces. The separation is defined by **data flow** (who produces `ConstraintSet` vs. who enforces it), not by file or crate location.
+
+---
+
+## Functional Component Map (Not a Layer Stack)
+
+The implementation organizes ICN's subsystems into functional areas. Note: "layer" terminology below is descriptive (e.g., "transport layer security") — ICN is **not** an OSI-like strictly layered stack. Instead, Policy Oracles translate domain semantics into constraints that the kernel enforces.
+
+### Substrate Services (Consumed by Both Kernel and Oracles)
+
+These services do not decide policy; they provide integrity and replication primitives:
+
+- **Transport** (`icn-net`): QUIC/TLS sessions, message authentication, mDNS discovery
+- **Gossip** (`icn-gossip`): Topic-based replication, anti-entropy, causal ordering
+- **Storage** (`icn-store`): Sled embedded database, transactional updates
+- **Identity** (`icn-identity`): DID management, keystore, signature verification
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
