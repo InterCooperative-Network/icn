@@ -1,0 +1,48 @@
+[package]
+name = "icn-membership-app"
+version = "0.1.0"
+edition = "2021"
+description = "Membership app - unified entity and membership management for ICN"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for PolicyOracle trait and types
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
+# Core crates we're consolidating
+icn-entity = { path = "../../crates/icn-entity" }
+icn-coop = { path = "../../crates/icn-coop" }
+icn-community = { path = "../../crates/icn-community" }
+
+# Identity types (for Did)
+icn-identity = { path = "../../crates/icn-identity" }
+
+# CCL for membership rules (second CCL consumer)
+icn-ccl = { path = "../../crates/icn-ccl" }
+
+# Storage
+icn-store = { path = "../../crates/icn-store" }
+
+# Time utilities
+icn-time = { path = "../../crates/icn-time" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+# Sync primitives
+parking_lot = "0.12"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"

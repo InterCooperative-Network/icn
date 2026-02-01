@@ -3309,6 +3309,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-membership-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ed25519-dalek",
+ "icn-ccl",
+ "icn-community",
+ "icn-coop",
+ "icn-entity",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-store",
+ "icn-time",
+ "parking_lot 0.12.5",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-net"
 version = "0.1.0"
 dependencies = [

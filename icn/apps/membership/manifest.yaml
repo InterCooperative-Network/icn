@@ -1,0 +1,87 @@
+name: membership
+version: 0.1.0
+publisher: did:icn:system
+
+description: >
+  Unified membership app that consolidates entity, cooperative, and community
+  membership management. Provides CCL-based membership rules for cooperative
+  and community configurations.
+
+capabilities_required:
+  - state:kv:write:self
+  - state:kv:read:self
+  - trust:read
+
+capabilities_provided:
+  - membership:validate
+  - membership:authorize
+
+state:
+  kv:
+    - name: memberships
+      description: Membership records by member_id:parent_id
+    - name: entities
+      description: Entity metadata and configurations
+    - name: rules
+      description: CCL-based membership rules
+
+compute:
+  reducers:
+    - name: membership_reducer
+      event_type: membership:change
+      description: Processes membership state transitions
+    - name: entity_reducer
+      event_type: entity:update
+      description: Processes entity configuration updates
+  
+  services:
+    - name: membership_query
+      request_type: membership:query
+      description: Query membership status and capabilities
+    - name: entity_query
+      request_type: entity:query
+      description: Query entity configuration and rules
+    - name: validate_criteria
+      request_type: membership:validate_criteria
+      description: Validate membership against CCL criteria
+
+ccl_schemas:
+  cooperative_membership:
+    type: object
+    properties:
+      entity:
+        type: object
+        properties:
+          name:
+            type: string
+          type:
+            type: string
+            enum: [cooperative, community, federation]
+          membership:
+            type: object
+            properties:
+              classes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    criteria:
+                      type: object
+                      properties:
+                        all:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              field:
+                                type: string
+                              op:
+                                type: string
+                                enum: ["==", "!=", ">", ">=", "<", "<=", "in"]
+                              value:
+                                oneOf:
+                                  - type: string
+                                  - type: number
+                                  - type: boolean
