@@ -425,7 +425,7 @@ impl TrustAttestation {
                         ttl
                     }
                 })
-                .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
+                .unwrap_or(u64::MAX / 2); // Non-expiring: use large TTL to match TrustEdge semantics
 
         // Convert typed evidence to string references for attestation
         let evidence: Vec<String> = edge

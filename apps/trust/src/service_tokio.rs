@@ -138,7 +138,11 @@ impl TrustService for TrustServiceImplTokio {
                     None => return self.empty_score_result(),
                 };
 
-                // Collect edges pointing to this actor
+                // Use graph's compute_trust_score for the score value to stay
+                // consistent with trust_score() (direct+transitive computation).
+                let score = graph.compute_trust_score(&identity_did).unwrap_or(0.0);
+
+                // Collect edges pointing to this actor for provenance hash
                 let input_edges = graph
                     .get_all_known_dids()
                     .unwrap_or_default()
@@ -158,8 +162,8 @@ impl TrustService for TrustServiceImplTokio {
                     .map(|edge| icn_trust::TrustAttestation::from_trust_edge(edge))
                     .collect();
 
-                // Use AttestationReducer to compute score and hash
-                // Skip signature verification since edges from storage are already trusted
+                // Use AttestationReducer only for provenance hash and input count
+                // (not for scoring, which stays consistent with trust_score())
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
@@ -168,8 +172,10 @@ impl TrustService for TrustServiceImplTokio {
                 let reducer = reducer::AttestationReducer::with_skip_verification(now);
                 let reduced = reducer.reduce(&attestations);
 
-                // Convert to TrustScoreResult with current epoch and timestamp
-                reduced.to_kernel_result(self.epoch.load(Ordering::Relaxed), Some(now))
+                let mut result =
+                    reduced.to_kernel_result(self.epoch.load(Ordering::Relaxed), Some(now));
+                result.score = score;
+                result
             })
         })
     }
@@ -824,12 +830,9 @@ mod tests {
             "Reducer version must match"
         );
 
-        // Scores should also match (within floating point tolerance)
-        assert!(
-            (result1.score - result2.score).abs() < 0.001,
-            "Scores must match: {} vs {}",
-            result1.score,
-            result2.score
-        );
+        // Note: Scores are intentionally different — trust_score_detailed() uses
+        // graph.compute_trust_score() (direct+transitive) for consistency with
+        // trust_score(), while the reducer computes an arithmetic mean.
+        // This test verifies hash/input convergence, not score convergence.
     }
 }
