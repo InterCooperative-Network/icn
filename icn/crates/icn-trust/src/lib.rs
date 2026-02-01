@@ -78,7 +78,7 @@ pub mod typed_graph;
 pub mod types;
 
 pub use anomaly::{anomalies_to_sybil_flags, TrustAnomaly, TrustGraphAnalyzer};
-pub use attestation::TrustAttestation;
+pub use attestation::{TrustAttestation, TrustRevocation};
 pub use evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
 };

@@ -42,12 +42,23 @@ pub struct TrustAttestation {
     /// Unix timestamp when this attestation was created
     pub created_at: u64,
 
+    /// Monotonic sequence number for replay protection
+    ///
+    /// Each issuer maintains a monotonic counter. Receivers track the last
+    /// seen sequence per issuer and reject attestations with stale sequences.
+    ///
+    /// **Migration**: Legacy attestations without this field are treated as
+    /// sequence 0 during deserialization for backward compatibility.
+    #[serde(default)]
+    pub sequence: u64,
+
     /// Ed25519 signature over the canonical representation
     ///
-    /// V2 (current): issuer || subject || score || ttl || created_at || graph_type || labels || evidence
+    /// V3 (current): issuer || subject || score || ttl || created_at || sequence || graph_type || labels || evidence
+    /// V2 (legacy):  issuer || subject || score || ttl || created_at || graph_type || labels || evidence
     /// V1 (legacy):  issuer || subject || score || ttl || created_at || labels || evidence
     ///
-    /// The verify() method supports both formats for backward compatibility.
+    /// The verify() method supports all formats for backward compatibility.
     pub signature: Vec<u8>,
 
     /// The type of trust graph this attestation belongs to
@@ -56,6 +67,36 @@ pub struct TrustAttestation {
     /// created before multi-graph support was added.
     #[serde(default)]
     pub graph_type: TrustGraphType,
+}
+
+/// A signed trust revocation that can be broadcast over the network
+///
+/// This represents a cryptographically signed statement: "I (issuer) revoke
+/// my previous trust attestation for (subject) as of this timestamp."
+///
+/// Revocations win over any attestation with an earlier timestamp.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustRevocation {
+    /// The DID revoking the trust statement
+    pub issuer: Did,
+
+    /// The DID whose trust is being revoked
+    pub subject: Did,
+
+    /// Unix timestamp when this revocation was created
+    pub revoked_at: u64,
+
+    /// Optional reason for revocation (for auditing)
+    #[serde(default)]
+    pub reason: Option<String>,
+
+    /// The type of trust graph this revocation applies to
+    #[serde(default)]
+    pub graph_type: TrustGraphType,
+
+    /// Ed25519 signature over the canonical representation
+    /// Payload: issuer || subject || revoked_at || graph_type || reason (if present)
+    pub signature: Vec<u8>,
 }
 
 impl TrustAttestation {
@@ -82,6 +123,7 @@ impl TrustAttestation {
             evidence: Vec::new(),
             ttl_seconds: 30 * 24 * 60 * 60, // 30 days default
             created_at: now,
+            sequence: 0, // Will be set by the caller before signing
             signature: Vec::new(),
             graph_type,
         }
@@ -111,12 +153,55 @@ impl TrustAttestation {
         self
     }
 
-    /// Get the canonical signing payload (v2 format, includes graph_type)
+    /// Set the sequence number
+    ///
+    /// The sequence number should be set before signing to enable replay protection.
+    /// Typically, the issuer increments a counter stored in persistent storage.
+    pub fn with_sequence(mut self, sequence: u64) -> Self {
+        self.sequence = sequence;
+        self
+    }
+
+    /// Get the canonical signing payload (v3 format, includes sequence)
     ///
     /// The signature covers the core attestation fields in a deterministic order:
-    /// issuer || subject || score || ttl || created_at || graph_type || labels || evidence
+    /// issuer || subject || score || ttl || created_at || sequence || graph_type || labels || evidence
     fn signing_payload(&self) -> Vec<u8> {
-        self.signing_payload_v2()
+        self.signing_payload_v3()
+    }
+
+    /// V3 signing payload - includes sequence (replay protection)
+    fn signing_payload_v3(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        // Core fields
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.score.to_le_bytes());
+        hasher.update(self.ttl_seconds.to_le_bytes());
+        hasher.update(self.created_at.to_le_bytes());
+
+        // Sequence number (added for replay protection)
+        hasher.update(self.sequence.to_le_bytes());
+
+        // Graph type (added for multi-graph support)
+        hasher.update(self.graph_type.as_str().as_bytes());
+
+        // Labels (sorted for determinism)
+        let mut sorted_labels = self.labels.clone();
+        sorted_labels.sort();
+        for label in sorted_labels {
+            hasher.update(label.as_bytes());
+        }
+
+        // Evidence (sorted for determinism)
+        let mut sorted_evidence = self.evidence.clone();
+        sorted_evidence.sort();
+        for ev in sorted_evidence {
+            hasher.update(ev.as_bytes());
+        }
+
+        hasher.finalize().to_vec()
     }
 
     /// V2 signing payload - includes graph_type (multi-graph support)
@@ -129,6 +214,8 @@ impl TrustAttestation {
         hasher.update(self.score.to_le_bytes());
         hasher.update(self.ttl_seconds.to_le_bytes());
         hasher.update(self.created_at.to_le_bytes());
+
+        // Note: No sequence in v2 format
 
         // Graph type (added for multi-graph support)
         hasher.update(self.graph_type.as_str().as_bytes());
@@ -161,7 +248,7 @@ impl TrustAttestation {
         hasher.update(self.ttl_seconds.to_le_bytes());
         hasher.update(self.created_at.to_le_bytes());
 
-        // Note: No graph_type in v1 format
+        // Note: No sequence or graph_type in v1 format
 
         // Labels (sorted for determinism)
         let mut sorted_labels = self.labels.clone();
@@ -204,9 +291,9 @@ impl TrustAttestation {
     ///
     /// Extracts the verifying key from the issuer DID and checks the signature.
     ///
-    /// For backward compatibility, this method tries both v2 (with graph_type) and
-    /// v1 (without graph_type) signing formats. This ensures that attestations signed
-    /// before multi-graph support was added will still verify correctly.
+    /// For backward compatibility, this method tries v3 (with sequence), v2 (with
+    /// graph_type), and v1 (legacy) signing formats. This ensures that attestations
+    /// signed before replay protection or multi-graph support will still verify.
     pub fn verify(&self) -> Result<()> {
         if self.signature.is_empty() {
             anyhow::bail!("Attestation has no signature");
@@ -230,13 +317,19 @@ impl TrustAttestation {
             .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
         let signature = Signature::from_bytes(&sig_bytes);
 
-        // Try v2 format first (with graph_type)
+        // Try v3 format first (with sequence)
+        let payload_v3 = self.signing_payload_v3();
+        if verifying_key.verify(&payload_v3, &signature).is_ok() {
+            return Ok(());
+        }
+
+        // Fall back to v2 format (with graph_type, no sequence)
         let payload_v2 = self.signing_payload_v2();
         if verifying_key.verify(&payload_v2, &signature).is_ok() {
             return Ok(());
         }
 
-        // Fall back to v1 format for backward compatibility (without graph_type)
+        // Fall back to v1 format for backward compatibility (without graph_type or sequence)
         // This handles attestations signed before multi-graph support was added
         let payload_v1 = self.signing_payload_v1();
         verifying_key
@@ -440,9 +533,152 @@ impl TrustAttestation {
             evidence,
             ttl_seconds,
             created_at: edge.created_at,
+            sequence: 0, // Will be set by the caller before signing
             signature: Vec::new(),
             graph_type: edge.graph_type,
         }
+    }
+
+    /// Extract verifying key from a DID
+    ///
+    /// DIDs are in the format: did:icn:<multibase-encoded-pubkey>
+    fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
+        let did_str = did.as_str();
+
+        if !did_str.starts_with("did:icn:") {
+            anyhow::bail!("Invalid DID format: {did_str}");
+        }
+
+        let encoded = &did_str[8..]; // Skip "did:icn:"
+        let (_base, decoded) = multibase::decode(encoded)?;
+
+        if decoded.len() != 32 {
+            anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
+        }
+
+        let key_bytes: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
+
+        Ok(VerifyingKey::from_bytes(&key_bytes)?)
+    }
+}
+
+impl TrustRevocation {
+    /// Create a new unsigned revocation
+    ///
+    /// Note: This returns a revocation with an empty signature.
+    /// You must call `sign()` before broadcasting.
+    pub fn new(issuer: Did, subject: Did) -> Self {
+        Self::new_typed(issuer, subject, TrustGraphType::Social)
+    }
+
+    /// Create a new unsigned revocation with explicit graph type
+    pub fn new_typed(issuer: Did, subject: Did, graph_type: TrustGraphType) -> Self {
+        let now = icn_time::current_timestamp_secs();
+
+        Self {
+            issuer,
+            subject,
+            revoked_at: now,
+            reason: None,
+            graph_type,
+            signature: Vec::new(),
+        }
+    }
+
+    /// Add a reason for this revocation
+    pub fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.reason = Some(reason.into());
+        self
+    }
+
+    /// Set the graph type
+    pub fn with_graph_type(mut self, graph_type: TrustGraphType) -> Self {
+        self.graph_type = graph_type;
+        self
+    }
+
+    /// Get the canonical signing payload
+    ///
+    /// The signature covers: issuer || subject || revoked_at || graph_type || reason (if present)
+    fn signing_payload(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.revoked_at.to_le_bytes());
+        hasher.update(self.graph_type.as_str().as_bytes());
+
+        if let Some(ref reason) = self.reason {
+            hasher.update(reason.as_bytes());
+        }
+
+        hasher.finalize().to_vec()
+    }
+
+    /// Sign this revocation with a keypair
+    ///
+    /// This creates an Ed25519 signature over the canonical representation
+    /// and stores it in the `signature` field.
+    pub fn sign(&mut self, keypair: &icn_identity::KeyPair) -> Result<()> {
+        if keypair.did() != &self.issuer {
+            anyhow::bail!(
+                "Keypair DID ({}) does not match revocation issuer ({})",
+                keypair.did(),
+                self.issuer
+            );
+        }
+
+        let payload = self.signing_payload();
+        let sig = keypair.sign(&payload);
+        self.signature = sig.to_bytes().to_vec();
+
+        Ok(())
+    }
+
+    /// Verify the signature on this revocation
+    ///
+    /// Extracts the verifying key from the issuer DID and checks the signature.
+    pub fn verify(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Revocation has no signature");
+        }
+
+        if self.signature.len() != 64 {
+            anyhow::bail!(
+                "Invalid signature length: {} (expected 64)",
+                self.signature.len()
+            );
+        }
+
+        // Extract public key from issuer DID
+        let verifying_key = self.extract_verifying_key_from_did(&self.issuer)?;
+
+        // Parse signature
+        let sig_bytes: [u8; 64] = self
+            .signature
+            .as_slice()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
+        let signature = Signature::from_bytes(&sig_bytes);
+
+        // Verify signature
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Check if this revocation should supersede an attestation
+    ///
+    /// A revocation supersedes any attestation with an earlier timestamp.
+    /// This provides strong revocation semantics: once revoked, previous
+    /// attestations are invalid regardless of their trust score.
+    pub fn supersedes_attestation(&self, attestation_created_at: u64) -> bool {
+        self.revoked_at >= attestation_created_at
     }
 
     /// Extract verifying key from a DID
@@ -661,6 +897,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -673,6 +910,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 400, // 6.67 minutes newer (> 5 min tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -696,6 +934,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -708,6 +947,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -734,6 +974,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -746,6 +987,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -774,6 +1016,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: node_a_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -786,6 +1029,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: node_b_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -815,6 +1059,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -828,6 +1073,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 3600, // 1 hour later (well outside tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -837,5 +1083,205 @@ mod tests {
 
         // Old high trust should not supersede newer low trust
         assert!(!high_trust.should_supersede(low_trust.created_at, low_trust.score));
+    }
+
+    // ============================================================================
+    // Sequence Number Tests (Replay Protection)
+    // ============================================================================
+
+    #[test]
+    fn test_attestation_with_sequence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
+            .with_sequence(42);
+
+        // Sign with sequence included
+        attestation.sign(&alice).unwrap();
+
+        // Verify should succeed
+        assert!(attestation.verify().is_ok());
+        assert_eq!(attestation.sequence, 42);
+    }
+
+    #[test]
+    fn test_attestation_sequence_in_signature() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut att1 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
+            .with_sequence(1);
+        att1.sign(&alice).unwrap();
+
+        let mut att2 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
+            .with_sequence(2);
+        att2.sign(&alice).unwrap();
+
+        // Different sequences should produce different signatures
+        assert_ne!(att1.signature, att2.signature);
+
+        // Both should verify
+        assert!(att1.verify().is_ok());
+        assert!(att2.verify().is_ok());
+
+        // Tampering with sequence should fail verification
+        let mut att1_tampered = att1.clone();
+        att1_tampered.sequence = 999;
+        assert!(att1_tampered.verify().is_err());
+    }
+
+    #[test]
+    fn test_attestation_backward_compatibility_no_sequence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Create an attestation without sequence (defaults to 0)
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        assert_eq!(attestation.sequence, 0);
+
+        // Sign with v3 format (includes sequence 0)
+        attestation.sign(&alice).unwrap();
+
+        // Should verify successfully
+        assert!(attestation.verify().is_ok());
+    }
+
+    // ============================================================================
+    // Trust Revocation Tests
+    // ============================================================================
+
+    #[test]
+    fn test_revocation_creation() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone())
+            .with_reason("Breach of contract");
+
+        assert_eq!(revocation.issuer, *alice.did());
+        assert_eq!(revocation.subject, *bob.did());
+        assert_eq!(revocation.reason, Some("Breach of contract".to_string()));
+        assert_eq!(revocation.graph_type, TrustGraphType::Social);
+    }
+
+    #[test]
+    fn test_revocation_sign_and_verify() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+
+        // Sign
+        revocation.sign(&alice).unwrap();
+        assert!(!revocation.signature.is_empty());
+
+        // Verify
+        assert!(revocation.verify().is_ok());
+    }
+
+    #[test]
+    fn test_revocation_verify_fails_wrong_signature() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+
+        // Sign with Eve's key (wrong issuer)
+        revocation.issuer = eve.did().clone();
+        revocation.sign(&eve).unwrap();
+
+        // Change issuer back to Alice
+        revocation.issuer = alice.did().clone();
+
+        // Verify should fail
+        assert!(revocation.verify().is_err());
+    }
+
+    #[test]
+    fn test_revocation_verify_fails_tampered_subject() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let carol = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+        revocation.sign(&alice).unwrap();
+
+        // Tamper with subject
+        revocation.subject = carol.did().clone();
+
+        // Verify should fail
+        assert!(revocation.verify().is_err());
+    }
+
+    #[test]
+    fn test_revocation_supersedes_attestation() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        // Attestation created at base_time
+        let attestation = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 1,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        // Revocation created later
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+        revocation.revoked_at = base_time + 3600; // 1 hour later
+
+        // Revocation should supersede attestation
+        assert!(revocation.supersedes_attestation(attestation.created_at));
+
+        // Revocation at same time should also supersede
+        revocation.revoked_at = base_time;
+        assert!(revocation.supersedes_attestation(attestation.created_at));
+
+        // Revocation before attestation should NOT supersede
+        revocation.revoked_at = base_time - 1;
+        assert!(!revocation.supersedes_attestation(attestation.created_at));
+    }
+
+    #[test]
+    fn test_revocation_with_graph_type() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new_typed(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustGraphType::EconomicReliability,
+        );
+
+        revocation.sign(&alice).unwrap();
+        assert!(revocation.verify().is_ok());
+        assert_eq!(revocation.graph_type, TrustGraphType::EconomicReliability);
+    }
+
+    #[test]
+    fn test_revocation_sign_wrong_keypair() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+
+        // Try to sign with Eve's keypair (should fail)
+        let result = revocation.sign(&eve);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not match revocation issuer"));
     }
 }
