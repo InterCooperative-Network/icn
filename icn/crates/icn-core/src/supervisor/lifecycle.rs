@@ -314,9 +314,7 @@ async fn spawn_actors_with_identity(
     let treasury_manager_handle = handles.treasury_manager;
     let contract_runtime_handle = handles.contract_runtime;
     let contract_actor_handle = handles.contract_actor;
-    let protocol_parameter_store_from_daemon: Arc<
-        dyn icn_kernel_api::protocol_params::ProtocolParameterStore,
-    > = handles.protocol_parameter_store;
+    let protocol_parameter_store_from_daemon = handles.protocol_parameter_store;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -522,7 +520,7 @@ async fn spawn_actors_with_identity(
             gossip_handle: gossip_handle.clone(),
             event_bus: event_bus.clone(),
             shutdown_rx: shutdown_tx.subscribe(),
-            protocol_parameter_store: Some(protocol_parameter_store_from_daemon),
+            protocol_parameter_store: protocol_parameter_store_from_daemon,
         },
     )
     .await?;

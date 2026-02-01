@@ -12,6 +12,7 @@ use anyhow::Result;
 use clap::Parser;
 use icn_core::{Config, Runtime};
 use icn_identity::{AgeKeyStore, KeyStore};
+use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_kernel_api::ServiceRegistry;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -141,6 +142,23 @@ async fn build_services(
         icn_governance::SledParameterStore::new(Arc::new(param_db))
             .context("Failed to initialize SledParameterStore")?,
     );
+    // Load default parameters on first run (if store is empty)
+    {
+        let existing = parameter_store.list()?;
+        if existing.is_empty() {
+            let defaults = icn_governance::default_parameters();
+            let count = defaults.len();
+            for param in defaults {
+                parameter_store.set(param, None, None)?;
+            }
+            tracing::info!("✓ {} default protocol parameters initialized", count);
+        } else {
+            tracing::info!(
+                "✓ Protocol parameter store loaded ({} parameters)",
+                existing.len()
+            );
+        }
+    }
     let parameter_store_trait: Arc<dyn icn_governance::ProtocolParameterStore> =
         parameter_store.clone();
     let governance_service = icn_governance_app::create_service(parameter_store_trait);
@@ -207,7 +225,8 @@ async fn build_services(
         treasury_manager: ledger_services.treasury_manager,
         contract_runtime: ledger_services.contract_runtime,
         contract_actor: ledger_services.contract_actor,
-        protocol_parameter_store: parameter_store,
+        protocol_parameter_store: parameter_store.clone()
+            as Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
     };
 
     Ok((registry, Some(bootstrap_handles)))
