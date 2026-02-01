@@ -61,12 +61,18 @@ pub struct AttestationReducer {
     /// Current time for expiration filtering (Unix seconds).
     /// Injected for determinism in tests.
     now: u64,
+    /// Skip signature verification (for trusted internal sources like graph storage).
+    /// Default: false (verify signatures).
+    skip_verification: bool,
 }
 
 impl AttestationReducer {
     /// Create a reducer with the given "current time" for expiry checks.
     pub fn new(now: u64) -> Self {
-        Self { now }
+        Self {
+            now,
+            skip_verification: false,
+        }
     }
 
     /// Create a reducer using the actual wall clock.
@@ -75,7 +81,22 @@ impl AttestationReducer {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        Self { now }
+        Self {
+            now,
+            skip_verification: false,
+        }
+    }
+
+    /// Create a reducer that skips signature verification.
+    ///
+    /// **WARNING**: Only use this for attestations from trusted internal sources
+    /// (e.g., graph storage) where signatures are not available but the data
+    /// integrity is already guaranteed by the storage layer.
+    pub fn with_skip_verification(now: u64) -> Self {
+        Self {
+            now,
+            skip_verification: true,
+        }
     }
 
     /// Reduce a set of attestations into a single score.
@@ -106,7 +127,7 @@ impl AttestationReducer {
         let valid: Vec<&TrustAttestation> = attestations
             .iter()
             .filter(|a| {
-                a.verify().is_ok()
+                (self.skip_verification || a.verify().is_ok())
                     && !a.is_expired(self.now)
                     && a.created_at <= self.now + CLOCK_SKEW_TOLERANCE_SECS
             })

@@ -128,10 +128,6 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
-    // TODO(#1000): Refactor to use `AttestationReducer` once the compute handler
-    // pipeline converts TrustEdges to TrustAttestations. Currently the reducer is
-    // used by the compute handler path; this method reimplements hash logic directly
-    // from the graph's edge storage for the service query path.
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
         tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
@@ -142,9 +138,7 @@ impl TrustService for TrustServiceImplTokio {
                     None => return self.empty_score_result(),
                 };
 
-                let score = graph.compute_trust_score(&identity_did).unwrap_or(0.0); // Unknown actors start at zero trust
-
-                // Collect edges pointing to this actor to derive input count + hash
+                // Collect edges pointing to this actor
                 let input_edges = graph
                     .get_all_known_dids()
                     .unwrap_or_default()
@@ -157,45 +151,28 @@ impl TrustService for TrustServiceImplTokio {
                     })
                     .collect::<Vec<_>>();
 
-                let input_count = input_edges.len() as u32;
+                // Convert TrustEdges to TrustAttestations for unified hashing
+                // Note: Edges from storage don't have signatures but are already validated
+                let attestations: Vec<icn_trust::TrustAttestation> = input_edges
+                    .iter()
+                    .map(|edge| icn_trust::TrustAttestation::from_trust_edge(edge))
+                    .collect();
 
-                // Compute deterministic hash over the input edges.
-                //
-                // NOTE: This hashes TrustEdges (storage format) while AttestationReducer
-                // hashes TrustAttestations (wire format). These two hash methods serve
-                // different purposes and should not be compared:
-                // - This method: live score provenance from the graph's current state
-                // - AttestationReducer: pure scoring from a set of attestations
-                // When the reducer is integrated into this method (see TODO below),
-                // both paths will use the same attestation-based hashing.
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(reducer::REDUCER_VERSION.as_bytes());
-                // Sort by source DID for determinism
-                let mut sorted = input_edges;
-                sorted.sort_by(|a, b| a.source.to_string().cmp(&b.source.to_string()));
-                for edge in &sorted {
-                    hasher.update(edge.source.as_str().as_bytes());
-                    hasher.update(edge.target.as_str().as_bytes());
-                    hasher.update(edge.score.value().to_le_bytes());
-                    hasher.update(edge.created_at.to_le_bytes());
-                    hasher.update(edge.graph_type.as_str().as_bytes());
-                }
-                let inputs_hash: [u8; 32] = hasher.finalize().into();
-
+                // Use AttestationReducer to compute score and hash
+                // Skip signature verification since edges from storage are already trusted
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
                     .unwrap_or(0);
 
-                TrustScoreResult {
-                    score,
-                    epoch: self.epoch.load(Ordering::Relaxed),
-                    computed_at: now,
-                    input_count,
-                    inputs_hash,
-                    reducer_version: reducer::REDUCER_VERSION.to_string(),
-                }
+                let reducer = reducer::AttestationReducer::with_skip_verification(now);
+                let reduced = reducer.reduce(&attestations);
+
+                // Convert to TrustScoreResult with current epoch
+                let mut result = reduced.to_kernel_result(self.epoch.load(Ordering::Relaxed));
+                // Override computed_at to use current timestamp
+                result.computed_at = now;
+                result
             })
         })
     }
@@ -782,6 +759,73 @@ mod tests {
             result.is_err(),
             "Attestation with spoofed issuer must be rejected, got: {:?}",
             result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_edge_attestation_hash_convergence() {
+        // Verify that TrustEdge→TrustAttestation→hash produces identical results
+        // whether hashing edges directly or via AttestationReducer.
+        let (graph, keypair) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair.clone());
+
+        let alice = icn_identity::KeyPair::generate().unwrap();
+        let bob = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // Add two trust edges via the graph directly
+        let now = icn_time::current_timestamp_secs();
+        let edge1 = icn_trust::TrustEdge::new_typed(
+            alice.did().clone(),
+            target.did().clone(),
+            icn_trust::TrustScore::unchecked(0.8),
+            icn_trust::types::TrustGraphType::Social,
+        );
+        let edge2 = icn_trust::TrustEdge::new_typed(
+            bob.did().clone(),
+            target.did().clone(),
+            icn_trust::TrustScore::unchecked(0.6),
+            icn_trust::types::TrustGraphType::Social,
+        );
+
+        {
+            let mut g = graph.write().await;
+            g.add_edge(edge1.clone()).unwrap();
+            g.add_edge(edge2.clone()).unwrap();
+        }
+
+        // Get detailed score via service (uses AttestationReducer internally)
+        let result1 = service.trust_score_detailed(&target_did);
+
+        // Manually compute hash via AttestationReducer (direct path)
+        let attestations = vec![
+            icn_trust::TrustAttestation::from_trust_edge(&edge1),
+            icn_trust::TrustAttestation::from_trust_edge(&edge2),
+        ];
+        let reducer = reducer::AttestationReducer::with_skip_verification(now);
+        let result2 = reducer.reduce(&attestations);
+
+        // Both paths should produce identical hashes and input counts
+        assert_eq!(
+            result1.inputs_hash, result2.inputs_hash,
+            "Hash convergence: TrustEdge and TrustAttestation must hash identically"
+        );
+        assert_eq!(
+            result1.input_count, result2.input_count,
+            "Input count must match between both paths"
+        );
+        assert_eq!(
+            result1.reducer_version, result2.reducer_version,
+            "Reducer version must match"
+        );
+
+        // Scores should also match (within floating point tolerance)
+        assert!(
+            (result1.score - result2.score).abs() < 0.001,
+            "Scores must match: {} vs {}",
+            result1.score,
+            result2.score
         );
     }
 }

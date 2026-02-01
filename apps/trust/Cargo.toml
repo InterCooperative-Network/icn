@@ -16,6 +16,9 @@ icn-trust = { path = "../../icn/crates/icn-trust" }
 # Identity types (for Did conversion)
 icn-identity = { path = "../../icn/crates/icn-identity" }
 
+# Time utilities (for timestamp functions)
+icn-time = { path = "../../icn/crates/icn-time" }
+
 # Storage for tests
 icn-store = { path = "../../icn/crates/icn-store" }
 
