@@ -938,8 +938,8 @@ mod tests {
     async fn test_trust_edge_attestation_hash_convergence() {
         // Verify that TrustEdge→TrustAttestation→hash produces identical results
         // whether hashing edges directly or via AttestationReducer.
-        let (graph, keypair) = create_test_graph();
-        let service = TrustServiceImplTokio::new(graph.clone(), keypair.clone());
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair.clone(), store);
 
         let alice = icn_identity::KeyPair::generate().unwrap();
         let bob = icn_identity::KeyPair::generate().unwrap();
