@@ -850,6 +850,91 @@ impl TrustGraph {
         Ok(trusted_dids)
     }
 
+    // ============================================================
+    // Scope-Aware Trust Computation (Wave 2)
+    // ============================================================
+
+    /// Compute trust score within a specific scope
+    ///
+    /// This filters edges to only those matching the given scope before
+    /// computing trust. This provides scope-bounded trust computation to
+    /// prevent centralization across scope boundaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The DID to compute trust for
+    /// * `scope` - The scope to filter edges by
+    ///
+    /// # Firewall Compliance
+    ///
+    /// This method is in `icn-trust` (app layer). The kernel never calls this.
+    /// PolicyOracles use this to compute scope-aware constraint values.
+    pub fn compute_trust_score_in_scope(
+        &self,
+        target: &Did,
+        scope: &crate::ScopeId,
+    ) -> Result<f64> {
+        let outgoing = self.get_outgoing_edges(&self.own_did)?;
+        let now = icn_time::current_timestamp_secs();
+
+        // Filter to scope-matching edges only
+        let scoped_edges: Vec<_> = outgoing
+            .into_iter()
+            .filter(|e| !e.is_expired(now))
+            .filter(|e| match &e.scope_id {
+                Some(edge_scope) => edge_scope == scope,
+                None => scope.is_global(), // Global edges match global scope queries
+            })
+            .collect();
+
+        // Use pathfinder with scope-filtered edges
+        // (Future: could create a scoped pathfinder)
+        
+        // Compute direct score
+        let direct_score = scoped_edges
+            .iter()
+            .find(|e| e.target == *target)
+            .map(|e| e.score.value())
+            .unwrap_or(0.0);
+
+        // Compute transitive scores through intermediaries
+        let intermediates = scoped_edges
+            .iter()
+            .filter(|e| e.target != *target) // Don't count direct edge as transitive
+            .filter_map(|e| {
+                // Look for edges from intermediate to target
+                scoped_edges
+                    .iter()
+                    .find(|indirect| indirect.source == e.target && indirect.target == *target)
+                    .map(|indirect| (e.score.value(), indirect.score.value()))
+            });
+
+        let weights = crate::ScoringWeights::legacy();
+        let score = crate::computation::compute_trust_score(direct_score, intermediates, weights);
+        Ok(score)
+    }
+
+    /// Get all edges within a specific scope
+    ///
+    /// Returns all outgoing edges from this node that belong to the given scope.
+    pub fn get_edges_in_scope(&self, scope: &crate::ScopeId) -> Result<Vec<TrustEdge>> {
+        let outgoing = self.get_outgoing_edges(&self.own_did)?;
+        let now = icn_time::current_timestamp_secs();
+
+        Ok(outgoing
+            .into_iter()
+            .filter(|e| !e.is_expired(now))
+            .filter(|e| match &e.scope_id {
+                Some(edge_scope) => edge_scope == scope,
+                None => scope.is_global(),
+            })
+            .collect())
+    }
+
+    // ============================================================
+    // End of TrustGraph Implementation
+    // ============================================================
+
     /// Invalidate cached scores for a DID and all transitively affected DIDs.
     ///
     /// When any edge with `target` as the target node changes (regardless of

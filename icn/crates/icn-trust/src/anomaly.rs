@@ -12,7 +12,7 @@
 use crate::typed_graph::TypedTrustGraph;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Detected trust anomaly
@@ -495,6 +495,302 @@ pub fn anomalies_to_sybil_flags(anomalies: &[TrustAnomaly]) -> Vec<crate::sybil:
     }
 
     flags
+}
+
+// ============================================================================
+// Centralization Metrics (Wave 2)
+// ============================================================================
+
+/// Centralization metrics for a scope
+///
+/// These metrics are **observational only**. They feed dashboards and governance
+/// decisions, NOT automatic enforcement. The metrics never enter the kernel.
+///
+/// # Usage Pattern
+///
+/// ```text
+/// Metrics ─► Governance ─► PolicyOracle ─► ConstraintSet ─► Kernel
+///             │                              │
+///        (human vote)                   (pure data)
+/// ```
+///
+/// **Never**: `Metrics ─► Kernel` (direct)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CentralizationMetrics {
+    /// Gini coefficient of inbound trust (0.0 = perfect equality, 1.0 = one node has all trust)
+    pub gini_coefficient: f64,
+    /// Number of nodes in scope
+    pub node_count: usize,
+    /// Total inbound trust across all nodes
+    pub total_inbound_trust: f64,
+    /// Top 10% of nodes by inbound trust (concentration measure)
+    pub top_10_percent_share: f64,
+    /// Betweenness centrality statistics
+    pub betweenness: BetweennessStats,
+}
+
+/// Betweenness centrality statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BetweennessStats {
+    /// Maximum betweenness centrality (most central node)
+    pub max: f64,
+    /// Mean betweenness centrality
+    pub mean: f64,
+    /// Standard deviation
+    pub std_dev: f64,
+}
+
+impl TrustGraphAnalyzer {
+    /// Compute centralization metrics for a specific scope
+    ///
+    /// This is an **observational metric** that feeds governance dashboards.
+    /// It does NOT trigger automatic enforcement. Governance policies can use
+    /// these metrics to decide on policy changes via PolicyOracle.
+    ///
+    /// # Firewall Compliance
+    ///
+    /// This method is in `icn-trust` (app layer). The kernel never calls this.
+    /// Metrics are exposed via `icn-obs` but remain in the app layer.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The trust graph to analyze
+    /// * `scope` - The scope to compute metrics for (uses `get_edges_in_scope`)
+    ///
+    /// # Returns
+    ///
+    /// Centralization metrics for the scope, or error if computation fails.
+    pub fn compute_centralization_metrics(
+        &self,
+        graph: &TypedTrustGraph,
+        scope: &crate::ScopeId,
+    ) -> anyhow::Result<CentralizationMetrics> {
+        use std::collections::HashMap;
+
+        // Get edges in scope
+        let edges = graph.inner().get_edges_in_scope(scope)?;
+
+        if edges.is_empty() {
+            return Ok(CentralizationMetrics {
+                gini_coefficient: 0.0,
+                node_count: 0,
+                total_inbound_trust: 0.0,
+                top_10_percent_share: 0.0,
+                betweenness: BetweennessStats {
+                    max: 0.0,
+                    mean: 0.0,
+                    std_dev: 0.0,
+                },
+            });
+        }
+
+        // Compute inbound trust per node
+        let mut inbound_trust: HashMap<Did, f64> = HashMap::new();
+        let mut nodes: HashSet<Did> = HashSet::new();
+
+        for edge in &edges {
+            nodes.insert(edge.source.clone());
+            nodes.insert(edge.target.clone());
+            *inbound_trust.entry(edge.target.clone()).or_insert(0.0) += edge.score.value();
+        }
+
+        let node_count = nodes.len();
+        let total_inbound_trust: f64 = inbound_trust.values().sum();
+
+        // Compute Gini coefficient
+        let gini = self.compute_gini_coefficient(&inbound_trust);
+
+        // Compute top 10% share
+        let top_10_percent_share = self.compute_top_concentration(&inbound_trust, 0.1);
+
+        // Compute betweenness centrality
+        let betweenness = self.compute_betweenness_stats(&edges, &nodes);
+
+        Ok(CentralizationMetrics {
+            gini_coefficient: gini,
+            node_count,
+            total_inbound_trust,
+            top_10_percent_share,
+            betweenness,
+        })
+    }
+
+    /// Compute Gini coefficient of trust distribution
+    ///
+    /// The Gini coefficient measures inequality in trust distribution:
+    /// - 0.0 = perfect equality (all nodes have equal inbound trust)
+    /// - 1.0 = perfect inequality (one node has all trust)
+    ///
+    /// Formula: G = (2 * Σ(i * x_i)) / (n * Σ(x_i)) - (n + 1) / n
+    fn compute_gini_coefficient(&self, inbound_trust: &HashMap<Did, f64>) -> f64 {
+        if inbound_trust.is_empty() {
+            return 0.0;
+        }
+
+        let mut values: Vec<f64> = inbound_trust.values().copied().collect();
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let n = values.len() as f64;
+        let sum: f64 = values.iter().sum();
+
+        if sum == 0.0 {
+            return 0.0;
+        }
+
+        let weighted_sum: f64 = values
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| (i as f64 + 1.0) * x)
+            .sum();
+
+        let gini = (2.0 * weighted_sum) / (n * sum) - (n + 1.0) / n;
+        gini.max(0.0).min(1.0) // Clamp to [0, 1]
+    }
+
+    /// Compute concentration in top percentile
+    ///
+    /// Returns the fraction of total trust held by the top `percentile` of nodes.
+    /// E.g., `percentile=0.1` returns the share held by the top 10% of nodes.
+    fn compute_top_concentration(
+        &self,
+        inbound_trust: &HashMap<Did, f64>,
+        percentile: f64,
+    ) -> f64 {
+        if inbound_trust.is_empty() {
+            return 0.0;
+        }
+
+        let mut values: Vec<f64> = inbound_trust.values().copied().collect();
+        values.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal)); // Sort descending
+
+        let top_n = ((values.len() as f64 * percentile).ceil() as usize).max(1);
+        let top_sum: f64 = values.iter().take(top_n).sum();
+        let total_sum: f64 = values.iter().sum();
+
+        if total_sum == 0.0 {
+            0.0
+        } else {
+            top_sum / total_sum
+        }
+    }
+
+    /// Compute betweenness centrality statistics
+    ///
+    /// Betweenness centrality measures how often a node appears on shortest paths
+    /// between other nodes. High betweenness indicates bridge/bottleneck nodes.
+    ///
+    /// This uses a simplified all-pairs shortest paths approach.
+    fn compute_betweenness_stats(
+        &self,
+        edges: &[crate::TrustEdge],
+        _nodes: &HashSet<Did>,
+    ) -> BetweennessStats {
+        use std::collections::HashMap;
+
+        // Extract nodes from edges
+        let mut nodes = HashSet::new();
+        for edge in edges {
+            nodes.insert(edge.source.clone());
+            nodes.insert(edge.target.clone());
+        }
+
+        if nodes.len() <= 1 {
+            return BetweennessStats {
+                max: 0.0,
+                mean: 0.0,
+                std_dev: 0.0,
+            };
+        }
+
+        // Build adjacency list
+        let mut adj: HashMap<Did, Vec<Did>> = HashMap::new();
+        for edge in edges {
+            adj.entry(edge.source.clone())
+                .or_default()
+                .push(edge.target.clone());
+        }
+
+        // Compute betweenness for each node
+        let mut betweenness: HashMap<Did, f64> = HashMap::new();
+        for node in &nodes {
+            betweenness.insert(node.clone(), 0.0);
+        }
+
+        // For each pair of nodes, find shortest paths and count intermediate nodes
+        for start in &nodes {
+            let shortest_paths = self.compute_shortest_paths(start, &adj);
+
+            for (end, path) in shortest_paths {
+                if start == &end {
+                    continue;
+                }
+
+                // Count intermediate nodes (exclude start and end)
+                for node in path.iter().skip(1).take(path.len().saturating_sub(2)) {
+                    *betweenness.get_mut(node).unwrap() += 1.0;
+                }
+            }
+        }
+
+        // Normalize by (n-1)(n-2) for directed graphs
+        let n = nodes.len() as f64;
+        let normalization = if n > 2.0 { (n - 1.0) * (n - 2.0) } else { 1.0 };
+
+        let normalized: Vec<f64> = betweenness
+            .values()
+            .map(|&bc| bc / normalization)
+            .collect();
+
+        let max = normalized.iter().copied().fold(0.0, f64::max);
+        let mean = if normalized.is_empty() {
+            0.0
+        } else {
+            normalized.iter().sum::<f64>() / normalized.len() as f64
+        };
+
+        let variance = if normalized.is_empty() {
+            0.0
+        } else {
+            normalized.iter().map(|&bc| (bc - mean).powi(2)).sum::<f64>() / normalized.len() as f64
+        };
+
+        let std_dev = variance.sqrt();
+
+        BetweennessStats { max, mean, std_dev }
+    }
+
+    /// Compute shortest paths from start node using BFS
+    fn compute_shortest_paths(
+        &self,
+        start: &Did,
+        adj: &HashMap<Did, Vec<Did>>,
+    ) -> HashMap<Did, Vec<Did>> {
+        use std::collections::{HashMap, VecDeque};
+
+        let mut paths: HashMap<Did, Vec<Did>> = HashMap::new();
+        let mut visited: HashSet<Did> = HashSet::new();
+        let mut queue: VecDeque<(Did, Vec<Did>)> = VecDeque::new();
+
+        queue.push_back((start.clone(), vec![start.clone()]));
+        visited.insert(start.clone());
+
+        while let Some((node, path)) = queue.pop_front() {
+            paths.insert(node.clone(), path.clone());
+
+            if let Some(neighbors) = adj.get(&node) {
+                for neighbor in neighbors {
+                    if !visited.contains(neighbor) {
+                        visited.insert(neighbor.clone());
+                        let mut new_path = path.clone();
+                        new_path.push(neighbor.clone());
+                        queue.push_back((neighbor.clone(), new_path));
+                    }
+                }
+            }
+        }
+
+        paths
+    }
 }
 
 fn current_timestamp() -> u64 {
