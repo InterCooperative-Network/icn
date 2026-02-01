@@ -49,6 +49,9 @@ pub struct TrustAttestation {
     ///
     /// **Migration**: Legacy attestations without this field are treated as
     /// sequence 0 during deserialization for backward compatibility.
+    /// Attestations with `sequence == 0` bypass replay protection to allow
+    /// a grace period for nodes to upgrade.  A future release will reject
+    /// `sequence == 0` after a migration deadline.
     #[serde(default)]
     pub sequence: u64,
 

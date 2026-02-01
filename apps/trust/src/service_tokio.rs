@@ -360,31 +360,6 @@ impl TrustService for TrustServiceImplTokio {
             return Ok(()); // Silently reject expired attestations
         }
 
-        // Validate sequence number for replay protection
-        // Attestations with sequence > 0 must have a monotonically increasing sequence
-        if attestation.sequence > 0 {
-            let seq_valid = tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let tracker = self.sequence_tracker.read().await;
-                    tracker
-                        .validate_sequence(&attestation.issuer, attestation.sequence)
-                        .await
-                })
-            });
-            if let Err(e) = seq_valid {
-                tracing::warn!(
-                    source = %source,
-                    "Rejecting replayed trust attestation: {} -> {} ({})",
-                    attestation.issuer, attestation.subject, e
-                );
-                return Err(format!(
-                    "Replay detected for attestation {} -> {}: {e}",
-                    attestation.issuer, attestation.subject
-                ));
-            }
-        }
-
         // Save sequence info before converting (attestation is consumed)
         let att_issuer = attestation.issuer.clone();
         let att_sequence = attestation.sequence;
@@ -392,10 +367,33 @@ impl TrustService for TrustServiceImplTokio {
         // Convert to trust edge
         let edge = attestation.to_trust_edge();
 
+        // Acquire both graph write lock and sequence tracker write lock atomically.
+        // This prevents TOCTOU: validate + graph write + sequence update are one unit.
         tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let mut graph = self.graph.write().await;
+
+                // Validate sequence under the write lock so no concurrent
+                // ingest can sneak between validation and update.
+                if att_sequence > 0 {
+                    let tracker = self.sequence_tracker.write().await;
+                    if let Err(e) = tracker.validate_sequence(&att_issuer, att_sequence) {
+                        tracing::warn!(
+                            source = %source,
+                            "Rejecting replayed trust attestation: {} -> {} ({})",
+                            att_issuer, edge.target, e
+                        );
+                        return Err(format!(
+                            "Replay detected for attestation {} -> {}: {e}",
+                            att_issuer, edge.target
+                        ));
+                    }
+                    // Drop tracker temporarily — will re-acquire for update
+                    // after graph write succeeds (avoids holding two locks
+                    // longer than needed).
+                    drop(tracker);
+                }
 
                 // Check if we already have this edge — supersede check
                 match graph.get_edge(&edge.source, &edge.target) {
@@ -420,10 +418,15 @@ impl TrustService for TrustServiceImplTokio {
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
                 self.bump_epoch();
 
-                // Update sequence tracker after successful write
+                // Atomically validate-and-update sequence tracker after
+                // successful graph write.  Uses write lock to prevent
+                // concurrent TOCTOU on the same issuer.
                 if att_sequence > 0 {
-                    let tracker = self.sequence_tracker.read().await;
-                    if let Err(e) = tracker.update_last_seen(&att_issuer, att_sequence).await {
+                    let tracker = self.sequence_tracker.write().await;
+                    if let Err(e) = tracker.validate_and_update(&att_issuer, att_sequence) {
+                        // This should not happen if the earlier validate_sequence
+                        // succeeded, unless there's a concurrent writer (which
+                        // the graph write lock prevents).
                         tracing::warn!(
                             "Failed to update sequence tracker for {}: {}",
                             att_issuer,
@@ -503,13 +506,12 @@ impl TrustService for TrustServiceImplTokio {
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
                 self.bump_epoch();
 
-                // Get next sequence number
+                // Get next sequence number (write lock serializes access)
                 let sequence = self
                     .sequence_tracker
                     .write()
                     .await
                     .next_issuer_sequence()
-                    .await
                     .map_err(|e| format!("Failed to get sequence: {e}"))?;
 
                 // Create attestation with sequence
