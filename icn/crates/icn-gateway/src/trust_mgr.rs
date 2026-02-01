@@ -1837,7 +1837,6 @@ mod tests {
     #[tokio::test]
     async fn test_algorithm_consistency_standalone_vs_actor_backed() {
         use icn_store::SledStore;
-        use icn_trust::TrustGraph;
         use std::sync::Arc;
 
         // Setup: Create identical trust scenarios in both modes
