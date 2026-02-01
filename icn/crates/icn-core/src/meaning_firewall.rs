@@ -360,12 +360,12 @@ mod tests {
     /// - lifecycle.rs: 4 (raw_handle extractions, fn signatures)
     /// - background_tasks.rs: 4 (governance polling types)
     /// - init_governance.rs: 3 (GovernanceManager, GovernanceSled)
-    /// - events.rs: 3 (ProposalPayload references)
+    /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
     /// - init_gateway.rs: 1 (GovernanceManager import)
     /// - actors.rs: 1 (CoreActorHandles governance handle)
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 83;
+        let expected: usize = 80;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(
