@@ -471,6 +471,7 @@ impl TrustAttestation {
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
             graph_type: self.graph_type,
+            scope_id: None, // Attestations default to global scope
         }
     }
 
@@ -491,6 +492,7 @@ impl TrustAttestation {
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
             graph_type: self.graph_type,
+            scope_id: None, // Attestations default to global scope
         }
     }
 

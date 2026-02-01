@@ -96,7 +96,7 @@ pub use sybil::{
 };
 pub use trust_cache::TrustCache;
 pub use typed_graph::TypedTrustGraph;
-pub use types::{ScoringWeights, TrustGraphType, TrustScore, TrustScoreError};
+pub use types::{ScopeId, ScoringWeights, TrustGraphType, TrustScore, TrustScoreError};
 
 use anyhow::Result;
 use icn_identity::Did;
@@ -181,15 +181,30 @@ pub struct TrustEdge {
     /// created before multi-graph support was added.
     #[serde(default)]
     pub graph_type: TrustGraphType,
+    /// Optional scope identifier for scope-bounded trust (Wave 2)
+    ///
+    /// When set, this edge is scoped to a specific organizational boundary
+    /// (cooperative, federation, domain, or topic class). Trust computation
+    /// can be performed within scope boundaries to prevent centralization.
+    ///
+    /// Defaults to `None` (global scope) for backward compatibility.
+    ///
+    /// # Firewall Compliance
+    ///
+    /// This field lives ONLY in `icn-trust`. It never crosses into kernel
+    /// crates. PolicyOracles use scope-bounded trust to compute constraint
+    /// values, but the kernel receives only opaque `ConstraintSet` data.
+    #[serde(default)]
+    pub scope_id: Option<ScopeId>,
 }
 
 impl TrustEdge {
-    /// Create a new trust edge (defaults to Social graph type)
+    /// Create a new trust edge (defaults to Social graph type, global scope)
     pub fn new(source: Did, target: Did, score: TrustScore) -> Self {
         Self::new_typed(source, target, score, TrustGraphType::Social)
     }
 
-    /// Create a new trust edge with explicit graph type
+    /// Create a new trust edge with explicit graph type (global scope)
     pub fn new_typed(
         source: Did,
         target: Did,
@@ -208,12 +223,43 @@ impl TrustEdge {
             expires_at: None,
             created_at: now,
             graph_type,
+            scope_id: None, // Global scope by default
+        }
+    }
+
+    /// Create a new trust edge with explicit graph type and scope
+    pub fn new_scoped(
+        source: Did,
+        target: Did,
+        score: TrustScore,
+        graph_type: TrustGraphType,
+        scope_id: ScopeId,
+    ) -> Self {
+        let now = icn_time::current_timestamp_secs();
+
+        Self {
+            source,
+            target,
+            labels: Vec::new(),
+            score,
+            evidence: Vec::new(),
+            legacy_evidence: Vec::new(),
+            expires_at: None,
+            created_at: now,
+            graph_type,
+            scope_id: Some(scope_id),
         }
     }
 
     /// Check if this edge is expired
     pub fn is_expired(&self, now: u64) -> bool {
         self.expires_at.is_some_and(|exp| now > exp)
+    }
+
+    /// Set the scope for this edge
+    pub fn with_scope(mut self, scope_id: ScopeId) -> Self {
+        self.scope_id = Some(scope_id);
+        self
     }
 
     /// Add a label to this edge
@@ -889,6 +935,7 @@ impl TrustGraph {
                 expires_at: edge.expires_at,
                 created_at: edge.created_at,
                 graph_type: edge.graph_type,
+                scope_id: edge.scope_id, // Preserve scope during migration
             };
 
             self.add_edge(new_edge)?;
@@ -919,6 +966,7 @@ impl TrustGraph {
                     expires_at: edge.expires_at,
                     created_at: edge.created_at,
                     graph_type: edge.graph_type,
+                    scope_id: edge.scope_id, // Preserve scope during migration
                 };
 
                 self.add_edge(new_edge)?;
