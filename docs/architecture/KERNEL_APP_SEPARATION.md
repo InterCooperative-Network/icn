@@ -966,6 +966,71 @@ fn check_access(&self, score: f64) -> bool {
 
 ## 6. Migration Status
 
+### 6.0 Wave-Based Migration Progress
+
+**Current Status**: Wave 1 Complete ✅
+
+The kernel/app separation is being executed in waves, with each wave building on previous work:
+
+| Wave | Tracking Issue | Status | Description |
+|------|----------------|--------|-------------|
+| **Wave 0** | [#1006](https://github.com/InterCooperative-Network/icn/issues/1006) | ✅ Complete | PolicyOracle infrastructure and bootstrap phases |
+| **Wave 1** | [#1007](https://github.com/InterCooperative-Network/icn/issues/1007) | ✅ Complete | Firewall Contract documentation + CI enforcement |
+| **Wave 2** | [#1008](https://github.com/InterCooperative-Network/icn/issues/1008) | ⏳ Planned | Migrate rate limit values to ConstraintSet |
+| **Wave 3** | [#1010](https://github.com/InterCooperative-Network/icn/issues/1010) | ⏳ Planned | Migrate capability grants to ConstraintSet |
+| **Wave 4** | [#1011](https://github.com/InterCooperative-Network/icn/issues/1011) | ⏳ Planned | Migrate credit ceiling values to ConstraintSet |
+| **Wave 5** | [#1012](https://github.com/InterCooperative-Network/icn/issues/1012) | ⏳ Planned | Final cleanup and enforcement |
+
+**Wave 1 Deliverables** (✅ Complete as of 2026-02-01):
+- ✅ Firewall Contract section added to this document
+- ✅ 5 non-negotiable invariants documented with rationale
+- ✅ Mechanism vs value distinction table
+- ✅ Violation examples (what NOT to do)
+- ✅ `.github/scripts/firewall_denylist.py` CI enforcement script
+- ✅ CI job integrated (non-blocking until migrations complete)
+
+**Known Violations** (to be resolved in Waves 2-6):
+
+Currently detected by `firewall_denylist.py`:
+- `icn-core -> icn-ccl`
+- `icn-core -> icn-community`
+- `icn-core -> icn-compute`
+- `icn-core -> icn-coop`
+- `icn-core -> icn-entity`
+- `icn-core -> icn-federation`
+- `icn-core -> icn-governance`
+- `icn-core -> icn-ledger`
+- `icn-core -> icn-steward`
+- `icn-core -> icn-trust`
+
+**Definition of Done for Complete Separation**:
+- [ ] CI `firewall-contract` job passes without violations
+- [ ] `continue-on-error` removed from CI job
+- [ ] All `raw_handles` removed from ServiceRegistry
+- [ ] No kernel crate depends on any domain/app crate
+
+### 6.0.1 Enforcement Mechanism Status
+
+The table below shows the current state of kernel enforcement mechanisms and policy value sources:
+
+| Enforcement | Kernel-Pure? | Status | Migration Target |
+|-------------|--------------|--------|------------------|
+| **Transport auth** | ✅ Yes | Complete | No changes needed - pure cryptographic check |
+| **Replay guard** | ✅ Yes | Complete | No changes needed - pure sequence tracking |
+| **Rate limiter (mechanism)** | ✅ Yes | Complete | Kernel provides token bucket algorithm |
+| **Rate limit values** | 🟡 Partial | Wave 2 | Some hardcoded, needs full migration to ConstraintSet |
+| **Capability gate (mechanism)** | ✅ Yes | Complete | Kernel checks capability presence |
+| **Capability grants** | 🟡 Partial | Wave 3 | Needs migration to PolicyOracle-provided values |
+| **Credit gate (mechanism)** | ✅ Yes | Complete | Kernel enforces ceiling checks |
+| **Credit ceiling values** | 🟡 Partial | Wave 4 | Needs migration to ConstraintSet |
+| **Topic access control** | 🟡 Partial | Wave 2 | Some direct trust checks, needs PolicyOracle |
+| **Replication selection** | ❌ No | Wave 2 | Direct trust-score calls need migration |
+
+**Legend**:
+- ✅ **Kernel-Pure**: Mechanism and values properly separated
+- 🟡 **Partial**: Mechanism separated, but some values still hardcoded in kernel
+- ❌ **No**: Still has semantic knowledge, needs migration
+
 ### 6.1 Completed Migrations
 
 | Component | Migration Date | Notes |
