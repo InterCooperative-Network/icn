@@ -42,12 +42,26 @@ pub struct TrustAttestation {
     /// Unix timestamp when this attestation was created
     pub created_at: u64,
 
+    /// Monotonic sequence number for replay protection
+    ///
+    /// Each issuer maintains a monotonic counter. Receivers track the last
+    /// seen sequence per issuer and reject attestations with stale sequences.
+    ///
+    /// **Migration**: Legacy attestations without this field are treated as
+    /// sequence 0 during deserialization for backward compatibility.
+    /// Attestations with `sequence == 0` bypass replay protection to allow
+    /// a grace period for nodes to upgrade.  A future release will reject
+    /// `sequence == 0` after a migration deadline.
+    #[serde(default)]
+    pub sequence: u64,
+
     /// Ed25519 signature over the canonical representation
     ///
-    /// V2 (current): issuer || subject || score || ttl || created_at || graph_type || labels || evidence
+    /// V3 (current): issuer || subject || score || ttl || created_at || sequence || graph_type || labels || evidence
+    /// V2 (legacy):  issuer || subject || score || ttl || created_at || graph_type || labels || evidence
     /// V1 (legacy):  issuer || subject || score || ttl || created_at || labels || evidence
     ///
-    /// The verify() method supports both formats for backward compatibility.
+    /// The verify() method supports all formats for backward compatibility.
     pub signature: Vec<u8>,
 
     /// The type of trust graph this attestation belongs to
@@ -56,6 +70,36 @@ pub struct TrustAttestation {
     /// created before multi-graph support was added.
     #[serde(default)]
     pub graph_type: TrustGraphType,
+}
+
+/// A signed trust revocation that can be broadcast over the network
+///
+/// This represents a cryptographically signed statement: "I (issuer) revoke
+/// my previous trust attestation for (subject) as of this timestamp."
+///
+/// Revocations win over any attestation with an earlier timestamp.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustRevocation {
+    /// The DID revoking the trust statement
+    pub issuer: Did,
+
+    /// The DID whose trust is being revoked
+    pub subject: Did,
+
+    /// Unix timestamp when this revocation was created
+    pub revoked_at: u64,
+
+    /// Optional reason for revocation (for auditing)
+    #[serde(default)]
+    pub reason: Option<String>,
+
+    /// The type of trust graph this revocation applies to
+    #[serde(default)]
+    pub graph_type: TrustGraphType,
+
+    /// Ed25519 signature over the canonical representation
+    /// Payload: issuer || subject || revoked_at || graph_type || reason (if present)
+    pub signature: Vec<u8>,
 }
 
 impl TrustAttestation {
@@ -87,6 +131,7 @@ impl TrustAttestation {
             evidence: Vec::new(),
             ttl_seconds: 30 * 24 * 60 * 60, // 30 days default
             created_at: now,
+            sequence: 0, // Will be set by the caller before signing
             signature: Vec::new(),
             graph_type,
         }
@@ -116,12 +161,55 @@ impl TrustAttestation {
         self
     }
 
-    /// Get the canonical signing payload (v2 format, includes graph_type)
+    /// Set the sequence number
+    ///
+    /// The sequence number should be set before signing to enable replay protection.
+    /// Typically, the issuer increments a counter stored in persistent storage.
+    pub fn with_sequence(mut self, sequence: u64) -> Self {
+        self.sequence = sequence;
+        self
+    }
+
+    /// Get the canonical signing payload (v3 format, includes sequence)
     ///
     /// The signature covers the core attestation fields in a deterministic order:
-    /// issuer || subject || score || ttl || created_at || graph_type || labels || evidence
+    /// issuer || subject || score || ttl || created_at || sequence || graph_type || labels || evidence
     fn signing_payload(&self) -> Vec<u8> {
-        self.signing_payload_v2()
+        self.signing_payload_v3()
+    }
+
+    /// V3 signing payload - includes sequence (replay protection)
+    fn signing_payload_v3(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        // Core fields
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.score.to_le_bytes());
+        hasher.update(self.ttl_seconds.to_le_bytes());
+        hasher.update(self.created_at.to_le_bytes());
+
+        // Sequence number (added for replay protection)
+        hasher.update(self.sequence.to_le_bytes());
+
+        // Graph type (added for multi-graph support)
+        hasher.update(self.graph_type.as_str().as_bytes());
+
+        // Labels (sorted for determinism)
+        let mut sorted_labels = self.labels.clone();
+        sorted_labels.sort();
+        for label in sorted_labels {
+            hasher.update(label.as_bytes());
+        }
+
+        // Evidence (sorted for determinism)
+        let mut sorted_evidence = self.evidence.clone();
+        sorted_evidence.sort();
+        for ev in sorted_evidence {
+            hasher.update(ev.as_bytes());
+        }
+
+        hasher.finalize().to_vec()
     }
 
     /// V2 signing payload - includes graph_type (multi-graph support)
@@ -134,6 +222,8 @@ impl TrustAttestation {
         hasher.update(self.score.to_le_bytes());
         hasher.update(self.ttl_seconds.to_le_bytes());
         hasher.update(self.created_at.to_le_bytes());
+
+        // Note: No sequence in v2 format
 
         // Graph type (added for multi-graph support)
         hasher.update(self.graph_type.as_str().as_bytes());
@@ -166,7 +256,7 @@ impl TrustAttestation {
         hasher.update(self.ttl_seconds.to_le_bytes());
         hasher.update(self.created_at.to_le_bytes());
 
-        // Note: No graph_type in v1 format
+        // Note: No sequence or graph_type in v1 format
 
         // Labels (sorted for determinism)
         let mut sorted_labels = self.labels.clone();
@@ -209,9 +299,9 @@ impl TrustAttestation {
     ///
     /// Extracts the verifying key from the issuer DID and checks the signature.
     ///
-    /// For backward compatibility, this method tries both v2 (with graph_type) and
-    /// v1 (without graph_type) signing formats. This ensures that attestations signed
-    /// before multi-graph support was added will still verify correctly.
+    /// For backward compatibility, this method tries v3 (with sequence), v2 (with
+    /// graph_type), and v1 (legacy) signing formats. This ensures that attestations
+    /// signed before replay protection or multi-graph support will still verify.
     pub fn verify(&self) -> Result<()> {
         if self.signature.is_empty() {
             anyhow::bail!("Attestation has no signature");
@@ -235,13 +325,19 @@ impl TrustAttestation {
             .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
         let signature = Signature::from_bytes(&sig_bytes);
 
-        // Try v2 format first (with graph_type)
+        // Try v3 format first (with sequence)
+        let payload_v3 = self.signing_payload_v3();
+        if verifying_key.verify(&payload_v3, &signature).is_ok() {
+            return Ok(());
+        }
+
+        // Fall back to v2 format (with graph_type, no sequence)
         let payload_v2 = self.signing_payload_v2();
         if verifying_key.verify(&payload_v2, &signature).is_ok() {
             return Ok(());
         }
 
-        // Fall back to v1 format for backward compatibility (without graph_type)
+        // Fall back to v1 format for backward compatibility (without graph_type or sequence)
         // This handles attestations signed before multi-graph support was added
         let payload_v1 = self.signing_payload_v1();
         verifying_key
@@ -470,33 +566,162 @@ impl TrustAttestation {
             evidence,
             ttl_seconds,
             created_at: edge.created_at,
+            sequence: 0, // Will be set by the caller before signing
             signature: Vec::new(),
             graph_type: edge.graph_type,
         }
     }
 
     /// Extract verifying key from a DID
-    ///
-    /// DIDs are in the format: did:icn:<multibase-encoded-pubkey>
     fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
-        let did_str = did.as_str();
+        extract_verifying_key_from_did(did)
+    }
+}
 
-        if !did_str.starts_with("did:icn:") {
-            anyhow::bail!("Invalid DID format: {did_str}");
+/// Shared helper to extract an Ed25519 verifying key from a DID.
+///
+/// DIDs are in the format: `did:icn:<multibase-encoded-pubkey>`
+fn extract_verifying_key_from_did(did: &Did) -> Result<VerifyingKey> {
+    let did_str = did.as_str();
+
+    if !did_str.starts_with("did:icn:") {
+        anyhow::bail!("Invalid DID format: {did_str}");
+    }
+
+    let encoded = &did_str[8..]; // Skip "did:icn:"
+    let (_base, decoded) = multibase::decode(encoded)?;
+
+    if decoded.len() != 32 {
+        anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
+    }
+
+    let key_bytes: [u8; 32] = decoded
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
+
+    Ok(VerifyingKey::from_bytes(&key_bytes)?)
+}
+
+impl TrustRevocation {
+    /// Create a new unsigned revocation
+    ///
+    /// Note: This returns a revocation with an empty signature.
+    /// You must call `sign()` before broadcasting.
+    pub fn new(issuer: Did, subject: Did) -> Self {
+        Self::new_typed(issuer, subject, TrustGraphType::Social)
+    }
+
+    /// Create a new unsigned revocation with explicit graph type
+    pub fn new_typed(issuer: Did, subject: Did, graph_type: TrustGraphType) -> Self {
+        let now = icn_time::current_timestamp_secs();
+
+        Self {
+            issuer,
+            subject,
+            revoked_at: now,
+            reason: None,
+            graph_type,
+            signature: Vec::new(),
+        }
+    }
+
+    /// Add a reason for this revocation
+    pub fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.reason = Some(reason.into());
+        self
+    }
+
+    /// Set the graph type
+    pub fn with_graph_type(mut self, graph_type: TrustGraphType) -> Self {
+        self.graph_type = graph_type;
+        self
+    }
+
+    /// Get the canonical signing payload
+    ///
+    /// The signature covers: issuer || subject || revoked_at || graph_type || reason (if present)
+    fn signing_payload(&self) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+
+        hasher.update(self.issuer.as_str().as_bytes());
+        hasher.update(self.subject.as_str().as_bytes());
+        hasher.update(self.revoked_at.to_le_bytes());
+        hasher.update(self.graph_type.as_str().as_bytes());
+
+        if let Some(ref reason) = self.reason {
+            hasher.update(reason.as_bytes());
         }
 
-        let encoded = &did_str[8..]; // Skip "did:icn:"
-        let (_base, decoded) = multibase::decode(encoded)?;
+        hasher.finalize().to_vec()
+    }
 
-        if decoded.len() != 32 {
-            anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
+    /// Sign this revocation with a keypair
+    ///
+    /// This creates an Ed25519 signature over the canonical representation
+    /// and stores it in the `signature` field.
+    pub fn sign(&mut self, keypair: &icn_identity::KeyPair) -> Result<()> {
+        if keypair.did() != &self.issuer {
+            anyhow::bail!(
+                "Keypair DID ({}) does not match revocation issuer ({})",
+                keypair.did(),
+                self.issuer
+            );
         }
 
-        let key_bytes: [u8; 32] = decoded
+        let payload = self.signing_payload();
+        let sig = keypair.sign(&payload);
+        self.signature = sig.to_bytes().to_vec();
+
+        Ok(())
+    }
+
+    /// Verify the signature on this revocation
+    ///
+    /// Extracts the verifying key from the issuer DID and checks the signature.
+    pub fn verify(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Revocation has no signature");
+        }
+
+        if self.signature.len() != 64 {
+            anyhow::bail!(
+                "Invalid signature length: {} (expected 64)",
+                self.signature.len()
+            );
+        }
+
+        // Extract public key from issuer DID
+        let verifying_key = self.extract_verifying_key_from_did(&self.issuer)?;
+
+        // Parse signature
+        let sig_bytes: [u8; 64] = self
+            .signature
+            .as_slice()
             .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
+            .map_err(|_| anyhow::anyhow!("Failed to convert signature to array"))?;
+        let signature = Signature::from_bytes(&sig_bytes);
 
-        Ok(VerifyingKey::from_bytes(&key_bytes)?)
+        // Verify signature
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .map_err(|e| anyhow::anyhow!("Signature verification failed: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Check if this revocation should supersede an attestation
+    ///
+    /// A revocation supersedes any attestation with an earlier timestamp.
+    /// This provides strong revocation semantics: once revoked, previous
+    /// attestations are invalid regardless of their trust score.
+    pub fn supersedes_attestation(&self, attestation_created_at: u64) -> bool {
+        self.revoked_at >= attestation_created_at
+    }
+
+    /// Extract verifying key from a DID
+    fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
+        extract_verifying_key_from_did(did)
     }
 }
 
@@ -691,6 +916,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -703,6 +929,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 400, // 6.67 minutes newer (> 5 min tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -726,6 +953,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -738,6 +966,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -764,6 +993,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -776,6 +1006,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 60, // 1 minute newer (within tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -804,6 +1035,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: node_a_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -816,6 +1048,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: node_b_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -845,6 +1078,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -858,6 +1092,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time + 3600, // 1 hour later (well outside tolerance)
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -875,51 +1110,42 @@ mod tests {
 
     #[test]
     fn test_replay_protection_old_high_score_rejected() {
-        // CRITICAL: Verify that an old attestation with a higher score
-        // CANNOT supersede a newer attestation with a lower score.
-        //
-        // This prevents replay attacks where an attacker records an old
-        // high-trust attestation and attempts to replay it after the issuer
-        // has downgraded their trust.
-
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
         let base_time = 10_000u64;
 
-        // Attacker records this old high-trust attestation
         let old_high_trust = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
-            score: 0.95, // Very high trust
+            score: 0.95,
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // Victim (Alice) later creates a revocation/downgrade
         let new_low_trust = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
-            score: 0.05, // Revocation - very low trust
+            score: 0.05,
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: base_time + 7200, // 2 hours later (well outside 5-min tolerance)
+            created_at: base_time + 7200,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // ✅ CRITICAL: Old high-trust attestation must NOT supersede newer low-trust one
         assert!(
             !old_high_trust.should_supersede(new_low_trust.created_at, new_low_trust.score),
             "OLD attestation with higher score MUST NOT supersede NEWER attestation (replay protection)"
         );
 
-        // ✅ New attestation should supersede old one (normal case)
         assert!(
             new_low_trust.should_supersede(old_high_trust.created_at, old_high_trust.score),
             "NEWER attestation should supersede OLDER attestation"
@@ -928,9 +1154,6 @@ mod tests {
 
     #[test]
     fn test_replay_protection_outside_tolerance_window() {
-        // Verify replay protection works for various time differences
-        // outside the 5-minute clock skew tolerance window.
-
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
@@ -944,17 +1167,17 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // Test various time differences outside tolerance (5 minutes = 300 seconds)
         let test_cases = vec![
-            (400, 0.1),   // 6.67 minutes newer, lower score
-            (600, 0.2),   // 10 minutes newer, lower score
-            (1800, 0.3),  // 30 minutes newer, lower score
-            (3600, 0.05), // 1 hour newer, very low score (revocation)
-            (86400, 0.0), // 1 day newer, zero score
+            (400, 0.1),
+            (600, 0.2),
+            (1800, 0.3),
+            (3600, 0.05),
+            (86400, 0.0),
         ];
 
         for (time_delta, new_score) in test_cases {
@@ -966,18 +1189,17 @@ mod tests {
                 evidence: vec![],
                 ttl_seconds: 86400,
                 created_at: base_time + time_delta,
+                sequence: 0,
                 signature: vec![],
                 graph_type: TrustGraphType::default(),
             };
 
-            // Old attestation should NOT supersede newer one, regardless of score
             assert!(
                 !old_att.should_supersede(new_att.created_at, new_att.score),
                 "Old attestation (score={}) should NOT supersede newer attestation (created +{}s, score={})",
                 old_att.score, time_delta, new_score
             );
 
-            // New attestation SHOULD supersede old one
             assert!(
                 new_att.should_supersede(old_att.created_at, old_att.score),
                 "Newer attestation (created +{}s, score={}) SHOULD supersede old attestation (score={})",
@@ -988,21 +1210,11 @@ mod tests {
 
     #[test]
     fn test_identical_timestamp_behavior() {
-        // When attestations have IDENTICAL timestamps (same created_at),
-        // document the expected behavior:
-        //
-        // - If scores differ: higher score wins (score tiebreaker)
-        // - If scores equal: both supersede each other (first processed wins in reducer)
-        //
-        // This scenario can occur in test environments or when multiple
-        // attestations are batch-created at the same timestamp.
-
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
         let timestamp = 30_000u64;
 
-        // Case 1: Identical timestamp, different scores
         let low_score_att = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
@@ -1011,6 +1223,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: timestamp,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -1022,12 +1235,12 @@ mod tests {
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: timestamp, // Same timestamp
+            created_at: timestamp,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // Higher score wins when timestamps are identical
         assert!(
             high_score_att.should_supersede(low_score_att.created_at, low_score_att.score),
             "Higher score should supersede lower score with identical timestamp"
@@ -1038,7 +1251,6 @@ mod tests {
             "Lower score should NOT supersede higher score with identical timestamp"
         );
 
-        // Case 2: Identical timestamp AND identical score
         let att_a = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
@@ -1047,6 +1259,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: timestamp,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -1054,17 +1267,16 @@ mod tests {
         let att_b = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
-            score: 0.5, // Same score
+            score: 0.5,
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: timestamp, // Same timestamp
+            created_at: timestamp,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // With identical timestamp and score, time_diff = 0 (>= 0 wins)
-        // So both should "supersede" each other - the first one wins in practice
         assert!(
             att_a.should_supersede(att_b.created_at, att_b.score),
             "With identical timestamp and score, first should supersede"
@@ -1074,23 +1286,15 @@ mod tests {
             att_b.should_supersede(att_a.created_at, att_a.score),
             "With identical timestamp and score, both return true (time_diff = 0)"
         );
-
-        // Note: In the reducer, this means whichever one is processed first wins.
-        // The deduplication logic in AttestationReducer will keep one arbitrarily,
-        // which is acceptable since they represent the same trust statement.
     }
 
     #[test]
     fn test_within_tolerance_score_tiebreaker() {
-        // Within the 5-minute clock skew tolerance window, score acts as
-        // a tiebreaker. This test verifies that behavior is correct.
-
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
         let base_time = 40_000u64;
 
-        // Case 1: Within tolerance, higher score wins even if slightly older
         let older_high_score = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
@@ -1099,6 +1303,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -1110,12 +1315,12 @@ mod tests {
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: base_time + 120, // 2 minutes newer (within 5-min tolerance)
+            created_at: base_time + 120,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // Within tolerance, higher score wins
         assert!(
             older_high_score.should_supersede(newer_low_score.created_at, newer_low_score.score),
             "Within tolerance window, older high score should supersede newer low score"
@@ -1126,7 +1331,6 @@ mod tests {
             "Within tolerance window, newer low score should NOT supersede older high score"
         );
 
-        // Case 2: At exact tolerance boundary (5 minutes = 300 seconds)
         let boundary_high_score = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
@@ -1135,6 +1339,7 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -1146,29 +1351,27 @@ mod tests {
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: base_time + 300, // Exactly at 5-minute boundary
+            created_at: base_time + 300,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // At boundary (time_diff = 300), condition is NOT > 300, so falls into tolerance window
-        // Higher score should still win
         assert!(
             boundary_high_score
                 .should_supersede(boundary_low_score.created_at, boundary_low_score.score),
             "At tolerance boundary, higher score should supersede"
         );
 
-        // Case 3: Just OUTSIDE tolerance (301 seconds)
-        // At 301s the newer attestation is "clearly newer" so it wins regardless of score.
         let just_outside = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
-            score: 0.1, // Lower score
+            score: 0.1,
             labels: vec![],
             evidence: vec![],
             ttl_seconds: 86400,
-            created_at: base_time + 301, // Just outside tolerance
+            created_at: base_time + 301,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
@@ -1181,20 +1384,190 @@ mod tests {
             evidence: vec![],
             ttl_seconds: 86400,
             created_at: base_time,
+            sequence: 0,
             signature: vec![],
             graph_type: TrustGraphType::default(),
         };
 
-        // 301s difference: newer wins regardless of lower score (replay protection)
         assert!(
             just_outside.should_supersede(older_high.created_at, older_high.score),
             "Just outside tolerance (301s), newer should win even with lower score"
         );
 
-        // Older cannot supersede newer outside tolerance
         assert!(
             !older_high.should_supersede(just_outside.created_at, just_outside.score),
             "Just outside tolerance (301s), older should NOT supersede newer"
         );
+    }
+
+    // ============================================================================
+    // Sequence Number Tests (Replay Protection)
+    // ============================================================================
+
+    #[test]
+    fn test_attestation_with_sequence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(42);
+
+        attestation.sign(&alice).unwrap();
+
+        assert!(attestation.verify().is_ok());
+        assert_eq!(attestation.sequence, 42);
+    }
+
+    #[test]
+    fn test_attestation_sequence_in_signature() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut att1 =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(1);
+        att1.sign(&alice).unwrap();
+
+        let mut att2 =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(2);
+        att2.sign(&alice).unwrap();
+
+        assert_ne!(att1.signature, att2.signature);
+        assert!(att1.verify().is_ok());
+        assert!(att2.verify().is_ok());
+
+        let mut att1_tampered = att1.clone();
+        att1_tampered.sequence = 999;
+        assert!(att1_tampered.verify().is_err());
+    }
+
+    #[test]
+    fn test_attestation_backward_compatibility_no_sequence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        assert_eq!(attestation.sequence, 0);
+
+        attestation.sign(&alice).unwrap();
+        assert!(attestation.verify().is_ok());
+    }
+
+    // ============================================================================
+    // Trust Revocation Tests
+    // ============================================================================
+
+    #[test]
+    fn test_revocation_creation() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone())
+            .with_reason("Breach of contract");
+
+        assert_eq!(revocation.issuer, *alice.did());
+        assert_eq!(revocation.subject, *bob.did());
+        assert_eq!(revocation.reason, Some("Breach of contract".to_string()));
+        assert_eq!(revocation.graph_type, TrustGraphType::Social);
+    }
+
+    #[test]
+    fn test_revocation_sign_and_verify() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+
+        revocation.sign(&alice).unwrap();
+        assert!(!revocation.signature.is_empty());
+        assert!(revocation.verify().is_ok());
+    }
+
+    #[test]
+    fn test_revocation_verify_fails_wrong_signature() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+        revocation.issuer = eve.did().clone();
+        revocation.sign(&eve).unwrap();
+        revocation.issuer = alice.did().clone();
+        assert!(revocation.verify().is_err());
+    }
+
+    #[test]
+    fn test_revocation_verify_fails_tampered_subject() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let carol = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+        revocation.sign(&alice).unwrap();
+        revocation.subject = carol.did().clone();
+        assert!(revocation.verify().is_err());
+    }
+
+    #[test]
+    fn test_revocation_supersedes_attestation() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 1000u64;
+
+        let attestation = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 1,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+        revocation.revoked_at = base_time + 3600;
+
+        assert!(revocation.supersedes_attestation(attestation.created_at));
+
+        revocation.revoked_at = base_time;
+        assert!(revocation.supersedes_attestation(attestation.created_at));
+
+        revocation.revoked_at = base_time - 1;
+        assert!(!revocation.supersedes_attestation(attestation.created_at));
+    }
+
+    #[test]
+    fn test_revocation_with_graph_type() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new_typed(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustGraphType::EconomicReliability,
+        );
+
+        revocation.sign(&alice).unwrap();
+        assert!(revocation.verify().is_ok());
+        assert_eq!(revocation.graph_type, TrustGraphType::EconomicReliability);
+    }
+
+    #[test]
+    fn test_revocation_sign_wrong_keypair() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let eve = KeyPair::generate().unwrap();
+
+        let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
+
+        let result = revocation.sign(&eve);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not match revocation issuer"));
     }
 }
