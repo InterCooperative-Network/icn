@@ -4,7 +4,7 @@
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
-pub use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
+pub use icn_ledger_app::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use serde::Deserialize;
 use std::collections::HashMap;
 use utoipa::ToSchema;

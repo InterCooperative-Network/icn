@@ -3077,6 +3077,7 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
+ "icn-ledger-app",
  "icn-net",
  "icn-obs",
  "icn-rpc",
@@ -3294,11 +3295,17 @@ dependencies = [
  "icn-ledger",
  "icn-obs",
  "icn-store",
+ "icn-time",
  "metrics",
  "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "sled",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "utoipa",
+ "uuid",
 ]
 
 [[package]]
