@@ -982,7 +982,7 @@ mod tests {
         // document the expected behavior:
         //
         // - If scores differ: higher score wins (score tiebreaker)
-        // - If scores equal: neither supersedes (deterministic tie)
+        // - If scores equal: both supersede each other (first processed wins in reducer)
         //
         // This scenario can occur in test environments or when multiple
         // attestations are batch-created at the same timestamp.
