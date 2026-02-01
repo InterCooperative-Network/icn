@@ -55,8 +55,7 @@ impl TrustServiceImplTokio {
     ) -> Self {
         let own_did = keypair.did().clone();
         let oracle = Arc::new(TrustPolicyOracleTokio::new(graph.clone()));
-        let sequence_tracker =
-            Arc::new(RwLock::new(SequenceTracker::new(store, own_did.clone())));
+        let sequence_tracker = Arc::new(RwLock::new(SequenceTracker::new(store, own_did.clone())));
         Self {
             graph,
             oracle,
@@ -424,10 +423,7 @@ impl TrustService for TrustServiceImplTokio {
                 // Update sequence tracker after successful write
                 if att_sequence > 0 {
                     let tracker = self.sequence_tracker.read().await;
-                    if let Err(e) = tracker
-                        .update_last_seen(&att_issuer, att_sequence)
-                        .await
-                    {
+                    if let Err(e) = tracker.update_last_seen(&att_issuer, att_sequence).await {
                         tracing::warn!(
                             "Failed to update sequence tracker for {}: {}",
                             att_issuer,
@@ -517,7 +513,8 @@ impl TrustService for TrustServiceImplTokio {
                     .map_err(|e| format!("Failed to get sequence: {e}"))?;
 
                 // Create attestation with sequence
-                let mut attestation = TrustAttestation::from_trust_edge(&edge).with_sequence(sequence);
+                let mut attestation =
+                    TrustAttestation::from_trust_edge(&edge).with_sequence(sequence);
 
                 // Sign attestation before gossip broadcast
                 attestation
