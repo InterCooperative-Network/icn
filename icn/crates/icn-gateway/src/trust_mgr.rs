@@ -714,7 +714,7 @@ impl TrustManager {
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges(from);
-        
+
         // Build iterator of (intermediate_trust, indirect_trust) pairs
         let intermediates = outgoing.into_iter().filter_map(|intermediate_edge| {
             // Skip if intermediate is the target
@@ -723,9 +723,8 @@ impl TrustManager {
             }
 
             // Get edge from intermediate to target
-            self.get_edge(&intermediate_edge.target, to).map(|indirect_edge| {
-                (intermediate_edge.score.value(), indirect_edge.score.value())
-            })
+            self.get_edge(&intermediate_edge.target, to)
+                .map(|indirect_edge| (intermediate_edge.score.value(), indirect_edge.score.value()))
         });
 
         // Use shared computation algorithm with legacy weights (0.7/0.3)
@@ -749,7 +748,7 @@ impl TrustManager {
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges_async(from).await;
-        
+
         // Build vector of (intermediate_trust, indirect_trust) pairs
         // Note: We collect into a Vec because we can't use async in filter_map
         let mut intermediates = Vec::new();
@@ -761,10 +760,7 @@ impl TrustManager {
 
             // Get edge from intermediate to target
             if let Some(indirect_edge) = self.get_edge_async(&intermediate_edge.target, to).await {
-                intermediates.push((
-                    intermediate_edge.score.value(),
-                    indirect_edge.score.value(),
-                ));
+                intermediates.push((intermediate_edge.score.value(), indirect_edge.score.value()));
             }
         }
 
@@ -1055,9 +1051,9 @@ fn compute_trust_from_edges_map(
         }
 
         let key2 = format!("{}:{}", mid.target, target_did);
-        edges.get(&key2).map(|indirect| {
-            (mid.score.value(), indirect.score.value())
-        })
+        edges
+            .get(&key2)
+            .map(|indirect| (mid.score.value(), indirect.score.value()))
     });
 
     // Use shared computation algorithm with legacy weights (0.7/0.3)
@@ -1858,13 +1854,16 @@ mod tests {
         let edge_bob_carol = TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.7));
 
         // Scenario 3: Multiple intermediaries
-        let edge_alice_dave = TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.6));
-        let edge_dave_carol = TrustEdge::new(dave.clone(), carol.clone(), TrustScore::unchecked(0.8));
+        let edge_alice_dave =
+            TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.6));
+        let edge_dave_carol =
+            TrustEdge::new(dave.clone(), carol.clone(), TrustScore::unchecked(0.8));
 
         // Test Scenario 1: Direct trust only
         {
             // Standalone mode
-            let standalone = TrustManager::new();
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
             standalone.add_edge(edge_direct.clone()).unwrap();
             let score_standalone = standalone.compute_trust_score(&alice, &bob);
 
@@ -1886,7 +1885,8 @@ mod tests {
         // Test Scenario 2: Transitive trust through one intermediary
         {
             // Standalone mode
-            let standalone = TrustManager::new();
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
             standalone.add_edge(edge_alice_bob.clone()).unwrap();
             standalone.add_edge(edge_bob_carol.clone()).unwrap();
             let score_standalone = standalone.compute_trust_score(&alice, &carol);
@@ -1910,7 +1910,8 @@ mod tests {
         // Test Scenario 3: Multiple intermediaries (averaging)
         {
             // Standalone mode
-            let standalone = TrustManager::new();
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
             standalone.add_edge(edge_alice_bob.clone()).unwrap();
             standalone.add_edge(edge_bob_carol.clone()).unwrap();
             standalone.add_edge(edge_alice_dave.clone()).unwrap();

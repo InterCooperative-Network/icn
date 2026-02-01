@@ -51,7 +51,7 @@ This function:
 ### Changes Made
 
 **New Module:**
-- `icn-trust/src/computation.rs` (222 lines)
+- `icn-trust/src/computation.rs` (203 lines)
   - Core algorithm implementation
   - 9 comprehensive unit tests
   - Full documentation with examples

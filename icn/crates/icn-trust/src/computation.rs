@@ -78,11 +78,7 @@ use crate::types::ScoringWeights;
 /// // final = 0.0 * 0.7 + 0.555 * 0.3 = 0.1665
 /// assert!((score - 0.1665).abs() < 0.001);
 /// ```
-pub fn compute_trust_score<I>(
-    direct_score: f64,
-    intermediates: I,
-    weights: ScoringWeights,
-) -> f64
+pub fn compute_trust_score<I>(direct_score: f64, intermediates: I, weights: ScoringWeights) -> f64
 where
     I: Iterator<Item = (f64, f64)>,
 {
@@ -103,7 +99,7 @@ where
     };
 
     // Combine using provided weights and clamp to [0.0, 1.0]
-    (direct_score * weights.direct + transitive_score * weights.transitive).min(1.0)
+    (direct_score * weights.direct + transitive_score * weights.transitive).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
