@@ -87,7 +87,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Check kernel crates for forbidden deps
+      - name: Check kernel crates for forbidden deps (bash version)
         run: |
           set -euo pipefail
           KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
@@ -113,6 +113,21 @@ jobs:
             done
           done
         working-directory: ./icn
+
+  firewall-contract:
+    name: Firewall Contract Enforcement
+    runs-on: ubuntu-latest
+    # Non-blocking until Wave 2 completes (icn-core migrations)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run firewall denylist check
+        run: python3 .github/scripts/firewall_denylist.py
+        # Reports violations but doesn't fail CI until migrations complete
+        # After Wave 6: remove continue-on-error above to enforce
 
   clippy:
     name: Clippy

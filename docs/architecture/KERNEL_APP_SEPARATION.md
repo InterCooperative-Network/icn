@@ -1,8 +1,8 @@
 # Kernel/App Separation Architecture
 
 **Status**: Living Document  
-**Last Updated**: 2026-01-30
-**Related Issues**: Phase 19+ (Trust Extraction, PolicyOracle Migration)
+**Last Updated**: 2026-02-01
+**Related Issues**: Phase 19+ (Trust Extraction, PolicyOracle Migration), [#1007](https://github.com/InterCooperative-Network/icn/issues/1007) (Wave 1 Firewall Contract)
 
 ---
 
@@ -18,21 +18,288 @@ This is the **constraint engine model**: Policy Oracles (apps) decide constraint
 
 ---
 
+## Firewall Contract (Non-Negotiable Invariants)
+
+> **Status**: Enforced via CI  
+> **Tracking Issue**: [#1007](https://github.com/InterCooperative-Network/icn/issues/1007) (Wave 1)
+
+These invariants are mechanically enforced to ensure the kernel remains semantically blind.
+
+### Invariant 1: Kernel Must Not Import Domain Crates
+
+**Rule**: Kernel crates (`icn-core`, `icn-kernel-api`, `icn-net`, `icn-gossip`, `icn-store`) must NOT depend on:
+- Domain crates: `icn-trust`, `icn-governance`, `icn-ledger` (internals)
+- App crates: anything under `apps/`
+
+**Rationale**: Direct imports create compile-time coupling. If kernel code can import `TrustGraph`, it can call domain-specific methods, violating the meaning firewall.
+
+**Enforcement**: CI checks dependency closure via `cargo metadata` (see `.github/scripts/firewall_denylist.py`).
+
+**Example Violation**:
+```rust
+// ❌ FORBIDDEN in icn-core
+use icn_trust::TrustGraph;
+
+fn select_replica(&self, candidates: &[Did]) -> Did {
+    let score = self.trust_graph.compute_trust_score(&candidates[0]);
+    // Kernel now "knows" what trust scores mean
+}
+```
+
+**Correct Pattern**:
+```rust
+// ✅ ALLOWED - kernel receives constraints from PolicyOracle
+fn select_replica(&self, candidates: &[Did], constraints: &ConstraintSet) -> Did {
+    let min_score = constraints.custom.get("min_trust_score")
+        .and_then(|v| v.as_float())
+        .unwrap_or(0.0);
+    // Kernel enforces the constraint without knowing WHY min_score=0.7
+}
+```
+
+### Invariant 2: Kernel Only Accepts Pure Data Types
+
+**Rule**: Kernel entrypoints must accept only:
+- **Cryptographic proofs**: `IdentityProof`, Ed25519 signatures
+- **Pure data**: `ConstraintSet`, `CapabilityToken`, `RateLimitPolicy`
+- **Kernel primitives**: `Did`, `Timestamp`, `Hash`
+
+**Rationale**: Pure data types have no behavior. Accepting `&TrustGraph` or `GovernanceConfig` allows kernel code to call semantic methods.
+
+**Example Violation**:
+```rust
+// ❌ FORBIDDEN - accepting domain type
+pub fn authorize_action(
+    &self,
+    actor: &Did,
+    trust_graph: &TrustGraph,  // Domain type with semantic methods
+) -> bool {
+    trust_graph.compute_trust_score(actor) >= 0.4
+}
+```
+
+**Correct Pattern**:
+```rust
+// ✅ ALLOWED - accepting pure data
+pub fn authorize_action(
+    &self,
+    actor: &Did,
+    constraints: &ConstraintSet,  // Pure data, no methods
+) -> bool {
+    constraints.custom.get("trust_score")
+        .and_then(|v| v.as_float())
+        .map(|score| score >= 0.4)
+        .unwrap_or(false)
+}
+```
+
+### Invariant 3: All Semantic Lookup Confined to PolicyOracle
+
+**Rule**: Any decision based on trust scores, governance rules, membership status, or credit limits MUST happen in a `PolicyOracle` implementation, NOT in kernel code.
+
+**Rationale**: PolicyOracles are the translation boundary. They convert domain semantics into `ConstraintSet` values the kernel can enforce blindly.
+
+**Example Violation**:
+```rust
+// ❌ FORBIDDEN in icn-core
+fn rate_limit_for(&self, actor: &Did) -> RateLimit {
+    let score = self.trust_graph.compute_trust_score(actor);
+    if score >= 0.7 {  // Kernel "knows" 0.7 means "Federated"
+        RateLimit::new(200, 50)
+    } else {
+        RateLimit::new(20, 5)
+    }
+}
+```
+
+**Correct Pattern**:
+```rust
+// ✅ In apps/trust/src/oracle.rs (PolicyOracle implementation)
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let score = self.graph.compute_trust_score(&request.actor);
+        
+        // Semantic logic ENDS here ═══════════════════════════
+        // Convert to pure constraints below the firewall
+        
+        let rate_limit = if score >= 0.7 {
+            RateLimit::new(200, 50)
+        } else {
+            RateLimit::new(20, 5)
+        };
+        
+        PolicyDecision::allow_with(
+            ConstraintSet::new().with_rate_limit(rate_limit)
+        )
+    }
+}
+
+// ✅ In icn-core (kernel code)
+fn apply_rate_limit(&self, actor: &Did, constraints: &ConstraintSet) {
+    if let Some(limit) = constraints.rate_limit {
+        self.rate_limiter.apply(&actor, limit);
+        // Kernel doesn't know WHY limit is 200/50 vs 20/5
+    }
+}
+```
+
+### Invariant 4: Kernel Must Not Pattern-Match on `ConstraintSet.custom` Keys
+
+**Rule**: Kernel enforcement logic must ONLY use typed `ConstraintSet` fields:
+- `rate_limit: Option<RateLimit>`
+- `max_topics: Option<u32>`
+- `max_connections: Option<u32>`
+- etc.
+
+Kernel code MUST NOT:
+- Check for specific `custom` keys (e.g., `constraints.custom.get("trust_score")`)
+- Branch on `custom` key presence
+- Extract `custom` values to affect enforcement
+
+**Rationale**: `custom` is an escape hatch for app-specific data. If kernel code depends on `custom` keys, it's indirectly depending on app semantics.
+
+**Example Violation**:
+```rust
+// ❌ FORBIDDEN - kernel branching on custom key
+fn should_replicate(&self, constraints: &ConstraintSet) -> bool {
+    if let Some(trust_score) = constraints.custom.get("trust_score") {
+        trust_score.as_float().unwrap() >= 0.4  // Kernel "knows" trust_score semantics
+    } else {
+        false
+    }
+}
+```
+
+**Correct Pattern**:
+```rust
+// ✅ ALLOWED - PolicyOracle sets typed field
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let score = self.graph.compute_trust_score(&request.actor);
+        
+        PolicyDecision::allow_with(
+            ConstraintSet::new()
+                .with_custom("can_replicate", ConstraintValue::Bool(score >= 0.4))
+        )
+    }
+}
+
+// ✅ Kernel checks typed field (if added to ConstraintSet)
+// OR kernel remains completely agnostic and lets app handle it
+fn should_replicate(&self, constraints: &ConstraintSet) -> bool {
+    // Option A: Add typed field to ConstraintSet
+    constraints.can_replicate.unwrap_or(false)
+    
+    // Option B: Don't check at all - let replication be a higher-level decision
+}
+```
+
+### Invariant 5: Kernel Contains Enforcement Mechanisms, Not Policy Decisions
+
+**Rule**: Kernel provides enforcement infrastructure. Apps provide policy values.
+
+| Component | Kernel Owns (Mechanism) | Apps Own (Value) | Notes |
+|-----------|-------------------------|------------------|-------|
+| **Rate limiting** | `RateLimiter` struct, token bucket algorithm | `rate_limit: RateLimit(messages_per_second, burst_size)` in `ConstraintSet` | Kernel enforces rate; app decides rate |
+| **Credit gating** | `CreditGate` check logic (`balance >= ceiling?`) | `credit_ceiling: 1000` in `ConstraintSet` | Kernel checks ceiling; app computes ceiling |
+| **Capability gating** | `CapabilityGate` check logic (`caps.contains(required)?`) | `capabilities: [Read, Write]` in `ConstraintSet` | Kernel checks presence; app grants capabilities |
+| **Topic access** | Topic subscription acceptance logic | `allowed_topics: Vec<String>` in `ConstraintSet` | Kernel enforces list; app computes list |
+| **Replay guard** | `ReplayGuard` sequence tracking and rejection logic | N/A (no tunable values) | Pure mechanism, no policy knobs |
+| **Transport auth** | TLS certificate verification, DID-TLS binding | N/A (no tunable values) | Pure cryptographic check, no policy |
+
+**Example**: Rate limiting mechanism vs value
+
+```rust
+// ✅ Kernel provides the mechanism
+pub struct RateLimiter {
+    limiters: HashMap<Did, TokenBucket>,
+}
+
+impl RateLimiter {
+    pub fn check(&mut self, actor: &Did, limit: &RateLimit) -> Result<(), RateLimitError> {
+        let bucket = self.limiters.entry(*actor).or_insert_with(|| {
+            TokenBucket::new(limit.messages_per_second, limit.burst_size)
+        });
+        bucket.consume(1)  // Mechanism: token bucket algorithm
+    }
+}
+
+// ✅ App provides the value
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let score = self.graph.compute_trust_score(&request.actor);
+        
+        // App decides the rate based on trust class
+        let rate = if score >= 0.7 { RateLimit::new(200, 50) }
+                   else if score >= 0.4 { RateLimit::new(100, 25) }
+                   else { RateLimit::new(20, 5) };
+        
+        PolicyDecision::allow_with(ConstraintSet::new().with_rate_limit(rate))
+    }
+}
+```
+
+### Violation Examples (What NOT to Do)
+
+**❌ Direct trust-score call in kernel**:
+```rust
+// icn/crates/icn-core/src/supervisor/init_gossip.rs
+fn select_anti_entropy_peers(&self) -> Vec<Did> {
+    self.peers.iter()
+        .filter(|peer| {
+            let score = self.trust_graph.compute_trust_score(peer);  // VIOLATION
+            score >= 0.4
+        })
+        .collect()
+}
+```
+
+**❌ Importing domain types in kernel**:
+```rust
+// icn/crates/icn-net/src/rate_limit.rs
+use icn_trust::{TrustGraph, TrustClass};  // VIOLATION
+```
+
+**❌ Hardcoded policy constants in kernel**:
+```rust
+// icn/crates/icn-core/src/supervisor/mod.rs
+const MIN_TRUST_FOR_REPLICATION: f64 = 0.4;  // VIOLATION - kernel defines policy
+```
+
+**❌ Pattern-matching on custom keys**:
+```rust
+// icn/crates/icn-core/src/supervisor/replication.rs
+fn should_replicate(&self, constraints: &ConstraintSet) -> bool {
+    if let Some(class) = constraints.custom.get("trust_class") {  // VIOLATION
+        class.as_string() == Some("Partner")
+    }
+}
+```
+
+### Migration Path
+
+1. **Wave 1 (This Issue)**: Document contract, add CI enforcement
+2. **Waves 2-6**: Migrate existing violations to PolicyOracle pattern
+3. **Enforcement**: After Wave 1, CI MUST fail on new violations
+
+---
+
 ## Table of Contents
 
-1. [The Meaning Firewall](#1-the-meaning-firewall)
-2. [Architectural Layers](#2-architectural-layers)
-3. [Core Abstractions](#3-core-abstractions)
+1. [Firewall Contract](#firewall-contract-non-negotiable-invariants)
+2. [The Meaning Firewall](#1-the-meaning-firewall)
+3. [Architectural Layers](#2-architectural-layers)
+4. [Core Abstractions](#3-core-abstractions)
    - [PolicyOracle](#31-policyoracle)
    - [TrustService](#32-trustservice)
    - [ServiceRegistry](#33-serviceregistry)
    - [ConstraintSet](#34-constraintset)
    - [OracleRegistry](#35-oracleregistry)
-4. [Request Flow](#4-request-flow)
-5. [Implementation Guide](#5-implementation-guide)
-6. [Migration Status](#6-migration-status)
-7. [Testing Patterns](#7-testing-patterns)
-8. [FAQ](#8-faq)
+5. [Request Flow](#4-request-flow)
+6. [Implementation Guide](#5-implementation-guide)
+7. [Migration Status](#6-migration-status)
+8. [Testing Patterns](#7-testing-patterns)
+9. [FAQ](#8-faq)
 
 ---
 
