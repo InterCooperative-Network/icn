@@ -361,6 +361,35 @@ impl TrustService for TrustServiceImplTokio {
             return Ok(()); // Silently reject expired attestations
         }
 
+        // Validate sequence number for replay protection
+        // Attestations with sequence > 0 must have a monotonically increasing sequence
+        if attestation.sequence > 0 {
+            let seq_valid = tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    let tracker = self.sequence_tracker.read().await;
+                    tracker
+                        .validate_sequence(&attestation.issuer, attestation.sequence)
+                        .await
+                })
+            });
+            if let Err(e) = seq_valid {
+                tracing::warn!(
+                    source = %source,
+                    "Rejecting replayed trust attestation: {} -> {} ({})",
+                    attestation.issuer, attestation.subject, e
+                );
+                return Err(format!(
+                    "Replay detected for attestation {} -> {}: {e}",
+                    attestation.issuer, attestation.subject
+                ));
+            }
+        }
+
+        // Save sequence info before converting (attestation is consumed)
+        let att_issuer = attestation.issuer.clone();
+        let att_sequence = attestation.sequence;
+
         // Convert to trust edge
         let edge = attestation.to_trust_edge();
 
@@ -391,6 +420,21 @@ impl TrustService for TrustServiceImplTokio {
 
                 graph.add_edge(edge.clone()).map_err(|e| format!("{e}"))?;
                 self.bump_epoch();
+
+                // Update sequence tracker after successful write
+                if att_sequence > 0 {
+                    let tracker = self.sequence_tracker.read().await;
+                    if let Err(e) = tracker
+                        .update_last_seen(&att_issuer, att_sequence)
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to update sequence tracker for {}: {}",
+                            att_issuer,
+                            e
+                        );
+                    }
+                }
 
                 tracing::info!(
                     "Applied remote trust attestation: {} -> {} (score: {})",

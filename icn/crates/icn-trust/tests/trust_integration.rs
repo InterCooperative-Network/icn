@@ -311,6 +311,7 @@ fn test_attestation_supersede_logic() {
         evidence: vec![],
         ttl_seconds: 86400,
         created_at: base_time,
+        sequence: 0,
         signature: vec![],
         graph_type: TrustGraphType::Social,
     };
@@ -324,6 +325,7 @@ fn test_attestation_supersede_logic() {
         evidence: vec![],
         ttl_seconds: 86400,
         created_at: base_time + 400,
+        sequence: 0,
         signature: vec![],
         graph_type: TrustGraphType::Social,
     };
@@ -340,6 +342,7 @@ fn test_attestation_supersede_logic() {
         evidence: vec![],
         ttl_seconds: 86400,
         created_at: base_time + 60, // Only 1 minute newer
+        sequence: 0,
         signature: vec![],
         graph_type: TrustGraphType::Social,
     };

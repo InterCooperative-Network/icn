@@ -103,6 +103,7 @@ async fn build_services(
         Arc::new(icn_store::SledStore::open(&trust_store_path)?);
 
     // Create TrustGraph with tokio lock (for icn-core compatibility)
+    let trust_store_for_sequences = trust_store.clone();
     let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did.clone());
     let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
@@ -120,7 +121,8 @@ async fn build_services(
     let keypair = bundle
         .keypair()
         .context("Cannot create TrustService: failed to extract keypair from identity bundle")?;
-    let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle, keypair);
+    let trust_service =
+        icn_trust_app::create_service_tokio(trust_graph_handle, keypair, trust_store_for_sequences);
     registry = registry.with_trust(trust_service);
     tracing::info!("Trust service initialized from apps/trust");
 

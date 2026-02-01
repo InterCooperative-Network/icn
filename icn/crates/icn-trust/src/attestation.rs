@@ -540,28 +540,33 @@ impl TrustAttestation {
     }
 
     /// Extract verifying key from a DID
-    ///
-    /// DIDs are in the format: did:icn:<multibase-encoded-pubkey>
     fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
-        let did_str = did.as_str();
-
-        if !did_str.starts_with("did:icn:") {
-            anyhow::bail!("Invalid DID format: {did_str}");
-        }
-
-        let encoded = &did_str[8..]; // Skip "did:icn:"
-        let (_base, decoded) = multibase::decode(encoded)?;
-
-        if decoded.len() != 32 {
-            anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
-        }
-
-        let key_bytes: [u8; 32] = decoded
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
-
-        Ok(VerifyingKey::from_bytes(&key_bytes)?)
+        extract_verifying_key_from_did(did)
     }
+}
+
+/// Shared helper to extract an Ed25519 verifying key from a DID.
+///
+/// DIDs are in the format: `did:icn:<multibase-encoded-pubkey>`
+fn extract_verifying_key_from_did(did: &Did) -> Result<VerifyingKey> {
+    let did_str = did.as_str();
+
+    if !did_str.starts_with("did:icn:") {
+        anyhow::bail!("Invalid DID format: {did_str}");
+    }
+
+    let encoded = &did_str[8..]; // Skip "did:icn:"
+    let (_base, decoded) = multibase::decode(encoded)?;
+
+    if decoded.len() != 32 {
+        anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
+    }
+
+    let key_bytes: [u8; 32] = decoded
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
+
+    Ok(VerifyingKey::from_bytes(&key_bytes)?)
 }
 
 impl TrustRevocation {
@@ -682,27 +687,8 @@ impl TrustRevocation {
     }
 
     /// Extract verifying key from a DID
-    ///
-    /// DIDs are in the format: did:icn:<multibase-encoded-pubkey>
     fn extract_verifying_key_from_did(&self, did: &Did) -> Result<VerifyingKey> {
-        let did_str = did.as_str();
-
-        if !did_str.starts_with("did:icn:") {
-            anyhow::bail!("Invalid DID format: {did_str}");
-        }
-
-        let encoded = &did_str[8..]; // Skip "did:icn:"
-        let (_base, decoded) = multibase::decode(encoded)?;
-
-        if decoded.len() != 32 {
-            anyhow::bail!("Invalid public key length: {} (expected 32)", decoded.len());
-        }
-
-        let key_bytes: [u8; 32] = decoded
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to convert to 32-byte array"))?;
-
-        Ok(VerifyingKey::from_bytes(&key_bytes)?)
+        extract_verifying_key_from_did(did)
     }
 }
 
@@ -1094,8 +1080,8 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
-            .with_sequence(42);
+        let mut attestation =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(42);
 
         // Sign with sequence included
         attestation.sign(&alice).unwrap();
@@ -1110,12 +1096,12 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        let mut att1 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
-            .with_sequence(1);
+        let mut att1 =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(1);
         att1.sign(&alice).unwrap();
 
-        let mut att2 = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5)
-            .with_sequence(2);
+        let mut att2 =
+            TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(2);
         att2.sign(&alice).unwrap();
 
         // Different sequences should produce different signatures
