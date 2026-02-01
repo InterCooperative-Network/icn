@@ -13,6 +13,9 @@ use tracing::debug;
 /// Topic name for trust attestations
 pub const TRUST_ATTESTATIONS_TOPIC: &str = "trust:attestations";
 
+/// Topic name for trust revocations
+pub const TRUST_REVOCATIONS_TOPIC: &str = "trust:revocations";
+
 /// Token bucket for rate limiting
 #[derive(Debug, Clone)]
 struct TokenBucket {

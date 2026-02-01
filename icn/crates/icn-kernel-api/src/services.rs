@@ -240,6 +240,21 @@ pub trait TrustService: Send + Sync {
         Ok(())
     }
 
+    /// Ingest a trust revocation from a peer.
+    ///
+    /// The kernel routes opaque revocation bytes to the trust service.
+    /// The trust service owns deserialization, signature verification,
+    /// supersedence checks, and edge removal.
+    ///
+    /// `source` is the DID of the peer that forwarded this revocation
+    /// (the gossip subscriber, not necessarily the revocation issuer).
+    /// The trust service decides whether to accept or reject it.
+    ///
+    /// Default implementation does nothing (no revocation support).
+    fn ingest_revocation(&self, _bytes: &[u8], _source: &Did) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Recover identity: migrate trust state from old DID to new DID.
     ///
     /// Called when an identity recovery is finalized. The trust service
