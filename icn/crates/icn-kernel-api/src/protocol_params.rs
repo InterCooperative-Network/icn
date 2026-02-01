@@ -200,6 +200,16 @@ impl ProtocolParameter {
         self
     }
 
+    /// Builder: set the `updated_at` timestamp.
+    ///
+    /// Since kernel-api does not depend on `icn_time`, callers that need
+    /// real timestamps should chain this after `new()`.
+    #[must_use]
+    pub fn with_updated_at(mut self, updated_at: u64) -> Self {
+        self.updated_at = updated_at;
+        self
+    }
+
     /// Mark parameter as requiring restart to take effect
     #[must_use]
     pub fn requires_restart(mut self) -> Self {
@@ -900,4 +910,260 @@ pub trait ProtocolParameterStore: Send + Sync {
 
     /// Get count of active pending changes (status = Pending)
     fn count_pending_changes(&self) -> anyhow::Result<usize>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- ProtocolParameter builder tests ---
+
+    #[test]
+    fn test_new_defaults() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(42));
+        assert_eq!(p.id, "id");
+        assert_eq!(p.updated_at, 0);
+        assert_eq!(p.version, 0);
+        assert_eq!(p.scope, ParameterScope::Global);
+    }
+
+    #[test]
+    fn test_with_updated_at() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(1))
+            .with_updated_at(1234567890);
+        assert_eq!(p.updated_at, 1234567890);
+    }
+
+    #[test]
+    fn test_with_scope() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Boolean(true))
+            .with_scope(ParameterScope::Cooperative {
+                id: "coop-1".into(),
+            });
+        assert_eq!(
+            p.scope,
+            ParameterScope::Cooperative {
+                id: "coop-1".into()
+            }
+        );
+    }
+
+    #[test]
+    fn test_with_constraints() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(10))
+            .with_min(ParameterValue::Integer(0))
+            .with_max(ParameterValue::Integer(100));
+        assert_eq!(p.constraints.min, Some(ParameterValue::Integer(0)));
+        assert_eq!(p.constraints.max, Some(ParameterValue::Integer(100)));
+    }
+
+    // --- Validation tests ---
+
+    #[test]
+    fn test_validate_type_mismatch() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(10));
+        let err = p.validate(&ParameterValue::Float(1.0)).unwrap_err();
+        assert!(matches!(err, ParameterValidationError::TypeMismatch { .. }));
+    }
+
+    #[test]
+    fn test_validate_nan_rejected() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Float(1.0));
+        let err = p.validate(&ParameterValue::Float(f64::NAN)).unwrap_err();
+        assert!(matches!(
+            err,
+            ParameterValidationError::InvalidFloatValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validate_infinity_rejected() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Float(1.0));
+        let err = p
+            .validate(&ParameterValue::Float(f64::INFINITY))
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            ParameterValidationError::InvalidFloatValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validate_below_min() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(10))
+            .with_min(ParameterValue::Integer(5));
+        let err = p.validate(&ParameterValue::Integer(3)).unwrap_err();
+        assert!(matches!(err, ParameterValidationError::BelowMinimum { .. }));
+    }
+
+    #[test]
+    fn test_validate_above_max() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(10))
+            .with_max(ParameterValue::Integer(100));
+        let err = p.validate(&ParameterValue::Integer(200)).unwrap_err();
+        assert!(matches!(err, ParameterValidationError::AboveMaximum { .. }));
+    }
+
+    #[test]
+    fn test_validate_in_range() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Integer(10))
+            .with_min(ParameterValue::Integer(0))
+            .with_max(ParameterValue::Integer(100));
+        assert!(p.validate(&ParameterValue::Integer(50)).is_ok());
+    }
+
+    #[test]
+    fn test_validate_float_epsilon_boundary() {
+        // Float comparison uses epsilon tolerance
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::Float(1.0))
+            .with_min(ParameterValue::Float(1.0));
+        // Value very slightly below min should still pass due to epsilon
+        assert!(p.validate(&ParameterValue::Float(1.0 - 1e-10)).is_ok());
+    }
+
+    #[test]
+    fn test_validate_string_same_type_ok() {
+        let p = ProtocolParameter::new("id", "name", "desc", ParameterValue::String("x".into()));
+        assert!(p.validate(&ParameterValue::String("y".into())).is_ok());
+    }
+
+    // --- ParameterScope tests ---
+
+    #[test]
+    fn test_scope_specificity() {
+        let global = ParameterScope::Global;
+        let fed = ParameterScope::Federation { id: "fed-1".into() };
+        let coop = ParameterScope::Cooperative {
+            id: "coop-1".into(),
+        };
+
+        assert!(coop.is_more_specific_than(&fed));
+        assert!(coop.is_more_specific_than(&global));
+        assert!(fed.is_more_specific_than(&global));
+        assert!(!global.is_more_specific_than(&fed));
+        assert!(!fed.is_more_specific_than(&coop));
+    }
+
+    #[test]
+    fn test_scope_display() {
+        assert_eq!(ParameterScope::Global.to_string(), "global");
+        assert_eq!(
+            ParameterScope::Cooperative {
+                id: "my-coop".into()
+            }
+            .to_string(),
+            "cooperative:my-coop"
+        );
+    }
+
+    // --- PendingParameterChange tests ---
+
+    #[test]
+    fn test_pending_change_new_defaults() {
+        let c = PendingParameterChange::new(
+            "change-1",
+            "param-1",
+            ParameterValue::Integer(42),
+            1000,
+            ParameterScope::Global,
+            "proposal-1",
+            "testing",
+        );
+        assert_eq!(c.created_at, 0);
+        assert_eq!(c.status, PendingChangeStatus::Pending);
+        assert!(c.applied_at.is_none());
+    }
+
+    #[test]
+    fn test_pending_change_with_created_at() {
+        let c = PendingParameterChange::new(
+            "change-1",
+            "param-1",
+            ParameterValue::Integer(1),
+            1000,
+            ParameterScope::Global,
+            "p-1",
+            "r",
+        )
+        .with_created_at(999);
+        assert_eq!(c.created_at, 999);
+    }
+
+    #[test]
+    fn test_mark_applied_at() {
+        let mut c = PendingParameterChange::new(
+            "change-1",
+            "param-1",
+            ParameterValue::Integer(1),
+            1000,
+            ParameterScope::Global,
+            "p-1",
+            "r",
+        );
+        c.mark_applied_at(5000);
+        assert_eq!(c.status, PendingChangeStatus::Applied);
+        assert_eq!(c.applied_at, Some(5000));
+    }
+
+    #[test]
+    fn test_generate_id_uniqueness() {
+        let id1 = PendingParameterChange::generate_id("param-a");
+        let id2 = PendingParameterChange::generate_id("param-a");
+        assert_ne!(id1, id2, "Generated IDs must be unique");
+        assert!(id1.starts_with("pending:param-a:"));
+    }
+
+    #[test]
+    fn test_generate_id_with_timestamp() {
+        let id = PendingParameterChange::generate_id_with_timestamp("param-b", 12345);
+        assert!(id.starts_with("pending:param-b:12345:"));
+    }
+
+    // --- ParameterValue display tests ---
+
+    #[test]
+    fn test_parameter_value_display() {
+        assert_eq!(ParameterValue::Integer(42).to_string(), "42");
+        assert_eq!(ParameterValue::Float(3.14).to_string(), "3.14");
+        assert_eq!(ParameterValue::Boolean(true).to_string(), "true");
+        assert_eq!(
+            ParameterValue::String("hello".into()).to_string(),
+            "\"hello\""
+        );
+        assert_eq!(ParameterValue::Duration(90).to_string(), "1m");
+    }
+
+    #[test]
+    fn test_parameter_value_type_name() {
+        assert_eq!(ParameterValue::Integer(0).type_name(), "integer");
+        assert_eq!(ParameterValue::Float(0.0).type_name(), "float");
+        assert_eq!(ParameterValue::Boolean(false).type_name(), "boolean");
+        assert_eq!(ParameterValue::String(String::new()).type_name(), "string");
+        assert_eq!(ParameterValue::Duration(0).type_name(), "duration");
+    }
+
+    // --- ParameterValue PartialOrd tests ---
+
+    #[test]
+    fn test_integer_ordering() {
+        assert!(ParameterValue::Integer(5) < ParameterValue::Integer(10));
+        assert!(ParameterValue::Integer(10) > ParameterValue::Integer(5));
+        assert_eq!(
+            ParameterValue::Integer(5).partial_cmp(&ParameterValue::Integer(5)),
+            Some(std::cmp::Ordering::Equal)
+        );
+    }
+
+    #[test]
+    fn test_float_ordering() {
+        assert!(ParameterValue::Float(1.0) < ParameterValue::Float(2.0));
+    }
+
+    #[test]
+    fn test_cross_type_ordering_is_none() {
+        assert_eq!(
+            ParameterValue::Integer(5).partial_cmp(&ParameterValue::Float(5.0)),
+            None
+        );
+    }
 }
