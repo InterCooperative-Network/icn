@@ -11,48 +11,127 @@ jobs:
   enforce-labels:
     runs-on: ubuntu-latest
     steps:
-      - name: Check required labels
+      - name: Enforce required labels
         uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
-            const labels = issue.labels.map(l => l.name);
+            const body = issue.body || '';
+            const currentLabels = issue.labels.map(l => l.name);
 
-            const epics = labels.filter(l => l.startsWith('epic:'));
-            const types = labels.filter(l => l.startsWith('type:'));
-            const tiers = labels.filter(l => l.startsWith('tier:'));
-            const isTrust = labels.includes('epic:trust-hardening');
+            // --- Parse form fields from issue body ---
+            // GitHub renders YAML form dropdowns as:
+            //   ### Field Label\n\nselected value
+            function parseFormField(fieldLabel) {
+              const re = new RegExp(`###\\s+${fieldLabel}\\s*\\n+([^\\n#]+)`, 'i');
+              const m = body.match(re);
+              return m ? m[1].trim() : null;
+            }
+
+            // Extract values from form (work_item.yml / bug_report.yml)
+            const formEpic = parseFormField('Epic');
+            const formTypeRaw = parseFormField('Type');
+            const formTier = parseFormField('Trust Tier.*');
+
+            // Type field includes description: "type:impl — Implementation"
+            const formType = formTypeRaw
+              ? formTypeRaw.split(/\s+[—–-]\s+/)[0].trim()
+              : null;
+
+            const validEpics = [
+              'epic:kernel-separation', 'epic:arch-invariants',
+              'epic:trust-hardening', 'epic:service-discovery',
+              'epic:commons-compute', 'epic:kernel-perf'
+            ];
+            const validTypes = [
+              'type:spec', 'type:impl', 'type:refactor', 'type:test', 'type:doc'
+            ];
+            const validTiers = [
+              'tier:1-correctness', 'tier:2-observability', 'tier:3-perf'
+            ];
+
+            // --- Determine what to apply ---
+            const hasEpic = currentLabels.some(l => l.startsWith('epic:'));
+            const hasType = currentLabels.some(l => l.startsWith('type:'));
+            const hasTier = currentLabels.some(l => l.startsWith('tier:'));
+
+            const toAdd = [];
+
+            // Auto-apply epic from form if missing
+            if (!hasEpic && formEpic && validEpics.includes(formEpic)) {
+              toAdd.push(formEpic);
+            }
+
+            // Auto-apply type from form if missing; default type:impl
+            if (!hasType) {
+              if (formType && validTypes.includes(formType)) {
+                toAdd.push(formType);
+              } else {
+                toAdd.push('type:impl');
+              }
+            }
+
+            // Auto-apply tier from form if missing (only for trust epic)
+            const effectiveEpic = hasEpic
+              ? currentLabels.find(l => l.startsWith('epic:'))
+              : (formEpic && validEpics.includes(formEpic) ? formEpic : null);
+            const isTrust = effectiveEpic === 'epic:trust-hardening';
+
+            if (isTrust && !hasTier && formTier && validTiers.includes(formTier)) {
+              toAdd.push(formTier);
+            }
+
+            // Apply labels if we found any to add
+            if (toAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: toAdd
+              });
+              core.info(`Auto-applied labels: ${toAdd.join(', ')}`);
+            }
+
+            // --- Re-check after auto-apply ---
+            const finalLabels = [...currentLabels, ...toAdd];
+            const epics = finalLabels.filter(l => l.startsWith('epic:'));
+            const types = finalLabels.filter(l => l.startsWith('type:'));
+            const tiers = finalLabels.filter(l => l.startsWith('tier:'));
+            const finalIsTrust = finalLabels.includes('epic:trust-hardening');
 
             const problems = [];
 
             if (epics.length === 0) {
-              problems.push('Missing `epic:*` label');
+              problems.push('Missing `epic:*` label (could not parse from issue body)');
             } else if (epics.length > 1) {
               problems.push(`Multiple \`epic:*\` labels: ${epics.join(', ')}`);
             }
 
-            if (types.length === 0) {
-              problems.push('Missing `type:*` label');
-            } else if (types.length > 1) {
+            if (types.length > 1) {
               problems.push(`Multiple \`type:*\` labels: ${types.join(', ')}`);
             }
 
-            if (isTrust && tiers.length === 0) {
-              problems.push('Trust-hardening issues require a `tier:*` label');
+            if (finalIsTrust && tiers.length === 0) {
+              problems.push('`epic:trust-hardening` requires a `tier:*` label — a human must assign the correct tier');
             } else if (tiers.length > 1) {
               problems.push(`Multiple \`tier:*\` labels: ${tiers.join(', ')}`);
             }
 
+            // --- Comment only on remaining problems ---
             if (problems.length > 0) {
-              const body = [
-                '**Label check failed.** Every issue needs exactly one `epic:*` and one `type:*` label.',
+              const applied = toAdd.length > 0
+                ? `\n\nAuto-applied: ${toAdd.map(l => '`' + l + '`').join(', ')}`
+                : '';
+
+              const msg = [
+                `**Label check failed.**${applied}`,
                 '',
+                'Remaining issues:',
                 ...problems.map(p => `- ${p}`),
                 '',
-                'See [ISSUE_POLICY.md](/.github/ISSUE_POLICY.md) for details.'
+                'See [ISSUE_POLICY.md](/.github/ISSUE_POLICY.md) for the label taxonomy.'
               ].join('\n');
 
-              // Check if we already commented (avoid spam)
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -68,14 +147,14 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: botComment.id,
-                  body: body
+                  body: msg
                 });
               } else {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
-                  body: body
+                  body: msg
                 });
               }
             }

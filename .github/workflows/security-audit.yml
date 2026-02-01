@@ -81,6 +81,6 @@ jobs:
                 repo: context.repo.repo,
                 title: title,
                 body: body,
-                labels: ['bug', 'epic:arch-invariants', 'type:impl', 'priority:critical']
+                labels: ['priority:critical', 'type:impl']
               });
             }
