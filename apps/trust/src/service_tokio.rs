@@ -771,20 +771,25 @@ mod tests {
         let target = icn_identity::KeyPair::generate().unwrap();
         let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
 
-        // Add two trust edges via the graph directly
+        // Capture timestamp once for deterministic test behavior
         let now = icn_time::current_timestamp_secs();
-        let edge1 = icn_trust::TrustEdge::new_typed(
+
+        // Add two trust edges via the graph directly
+        let mut edge1 = icn_trust::TrustEdge::new_typed(
             alice.did().clone(),
             target.did().clone(),
             icn_trust::TrustScore::unchecked(0.8),
             icn_trust::types::TrustGraphType::Social,
         );
-        let edge2 = icn_trust::TrustEdge::new_typed(
+        edge1.created_at = now; // Override to ensure deterministic timestamp
+
+        let mut edge2 = icn_trust::TrustEdge::new_typed(
             bob.did().clone(),
             target.did().clone(),
             icn_trust::TrustScore::unchecked(0.6),
             icn_trust::types::TrustGraphType::Social,
         );
+        edge2.created_at = now; // Override to ensure deterministic timestamp
 
         {
             let mut g = graph.write().await;
