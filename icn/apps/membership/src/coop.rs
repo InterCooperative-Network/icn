@@ -4,7 +4,7 @@
 //! using CCL for membership rules.
 
 use crate::entity::{EntityConfig, EntityId, MembershipClass};
-use crate::membership::{MembershipError, MembershipManager, UnifiedMembership};
+use crate::membership::{MembershipError, MembershipManager, MembershipTrait, UnifiedMembership};
 use icn_entity::MembershipRole;
 use serde::{Deserialize, Serialize};
 
@@ -115,8 +115,8 @@ pub mod compat {
 
     /// Convert icn-coop Member to UnifiedMembership
     pub fn from_coop_member(member: &icn_coop::Member) -> UnifiedMembership {
-        let member_id = EntityId::individual(&member.did);
-        let parent_id = EntityId::cooperative(&member.coop_id);
+        let member_id = EntityId::from_did(&member.did);
+        let parent_id = EntityId::cooperative(&member.coop_id).expect("Invalid coop ID");
 
         let role = match member.role {
             icn_coop::MemberRole::Founder => MembershipRole::Founder,
@@ -125,7 +125,9 @@ pub mod compat {
             icn_coop::MemberRole::Consumer => MembershipRole::Consumer,
             icn_coop::MemberRole::Producer => MembershipRole::Producer,
             icn_coop::MemberRole::BoardMember => MembershipRole::BoardMember,
-            icn_coop::MemberRole::Officer => MembershipRole::Officer,
+            icn_coop::MemberRole::Officer => MembershipRole::Officer {
+                title: "Officer".to_string(),
+            },
         };
 
         let status = match member.status {
@@ -139,11 +141,10 @@ pub mod compat {
         UnifiedMembership {
             member_id,
             parent_id,
-            role,
+            role: role.clone(),
             status,
             joined_at: member
                 .joined_at
-                .and_utc()
                 .timestamp()
                 .try_into()
                 .unwrap_or(0),
@@ -166,7 +167,7 @@ mod tests {
 
     fn create_test_coop_config() -> CoopMembershipConfig {
         let entity = EntityConfig {
-            id: EntityId::cooperative("test-coop"),
+            id: EntityId::cooperative("test-coop").expect("Invalid coop ID"),
             name: "Test Coop".to_string(),
             entity_type: EntityType::Cooperative,
             status: icn_entity::EntityStatus::Active,
@@ -183,8 +184,8 @@ mod tests {
         let manager = CoopMembershipManager::new();
         let config = create_test_coop_config();
 
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let coop_id = EntityId::cooperative("test-coop");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let membership = manager
             .add_coop_member(member_id, coop_id, MembershipRole::Worker, &config)
@@ -200,8 +201,8 @@ mod tests {
     #[test]
     fn test_update_shares() {
         let manager = CoopMembershipManager::new();
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let coop_id = EntityId::cooperative("test-coop");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let mut membership =
             UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
@@ -213,8 +214,8 @@ mod tests {
     #[test]
     fn test_labor_assignments() {
         let manager = CoopMembershipManager::new();
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let coop_id = EntityId::cooperative("test-coop");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let mut membership =
             UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);

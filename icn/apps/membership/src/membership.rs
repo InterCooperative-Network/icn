@@ -369,13 +369,13 @@ mod tests {
     use super::*;
 
     fn create_test_entity_id() -> EntityId {
-        EntityId::individual(icn_identity::KeyPair::generate().unwrap().did())
+        EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did())
     }
 
     #[test]
     fn test_unified_membership_creation() {
         let member_id = create_test_entity_id();
-        let parent_id = EntityId::cooperative("test-coop");
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let membership = UnifiedMembership::new(member_id.clone(), parent_id, MembershipRole::Worker);
 
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn test_membership_state_transitions() {
         let member_id = create_test_entity_id();
-        let parent_id = EntityId::cooperative("test-coop");
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let mut membership =
             UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn test_membership_capabilities() {
         let member_id = create_test_entity_id();
-        let parent_id = EntityId::cooperative("test-coop");
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let mut membership =
             UnifiedMembership::active(member_id, parent_id, MembershipRole::Worker);
@@ -412,8 +412,8 @@ mod tests {
         assert!(membership.can_vote());
         assert!(membership.can_propose());
 
-        membership.add_capability(MembershipCapability::ManageMembers);
-        assert!(membership.has_capability(&MembershipCapability::ManageMembers));
+        membership.add_capability(MembershipCapability::Invite);
+        assert!(membership.has_capability(&MembershipCapability::Invite));
     }
 
     #[tokio::test]

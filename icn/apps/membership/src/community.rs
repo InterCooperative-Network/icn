@@ -3,8 +3,8 @@
 //! This module provides community-specific membership logic,
 //! using CCL for membership rules.
 
-use crate::entity::{EntityConfig, EntityId, MembershipClass};
-use crate::membership::{MembershipError, MembershipManager, UnifiedMembership};
+use crate::entity::{EntityConfig, EntityId};
+use crate::membership::{MembershipError, MembershipManager, MembershipTrait, UnifiedMembership};
 use icn_entity::MembershipRole;
 use serde::{Deserialize, Serialize};
 
@@ -175,15 +175,19 @@ pub mod compat {
     ) -> UnifiedMembership {
         // Parse member type from metadata
         let member_type = match &member.member_type {
-            icn_community::MemberType::Individual(did_str) => EntityId::individual(
-                &did_str
+            icn_community::MemberType::Individual(did_str) => {
+                let did: icn_identity::Did = did_str
+                    .as_str()
                     .parse()
-                    .unwrap_or_else(|_| icn_identity::KeyPair::generate().unwrap().did()),
-            ),
-            icn_community::MemberType::Cooperative(id) => EntityId::cooperative(id),
+                    .unwrap_or_else(|_| icn_identity::KeyPair::generate().unwrap().did().clone());
+                EntityId::from_did(&did)
+            }
+            icn_community::MemberType::Cooperative(id) => {
+                EntityId::cooperative(id).expect("Invalid coop ID")
+            }
         };
 
-        let parent_id = EntityId::community(community_id);
+        let parent_id = EntityId::community(community_id).expect("Invalid community ID");
 
         UnifiedMembership {
             member_id: member_type,
@@ -194,7 +198,7 @@ pub mod compat {
             } else {
                 icn_entity::MembershipStatus::Inactive
             },
-            joined_at: member.joined_at.and_utc().timestamp().try_into().unwrap_or(0),
+            joined_at: member.joined_at.timestamp().try_into().unwrap_or(0),
             updated_at: icn_time::current_timestamp_secs(),
             voting_weight: member.voting_weight as u64,
             capabilities: MembershipRole::Member.default_capabilities(),
@@ -214,7 +218,7 @@ mod tests {
 
     fn create_test_community_config() -> CommunityMembershipConfig {
         let entity = EntityConfig {
-            id: EntityId::community("test-community"),
+            id: EntityId::community("test-comm").expect("Invalid community ID"),
             name: "Test Community".to_string(),
             entity_type: EntityType::Community,
             status: icn_entity::EntityStatus::Active,
@@ -231,8 +235,8 @@ mod tests {
         let manager = CommunityMembershipManager::new();
         let config = create_test_community_config();
 
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let community_id = EntityId::community("test-community");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let community_id = EntityId::community("test-comm").expect("Invalid community ID");
 
         let membership = manager
             .add_community_member(
@@ -253,8 +257,8 @@ mod tests {
         let manager = CommunityMembershipManager::new();
         let config = create_test_community_config();
 
-        let member_id = EntityId::cooperative("test-coop");
-        let community_id = EntityId::community("test-community");
+        let member_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
+        let community_id = EntityId::community("test-comm").expect("Invalid community ID");
 
         let membership = manager
             .add_community_member(
@@ -273,8 +277,8 @@ mod tests {
     #[test]
     fn test_deactivate_member() {
         let manager = CommunityMembershipManager::new();
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let community_id = EntityId::community("test-community");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let community_id = EntityId::community("test-comm").expect("Invalid community ID");
 
         let mut membership =
             UnifiedMembership::active(member_id, community_id, MembershipRole::Member);

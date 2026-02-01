@@ -87,8 +87,8 @@ mod tests {
     #[tokio::test]
     async fn test_membership_manager() {
         let manager = MembershipManager::new();
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let parent_id = EntityId::cooperative("test-coop");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let membership = manager
             .add_member(member_id, parent_id, MembershipRole::Worker, 0.3)
@@ -109,8 +109,8 @@ mod tests {
             "Test Coop".to_string(),
         ));
 
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let coop_id = EntityId::cooperative("test-coop");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
         let membership = coop_manager
             .add_coop_member(member_id, coop_id, MembershipRole::Worker, &config)
@@ -131,8 +131,8 @@ mod tests {
             "Test Community".to_string(),
         ));
 
-        let member_id = EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let community_id = EntityId::community("test-comm");
+        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let community_id = EntityId::community("test-comm").expect("Invalid community ID");
 
         let membership = community_manager
             .add_community_member(
@@ -152,9 +152,9 @@ mod tests {
     fn test_all_entity_types_supported() {
         // Test that all entity types can be created
         let _individual =
-            EntityId::individual(icn_identity::KeyPair::generate().unwrap().did());
-        let _coop = EntityId::cooperative("test-coop");
-        let _community = EntityId::community("test-comm");
-        let _federation = EntityId::federation("test-fed");
+            EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let _coop = EntityId::cooperative("test-coop").expect("Invalid coop ID");
+        let _community = EntityId::community("test-comm").expect("Invalid community ID");
+        let _federation = EntityId::federation("test-fed").expect("Invalid federation ID");
     }
 }
