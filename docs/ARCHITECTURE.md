@@ -211,6 +211,8 @@ These guarantees form ICN's security spine. A governance proposal can change a r
 
 > **Boundary clarification:** This boundary is conceptual, not physical. Many crates contain both kernel and oracle surfaces. The separation is defined by **data flow** (who produces `ConstraintSet` values vs. who enforces them), not by file or crate location. Do not reorganize crates to "match the diagram."
 
+> **Terminology:** A *Policy Oracle* is any component that computes `ConstraintSet` values from domain semantics — not necessarily an "external app." Trust scoring, governance voting, and ledger policy are all Policy Oracles even though they live in the same process. The `ConstraintSet` they produce flows into the kernel's enforcement points: rate limiter, capability gate, credit gate, and replay guard.
+
 ### Functional Component Map (Not a Sequential Stack)
 
 While the constraint engine model describes the **conceptual architecture**, the actual implementation organizes components into these functional areas. These are not layered in the OSI sense—Policy Oracles and Kernel can interact with the same substrate services:
