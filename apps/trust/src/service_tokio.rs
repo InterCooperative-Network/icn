@@ -376,7 +376,16 @@ impl TrustService for TrustServiceImplTokio {
 
                 // Validate sequence under the write lock so no concurrent
                 // ingest can sneak between validation and update.
-                if att_sequence > 0 {
+                if att_sequence == 0 {
+                    // DEPRECATED: Sequence 0 bypasses replay protection for
+                    // backward compatibility during the migration period.
+                    // A future release will reject sequence == 0.
+                    tracing::warn!(
+                        issuer = %att_issuer,
+                        "Accepted attestation with sequence=0 (no replay protection). \
+                         This is deprecated and will be rejected in a future release."
+                    );
+                } else {
                     let tracker = self.sequence_tracker.write().await;
                     if let Err(e) = tracker.validate_sequence(&att_issuer, att_sequence) {
                         tracing::warn!(

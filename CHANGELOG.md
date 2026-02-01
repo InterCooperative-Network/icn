@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Signed Revocation Gossip & Sequence-Based Replay Protection (2026-02-01)
+
+**Trust Hardening** (PR #1022):
+
+Add signed trust revocations and per-issuer sequence numbers for replay attack prevention.
+
+- `TrustRevocation`: Ed25519-signed revocation messages that supersede attestations
+- `TrustAttestation.sequence`: Monotonic per-issuer sequence numbers (v3 signing format)
+- `SequenceTracker`: Per-issuer sequence storage with atomic validate-and-update
+- Race condition fixes: sequence validation inside graph write lock to prevent TOCTOU
+- Backward-compatible: v1/v2 attestation signatures still verified
+
+**Deprecation Notice**: Attestations with `sequence == 0` currently bypass replay protection for backward compatibility. A future release will **reject** `sequence == 0` after the migration period. Operators should ensure all nodes are upgraded to produce sequence numbers before the deadline.
+
+**Follow-up**: Gossip-layer revocation propagation tracked in #1024.
+
 ### Changed - Decouple ResourceEnforcerActor from icn-ledger (2026-01-30)
 
 **PR 3.1 Kernel/App Separation** (PR #979):
