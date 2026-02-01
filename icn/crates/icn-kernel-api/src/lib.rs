@@ -39,6 +39,7 @@ pub mod compute;
 pub mod coord;
 pub mod identity;
 pub mod naming;
+pub mod protocol_params;
 pub mod scope;
 pub mod services;
 pub mod state;

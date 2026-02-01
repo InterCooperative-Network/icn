@@ -271,7 +271,7 @@ pub enum ParameterApplyResult {
 /// - Logs all actions for audit trail
 pub fn spawn_parameter_scheduler_task(
     config: ParameterSchedulerConfig,
-    parameter_store: Arc<dyn icn_governance::ProtocolParameterStore>,
+    parameter_store: Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
     mut shutdown_rx: BroadcastReceiver<()>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -297,7 +297,7 @@ pub fn spawn_parameter_scheduler_task(
 
 /// Process all pending parameter changes that are due
 async fn process_due_changes(
-    store: &Arc<dyn icn_governance::ProtocolParameterStore>,
+    store: &Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
 ) -> anyhow::Result<()> {
     let now = icn_time::current_timestamp_secs();
 
@@ -380,8 +380,8 @@ async fn process_due_changes(
 
 /// Apply a single pending parameter change
 async fn apply_pending_change(
-    store: &Arc<dyn icn_governance::ProtocolParameterStore>,
-    change: &icn_governance::PendingParameterChange,
+    store: &Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
+    change: &icn_kernel_api::protocol_params::PendingParameterChange,
 ) -> ParameterApplyResult {
     // Get the current parameter
     let current_param = match store.get(&change.parameter_id) {

@@ -68,8 +68,9 @@ pub mod state; // Core trait definition, error types, and struct definitions
 // Re-export commonly used types for convenience.
 // Users can access types via `protocol_store::ProtocolParameterStore` or
 // directly via `protocol_store::inmemory::InMemoryParameterStore` etc.
+pub use crate::protocol::ProtocolParameterStore;
 pub use state::{
-    InMemoryParameterStore, ParameterStoreError, ProtocolParameterStore, SledParameterStore,
+    InMemoryParameterStore, ParameterStoreError, SledParameterStore,
     GLOBAL_HISTORY_WARNING_THRESHOLD, MAX_HISTORY_ENTRIES_PER_PARAM,
 };
 
@@ -81,7 +82,6 @@ mod tests {
         ParameterScope, ParameterValue, PendingChangeStatus, PendingParameterChange,
         ProtocolParameter,
     };
-    use icn_entity::EntityId;
     use state::*;
 
     fn test_param(id: &str, value: i64) -> ProtocolParameter {
@@ -303,7 +303,7 @@ mod tests {
         store.set(global.clone(), None, None).unwrap();
 
         // Set federation override
-        let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
+        let coop_id = "entity:icn:cooperative:test-coop".to_string();
         let mut fed_override = test_param("test.value", 200);
         fed_override.scope = ParameterScope::Cooperative {
             id: coop_id.clone(),
@@ -313,7 +313,7 @@ mod tests {
 
         // get_effective should return the federation override
         let effective = store
-            .get_effective("test.value", Some(&coop_id), None)
+            .get_effective("test.value", Some(coop_id.as_str()), None)
             .unwrap()
             .unwrap();
         assert_eq!(effective.value, ParameterValue::Integer(200));
@@ -328,14 +328,14 @@ mod tests {
         store.set(global, None, None).unwrap();
 
         // Federation override
-        let fed_id: EntityId = "entity:icn:federation:test-fed".parse().unwrap();
+        let fed_id = "entity:icn:federation:test-fed".to_string();
         let mut fed_override = test_param("test.value", 200);
         fed_override.scope = ParameterScope::Federation { id: fed_id };
         fed_override.constraints.allow_override = true;
         store.set(fed_override, None, None).unwrap();
 
         // Cooperative override
-        let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
+        let coop_id = "entity:icn:cooperative:test-coop".to_string();
         let mut coop_override = test_param("test.value", 300);
         coop_override.scope = ParameterScope::Cooperative { id: coop_id };
         coop_override.constraints.allow_override = true;
@@ -354,7 +354,7 @@ mod tests {
         store.set(global, None, None).unwrap();
 
         // Federation override
-        let fed_id: EntityId = "entity:icn:federation:test-fed".parse().unwrap();
+        let fed_id = "entity:icn:federation:test-fed".to_string();
         let mut fed_override = test_param("test.value", 200);
         fed_override.scope = ParameterScope::Federation { id: fed_id.clone() };
         fed_override.constraints.allow_override = true;
@@ -371,7 +371,7 @@ mod tests {
 
         // Override should be gone
         let effective = store
-            .get_effective("test.value", None, Some(&fed_id))
+            .get_effective("test.value", None, Some(fed_id.as_str()))
             .unwrap()
             .unwrap();
         assert_eq!(effective.value, ParameterValue::Integer(100)); // Falls back to global
@@ -723,7 +723,7 @@ mod tests {
         store.set(global.clone(), None, None).unwrap();
 
         // Set federation override
-        let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
+        let coop_id = "entity:icn:cooperative:test-coop".to_string();
         let mut coop_override = test_param("test.value", 200);
         coop_override.scope = ParameterScope::Cooperative {
             id: coop_id.clone(),
@@ -733,7 +733,7 @@ mod tests {
 
         // get_effective should return the cooperative override
         let effective = store
-            .get_effective("test.value", Some(&coop_id), None)
+            .get_effective("test.value", Some(coop_id.as_str()), None)
             .unwrap()
             .unwrap();
         assert_eq!(effective.value, ParameterValue::Integer(200));
@@ -748,14 +748,14 @@ mod tests {
         store.set(global, None, None).unwrap();
 
         // Federation override
-        let fed_id: EntityId = "entity:icn:federation:test-fed".parse().unwrap();
+        let fed_id = "entity:icn:federation:test-fed".to_string();
         let mut fed_override = test_param("test.value", 200);
         fed_override.scope = ParameterScope::Federation { id: fed_id };
         fed_override.constraints.allow_override = true;
         store.set(fed_override, None, None).unwrap();
 
         // Cooperative override
-        let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
+        let coop_id = "entity:icn:cooperative:test-coop".to_string();
         let mut coop_override = test_param("test.value", 300);
         coop_override.scope = ParameterScope::Cooperative { id: coop_id };
         coop_override.constraints.allow_override = true;
@@ -774,7 +774,7 @@ mod tests {
         store.set(global, None, None).unwrap();
 
         // Federation override
-        let fed_id: EntityId = "entity:icn:federation:test-fed".parse().unwrap();
+        let fed_id = "entity:icn:federation:test-fed".to_string();
         let mut fed_override = test_param("test.value", 200);
         fed_override.scope = ParameterScope::Federation { id: fed_id.clone() };
         fed_override.constraints.allow_override = true;
@@ -791,7 +791,7 @@ mod tests {
 
         // Override should be gone
         let effective = store
-            .get_effective("test.value", None, Some(&fed_id))
+            .get_effective("test.value", None, Some(fed_id.as_str()))
             .unwrap()
             .unwrap();
         assert_eq!(effective.value, ParameterValue::Integer(100)); // Falls back to global

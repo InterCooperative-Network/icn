@@ -2595,8 +2595,7 @@ impl GovernanceEventHandler {
                     // persistence below. In practice, entity deletion is governed and
                     // rate-limited, making this race extremely rare. Orphaned scoped
                     // parameters can be cleaned up via periodic parameter audit if needed.
-                    if let Some(entity_id) = scope.entity_id() {
-                        let entity_id_str = entity_id.as_str();
+                    if let Some(entity_id_str) = scope.entity_id_str() {
                         match self.gov_handle.entity_exists(entity_id_str) {
                             Ok(true) => {
                                 // Entity exists, proceed with scope change
