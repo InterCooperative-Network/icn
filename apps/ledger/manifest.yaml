@@ -1,0 +1,52 @@
+# Ledger App Manifest
+#
+# This app provides ledger-based policy decisions for the ICN kernel.
+# It wraps the internal Ledger implementation and exposes it via
+# the PolicyOracle and LedgerService interfaces, maintaining the Meaning Firewall.
+
+schema_version: 1
+name: ledger
+version: 0.1.0
+publisher: did:icn:icn-foundation
+
+description: |
+  Ledger app providing credit-based policy decisions and payment functionality.
+  The kernel calls this app's PolicyOracle to get credit constraints and uses
+  LedgerService for payment operations. The kernel never sees account structures
+  or ledger rules directly - only the constraints derived from credit policies.
+
+# Capabilities this app needs from the kernel
+capabilities_required:
+  - state:kv:read:self
+  - state:kv:write:self
+  - state:logs:append:self
+
+# Capabilities this app provides to others
+capabilities_provided:
+  - oracle:ledger:policy
+  - service:ledger:payments
+
+# State configuration
+state:
+  logs:
+    - name: journal_entries
+      ordering: causal
+  kv:
+    # Account balances and ledger state
+    - name: accounts
+      max_keys: 50000
+    - name: credit_limits
+      max_keys: 50000
+    # Budget management
+    - name: budgets
+      max_keys: 10000
+    # Escrow functionality
+    - name: escrows
+      max_keys: 5000
+    # Recurring payments
+    - name: recurring_payments
+      max_keys: 5000
+
+# Oracle configuration
+oracle:
+  domain: ledger
