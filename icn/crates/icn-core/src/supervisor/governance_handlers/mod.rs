@@ -834,10 +834,7 @@ pub fn create_execution_callback(
     handler: GovernanceEventHandler,
 ) -> icn_governance_actor::executor::ExecutionCallback {
     Arc::new(
-        move |proposal_id: &str,
-              payload: &serde_json::Value,
-              decided_at: u64,
-              domain_id: &str| {
+        move |proposal_id: &str, payload: &serde_json::Value, decided_at: u64, domain_id: &str| {
             // Deserialize the JSON payload to ProposalPayload
             match serde_json::from_value::<ProposalPayload>(payload.clone()) {
                 Ok(proposal_payload) => {
