@@ -1124,7 +1124,7 @@ mod tests {
     #[test]
     fn test_parameter_value_display() {
         assert_eq!(ParameterValue::Integer(42).to_string(), "42");
-        assert_eq!(ParameterValue::Float(3.14).to_string(), "3.14");
+        assert_eq!(ParameterValue::Float(2.5).to_string(), "2.5");
         assert_eq!(ParameterValue::Boolean(true).to_string(), "true");
         assert_eq!(
             ParameterValue::String("hello".into()).to_string(),
