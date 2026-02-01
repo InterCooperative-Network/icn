@@ -2,106 +2,17 @@
 //!
 //! This module provides a simple event bus for coordinating actions across actors.
 //! Key use case: Governance proposals triggering ledger transactions or contract execution.
+//!
+//! The [`SystemEvent`] enum and [`EventEmitter`] trait are defined in `icn-kernel-api`
+//! and re-exported here. The [`EventBus`] implementation lives in icn-core.
 
-use icn_identity::Did;
+use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
-/// System-wide events that actors can emit and subscribe to
-#[derive(Clone, Debug)]
-pub enum SystemEvent {
-    /// A governance proposal was accepted
-    ProposalAccepted {
-        /// Unique identifier for the proposal (was `ProposalId`)
-        proposal_id: String,
-        /// Domain in which the proposal was made
-        domain_id: String,
-        /// Payload describing the proposal action (serialized `ProposalPayload`)
-        payload: serde_json::Value,
-        /// Unix timestamp when the proposal was decided
-        decided_at: u64,
-    },
-
-    /// A governance proposal was rejected or failed to reach quorum
-    ProposalRejected {
-        /// Unique identifier for the proposal (was `ProposalId`)
-        proposal_id: String,
-        /// Domain in which the proposal was made
-        domain_id: String,
-        /// Unix timestamp when the proposal was decided
-        decided_at: u64,
-    },
-
-    /// A ledger transaction was executed (for contracts listening to ledger changes)
-    TransactionExecuted {
-        /// Hash of the ledger entry
-        entry_hash: [u8; 32],
-        /// Source DID of the transaction
-        from: Did,
-        /// Destination DID of the transaction
-        to: Did,
-        /// Transaction amount
-        amount: i64,
-        /// Currency identifier
-        currency: String,
-    },
-
-    /// A contract was executed
-    ContractExecuted {
-        /// Contract identifier
-        contract_id: String,
-        /// Execution outcome as JSON
-        outcome: serde_json::Value,
-    },
-
-    /// A proposal execution failed (proposal was accepted but could not be applied)
-    ProposalExecutionFailed {
-        /// Unique identifier for the proposal (was `ProposalId`)
-        proposal_id: String,
-        /// Type of the proposal (e.g., "protocol_change", "treasury")
-        proposal_type: String,
-        /// Human-readable error message
-        error: String,
-        /// Unix timestamp when the failure occurred
-        failed_at: u64,
-    },
-
-    /// Protocol parameters were initialized (first run)
-    ProtocolParametersInitialized {
-        /// Number of parameters initialized
-        count: usize,
-        /// Unix timestamp when the initialization occurred
-        initialized_at: u64,
-    },
-
-    /// Protocol parameter store was loaded (existing parameters)
-    ProtocolParametersLoaded {
-        /// Number of parameters loaded
-        count: usize,
-        /// Unix timestamp when the store was loaded
-        loaded_at: u64,
-    },
-
-    /// A protocol parameter was changed (for audit logging)
-    ProtocolParameterChanged {
-        /// Parameter ID that was changed
-        parameter_id: String,
-        /// Old value (serialized as string for logging)
-        old_value: String,
-        /// New value (serialized as string for logging)
-        new_value: String,
-        /// Proposal ID that authorized the change (if any)
-        proposal_id: Option<String>,
-        /// DID of the actor who made the change
-        changed_by: Option<String>,
-        /// Unix timestamp when the change occurred
-        changed_at: u64,
-    },
-}
-
-/// Callback function for event subscribers
-pub type EventCallback = Arc<dyn Fn(SystemEvent) + Send + Sync>;
+// Re-export event types and trait from kernel-api
+pub use icn_kernel_api::events::{EventCallback, EventEmitter, SystemEvent};
 
 /// Subscription handle that automatically unsubscribes when dropped
 ///
@@ -209,6 +120,14 @@ impl EventBus {
                 warn!("Event subscriber {} panicked: {:?}", id, e);
             }
         }
+    }
+}
+
+#[async_trait]
+impl EventEmitter for EventBus {
+    async fn emit(&self, event: SystemEvent) {
+        // Delegate to the inherent method
+        EventBus::emit(self, event).await;
     }
 }
 

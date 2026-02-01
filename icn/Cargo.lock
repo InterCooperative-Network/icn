@@ -2925,6 +2925,7 @@ dependencies = [
  "icn-gateway",
  "icn-gossip",
  "icn-governance",
+ "icn-governance-actor",
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
@@ -3164,6 +3165,26 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "icn-governance-actor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "icn-entity",
+ "icn-gossip",
+ "icn-governance",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-obs",
+ "icn-store",
+ "icn-time",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

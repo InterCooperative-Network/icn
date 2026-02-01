@@ -30,6 +30,7 @@ members = [
     "crates/icn-entity",
     "crates/icn-encoding",
     "crates/icn-api",
+    "apps/governance",
 ]
 
 [workspace.package]

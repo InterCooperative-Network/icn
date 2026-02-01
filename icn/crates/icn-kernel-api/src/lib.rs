@@ -37,6 +37,7 @@ pub mod bootstrap;
 pub mod comms;
 pub mod compute;
 pub mod coord;
+pub mod events;
 pub mod identity;
 pub mod naming;
 pub mod protocol_params;
@@ -60,6 +61,7 @@ pub use bootstrap::{
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
+pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{Discovery, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId};
 pub use scope::{CellId, MockCellService, ScopeLevel};

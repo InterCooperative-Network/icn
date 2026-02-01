@@ -1,12 +1,10 @@
 //! Governance actor for decentralized decision-making
 //!
-//! This module provides a production-ready governance actor that:
-//! - Subscribes to governance gossip messages
-//! - Persists domains, proposals, and votes to the node's store
-//! - Handles proposal lifecycle (create → open → vote → close)
-//! - Evaluates outcomes via governance profiles
-//! - Broadcasts state changes to peers
+//! The GovernanceActor implementation has been extracted to the
+//! `icn-governance-actor` crate (apps/governance). This module
+//! re-exports its public types for backwards compatibility.
 
-pub mod actor;
-
-pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use icn_governance_actor::actor;
+pub use icn_governance_actor::{
+    GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
+};

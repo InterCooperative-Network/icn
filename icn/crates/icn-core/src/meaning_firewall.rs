@@ -359,7 +359,7 @@ mod tests {
     /// - governance_handlers/treasury.rs: 9 (treasury governance handlers)
     /// - governance_handlers/protocol.rs: 7 (protocol change handlers)
     /// - governance_handlers/federation.rs: 3 (federation handlers)
-    /// - governance/actor.rs: 27 (governance actor message types, body/proposal)
+    /// - governance/actor.rs: 0 (extracted to apps/governance icn-governance-actor)
     /// - init_governance.rs: 3 (GovernanceManager, GovernanceSled)
     /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
     /// - actors.rs: 2 (CoreActorHandles governance handle)
@@ -370,7 +370,7 @@ mod tests {
     /// The module splits add +2 refs (each submodule needs its own `use` statement).
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 74;
+        let expected: usize = 47;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(
