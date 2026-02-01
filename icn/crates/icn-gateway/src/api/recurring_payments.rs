@@ -4,7 +4,7 @@
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
-pub use icn_store::recurring_payments::{
+pub use icn_ledger_app::{
     PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus,
 };
 use serde::Deserialize;

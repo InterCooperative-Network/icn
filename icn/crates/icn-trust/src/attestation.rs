@@ -354,8 +354,19 @@ impl TrustAttestation {
 
     /// Check if this attestation should supersede another attestation
     ///
-    /// This handles clock skew by using a tolerance window. Within the tolerance window,
-    /// we use trust score as a tiebreaker (higher trust wins).
+    /// This method implements replay protection by considering BOTH timestamp and score
+    /// in a two-tier ordering: timestamp takes precedence (outside clock skew tolerance),
+    /// with score as a tiebreaker (within tolerance window).
+    ///
+    /// ## Ordering Semantics
+    ///
+    /// The supersession logic follows these rules in order:
+    ///
+    /// 1. **Clearly newer** (time difference > 5 minutes): Accept, regardless of score
+    /// 2. **Clearly older** (time difference < -5 minutes): Reject, regardless of score
+    /// 3. **Within tolerance window** (time difference within ±5 minutes):
+    ///    - If scores differ significantly (> 0.001): Higher score wins
+    ///    - If scores are equal (within 0.001): Newer timestamp wins
     ///
     /// ## Clock Skew Tolerance
     ///
@@ -369,31 +380,44 @@ impl TrustAttestation {
     /// - This prevents clock skew from causing incorrect rejections while maintaining
     ///   general chronological ordering
     ///
-    /// ## Replay Attack Mitigation
+    /// ## Replay Attack Protection
     ///
-    /// Attestations are replay-resistant through monotonic timestamp checking.
-    /// When a trust relationship is updated, the newer attestation supersedes
-    /// the older one, preventing replay of stale high-trust attestations.
+    /// **Primary Defense:** Monotonic timestamp checking prevents replay of old attestations
+    /// with high scores. An old attestation will NOT supersede a newer attestation, even if
+    /// the old attestation has a higher trust score.
     ///
-    /// **Limitations:**
-    /// - If an attacker records an attestation and the issuer's node is compromised
-    ///   before publishing a revocation, the attacker could replay the high-trust
-    ///   attestation within the clock skew window.
-    /// - This is mitigated by:
-    ///   1. Short TTLs (default 30 days)
-    ///   2. Requiring issuer to actively re-attest to maintain high trust
-    ///   3. Key rotation invalidates old signatures (future Phase 8C)
+    /// **Example Scenario:**
+    /// - Attacker records: `attestation(score=0.9, created_at=1000)`
+    /// - Victim creates: `attestation(score=0.1, created_at=10000)` (revocation ~2.5 hours later)
+    /// - Old attestation has `time_diff = 1000 - 10000 = -9000 seconds`
+    /// - Since `-9000 < -300` (clock skew tolerance), the old attestation is rejected
+    /// - Result: ✅ Replay attack prevented by timestamp checking
+    ///
+    /// **Vulnerability Window:** Within the 5-minute clock skew tolerance window, a higher-score
+    /// attestation CAN supersede a lower-score one. This is by design to handle:
+    /// - Race conditions where nodes update trust simultaneously
+    /// - Clock skew between nodes causing near-simultaneous attestations to arrive out of order
+    ///
+    /// **Mitigations for tolerance window vulnerability:**
+    /// 1. Short TTLs (default 30 days) - old attestations expire
+    /// 2. Active re-attestation requirement - trust must be continuously maintained
+    /// 3. Key rotation (future) - invalidates old signatures after rotation
+    /// 4. Narrow tolerance window (5 minutes) - limits replay opportunity
     ///
     /// ## Parameters
     ///
-    /// - `other_created_at`: Timestamp of existing attestation
-    /// - `other_score`: Trust score of existing attestation
+    /// - `other_created_at`: Timestamp of existing attestation (Unix seconds)
+    /// - `other_score`: Trust score of existing attestation (0.0-1.0)
     ///
     /// ## Returns
     ///
     /// `true` if this attestation should supersede the other, `false` otherwise
     pub fn should_supersede(&self, other_created_at: u64, other_score: f64) -> bool {
         const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300; // 5 minutes
+        /// Score difference below which two scores are considered equal.
+        /// Chosen to absorb floating-point rounding while remaining well below
+        /// any meaningful trust difference.
+        const SCORE_EPSILON: f64 = 0.001;
 
         let time_diff = self.created_at as i64 - other_created_at as i64;
 
@@ -409,7 +433,7 @@ impl TrustAttestation {
 
         // Within tolerance window: use score as tiebreaker
         // Higher trust wins. If scores are equal, accept the newer one (even if within tolerance)
-        if (self.score - other_score).abs() < 0.001 {
+        if (self.score - other_score).abs() < SCORE_EPSILON {
             // Scores effectively equal - accept newer timestamp
             time_diff >= 0
         } else {
@@ -1074,6 +1098,302 @@ mod tests {
         assert!(!high_trust.should_supersede(low_trust.created_at, low_trust.score));
     }
 
+    // ====================================================================
+    // REPLAY PROTECTION TESTS (Issue #877, PR #987 follow-up)
+    // ====================================================================
+
+    #[test]
+    fn test_replay_protection_old_high_score_rejected() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 10_000u64;
+
+        let old_high_trust = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.95,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let new_low_trust = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.05,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 7200,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            !old_high_trust.should_supersede(new_low_trust.created_at, new_low_trust.score),
+            "OLD attestation with higher score MUST NOT supersede NEWER attestation (replay protection)"
+        );
+
+        assert!(
+            new_low_trust.should_supersede(old_high_trust.created_at, old_high_trust.score),
+            "NEWER attestation should supersede OLDER attestation"
+        );
+    }
+
+    #[test]
+    fn test_replay_protection_outside_tolerance_window() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 20_000u64;
+
+        let old_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let test_cases = vec![
+            (400, 0.1),
+            (600, 0.2),
+            (1800, 0.3),
+            (3600, 0.05),
+            (86400, 0.0),
+        ];
+
+        for (time_delta, new_score) in test_cases {
+            let new_att = TrustAttestation {
+                issuer: alice.did().clone(),
+                subject: bob.did().clone(),
+                score: new_score,
+                labels: vec![],
+                evidence: vec![],
+                ttl_seconds: 86400,
+                created_at: base_time + time_delta,
+                sequence: 0,
+                signature: vec![],
+                graph_type: TrustGraphType::default(),
+            };
+
+            assert!(
+                !old_att.should_supersede(new_att.created_at, new_att.score),
+                "Old attestation (score={}) should NOT supersede newer attestation (created +{}s, score={})",
+                old_att.score, time_delta, new_score
+            );
+
+            assert!(
+                new_att.should_supersede(old_att.created_at, old_att.score),
+                "Newer attestation (created +{}s, score={}) SHOULD supersede old attestation (score={})",
+                time_delta, new_score, old_att.score
+            );
+        }
+    }
+
+    #[test]
+    fn test_identical_timestamp_behavior() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let timestamp = 30_000u64;
+
+        let low_score_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.3,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: timestamp,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let high_score_att = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.8,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: timestamp,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            high_score_att.should_supersede(low_score_att.created_at, low_score_att.score),
+            "Higher score should supersede lower score with identical timestamp"
+        );
+
+        assert!(
+            !low_score_att.should_supersede(high_score_att.created_at, high_score_att.score),
+            "Lower score should NOT supersede higher score with identical timestamp"
+        );
+
+        let att_a = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: timestamp,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let att_b = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.5,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: timestamp,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            att_a.should_supersede(att_b.created_at, att_b.score),
+            "With identical timestamp and score, first should supersede"
+        );
+
+        assert!(
+            att_b.should_supersede(att_a.created_at, att_a.score),
+            "With identical timestamp and score, both return true (time_diff = 0)"
+        );
+    }
+
+    #[test]
+    fn test_within_tolerance_score_tiebreaker() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let base_time = 40_000u64;
+
+        let older_high_score = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let newer_low_score = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.3,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 120,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            older_high_score.should_supersede(newer_low_score.created_at, newer_low_score.score),
+            "Within tolerance window, older high score should supersede newer low score"
+        );
+
+        assert!(
+            !newer_low_score.should_supersede(older_high_score.created_at, older_high_score.score),
+            "Within tolerance window, newer low score should NOT supersede older high score"
+        );
+
+        let boundary_high_score = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.85,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let boundary_low_score = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.4,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 300,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            boundary_high_score
+                .should_supersede(boundary_low_score.created_at, boundary_low_score.score),
+            "At tolerance boundary, higher score should supersede"
+        );
+
+        let just_outside = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.1,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time + 301,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        let older_high = TrustAttestation {
+            issuer: alice.did().clone(),
+            subject: bob.did().clone(),
+            score: 0.9,
+            labels: vec![],
+            evidence: vec![],
+            ttl_seconds: 86400,
+            created_at: base_time,
+            sequence: 0,
+            signature: vec![],
+            graph_type: TrustGraphType::default(),
+        };
+
+        assert!(
+            just_outside.should_supersede(older_high.created_at, older_high.score),
+            "Just outside tolerance (301s), newer should win even with lower score"
+        );
+
+        assert!(
+            !older_high.should_supersede(just_outside.created_at, just_outside.score),
+            "Just outside tolerance (301s), older should NOT supersede newer"
+        );
+    }
+
     // ============================================================================
     // Sequence Number Tests (Replay Protection)
     // ============================================================================
@@ -1086,10 +1406,8 @@ mod tests {
         let mut attestation =
             TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(42);
 
-        // Sign with sequence included
         attestation.sign(&alice).unwrap();
 
-        // Verify should succeed
         assert!(attestation.verify().is_ok());
         assert_eq!(attestation.sequence, 42);
     }
@@ -1107,14 +1425,10 @@ mod tests {
             TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5).with_sequence(2);
         att2.sign(&alice).unwrap();
 
-        // Different sequences should produce different signatures
         assert_ne!(att1.signature, att2.signature);
-
-        // Both should verify
         assert!(att1.verify().is_ok());
         assert!(att2.verify().is_ok());
 
-        // Tampering with sequence should fail verification
         let mut att1_tampered = att1.clone();
         att1_tampered.sequence = 999;
         assert!(att1_tampered.verify().is_err());
@@ -1125,14 +1439,10 @@ mod tests {
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
-        // Create an attestation without sequence (defaults to 0)
         let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
         assert_eq!(attestation.sequence, 0);
 
-        // Sign with v3 format (includes sequence 0)
         attestation.sign(&alice).unwrap();
-
-        // Should verify successfully
         assert!(attestation.verify().is_ok());
     }
 
@@ -1161,11 +1471,8 @@ mod tests {
 
         let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
 
-        // Sign
         revocation.sign(&alice).unwrap();
         assert!(!revocation.signature.is_empty());
-
-        // Verify
         assert!(revocation.verify().is_ok());
     }
 
@@ -1176,15 +1483,9 @@ mod tests {
         let eve = KeyPair::generate().unwrap();
 
         let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
-
-        // Sign with Eve's key (wrong issuer)
         revocation.issuer = eve.did().clone();
         revocation.sign(&eve).unwrap();
-
-        // Change issuer back to Alice
         revocation.issuer = alice.did().clone();
-
-        // Verify should fail
         assert!(revocation.verify().is_err());
     }
 
@@ -1196,11 +1497,7 @@ mod tests {
 
         let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
         revocation.sign(&alice).unwrap();
-
-        // Tamper with subject
         revocation.subject = carol.did().clone();
-
-        // Verify should fail
         assert!(revocation.verify().is_err());
     }
 
@@ -1211,7 +1508,6 @@ mod tests {
 
         let base_time = 1000u64;
 
-        // Attestation created at base_time
         let attestation = TrustAttestation {
             issuer: alice.did().clone(),
             subject: bob.did().clone(),
@@ -1225,18 +1521,14 @@ mod tests {
             graph_type: TrustGraphType::default(),
         };
 
-        // Revocation created later
         let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
-        revocation.revoked_at = base_time + 3600; // 1 hour later
+        revocation.revoked_at = base_time + 3600;
 
-        // Revocation should supersede attestation
         assert!(revocation.supersedes_attestation(attestation.created_at));
 
-        // Revocation at same time should also supersede
         revocation.revoked_at = base_time;
         assert!(revocation.supersedes_attestation(attestation.created_at));
 
-        // Revocation before attestation should NOT supersede
         revocation.revoked_at = base_time - 1;
         assert!(!revocation.supersedes_attestation(attestation.created_at));
     }
@@ -1265,7 +1557,6 @@ mod tests {
 
         let mut revocation = TrustRevocation::new(alice.did().clone(), bob.did().clone());
 
-        // Try to sign with Eve's keypair (should fail)
         let result = revocation.sign(&eve);
         assert!(result.is_err());
         assert!(result

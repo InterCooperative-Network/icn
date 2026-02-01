@@ -4,7 +4,7 @@
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
-pub use icn_store::escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
+pub use icn_ledger_app::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;

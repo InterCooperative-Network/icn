@@ -6,6 +6,10 @@ description = "Ledger app - provides ledger-based policy decisions for the ICN k
 license = "MIT OR Apache-2.0"
 publish = false
 
+[features]
+default = []
+utoipa = ["dep:utoipa"]
+
 [dependencies]
 # Kernel API for PolicyOracle trait and types
 icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
@@ -29,12 +33,26 @@ icn-obs = { path = "../../icn/crates/icn-obs" }
 parking_lot = "0.12"
 tokio = { version = "1", features = ["sync", "rt", "time"] }
 
+# Serialization (for store implementations)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Sled database (for store implementations)
+sled = "0.34"
+
+# Time utilities (for budgets, escrow, recurring payments)
+icn-time = { path = "../../icn/crates/icn-time" }
+
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"
 
 # Logging
 tracing = "0.1"
+
+# OpenAPI documentation (optional)
+utoipa = { version = "5", optional = true }
 
 # Metrics
 metrics = "0.24"

@@ -3,7 +3,7 @@
 use icn_gateway::error::GatewayError;
 use icn_gateway::ledger_mgr::LedgerManager;
 use icn_identity::IdentityBundle;
-use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
+use icn_ledger_app::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use std::sync::Arc;
 use std::time::SystemTime;
 

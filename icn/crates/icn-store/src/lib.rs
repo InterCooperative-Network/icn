@@ -6,10 +6,6 @@
 // Allow unwrap/expect in test code - panics are acceptable for tests
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-/// Budget management for ledger accounts
-pub mod budgets;
-/// Escrow functionality for conditional payments
-pub mod escrow;
 /// Storage maintenance tasks
 pub mod maintenance;
 /// Notification storage and management
@@ -20,8 +16,6 @@ pub mod peer_cache;
 pub mod pos;
 /// Storage quota management
 pub mod quotas;
-/// Recurring payment scheduling
-pub mod recurring_payments;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
