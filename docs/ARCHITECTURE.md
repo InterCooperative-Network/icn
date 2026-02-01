@@ -151,7 +151,7 @@ ICN implements a **constraint enforcement architecture** where applications and 
 │  ┌─────────────────────────────────────────────────────────────────┐│
 │  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
 │  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
-│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
 │  └─────────────────────────────────────────────────────────────────┘│
 │                                                                      │
 │   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
@@ -195,6 +195,21 @@ The constraint engine model distinguishes between **enforcement mechanisms** (ke
 - Governance **cannot** remove **that** rate limiting exists (enforcement mechanism is fixed)
 
 This separation ensures the kernel remains predictable and auditable while allowing cooperative governance to adapt policies to changing needs.
+
+### Kernel Guarantees
+
+The kernel permanently guarantees these enforcement mechanisms. Governance may adjust their parameters, but cannot remove them:
+
+- **Signature verification** — every message cryptographically authenticated
+- **Replay protection** — sequence tracking prevents duplicate processing
+- **Capability gating** — actions require explicit, revocable grants
+- **Credit gating** — transactions bounded by credit ceilings
+- **Rate limiting** — per-actor throughput bounds enforced
+- **Deterministic execution** — same inputs always produce same outputs
+
+These guarantees form ICN's security spine. A governance proposal can change a rate limit from 20/s to 100/s, but no proposal can disable rate limiting itself.
+
+> **Boundary clarification:** This boundary is conceptual, not physical. Many crates contain both kernel and oracle surfaces. The separation is defined by **data flow** (who produces `ConstraintSet` values vs. who enforces them), not by file or crate location. Do not reorganize crates to "match the diagram."
 
 ### Functional Component Map (Not a Sequential Stack)
 

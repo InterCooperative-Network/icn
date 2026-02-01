@@ -89,7 +89,7 @@ Here's how these subsystems work together:
 5. Those meanings are expressed as **constraints** (rate limits, credit ceilings, capability grants)
 6. The **kernel enforces those constraints** on subsequent actions without understanding their semantic origin
 
-### 2. Design Principles
+### 4. Design Principles
 
 ICN's architecture follows five foundational principles:
 
@@ -142,7 +142,7 @@ ICN implements a **constraint enforcement architecture** where applications and 
 │  ┌─────────────────────────────────────────────────────────────────┐│
 │  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
 │  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
-│  │  (verify)   │ (reject) │  (apply)  │   (check)   │  (check)   │ ││
+│  │  (verify)   │ (reject) │  (apply)  │  (enforce)  │  (enforce) │ ││
 │  └─────────────────────────────────────────────────────────────────┘│
 │                                                                      │
 │   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │

@@ -54,6 +54,8 @@ ICN implements a constraint enforcement architecture where Policy Oracles (apps/
 
 **Boundary rule:** Anything that outputs constraint values is a Policy Oracle; anything that validates or enforces constraints is kernel (even if they live near each other in code).
 
+> **Important:** This boundary is conceptual, not physical. Many crates contain both kernel and oracle surfaces. The separation is defined by **data flow** (who produces `ConstraintSet` vs. who enforces it), not by file or crate location.
+
 ---
 
 ## Functional Component Map (Not a Layer Stack)
