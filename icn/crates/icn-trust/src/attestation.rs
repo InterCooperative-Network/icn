@@ -287,12 +287,12 @@ impl TrustAttestation {
     /// ## Replay Attack Protection
     ///
     /// **Primary Defense:** Monotonic timestamp checking prevents replay of old attestations
-    /// with high scores. An old attestation (e.g., created 1 hour ago) will NOT supersede
-    /// a newer attestation, even if the old attestation has a higher trust score.
+    /// with high scores. An old attestation will NOT supersede a newer attestation, even if
+    /// the old attestation has a higher trust score.
     ///
     /// **Example Scenario:**
     /// - Attacker records: `attestation(score=0.9, created_at=1000)`
-    /// - Victim creates: `attestation(score=0.1, created_at=10000)` (revocation)
+    /// - Victim creates: `attestation(score=0.1, created_at=10000)` (revocation ~2.5 hours later)
     /// - Old attestation has `time_diff = 1000 - 10000 = -9000 seconds`
     /// - Since `-9000 < -300` (clock skew tolerance), the old attestation is rejected
     /// - Result: ✅ Replay attack prevented by timestamp checking
