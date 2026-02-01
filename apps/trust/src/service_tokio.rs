@@ -783,6 +783,5 @@ mod tests {
             "Attestation with spoofed issuer must be rejected, got: {:?}",
             result
         );
-
     }
 }
