@@ -1,0 +1,76 @@
+name: Work Item
+description: Implementation, refactoring, testing, or documentation task
+body:
+  - type: dropdown
+    id: epic
+    attributes:
+      label: Epic
+      description: Which epic does this belong to?
+      options:
+        - "epic:kernel-separation"
+        - "epic:arch-invariants"
+        - "epic:trust-hardening"
+        - "epic:service-discovery"
+        - "epic:commons-compute"
+        - "epic:kernel-perf"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: What kind of work is this?
+      options:
+        - "type:spec — Design/specification"
+        - "type:impl — Implementation"
+        - "type:refactor — Structural change, behavior preserved"
+        - "type:test — Test coverage"
+        - "type:doc — Documentation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Trust Tier (only for epic:trust-hardening)
+      description: Leave blank if not a trust issue
+      options:
+        - "N/A"
+        - "tier:1-correctness"
+        - "tier:2-observability"
+        - "tier:3-perf"
+    validations:
+      required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is this work item and why does it matter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable
+      description: What ships when this is done?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: "Checklist format: - [ ] criterion"
+    validations:
+      required: true
+
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: "List blocking issues as checklist: - [ ] #NNN"
+    validations:
+      required: false

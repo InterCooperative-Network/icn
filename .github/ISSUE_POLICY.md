@@ -1,127 +1,73 @@
-# ICN Issue Taxonomy & Triage System
+# ICN Issue Taxonomy
 
-This document defines the canonical issue management system for ICN. All contributors and agents MUST follow this contract when creating, editing, or reorganizing issues.
-
-## Mission
-
-Keep the issue tracker queryable and pilot-oriented by enforcing:
-- One priority axis
-- One issue type axis
-- At least one domain axis
-- Optional concern axes
-- Controlled phase tags
+This document defines the issue management system for ICN. All contributors and agents MUST follow this contract.
 
 ---
 
-## 1. Label Dimensions and Invariants
+## 1. Label System (19 labels total)
 
-### A) Priority (REQUIRED, exactly one)
+Every issue gets **exactly one epic + exactly one type**. Trust issues also get **exactly one tier**. That's it.
+
+### A) Epic (REQUIRED, exactly one)
+
+| Label | Scope |
+|-------|-------|
+| `epic:kernel-separation` | Kernel/App boundary extraction (#856) |
+| `epic:arch-invariants` | Architecture invariant enforcement, waves 1-6 |
+| `epic:trust-hardening` | Trust correctness, observability, performance |
+| `epic:service-discovery` | Service discovery pipeline |
+| `epic:commons-compute` | Commons resource pool and compute |
+| `epic:kernel-perf` | Kernel performance and security |
+
+**Invariant**: Every open issue MUST have exactly one `epic:*` label.
+
+### B) Type (REQUIRED, exactly one)
 
 | Label | Meaning |
 |-------|---------|
-| `priority:critical` | Blocks pilot OR security invariant OR consensus correctness OR safe deploy |
-| `priority:high` | Required for pilot success but not a hard blocker |
-| `priority:medium` | Important, schedulable, not a pilot stopper |
-| `priority:low` | Polish / convenience / future work |
+| `type:spec` | Design/specification work |
+| `type:impl` | Implementation (new feature or change) |
+| `type:refactor` | Structural change, behavior preserved |
+| `type:test` | Test coverage |
+| `type:doc` | Documentation |
 
-**Invariant**: Every open issue MUST have exactly one `priority:*` label.
+**Invariant**: Every open issue MUST have exactly one `type:*` label.
 
-**Forbidden (deprecated)**: `critical`, `high`, `medium`, `low`, `P0-critical`, `P1-high`
+### C) Tier (REQUIRED for trust, exactly one)
 
-### B) Issue Type (REQUIRED, exactly one)
+Only for issues with `epic:trust-hardening`:
 
-Every issue MUST have exactly one of:
-- `bug` - Something isn't working
-- `enhancement` - New feature or request
-- `design` - Architecture/design discussion
-- `documentation` - Docs improvements
-- `testing` - Test coverage improvements
-- `refactor` - Code restructuring without behavior change
+| Label | Meaning |
+|-------|---------|
+| `tier:1-correctness` | Correctness fixes — do first |
+| `tier:2-observability` | Observability — after correctness |
+| `tier:3-perf` | Performance/testing — last |
 
-### C) Domain / Subsystem (REQUIRED for code work)
+**Invariant**: Trust issues MUST have exactly one `tier:*`. Non-trust issues MUST NOT.
 
-At least one domain label if the issue touches code:
+### D) System Labels (do not assign manually)
 
-| Domain | Scope |
-|--------|-------|
-| `core` | Runtime, supervisor, actor lifecycle |
-| `identity` | DIDs, keypairs, keystore |
-| `ledger` | Double-entry accounting, Merkle-DAG |
-| `governance` | Proposals, voting, parameters |
-| `treasury` | Budgets, spending rules |
-| `gateway` | REST/WebSocket API |
-| `federation` | Inter-coop protocols |
-| `sdk` | TypeScript/React Native SDKs |
-| `cli` | icnctl commands |
-| `ccl` | Contract language |
-| `gossip` | P2P message propagation |
-| `networking` | QUIC/TLS, sessions |
-| `protocol` | Wire formats, message types |
-| `storage` | Sled, persistence |
-| `web-ui` | Web interface |
-| `k8s` | Kubernetes manifests/config |
-| `ci` | GitHub Actions, pipelines |
-| `release` | Signing, SBOMs, artifacts |
-| `infrastructure` | General ops/platform |
+| Label | Used by |
+|-------|---------|
+| `bug` | True defects only |
+| `duplicate` | Closure hygiene |
+| `priority:critical` | Emergency: blocks correctness/security/trunk |
+| `dependencies` | Dependabot PRs (automated) |
+| `perf-regression-ok` | CI benchmark gate acknowledgment |
 
-**Invariant**: Every code-impacting issue MUST have >=1 domain label.
+### E) Dependencies
 
-### D) Concern / Motivation (OPTIONAL, many allowed)
+Dependencies go in the **issue body**, not labels:
 
-Use only when materially relevant:
-- `security` - Security implications
-- `performance` - Performance impact
-- `scalability` - Scaling considerations
-- `observability` - Metrics, tracing, logging
-- `compliance` - Regulatory/policy
-- `error-handling` - Error paths
-- `integration` - Cross-boundary work
-- `i18n` - Internationalization
-
-**Rule**: Concerns answer "why/what risk," not "where."
-
-### E) Lifecycle / Meta (OPTIONAL)
-
-- `duplicate` - Already exists elsewhere
-- `invalid` - Not a real issue
-- `wontfix` - Won't be addressed
-- `help wanted` - Extra attention needed
-- `good first issue` - Good for newcomers
-
-### F) Phase Tags (OPTIONAL, controlled)
-
-- `phase-21` (or other explicitly defined phase tags)
-
-**Rule**: Phase tags are only for roadmap grouping. Never use them as priority.
+```markdown
+## Depends on
+- [ ] #1007
+- [ ] #856
+```
 
 ---
 
-## 2. Label Normalization Rules
-
-When reorganizing, normalize labels per this mapping:
-
-### Priority Merge Mapping
-| Deprecated | Canonical |
-|------------|-----------|
-| `critical` | `priority:critical` |
-| `P0-critical` | `priority:critical` |
-| `high`, `P1-high` | `priority:high` |
-| `medium` | `priority:medium` |
-| `low` | `priority:low` |
-
-### Other Merges
-| Deprecated | Canonical |
-|------------|-----------|
-| `tech-debt` | `refactor` |
-| `technical-debt` | `refactor` |
-| `monitoring` | `observability` |
-| `ops` | `infrastructure` |
-
----
-
-## 3. Issue Title Standard
-
-Use consistent prefixes:
+## 2. Issue Title Standard
 
 ```
 <type>(<domain>): <action>
@@ -131,151 +77,52 @@ Examples:
 - `feat(ledger): Enforce credit limits server-side`
 - `fix(gossip): Remove blocking operations from async path`
 - `refactor(governance): Extract shared validation logic`
-- `docs(ops): Add troubleshooting runbooks`
 - `test(identity): Add rotation integration tests`
 
-**Rule**: The `<type>` prefix MUST match the issue type label.
+---
+
+## 3. Definition of "Triaged"
+
+An issue is triaged when it has:
+- [ ] Exactly one `epic:*`
+- [ ] Exactly one `type:*`
+- [ ] If `epic:trust-hardening`, exactly one `tier:*`
+- [ ] Dependencies in body checklist (not labels)
 
 ---
 
-## 4. Issue Hierarchy (Three Levels Only)
+## 4. Issue Hierarchy (Three Levels)
 
-### Level 0 — Meta / Roadmap (RARE)
+### Level 0 — Epics / Umbrellas
 - Explains why work exists
-- Very few (≤5 total)
+- Contains ratchets and acceptance criteria
 - Never directly worked
-- Contains links to Level 1 epics
 
-### Level 1 — Execution Epics (PRIMARY CONTROL SURFACE)
-- Represents a coherent system capability
-- Completable in ≤1–2 sprints
-- Owns a checklist of Level 2 sub-issues
-- No code merged directly for the epic
-
-### Level 2 — Atomic Work Items (WHERE WORK HAPPENS)
+### Level 1 — Work Items
 - Single responsibility
-- Limited surface area
-- Independently completable and reviewable
-- Produces concrete artifact (code, test, doc)
-- MUST belong to exactly one execution epic
-- MUST NOT contain further sub-tasks
+- Independently completable
+- Produces concrete artifact
+- MUST belong to exactly one epic
+
+### Level 2 — Sub-tasks (inside issue body only)
+- Expressed as checklist items in the parent issue body
+- NOT separate issues unless they grow large enough
 
 ---
 
-## 5. Epic Structure
-
-Every execution epic should have sub-issues in these categories (where applicable):
-
-| Category | Purpose |
-|----------|---------|
-| **Core Logic** | Primary functionality, data structures, state machines |
-| **Validation / Safety** | Server-side enforcement, invariant checks |
-| **Integration** | Wiring to gateway/SDK/other subsystems |
-| **Testing** | Integration tests, property tests |
-| **Observability** | Metrics, logging, alerts (if applicable) |
-| **Docs** | API docs, architecture notes (if externally visible) |
-
-**Limit**: No epic may have more than ~10 sub-issues. If it does, split the epic.
-
----
-
-## 6. Epic / Duplicate Handling
-
-### Superseding an Epic
-When a new epic supersedes an old one:
-1. Add `duplicate` label to old issue
-2. Comment: "Superseded by #XYZ"
-3. Close the old issue
-
-### Duplicate Issues
-When two issues describe the same work:
-1. Keep the newer or more detailed one as canonical
-2. Add `duplicate` to the non-canonical
-3. Cross-link and close
-
----
-
-## 7. Agent Behavior Rules
+## 5. Agent Behavior Rules
 
 ### When Creating Issues
-1. Search existing issues for semantic duplicates first
-2. If duplicate exists, comment + link instead of creating
-3. If creating:
-   - Apply exactly one `priority:*`
-   - Apply exactly one type label
-   - Apply >=1 domain label
-   - Add concerns only if meaningful
-4. If "future idea," set `priority:low` and label `design`
+1. Search existing issues for duplicates first
+2. Apply exactly one `epic:*` and one `type:*`
+3. Add `tier:*` if trust epic
+4. No new labels without explicit human approval
 
-### When Reorganizing
-Follow this order:
-
-**Pass 1 — Priority normalization**
-- Ensure exactly one `priority:*` per issue
-- Migrate and remove deprecated priority labels
-
-**Pass 2 — Type enforcement**
-- Ensure exactly one type label per issue
-
-**Pass 3 — Domain assignment**
-- Ensure >=1 domain label for code issues
-
-**Pass 4 — Concern cleanup**
-- Apply concerns only when supported by content
-- Merge duplicates per mapping rules
-
-**Pass 5 — Epic consolidation**
-- Identify duplicate epics
-- Supersede/close older ones
-
-**Pass 6 — Audit report**
-Output a report with:
-- Counts by priority
-- Issues missing type/domain labels
-- Deprecated labels still in use
-- Suspected duplicates needing human confirmation
+### When Closing
+- Duplicates: comment "Superseded by #XYZ", add `duplicate`, close
+- Merges: copy acceptance criteria into keeper issue as checklist, close with link
 
 ### Non-Negotiables
-- No creation of new labels without explicit human approval
+- No creation of new labels without human approval
 - Never change issue numbers or delete history
-- Never downgrade `priority:critical` without stating reason in comment
-- Don't relabel closed issues unless marking duplicate/invalid/wontfix
-
----
-
-## 8. Quick Reference
-
-Every issue MUST have:
-- Exactly one `priority:*`
-- Exactly one type label
-- At least one domain label (if it touches code)
-
-Everything else is optional.
-
----
-
-## 9. Execution Epics Template
-
-When creating an execution epic, use this template:
-
-```markdown
-## Summary
-[1-2 sentence description of the capability]
-
-## Scope
-[What's included and what's explicitly out of scope]
-
-## Sub-Issues
-- [ ] feat(domain): Core logic description
-- [ ] feat(domain): Integration with X
-- [ ] test(domain): Integration tests
-- [ ] docs(domain): API documentation (if applicable)
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Dependencies
-- Depends on: #XXX (if any)
-- Blocks: #YYY (if any)
-```
+- `priority:critical` burns off quickly or gets decomposed

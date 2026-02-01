@@ -36,4 +36,8 @@ They do **NOT**:
 
 ---
 
-[Existing Contributing content continues below...]
+## Issue Labels
+
+Every issue gets **exactly one `epic:*` + exactly one `type:*`**. Trust issues also get one `tier:*`. No exceptions.
+
+See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the full label system, triage rules, and agent behavior contract.
