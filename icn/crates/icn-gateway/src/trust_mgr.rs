@@ -60,8 +60,6 @@ use tracing::{debug, warn};
 /// 2. Running in standalone mode without a configured perspective DID
 /// 3. The target DID has no trust edges (neither direct nor transitive)
 pub const DEFAULT_TRUST_SCORE: f64 = 0.5;
-const DIRECT_TRUST_WEIGHT: f64 = 0.7;
-const TRANSITIVE_TRUST_WEIGHT: f64 = 0.3;
 
 // Trust class thresholds (single source of truth)
 // These define the trust score boundaries for rate limiting
@@ -716,32 +714,25 @@ impl TrustManager {
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges(from);
-        let mut transitive_sum = 0.0;
-        let mut transitive_count = 0;
 
-        for intermediate_edge in outgoing {
+        // Build iterator of (intermediate_trust, indirect_trust) pairs
+        let intermediates = outgoing.into_iter().filter_map(|intermediate_edge| {
             // Skip if intermediate is the target
             if intermediate_edge.target == *to {
-                continue;
+                return None;
             }
 
             // Get edge from intermediate to target
-            if let Some(indirect_edge) = self.get_edge(&intermediate_edge.target, to) {
-                // Weight: trust in intermediate * trust from intermediate to target
-                let weight = intermediate_edge.score * indirect_edge.score;
-                transitive_sum += weight;
-                transitive_count += 1;
-            }
-        }
+            self.get_edge(&intermediate_edge.target, to)
+                .map(|indirect_edge| (intermediate_edge.score.value(), indirect_edge.score.value()))
+        });
 
-        let transitive_score = if transitive_count > 0 {
-            transitive_sum / transitive_count as f64
-        } else {
-            0.0
-        };
-
-        // Combine (70% direct, 30% transitive)
-        (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
+        // Use shared computation algorithm with legacy weights (0.7/0.3)
+        icn_trust::compute_trust_score(
+            direct_score,
+            intermediates,
+            icn_trust::ScoringWeights::legacy(),
+        )
     }
 
     /// Compute trust score using local (in-memory or fallback) algorithm (async version)
@@ -757,9 +748,10 @@ impl TrustManager {
 
         // Transitive trust (via intermediates)
         let outgoing = self.get_outgoing_edges_async(from).await;
-        let mut transitive_sum = 0.0;
-        let mut transitive_count = 0;
 
+        // Build vector of (intermediate_trust, indirect_trust) pairs
+        // Note: We collect into a Vec because we can't use async in filter_map
+        let mut intermediates = Vec::new();
         for intermediate_edge in outgoing {
             // Skip if intermediate is the target
             if intermediate_edge.target == *to {
@@ -768,21 +760,16 @@ impl TrustManager {
 
             // Get edge from intermediate to target
             if let Some(indirect_edge) = self.get_edge_async(&intermediate_edge.target, to).await {
-                // Weight: trust in intermediate * trust from intermediate to target
-                let weight = intermediate_edge.score * indirect_edge.score;
-                transitive_sum += weight;
-                transitive_count += 1;
+                intermediates.push((intermediate_edge.score.value(), indirect_edge.score.value()));
             }
         }
 
-        let transitive_score = if transitive_count > 0 {
-            transitive_sum / transitive_count as f64
-        } else {
-            0.0
-        };
-
-        // Combine (70% direct, 30% transitive)
-        (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
+        // Use shared computation algorithm with legacy weights (0.7/0.3)
+        icn_trust::compute_trust_score(
+            direct_score,
+            intermediates.into_iter(),
+            icn_trust::ScoringWeights::legacy(),
+        )
     }
 
     /// Get trust network around a DID (for visualization) - async version
@@ -1032,23 +1019,8 @@ impl TrustPolicyOracle {
 
 /// Helper to compute trust score from edges map (for standalone mode)
 ///
-/// # Algorithm Difference: Standalone vs Actor-Backed Mode
-///
-/// **Standalone mode** (this function): Uses 1-hop transitive trust averaging.
-/// This is a simplified algorithm suitable for testing and development.
-///
-/// **Actor-backed mode** (`TrustGraph::compute_trust_score`): Uses multi-hop
-/// transitive trust with configurable depth and more sophisticated weighting.
-///
-/// This difference is intentional: standalone mode prioritizes simplicity and
-/// speed for dev/test scenarios. For production, use actor-backed mode which
-/// provides the full trust computation algorithm.
-///
-/// # TODO(Phase 3)
-///
-/// Consider extracting shared logic if algorithms converge. Currently separate
-/// due to intentional 1-hop vs multi-hop differences. See issue #902 for
-/// discussion of unification options.
+/// This function uses the shared trust computation algorithm from `icn_trust::computation`
+/// to ensure consistency with actor-backed mode.
 ///
 /// # Parameters
 ///
@@ -1064,8 +1036,7 @@ fn compute_trust_from_edges_map(
     let key = format!("{}:{}", own_did, target_did);
     let direct_score = edges.get(&key).map(|e| e.score.value()).unwrap_or(0.0);
 
-    // 2. Transitive trust (1 hop only for simplicity in standalone mode)
-    //    See note above about algorithm differences.
+    // 2. Transitive trust (via intermediaries)
     let prefix = format!("{}:", own_did);
     let outgoing: Vec<_> = edges
         .iter()
@@ -1073,29 +1044,24 @@ fn compute_trust_from_edges_map(
         .map(|entry| entry.value().clone())
         .collect();
 
-    let mut transitive_sum = 0.0;
-    let mut transitive_count = 0;
-
-    for mid in outgoing {
+    // Build iterator of (intermediate_trust, indirect_trust) pairs
+    let intermediates = outgoing.into_iter().filter_map(|mid| {
         if mid.target.to_string() == *target_did {
-            continue;
+            return None; // Skip if intermediate is the target
         }
 
         let key2 = format!("{}:{}", mid.target, target_did);
-        if let Some(indirect) = edges.get(&key2) {
-            let weight = mid.score.value() * indirect.score.value();
-            transitive_sum += weight;
-            transitive_count += 1;
-        }
-    }
+        edges
+            .get(&key2)
+            .map(|indirect| (mid.score.value(), indirect.score.value()))
+    });
 
-    let transitive_score = if transitive_count > 0 {
-        transitive_sum / (transitive_count as f64)
-    } else {
-        0.0
-    };
-
-    (direct_score * DIRECT_TRUST_WEIGHT + transitive_score * TRANSITIVE_TRUST_WEIGHT).min(1.0)
+    // Use shared computation algorithm with legacy weights (0.7/0.3)
+    icn_trust::compute_trust_score(
+        direct_score,
+        intermediates,
+        icn_trust::ScoringWeights::legacy(),
+    )
 }
 
 impl TrustPolicyOracle {
@@ -1859,5 +1825,114 @@ mod tests {
             (s2 - s1).abs() > 0.01,
             "Scores should differ after async edge mutation: s1={s1}, s2={s2}"
         );
+    }
+
+    /// Test that standalone and actor-backed modes produce identical trust scores
+    ///
+    /// This test validates that the unified trust computation algorithm produces
+    /// consistent results regardless of whether running in standalone mode
+    /// (TrustManager with in-memory edges) or actor-backed mode (with TrustGraph).
+    ///
+    /// This addresses issue #902: unify trust computation algorithm.
+    #[tokio::test]
+    async fn test_algorithm_consistency_standalone_vs_actor_backed() {
+        use icn_store::SledStore;
+        use std::sync::Arc;
+
+        // Setup: Create identical trust scenarios in both modes
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+        let dave = KeyPair::generate().unwrap().did().clone();
+
+        // Scenario 1: Direct trust only
+        let edge_direct = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8));
+
+        // Scenario 2: Transitive trust through one intermediary
+        let edge_alice_bob = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9));
+        let edge_bob_carol = TrustEdge::new(bob.clone(), carol.clone(), TrustScore::unchecked(0.7));
+
+        // Scenario 3: Multiple intermediaries
+        let edge_alice_dave =
+            TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.6));
+        let edge_dave_carol =
+            TrustEdge::new(dave.clone(), carol.clone(), TrustScore::unchecked(0.8));
+
+        // Test Scenario 1: Direct trust only
+        {
+            // Standalone mode
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
+            standalone.add_edge(edge_direct.clone()).unwrap();
+            let score_standalone = standalone.compute_trust_score(&alice, &bob);
+
+            // Actor-backed mode
+            let store = Arc::new(SledStore::temporary().unwrap());
+            let mut graph = TrustGraph::new(store, alice.clone());
+            graph.add_edge(edge_direct.clone()).unwrap();
+            let score_actor = graph.compute_trust_score(&bob).unwrap();
+
+            // Both should produce identical scores (within floating point epsilon)
+            assert!(
+                (score_standalone - score_actor).abs() < 0.0001,
+                "Direct trust scores differ: standalone={}, actor={}",
+                score_standalone,
+                score_actor
+            );
+        }
+
+        // Test Scenario 2: Transitive trust through one intermediary
+        {
+            // Standalone mode
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
+            standalone.add_edge(edge_alice_bob.clone()).unwrap();
+            standalone.add_edge(edge_bob_carol.clone()).unwrap();
+            let score_standalone = standalone.compute_trust_score(&alice, &carol);
+
+            // Actor-backed mode
+            let store = Arc::new(SledStore::temporary().unwrap());
+            let mut graph = TrustGraph::new(store, alice.clone());
+            graph.add_edge(edge_alice_bob.clone()).unwrap();
+            graph.add_edge(edge_bob_carol.clone()).unwrap();
+            let score_actor = graph.compute_trust_score(&carol).unwrap();
+
+            // Both should produce identical scores
+            assert!(
+                (score_standalone - score_actor).abs() < 0.0001,
+                "Transitive trust scores differ: standalone={}, actor={}",
+                score_standalone,
+                score_actor
+            );
+        }
+
+        // Test Scenario 3: Multiple intermediaries (averaging)
+        {
+            // Standalone mode
+            let mut standalone = TrustManager::new();
+            standalone.set_perspective(alice.clone());
+            standalone.add_edge(edge_alice_bob.clone()).unwrap();
+            standalone.add_edge(edge_bob_carol.clone()).unwrap();
+            standalone.add_edge(edge_alice_dave.clone()).unwrap();
+            standalone.add_edge(edge_dave_carol.clone()).unwrap();
+            let score_standalone = standalone.compute_trust_score(&alice, &carol);
+
+            // Actor-backed mode
+            let store = Arc::new(SledStore::temporary().unwrap());
+            let mut graph = TrustGraph::new(store, alice.clone());
+            graph.add_edge(edge_alice_bob.clone()).unwrap();
+            graph.add_edge(edge_bob_carol.clone()).unwrap();
+            graph.add_edge(edge_alice_dave.clone()).unwrap();
+            graph.add_edge(edge_dave_carol.clone()).unwrap();
+            let score_actor = graph.compute_trust_score(&carol).unwrap();
+
+            // Both should produce identical scores (averaging over multiple paths)
+            assert!(
+                (score_standalone - score_actor).abs() < 0.0001,
+                "Multi-path trust scores differ: standalone={}, actor={}",
+                score_standalone,
+                score_actor
+            );
+        }
     }
 }

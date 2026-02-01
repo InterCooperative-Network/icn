@@ -929,22 +929,38 @@ pub struct Evidence {
 
 **Decision: Local computation with transitive trust propagation (PageRank-like)**
 
-**Algorithm (v1):**
+**Algorithm (v2 - Unified):**
+
+As of Phase 3, the trust computation algorithm is unified across all modes
+(standalone and actor-backed) via `icn_trust::computation::compute_trust_score()`.
+
 ```
 TrustScore(A → B) =
-    DirectTrust(A → B) * 0.7 +
-    TransitiveTrust(A → C → B) * 0.3
+    DirectTrust(A → B) * direct_weight +
+    TransitiveTrust(A → C → B) * transitive_weight
 
 where:
-    DirectTrust = weighted avg of A's edges to B (by recency, evidence strength)
-    TransitiveTrust = Σ(TrustScore(A → C) * TrustScore(C → B)) / N
+    DirectTrust = trust edge from A to B (0.0 if no edge exists)
+    TransitiveTrust = Σ(Trust(A → C) * Trust(C → B)) / N
+    
+    Weights vary by trust graph type:
+    - Social: 60% direct, 40% transitive (reputation spreads)
+    - Economic: 80% direct, 20% transitive (payment history matters)
+    - Technical: 90% direct, 10% transitive (node performance is personal)
+    - Legacy/Default: 70% direct, 30% transitive (backward compatibility)
 ```
+
+**Implementation:**
+- **Location:** `icn-trust/src/computation.rs` - shared algorithm
+- **Used by:** `TrustGraph::compute_trust_score_weighted()` and `TrustManager::compute_trust_score_local()`
+- **Guarantee:** Standalone and actor-backed modes produce identical scores
 
 **Properties:**
 - **Local computation:** Each node computes trust from its perspective
 - **Transitive:** "Friend of a trusted friend" has some trust
 - **Asymmetric:** Different nodes see different trust scores
 - **Attack-resistant:** Sybil nodes have low trust unless vouched by existing trusted nodes
+- **Consistent:** Same algorithm everywhere (eliminates test/prod divergence)
 
 **Trust Classes (operational gates):**
 ```rust
@@ -960,6 +976,7 @@ pub enum TrustClass {
 - Not consensus-based (no global truth)
 - Resistant to Sybil: new identities start with zero trust
 - Contextual: trust for one purpose doesn't imply trust for all
+- Unified: No divergence between dev/test and production behavior
 
 ---
 
