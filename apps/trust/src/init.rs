@@ -1,8 +1,9 @@
-//! Security initialization (recovery store, misbehavior detector)
+//! Trust app initialization
 //!
-//! The TrustGraph is owned by the trust app (apps/trust/) and provided to
-//! the kernel via TrustService in the ServiceRegistry. This module only
-//! initializes kernel-level security services.
+//! This module provides initialization logic for trust-related kernel services.
+//! The TrustGraph is owned by this app and provided to the kernel via TrustService
+//! in the ServiceRegistry. This module initializes additional kernel-level security
+//! services that integrate with the trust layer.
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -12,9 +13,7 @@ use icn_kernel_api::services::TrustService;
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds};
 use icn_store::SledStore;
 
-use crate::config::Config;
-
-/// Services initialized during security setup
+/// Services initialized during trust app setup
 pub struct TrustServices {
     /// Byzantine fault detector for misbehavior tracking
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
@@ -24,17 +23,21 @@ pub struct TrustServices {
     pub security_store: Arc<dyn icn_store::Store>,
 }
 
-/// Initialize security services (recovery store, misbehavior detector)
+/// Initialize trust-related kernel services
 ///
 /// Creates:
 /// - Recovery store for social recovery
 /// - Misbehavior detector with TrustService integration
+///
+/// # Arguments
+/// * `data_dir` - Base data directory for storing trust-related data
+/// * `trust_service` - Optional TrustService for kernel/app separation
 pub async fn init_trust_services(
-    config: &Config,
+    data_dir: &std::path::Path,
     trust_service: Option<Arc<dyn TrustService>>,
 ) -> anyhow::Result<TrustServices> {
     // Create recovery store for social recovery events
-    let recovery_store_path = config.store_path().join("recovery");
+    let recovery_store_path = data_dir.join("recovery");
     let recovery_store: Arc<dyn icn_store::Store> =
         Arc::new(SledStore::open(&recovery_store_path)?);
     info!(
@@ -43,7 +46,7 @@ pub async fn init_trust_services(
     );
 
     // Create security store for misbehavior detector persistence
-    let security_store_path = config.store_path().join("security");
+    let security_store_path = data_dir.join("security");
     let security_store: Arc<dyn icn_store::Store> =
         Arc::new(SledStore::open(&security_store_path)?);
     info!(
@@ -124,12 +127,8 @@ mod tests {
     #[tokio::test]
     async fn test_trust_services_init() {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
 
-        let services = init_trust_services(&config, None).await.unwrap();
+        let services = init_trust_services(temp_dir.path(), None).await.unwrap();
 
         // Verify services were initialized (just check we can acquire locks)
         let _detector = services.misbehavior_detector.read().await;
@@ -138,13 +137,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_misbehavior_reports_to_trust_service() {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, Some(mock_ts.clone()))
+        let services = init_trust_services(temp_dir.path(), Some(mock_ts.clone()))
             .await
             .unwrap();
 
@@ -172,13 +167,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_severe_misbehavior_causes_quarantine() {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, Some(mock_ts.clone()))
+        let services = init_trust_services(temp_dir.path(), Some(mock_ts.clone()))
             .await
             .unwrap();
 
@@ -214,13 +205,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_quarantine_release_sends_positive_event() {
         let temp_dir = TempDir::new().unwrap();
-        let config = Config {
-            data_dir: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
 
         let mock_ts = Arc::new(MockTrustService::new());
-        let services = init_trust_services(&config, Some(mock_ts.clone()))
+        let services = init_trust_services(temp_dir.path(), Some(mock_ts.clone()))
             .await
             .unwrap();
 

@@ -30,7 +30,6 @@ pub mod init_rpc;
 pub mod init_send_callback;
 pub mod init_snapshot;
 pub mod init_steward;
-pub mod init_trust;
 pub mod lifecycle;
 pub mod nat_dial;
 pub mod shutdown;

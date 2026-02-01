@@ -16,8 +16,11 @@ icn-trust = { path = "../../icn/crates/icn-trust" }
 # Identity types (for Did conversion)
 icn-identity = { path = "../../icn/crates/icn-identity" }
 
-# Storage for tests
+# Storage for stores and init
 icn-store = { path = "../../icn/crates/icn-store" }
+
+# Security primitives (MisbehaviorDetector for init)
+icn-security = { path = "../../icn/crates/icn-security" }
 
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
