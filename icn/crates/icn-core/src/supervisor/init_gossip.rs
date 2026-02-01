@@ -231,6 +231,19 @@ pub async fn subscribe_standard_topics(
         info!("Subscribed to trust:attestations topic");
     }
 
+    // Subscribe to trust revocations topic
+    if let Err(e) = gossip
+        .subscribe(
+            crate::trust_propagation::TRUST_REVOCATIONS_TOPIC,
+            did.clone(),
+        )
+        .await
+    {
+        warn!("Failed to subscribe to trust revocations topic: {}", e);
+    } else {
+        info!("Subscribed to trust:revocations topic");
+    }
+
     // Subscribe to contracts:deploy topic with trust-gated access (min trust 0.4)
     if let Err(e) = gossip.subscribe("contracts:deploy", did.clone()).await {
         warn!("Failed to subscribe to contracts:deploy topic: {}", e);

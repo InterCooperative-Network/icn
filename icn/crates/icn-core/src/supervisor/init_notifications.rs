@@ -117,6 +117,27 @@ pub async fn handle_trust_attestation_via_service(
     }
 }
 
+/// Handle trust revocation entries via TrustService
+pub async fn handle_trust_revocation_via_service(
+    entry: &GossipEntry,
+    forwarding_peer: &str,
+    trust_service: &Arc<dyn icn_kernel_api::services::TrustService>,
+) {
+    // Extract data from gossip entry
+    let data = match entry.get_data() {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("Failed to decompress trust revocation: {}", e);
+            return;
+        }
+    };
+
+    let source = forwarding_peer.to_string();
+    if let Err(e) = trust_service.ingest_revocation(&data, &source) {
+        warn!("Failed to ingest trust revocation: {}", e);
+    }
+}
+
 /// Handle contract deployment entries
 pub async fn handle_contract_deployment(entry_data: Vec<u8>, contract_actor: ContractActorHandle) {
     match serde_json::from_slice::<icn_ccl::ContractDeploymentMessage>(&entry_data) {
@@ -822,7 +843,10 @@ pub fn create_notification_callback(
         let entry_data = match entry.get_data() {
             Ok(data) => Some(data),
             Err(e) => {
-                if topic != crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
+                // Attestations and revocations might fail to decompress if they use a newer format
+                if topic != crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC
+                    && topic != crate::trust_propagation::TRUST_REVOCATIONS_TOPIC
+                {
                     warn!("Failed to get entry data for topic {}: {}", topic, e);
                 }
                 None
@@ -840,6 +864,15 @@ pub fn create_notification_callback(
                 });
             } else {
                 warn!("Trust attestation received but no TrustService available");
+            }
+        } else if topic == crate::trust_propagation::TRUST_REVOCATIONS_TOPIC {
+            if let Some(trust_svc) = deps.trust_service.clone() {
+                let peer = subscriber_did.to_string();
+                tokio::spawn(async move {
+                    handle_trust_revocation_via_service(&entry, &peer, &trust_svc).await;
+                });
+            } else {
+                warn!("Trust revocation received but no TrustService available");
             }
         } else if topic == "contracts:deploy" {
             if let Some(data) = entry_data {

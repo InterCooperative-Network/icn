@@ -59,7 +59,9 @@ pub use resource_enforcer_actor::{
 };
 pub use runtime::Runtime;
 pub use storage_challenge::{ChallengeScheduler, ChallengeSchedulerHandle};
-pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
+pub use trust_propagation::{
+    AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC, TRUST_REVOCATIONS_TOPIC,
+};
 pub use upgrade::{
     create_pending_upgrade, PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator,
     CURRENT_VERSION,

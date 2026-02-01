@@ -441,6 +441,85 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
+    fn ingest_revocation(
+        &self,
+        bytes: &[u8],
+        source: &icn_kernel_api::types::Did,
+    ) -> Result<(), String> {
+        use icn_trust::TrustRevocation;
+
+        // Deserialize
+        let revocation: TrustRevocation =
+            serde_json::from_slice(bytes).map_err(|e| format!("Invalid revocation: {e}"))?;
+
+        // Verify signature — reject unsigned or invalid revocations
+        if let Err(e) = revocation.verify() {
+            tracing::warn!(
+                source = %source,
+                "Rejecting trust revocation with invalid signature: {} -> {} (error: {})",
+                revocation.issuer, revocation.subject, e
+            );
+            return Err(format!(
+                "Invalid revocation signature from {} -> {} (envelope source: {}): {e}",
+                revocation.issuer, revocation.subject, source
+            ));
+        }
+
+        // Save issuer/subject for logging
+        let issuer = revocation.issuer.clone();
+        let subject = revocation.subject.clone();
+
+        // Acquire graph write lock to check supersedence and remove edge atomically
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let mut graph = self.graph.write().await;
+
+                // Check if we have an existing edge to revoke
+                match graph.get_edge(&issuer, &subject) {
+                    Ok(Some(existing)) => {
+                        // Check if revocation supersedes the existing attestation
+                        if !revocation.supersedes_attestation(existing.created_at) {
+                            tracing::debug!(
+                                source = %source,
+                                "Rejecting outdated trust revocation: {} -> {} \
+                                 (revoked_at: {}, existing edge created_at: {})",
+                                issuer, subject, revocation.revoked_at, existing.created_at
+                            );
+                            return Ok(());
+                        }
+
+                        // Revocation is valid — remove the edge
+                        graph
+                            .remove_edge(&issuer, &subject)
+                            .map_err(|e| format!("Failed to remove edge: {e}"))?;
+
+                        self.bump_epoch();
+
+                        tracing::info!(
+                            source = %source,
+                            "Trust revoked: {} -> {} (reason: {:?})",
+                            issuer, subject, revocation.reason
+                        );
+                    }
+                    Ok(None) => {
+                        // No edge exists — revocation is a no-op (but not an error)
+                        tracing::debug!(
+                            source = %source,
+                            "Received revocation for non-existent edge: {} -> {}",
+                            issuer, subject
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Edge lookup error during revocation: {e}");
+                    }
+                }
+
+                Ok(())
+            })
+        })
+    }
+
     fn recover_identity(
         &self,
         old_did: &icn_kernel_api::types::Did,
@@ -924,5 +1003,175 @@ mod tests {
         // graph.compute_trust_score() (direct+transitive) for consistency with
         // trust_score(), while the reducer computes an arithmetic mean.
         // This test verifies hash/input convergence, not score convergence.
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_revocation_removes_edge() {
+        // Test that a valid revocation removes an existing edge
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair, store);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // First, create and ingest an attestation to establish the edge
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.7);
+        attestation.sign(&issuer).unwrap();
+        let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        service
+            .ingest_attestation(&attestation_bytes, &source)
+            .expect("ingest attestation should succeed");
+
+        // Verify edge exists
+        {
+            let g = graph.read().await;
+            let edge = g
+                .get_edge(issuer.did(), target.did())
+                .expect("edge lookup should succeed");
+            assert!(edge.is_some(), "edge should exist after attestation");
+        }
+
+        // Create and ingest a revocation
+        let mut revocation =
+            icn_trust::TrustRevocation::new(issuer.did().clone(), target.did().clone());
+        revocation.sign(&issuer).unwrap();
+        let revocation_bytes = serde_json::to_vec(&revocation).unwrap();
+        service
+            .ingest_revocation(&revocation_bytes, &source)
+            .expect("ingest revocation should succeed");
+
+        // Verify edge is removed
+        {
+            let g = graph.read().await;
+            let edge = g
+                .get_edge(issuer.did(), target.did())
+                .expect("edge lookup should succeed");
+            assert!(edge.is_none(), "edge should be removed after revocation");
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_revocation_rejects_unsigned() {
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair, store);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create an unsigned revocation
+        let revocation =
+            icn_trust::TrustRevocation::new(issuer.did().clone(), target.did().clone());
+        let bytes = serde_json::to_vec(&revocation).unwrap();
+
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        let result = service.ingest_revocation(&bytes, &source);
+        assert!(
+            result.is_err(),
+            "Unsigned revocations must be rejected, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_revocation_rejects_outdated() {
+        // Test that revocations with earlier timestamps than the edge are rejected
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair, store);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create and ingest an attestation
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.7);
+        let attestation_timestamp = attestation.created_at;
+        attestation.sign(&issuer).unwrap();
+        let attestation_bytes = serde_json::to_vec(&attestation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+        service
+            .ingest_attestation(&attestation_bytes, &source)
+            .expect("ingest attestation should succeed");
+
+        // Create a revocation with an earlier timestamp
+        let mut revocation =
+            icn_trust::TrustRevocation::new(issuer.did().clone(), target.did().clone());
+        revocation.revoked_at = attestation_timestamp - 1; // earlier than attestation
+        revocation.sign(&issuer).unwrap();
+        let revocation_bytes = serde_json::to_vec(&revocation).unwrap();
+        service
+            .ingest_revocation(&revocation_bytes, &source)
+            .expect("ingest revocation should succeed but not remove edge");
+
+        // Verify edge still exists
+        {
+            let g = graph.read().await;
+            let edge = g
+                .get_edge(issuer.did(), target.did())
+                .expect("edge lookup should succeed");
+            assert!(
+                edge.is_some(),
+                "edge should still exist when revocation is outdated"
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ingest_revocation_no_op_for_nonexistent_edge() {
+        // Test that revoking a non-existent edge is a no-op (not an error)
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair, store);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let target = icn_identity::KeyPair::generate().unwrap();
+
+        // Create and ingest a revocation for an edge that doesn't exist
+        let mut revocation =
+            icn_trust::TrustRevocation::new(issuer.did().clone(), target.did().clone());
+        revocation.sign(&issuer).unwrap();
+        let revocation_bytes = serde_json::to_vec(&revocation).unwrap();
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+
+        // Should succeed without error
+        let result = service.ingest_revocation(&revocation_bytes, &source);
+        assert!(
+            result.is_ok(),
+            "Revoking non-existent edge should be a no-op, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_revoke_trust_creates_signed_revocation() {
+        // Test that revoke_trust produces a properly signed revocation message
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair.clone(), store);
+
+        let target = icn_identity::KeyPair::generate().unwrap();
+        let target_did = icn_kernel_api::types::Did::from(target.did().to_string());
+
+        // First add an edge
+        service
+            .submit_attestation(&target_did, 0.5, vec![])
+            .unwrap();
+
+        // Revoke it
+        let bytes = service
+            .revoke_trust(&target_did)
+            .expect("revoke_trust should succeed");
+
+        // Deserialize and verify signature
+        let revocation: icn_trust::TrustRevocation =
+            serde_json::from_slice(&bytes).expect("should deserialize");
+        assert!(
+            !revocation.signature.is_empty(),
+            "Revocation must be signed before gossip broadcast"
+        );
+        revocation
+            .verify()
+            .expect("Revocation signature must be valid");
+        assert_eq!(revocation.issuer, *keypair.did());
+        assert_eq!(revocation.subject, *target.did());
     }
 }
