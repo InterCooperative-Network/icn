@@ -4,7 +4,7 @@
 
 use actix_web::{delete, get, post, web, HttpResponse};
 use icn_kernel_api::naming::{ServiceEndpoint, ServiceType};
-use icn_kernel_api::scope::ScopeLevel;
+use icn_kernel_api::scope::{CellId, ScopeLevel};
 use icn_kernel_api::types::{Endpoint, Signature};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -32,12 +32,18 @@ pub struct AnnounceRequest {
     pub service_id: String,
     /// DID of the service provider
     pub provider: String,
+    /// Endpoint type: "quic", "http", "grpc", or "websocket"
+    #[serde(default = "default_endpoint_type")]
+    pub endpoint_type: String,
     /// Service type name (e.g., "ledger")
     pub service_type: String,
     /// Service type version (e.g., "1.0")
     pub service_version: String,
     /// Network endpoints
     pub endpoints: Vec<EndpointRequest>,
+    /// String addresses (multiaddr or similar)
+    #[serde(default)]
+    pub addresses: Vec<String>,
     /// Capabilities offered
     #[serde(default)]
     pub capabilities: Vec<String>,
@@ -47,6 +53,9 @@ pub struct AnnounceRequest {
     /// Scope visibility level
     #[serde(default = "default_scope")]
     pub scope_visibility: String,
+    /// Optional cell ID for cell-scoped services
+    #[serde(default)]
+    pub cell_id: Option<String>,
     /// TTL in seconds
     #[serde(default = "default_ttl")]
     pub ttl_secs: u64,
@@ -54,8 +63,15 @@ pub struct AnnounceRequest {
     /// Set by the provider before signing; the gateway does not override this
     /// value because doing so would invalidate the signature.
     pub created_at: u64,
+    /// Unix timestamp of last update (included in the signed payload).
+    /// For initial announcements this should equal `created_at`.
+    pub updated_at: u64,
     /// Ed25519 signature (hex-encoded) over the canonical signing payload
     pub signature: String,
+}
+
+fn default_endpoint_type() -> String {
+    "http".to_string()
 }
 
 fn default_scope() -> String {
@@ -192,10 +208,22 @@ pub async fn announce_service(
         )));
     }
 
+    let endpoint_type = match req.endpoint_type.as_str() {
+        "quic" => icn_kernel_api::naming::EndpointType::Quic,
+        "http" => icn_kernel_api::naming::EndpointType::Http,
+        "grpc" => icn_kernel_api::naming::EndpointType::Grpc,
+        "websocket" => icn_kernel_api::naming::EndpointType::WebSocket,
+        other => {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid endpoint_type: {other}"
+            )));
+        }
+    };
+
     let endpoint = ServiceEndpoint {
         service_id: req.service_id.clone(),
         provider: req.provider.clone(),
-        endpoint_type: icn_kernel_api::naming::EndpointType::Http, // Default to HTTP for now
+        endpoint_type,
         service_type: ServiceType {
             name: req.service_type.clone(),
             version: req.service_version.clone(),
@@ -211,15 +239,32 @@ pub async fn announce_service(
                 ep
             })
             .collect(),
-        addresses: vec![], // No string addresses for now
+        addresses: req.addresses.clone(),
         capabilities: req.capabilities.clone(),
         trust_threshold: req.trust_threshold,
         scope_visibility: parse_scope(&req.scope_visibility),
-        cell_id: None, // No cell ID in current API
+        cell_id: req
+            .cell_id
+            .as_ref()
+            .map(|id| {
+                let bytes = hex::decode(id).map_err(|_| {
+                    crate::error::GatewayError::BadRequest("Invalid cell_id hex encoding".into())
+                })?;
+                if bytes.len() != 32 {
+                    return Err(crate::error::GatewayError::BadRequest(format!(
+                        "cell_id must be 32 bytes, got {}",
+                        bytes.len()
+                    )));
+                }
+                let mut arr = [0u8; 32];
+                arr.copy_from_slice(&bytes);
+                Ok(CellId(arr))
+            })
+            .transpose()?,
         ttl_secs: req.ttl_secs,
         signature: Signature::new(sig_bytes),
         created_at: req.created_at,
-        updated_at: req.created_at, // Initially same as created_at
+        updated_at: req.updated_at,
     };
 
     // Verify Ed25519 signature before accepting the endpoint

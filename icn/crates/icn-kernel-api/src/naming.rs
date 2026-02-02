@@ -239,6 +239,16 @@ pub struct ServiceEndpoint {
     pub updated_at: u64,
 }
 
+/// Append a length-prefixed string to the payload.
+///
+/// Writes a 4-byte little-endian length prefix followed by the string bytes.
+/// This prevents ambiguity attacks where different field values could produce
+/// identical concatenated payloads (e.g., `"ab" + "cd"` vs `"a" + "bcd"`).
+fn extend_with_length(payload: &mut Vec<u8>, s: &str) {
+    payload.extend_from_slice(&(s.len() as u32).to_le_bytes());
+    payload.extend_from_slice(s.as_bytes());
+}
+
 impl ServiceEndpoint {
     /// Compute deterministic signing payload.
     ///
@@ -246,10 +256,13 @@ impl ServiceEndpoint {
     /// following the `ComputeResult` pattern for canonical signing.
     pub fn signing_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
-        payload.extend_from_slice(self.service_id.as_bytes());
-        payload.extend_from_slice(self.provider.as_bytes());
-        
-        // Endpoint type
+
+        // All variable-length strings are length-prefixed (u32 LE) to prevent
+        // ambiguity attacks where different field values produce identical payloads.
+        extend_with_length(&mut payload, &self.service_id);
+        extend_with_length(&mut payload, &self.provider);
+
+        // Endpoint type (fixed 1 byte)
         let endpoint_type_byte = match self.endpoint_type {
             EndpointType::Quic => 0u8,
             EndpointType::Http => 1u8,
@@ -257,51 +270,51 @@ impl ServiceEndpoint {
             EndpointType::WebSocket => 3u8,
         };
         payload.push(endpoint_type_byte);
-        
-        payload.extend_from_slice(self.service_type.name.as_bytes());
-        payload.extend_from_slice(self.service_type.version.as_bytes());
-        
+
+        extend_with_length(&mut payload, &self.service_type.name);
+        extend_with_length(&mut payload, &self.service_type.version);
+
         // Endpoints: encode count then each endpoint
         payload.extend_from_slice(&(self.endpoints.len() as u32).to_le_bytes());
         for ep in &self.endpoints {
-            payload.extend_from_slice(ep.protocol.as_bytes());
-            payload.extend_from_slice(ep.host.as_bytes());
+            extend_with_length(&mut payload, &ep.protocol);
+            extend_with_length(&mut payload, &ep.host);
             payload.extend_from_slice(&ep.port.to_le_bytes());
             if let Some(ref path) = ep.path {
                 payload.push(1);
-                payload.extend_from_slice(path.as_bytes());
+                extend_with_length(&mut payload, path);
             } else {
                 payload.push(0);
             }
         }
-        
+
         // Addresses: sorted for determinism
         let mut sorted_addrs = self.addresses.clone();
         sorted_addrs.sort();
         payload.extend_from_slice(&(sorted_addrs.len() as u32).to_le_bytes());
         for addr in &sorted_addrs {
-            payload.extend_from_slice(addr.as_bytes());
+            extend_with_length(&mut payload, addr);
         }
-        
+
         // Capabilities: sorted for determinism
         let mut sorted_caps = self.capabilities.clone();
         sorted_caps.sort();
         payload.extend_from_slice(&(sorted_caps.len() as u32).to_le_bytes());
         for cap in &sorted_caps {
-            payload.extend_from_slice(cap.as_bytes());
+            extend_with_length(&mut payload, cap);
         }
-        
+
         payload.extend_from_slice(&self.trust_threshold.to_le_bytes());
         payload.push(self.scope_visibility.as_u8());
-        
-        // Cell ID: optional
+
+        // Cell ID: optional, fixed 32 bytes (no length prefix needed)
         if let Some(ref cell_id) = self.cell_id {
             payload.push(1);
-            payload.extend_from_slice(cell_id.as_bytes());
+            payload.extend_from_slice(&cell_id.0);
         } else {
             payload.push(0);
         }
-        
+
         payload.extend_from_slice(&self.ttl_secs.to_le_bytes());
         payload.extend_from_slice(&self.created_at.to_le_bytes());
         payload.extend_from_slice(&self.updated_at.to_le_bytes());
@@ -319,12 +332,12 @@ impl ServiceEndpoint {
     /// `Ok(true)` if signature is valid, `Ok(false)` if invalid,
     /// or `Err` if the public key or signature format is invalid.
     pub fn verify_signature(&self, public_key_bytes: &[u8; 32]) -> Result<bool, String> {
-        use ed25519_dalek::{Signature as Ed25519Signature, VerifyingKey, Verifier};
-        
+        use ed25519_dalek::{Signature as Ed25519Signature, Verifier, VerifyingKey};
+
         // Parse the public key
         let verifying_key = VerifyingKey::from_bytes(public_key_bytes)
             .map_err(|e| format!("Invalid public key: {}", e))?;
-        
+
         // Parse the signature (expecting 64 bytes for Ed25519)
         if self.signature.as_bytes().len() != 64 {
             return Err(format!(
@@ -332,14 +345,14 @@ impl ServiceEndpoint {
                 self.signature.as_bytes().len()
             ));
         }
-        
+
         let mut sig_bytes = [0u8; 64];
         sig_bytes.copy_from_slice(self.signature.as_bytes());
         let signature = Ed25519Signature::from_bytes(&sig_bytes);
-        
+
         // Compute the signing payload
         let payload = self.signing_payload();
-        
+
         // Verify the signature
         Ok(verifying_key.verify(&payload, &signature).is_ok())
     }
@@ -722,15 +735,15 @@ mod tests {
 
     #[test]
     fn test_service_endpoint_verify_signature_valid() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         use rand::rngs::OsRng;
-        
+
         // Generate a keypair
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
         let public_key_bytes = verifying_key.to_bytes();
-        
+
         // Create an endpoint
         let mut ep = ServiceEndpoint {
             service_id: "svc-sig-test".to_string(),
@@ -751,12 +764,12 @@ mod tests {
             created_at: 1700000000,
             updated_at: 1700000000,
         };
-        
+
         // Sign the payload
         let payload = ep.signing_payload();
         let signature = signing_key.sign(&payload);
         ep.signature = Signature::new(signature.to_bytes().to_vec());
-        
+
         // Verify the signature
         let result = ep.verify_signature(&public_key_bytes);
         assert!(result.is_ok());
@@ -765,15 +778,15 @@ mod tests {
 
     #[test]
     fn test_service_endpoint_verify_signature_invalid() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::SigningKey;
         use rand::rngs::OsRng;
-        
+
         // Generate a keypair
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
         let public_key_bytes = verifying_key.to_bytes();
-        
+
         // Create an endpoint with a bad signature
         let ep = ServiceEndpoint {
             service_id: "svc-bad-sig".to_string(),
@@ -794,7 +807,7 @@ mod tests {
             created_at: 1700000000,
             updated_at: 1700000000,
         };
-        
+
         // Verify should fail
         let result = ep.verify_signature(&public_key_bytes);
         assert!(result.is_ok());
@@ -803,15 +816,15 @@ mod tests {
 
     #[test]
     fn test_service_endpoint_tampered_detection() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         use rand::rngs::OsRng;
-        
+
         // Generate a keypair
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
         let public_key_bytes = verifying_key.to_bytes();
-        
+
         // Create and sign an endpoint
         let mut ep = ServiceEndpoint {
             service_id: "svc-tamper-test".to_string(),
@@ -832,21 +845,24 @@ mod tests {
             created_at: 1700000000,
             updated_at: 1700000000,
         };
-        
+
         let payload = ep.signing_payload();
         let signature = signing_key.sign(&payload);
         ep.signature = Signature::new(signature.to_bytes().to_vec());
-        
+
         // Verify original is valid
         assert!(ep.verify_signature(&public_key_bytes).unwrap());
-        
+
         // Tamper with the address
         ep.addresses = vec!["http://malicious.com:8080".to_string()];
-        
+
         // Verification should now fail
         let result = ep.verify_signature(&public_key_bytes);
         assert!(result.is_ok());
-        assert!(!result.unwrap(), "Tampered endpoint should fail verification");
+        assert!(
+            !result.unwrap(),
+            "Tampered endpoint should fail verification"
+        );
     }
 
     #[test]
@@ -857,7 +873,7 @@ mod tests {
             EndpointType::Grpc,
             EndpointType::WebSocket,
         ];
-        
+
         // Ensure serde works
         for endpoint_type in types {
             let json = serde_json::to_string(&endpoint_type).unwrap();
@@ -868,16 +884,16 @@ mod tests {
 
     #[test]
     fn test_service_endpoint_with_cell_id() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         use rand::rngs::OsRng;
-        
+
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
         let public_key_bytes = verifying_key.to_bytes();
-        
+
         let cell_id = CellId::derive(b"org123", "cell-alpha", &[42u8; 32]);
-        
+
         let mut ep = ServiceEndpoint {
             service_id: "svc-cell-test".to_string(),
             provider: "did:icn:bob".to_string(),
@@ -897,15 +913,15 @@ mod tests {
             created_at: 1700000000,
             updated_at: 1700000500,
         };
-        
+
         // Sign with cell_id included
         let payload = ep.signing_payload();
         let signature = signing_key.sign(&payload);
         ep.signature = Signature::new(signature.to_bytes().to_vec());
-        
+
         // Verify signature
         assert!(ep.verify_signature(&public_key_bytes).unwrap());
-        
+
         // Tampering with cell_id should break signature
         ep.cell_id = None;
         assert!(!ep.verify_signature(&public_key_bytes).unwrap());
