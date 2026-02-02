@@ -92,7 +92,16 @@ pub async fn handle_trust_attestation_via_service(
         }
     };
 
-    // Apply rate limiting before forwarding to trust service
+    // Apply rate limiting before forwarding to trust service.
+    // NOTE: Rate limiting occurs AFTER gossip deserialization and JSON parsing,
+    // meaning an attacker can still consume CPU/bandwidth up to this point.
+    // Primary network-level rate limiting is provided by trust-gated rate limits
+    // (10-200 msg/sec by trust class). This is defense-in-depth per-DID limiting.
+    //
+    // Byzantine detection: Repeated rejections are tracked via the
+    // `icn_trust_attestations_rejected_total{reason=...}` metric. Stateful
+    // per-DID Byzantine actor detection (e.g., auto-quarantine after N failures)
+    // is handled in the monitoring/alerting layer, not inline here.
     // Parse source DID from attestation for rate limiting
     if let Ok(attestation) = serde_json::from_slice::<serde_json::Value>(&data) {
         if let (Some(issuer), Some(subject)) = (

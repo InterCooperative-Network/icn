@@ -310,7 +310,7 @@ impl TrustService for TrustServiceImplTokio {
 
         // Deserialize
         let attestation: TrustAttestation = serde_json::from_slice(bytes).map_err(|e| {
-            icn_obs::metrics::trust::attestations_rejected_inc("malformed");
+            icn_obs::metrics::trust::attestations_rejected_malformed_inc();
             format!("Invalid attestation: {e}")
         })?;
 
@@ -321,7 +321,7 @@ impl TrustService for TrustServiceImplTokio {
                 "Rejecting attestation with excessive array sizes: {} -> {} ({})",
                 attestation.issuer, attestation.subject, e
             );
-            icn_obs::metrics::trust::attestations_rejected_inc("size_limit");
+            icn_obs::metrics::trust::attestations_rejected_size_limit_inc();
             return Err(format!(
                 "Size limit violation for attestation {} -> {}: {e}",
                 attestation.issuer, attestation.subject
@@ -336,7 +336,6 @@ impl TrustService for TrustServiceImplTokio {
                 attestation.issuer, attestation.subject, e
             );
             icn_obs::metrics::trust::attestations_rejected_invalid_signature_inc();
-            icn_obs::metrics::trust::attestations_rejected_inc("unsigned");
             return Err(format!(
                 "Invalid attestation signature from {} -> {} (envelope source: {}): {e}",
                 attestation.issuer, attestation.subject, source
@@ -356,7 +355,6 @@ impl TrustService for TrustServiceImplTokio {
                 attestation.issuer, attestation.subject,
             );
             icn_obs::metrics::trust::attestations_rejected_expired_inc();
-            icn_obs::metrics::trust::attestations_rejected_inc("expired");
             return Ok(()); // Silently reject expired attestations
         }
 
@@ -416,7 +414,6 @@ impl TrustService for TrustServiceImplTokio {
                                 edge.target,
                             );
                             icn_obs::metrics::trust::attestations_rejected_outdated_inc();
-                            icn_obs::metrics::trust::attestations_rejected_inc("outdated");
                             return Ok(());
                         }
                     }
