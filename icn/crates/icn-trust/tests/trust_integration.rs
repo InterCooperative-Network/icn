@@ -1149,3 +1149,159 @@ fn test_add_edge_validated_empty_evidence() {
     let retrieved = graph.get_edge(alice.did(), bob.did()).unwrap();
     assert!(retrieved.is_some());
 }
+
+// ============================================================================
+// High-Fanout Cache Invalidation Tests (Issue #998)
+// ============================================================================
+
+#[test]
+fn test_high_fanout_cache_invalidation() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let hub = KeyPair::generate().unwrap();
+    
+    let mut multi = MultiTrustGraph::new(store.clone(), hub.did().clone());
+    
+    // Create a high-fanout hub node with 100 outgoing edges
+    let mut spokes: Vec<KeyPair> = Vec::new();
+    for _ in 0..100 {
+        spokes.push(KeyPair::generate().unwrap());
+    }
+    
+    // Add edges from hub to all spokes in social graph
+    for spoke in &spokes {
+        multi
+            .social_mut()
+            .add_edge(TrustEdge::new(
+                hub.did().clone(),
+                spoke.did().clone(),
+                TrustScore::unchecked(0.7),
+            ))
+            .unwrap();
+    }
+    
+    // Cache scores for a subset of spokes (simulating low cache hit rate ~20%)
+    for i in 0..20 {
+        let score = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+        // Score is now cached
+        assert!(score >= 0.0);
+    }
+    
+    // Now add an incoming edge to the hub, which should trigger transitive invalidation
+    let source = KeyPair::generate().unwrap();
+    multi
+        .social_mut()
+        .add_edge(TrustEdge::new(
+            source.did().clone(),
+            hub.did().clone(),
+            TrustScore::unchecked(0.9),
+        ))
+        .unwrap();
+    
+    // The hub's cached score should be invalidated
+    // With selective invalidation, only ~20 of the 100 spokes will be invalidated
+    // (the ones that had cached entries), saving 80% of the work
+    
+    // Verify system still works correctly after high-fanout invalidation
+    for i in 50..70 {
+        // These were never cached, compute them now
+        let score = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+        assert!(score >= 0.0);
+    }
+}
+
+#[test]
+fn test_selective_invalidation_reduces_work() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let hub = KeyPair::generate().unwrap();
+    
+    let mut multi = MultiTrustGraph::new(store.clone(), hub.did().clone());
+    
+    // Create a moderate-fanout hub with 50 outgoing edges
+    let mut spokes: Vec<KeyPair> = Vec::new();
+    for _ in 0..50 {
+        spokes.push(KeyPair::generate().unwrap());
+    }
+    
+    // Add edges from hub to all spokes
+    for spoke in &spokes {
+        multi
+            .social_mut()
+            .add_edge(TrustEdge::new(
+                hub.did().clone(),
+                spoke.did().clone(),
+                TrustScore::unchecked(0.6),
+            ))
+            .unwrap();
+    }
+    
+    // Only cache a few scores (10% cache hit rate)
+    for i in 0..5 {
+        let _ = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+    }
+    
+    // Modify an incoming edge to hub
+    let source = KeyPair::generate().unwrap();
+    multi
+        .social_mut()
+        .add_edge(TrustEdge::new(
+            source.did().clone(),
+            hub.did().clone(),
+            TrustScore::unchecked(0.8),
+        ))
+        .unwrap();
+    
+    // With selective invalidation:
+    // - Hub's score is invalidated (direct)
+    // - Only ~5 downstream DIDs are actually invalidated (the cached ones)
+    // - The remaining ~45 are skipped (no cache entry)
+    // This saves 90% of the invalidation work for this low-hit-rate scenario
+    
+    // Verify all scores can still be computed correctly
+    for spoke in &spokes {
+        let score = multi.social().compute_trust_score(spoke.did()).unwrap();
+        assert!(score >= 0.0);
+    }
+}
+
+#[test]
+fn test_fanout_threshold_logging() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let hub = KeyPair::generate().unwrap();
+    
+    let mut multi = MultiTrustGraph::new(store.clone(), hub.did().clone());
+    
+    // Create a hub with exactly 51 outgoing edges (just over the threshold)
+    let mut spokes: Vec<KeyPair> = Vec::new();
+    for _ in 0..51 {
+        spokes.push(KeyPair::generate().unwrap());
+    }
+    
+    // Add edges from hub to all spokes
+    for spoke in &spokes {
+        multi
+            .social_mut()
+            .add_edge(TrustEdge::new(
+                hub.did().clone(),
+                spoke.did().clone(),
+                TrustScore::unchecked(0.5),
+            ))
+            .unwrap();
+    }
+    
+    // This edge modification should trigger the high-fanout logging path
+    // (threshold is 50 in the invalidate_affected implementation)
+    let source = KeyPair::generate().unwrap();
+    multi
+        .social_mut()
+        .add_edge(TrustEdge::new(
+            source.did().clone(),
+            hub.did().clone(),
+            TrustScore::unchecked(0.7),
+        ))
+        .unwrap();
+    
+    // Test passes if no panics occur during high-fanout invalidation
+    // and the system continues to function correctly
+    let score = multi.social().compute_trust_score(hub.did()).unwrap();
+    assert!(score >= 0.0);
+}

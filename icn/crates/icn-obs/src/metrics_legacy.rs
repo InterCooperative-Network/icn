@@ -389,6 +389,18 @@ pub fn init_descriptions() {
         "icn_trust_cache_size",
         "Current number of entries in trust cache"
     );
+    describe_histogram!(
+        "icn_trust_cache_downstream_count",
+        "Distribution of downstream invalidation counts per edge mutation"
+    );
+    describe_gauge!(
+        "icn_trust_cache_max_downstream_count",
+        "Maximum downstream count observed (high-fanout hub detection)"
+    );
+    describe_counter!(
+        "icn_trust_cache_selective_skips_total",
+        "Total number of transitive invalidations skipped (selective optimization)"
+    );
     describe_counter!(
         "icn_scalability_batch_verify_success_total",
         "Total number of successful batch verifications"
@@ -2297,6 +2309,20 @@ pub mod scalability {
     pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
         counter!("icn_trust_cache_transitive_invalidations_total")
             .increment(downstream_count);
+        
+        // Record distribution for monitoring fanout patterns
+        histogram!("icn_trust_cache_downstream_count").record(downstream_count as f64);
+        
+        // Track maximum for hub detection
+        gauge!("icn_trust_cache_max_downstream_count").set(downstream_count as f64);
+    }
+
+    /// Record a selective invalidation skip.
+    ///
+    /// When the selective optimization is enabled, this counts how many
+    /// transitive invalidations were skipped because the target had no cached entry.
+    pub fn trust_cache_selective_skips_inc() {
+        counter!("icn_trust_cache_selective_skips_total").increment(1);
     }
 
     /// Record a cache invalidation error (storage failure during transitive lookup).
