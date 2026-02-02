@@ -874,6 +874,9 @@ impl TrustGraph {
         target: &Did,
         scope: &crate::ScopeId,
     ) -> Result<f64> {
+        if !scope.is_valid() {
+            anyhow::bail!("Scope identifier is empty or whitespace-only: {:?}", scope);
+        }
         let outgoing = self.get_outgoing_edges(&self.own_did)?;
         let now = icn_time::current_timestamp_secs();
 
@@ -1685,5 +1688,16 @@ mod tests {
             score, 0.0,
             "Cooperative scope should not match unscoped edges"
         );
+    }
+
+    #[test]
+    fn test_empty_scope_id_rejected() {
+        let alice = icn_identity::KeyPair::generate().unwrap();
+        let bob = icn_identity::KeyPair::generate().unwrap();
+        let store = SledStore::temporary().unwrap();
+        let graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+        let empty_scope = ScopeId::cooperative("");
+        let result = graph.compute_trust_score_in_scope(bob.did(), &empty_scope);
+        assert!(result.is_err(), "Empty scope ID should be rejected");
     }
 }

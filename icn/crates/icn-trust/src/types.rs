@@ -626,6 +626,18 @@ impl ScopeId {
         Self::TopicClass(id.into())
     }
 
+    /// Validate that the scope identifier is well-formed.
+    /// Returns `false` for scoped variants with empty or whitespace-only identifiers.
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::Cooperative(id)
+            | Self::Federation(id)
+            | Self::Domain(id)
+            | Self::TopicClass(id) => !id.trim().is_empty(),
+            Self::Global => true,
+        }
+    }
+
     /// Create a global scope identifier (no boundaries)
     pub fn global() -> Self {
         Self::Global

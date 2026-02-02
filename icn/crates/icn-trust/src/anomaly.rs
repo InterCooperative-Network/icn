@@ -648,7 +648,13 @@ impl TrustGraphAnalyzer {
             .sum();
 
         let gini = (2.0 * weighted_sum) / (n * sum) - (n + 1.0) / n;
-        gini.clamp(0.0, 1.0) // Clamp to [0, 1]
+        if !(0.0..=1.0).contains(&gini) {
+            tracing::warn!(
+                "Gini coefficient {gini:.4} outside [0,1] range (n={}, sum={sum:.4}); clamping",
+                inbound_trust.len()
+            );
+        }
+        gini.clamp(0.0, 1.0)
     }
 
     /// Compute concentration in top percentile
@@ -711,7 +717,20 @@ impl TrustGraphAnalyzer {
         }
 
         // For each pair of nodes, find shortest paths and count intermediate nodes.
-        // O(n² * (V+E)) — may be slow for large scopes.
+        // O(n² * (V+E)) — refuse computation above hard limit to prevent DoS.
+        const BETWEENNESS_HARD_LIMIT: usize = 5000;
+        if nodes.len() > BETWEENNESS_HARD_LIMIT {
+            tracing::error!(
+                "Betweenness computation refused: {} nodes exceeds hard limit of {}",
+                nodes.len(),
+                BETWEENNESS_HARD_LIMIT
+            );
+            return BetweennessStats {
+                max: 0.0,
+                mean: 0.0,
+                std_dev: 0.0,
+            };
+        }
         if nodes.len() > 1000 {
             tracing::warn!(
                 "Betweenness computation for {} nodes may be slow; consider sampling",
