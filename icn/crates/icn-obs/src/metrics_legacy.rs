@@ -562,8 +562,12 @@ pub fn init_descriptions() {
         "Total number of trust attestations signed at submission (outbound attestations)"
     );
     describe_counter!(
-        "icn_trust_attestations_rejections_total",
-        "Total number of trust attestations rejected during ingestion, labeled by rejection reason"
+        "icn_trust_attestations_rejected_total",
+        "Total attestations rejected during ingestion. Reason labels: invalid_signature, expired, outdated, rate_limited, size_limit, invalid_evidence, malformed"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_size_limit_total",
+        "Total number of attestations rejected due to excessive array sizes"
     );
     describe_counter!(
         "icn_trust_attestations_rejected_expired_total",
@@ -2750,7 +2754,7 @@ pub mod trust {
 
     pub fn attestations_rejected_inc(reason: &str) {
         counter!(
-            "icn_trust_attestations_rejections_total",
+            "icn_trust_attestations_rejected_total",
             "reason" => reason.to_string()
         )
         .increment(1);
@@ -2758,27 +2762,32 @@ pub mod trust {
 
     pub fn attestations_rejected_expired_inc() {
         counter!("icn_trust_attestations_rejected_expired_total").increment(1);
+        attestations_rejected_inc("expired");
     }
 
     pub fn attestations_rejected_invalid_signature_inc() {
         counter!("icn_trust_attestations_rejected_invalid_signature_total").increment(1);
+        attestations_rejected_inc("invalid_signature");
     }
 
     pub fn attestations_rejected_outdated_inc() {
         counter!("icn_trust_attestations_rejected_outdated_total").increment(1);
+        attestations_rejected_inc("outdated");
     }
 
     pub fn attestations_rejected_rate_limited_inc() {
         counter!("icn_trust_attestations_rejected_rate_limited_total").increment(1);
+        attestations_rejected_inc("rate_limited");
+    }
+
+    pub fn attestations_rejected_size_limit_inc() {
+        counter!("icn_trust_attestations_rejected_size_limit_total").increment(1);
+        attestations_rejected_inc("size_limit");
     }
 
     pub fn attestations_rejected_invalid_evidence_inc() {
         counter!("icn_trust_attestations_rejected_invalid_evidence_total").increment(1);
-        counter!(
-            "icn_trust_attestations_rejections_total",
-            "reason" => "invalid_evidence"
-        )
-        .increment(1);
+        attestations_rejected_inc("invalid_evidence");
     }
 
     pub fn attestations_new_inc() {
