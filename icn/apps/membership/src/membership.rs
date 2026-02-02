@@ -464,27 +464,31 @@ mod tests {
 
         // Already active, can't approve again
         let err = membership.approve().unwrap_err();
-        assert!(matches!(err, MembershipError::InvalidStateTransition { .. }));
+        assert!(matches!(
+            err,
+            MembershipError::InvalidStateTransition { .. }
+        ));
     }
 
     #[test]
     fn test_invalid_state_transition_suspend_pending() {
         let member_id = create_test_entity_id();
         let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
-        let mut membership =
-            UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
+        let mut membership = UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
 
         // Pending member can't be suspended
         let err = membership.suspend("reason".to_string()).unwrap_err();
-        assert!(matches!(err, MembershipError::InvalidStateTransition { .. }));
+        assert!(matches!(
+            err,
+            MembershipError::InvalidStateTransition { .. }
+        ));
     }
 
     #[test]
     fn test_change_role_on_inactive_fails() {
         let member_id = create_test_entity_id();
         let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
-        let mut membership =
-            UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
+        let mut membership = UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
 
         let err = membership.change_role(MembershipRole::Founder).unwrap_err();
         assert!(matches!(err, MembershipError::PermissionDenied(_)));
@@ -504,7 +508,10 @@ mod tests {
             any: vec![],
         };
 
-        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        let err = manager
+            .evaluate_criteria(&data, &criteria)
+            .await
+            .unwrap_err();
         assert!(matches!(err, MembershipError::InvalidCriteria(_)));
     }
 
@@ -526,7 +533,10 @@ mod tests {
             any: vec![],
         };
 
-        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        let err = manager
+            .evaluate_criteria(&data, &criteria)
+            .await
+            .unwrap_err();
         assert!(matches!(err, MembershipError::InvalidCriteria(_)));
     }
 
@@ -551,8 +561,9 @@ mod tests {
         let mut data = HashMap::new();
         data.insert("role".to_string(), serde_json::json!("admin"));
 
-        let big_array: Vec<serde_json::Value> =
-            (0..1001).map(|i| serde_json::json!(format!("v{}", i))).collect();
+        let big_array: Vec<serde_json::Value> = (0..1001)
+            .map(|i| serde_json::json!(format!("v{}", i)))
+            .collect();
 
         let criteria = MembershipCriteria {
             all: vec![crate::entity::Condition {
@@ -563,7 +574,10 @@ mod tests {
             any: vec![],
         };
 
-        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        let err = manager
+            .evaluate_criteria(&data, &criteria)
+            .await
+            .unwrap_err();
         assert!(matches!(err, MembershipError::InvalidCriteria(_)));
     }
 }
