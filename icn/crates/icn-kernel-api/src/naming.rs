@@ -282,6 +282,7 @@ pub trait ScopedDiscovery: Send + Sync {
 ///
 /// If your implementation is purely in-memory with sync locks (`parking_lot::RwLock`),
 /// prefer implementing only `ScopedDiscovery`.
+#[async_trait::async_trait]
 pub trait AsyncScopedDiscovery: Send + Sync {
     /// Announce a service endpoint (async).
     async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError>;
@@ -309,7 +310,10 @@ pub trait AsyncScopedDiscovery: Send + Sync {
     ) -> Result<Vec<ServiceEndpoint>, NamingError>;
 
     /// Get a specific service endpoint by ID (async).
-    async fn get_endpoint(&self, service_id: &ServiceEndpointId) -> Result<ServiceEndpoint, NamingError>;
+    async fn get_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+    ) -> Result<ServiceEndpoint, NamingError>;
 }
 
 /// Naming service for name registration and resolution.

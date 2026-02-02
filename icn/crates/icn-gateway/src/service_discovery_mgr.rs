@@ -239,6 +239,7 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
 /// Use this trait when calling from async contexts (e.g., async HTTP handlers,
 /// async actor methods). Use the sync `ScopedDiscovery` trait only from blocking
 /// contexts or inside `tokio::task::spawn_blocking`.
+#[async_trait::async_trait]
 impl AsyncScopedDiscovery for ServiceDiscoveryManager {
     async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
         self.announce(endpoint).await
@@ -445,7 +446,9 @@ mod tests {
 
         // Use the trait method
         use icn_kernel_api::naming::AsyncScopedDiscovery;
-        AsyncScopedDiscovery::announce_endpoint(&mgr, ep).await.unwrap();
+        AsyncScopedDiscovery::announce_endpoint(&mgr, ep)
+            .await
+            .unwrap();
 
         // Verify via trait method
         let service_id = "async-svc".to_string();
@@ -460,8 +463,10 @@ mod tests {
         let ep = make_endpoint("async-svc", ScopeLevel::Org, 3600);
 
         use icn_kernel_api::naming::AsyncScopedDiscovery;
-        AsyncScopedDiscovery::announce_endpoint(&mgr, ep).await.unwrap();
-        
+        AsyncScopedDiscovery::announce_endpoint(&mgr, ep)
+            .await
+            .unwrap();
+
         let service_id = "async-svc".to_string();
         let provider = "did:icn:test".to_string();
         AsyncScopedDiscovery::withdraw_endpoint(&mgr, &service_id, &provider)
@@ -488,9 +493,10 @@ mod tests {
             version: "1.0".to_string(),
         };
 
-        let results = AsyncScopedDiscovery::discover_endpoints(&mgr, ScopeLevel::Org, &service_type)
-            .await
-            .unwrap();
+        let results =
+            AsyncScopedDiscovery::discover_endpoints(&mgr, ScopeLevel::Org, &service_type)
+                .await
+                .unwrap();
 
         assert_eq!(results.len(), 2);
     }
@@ -513,13 +519,13 @@ mod tests {
         };
 
         let results = AsyncScopedDiscovery::discover_endpoints_filtered(
-                &mgr,
-                ScopeLevel::Commons,
-                &service_type,
-                &["read".to_string(), "write".to_string()],
-            )
-            .await
-            .unwrap();
+            &mgr,
+            ScopeLevel::Commons,
+            &service_type,
+            &["read".to_string(), "write".to_string()],
+        )
+        .await
+        .unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].service_id, "svc-rw");

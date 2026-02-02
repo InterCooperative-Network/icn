@@ -612,6 +612,21 @@ pub trait PolicyOracle: Send + Sync {
     ///
     /// Most implementations should NOT override this - the default sync path
     /// is more efficient for cached in-memory decisions.
+    ///
+    /// # Implementation Note
+    ///
+    /// This trait is annotated with `#[async_trait]`. If you override
+    /// `evaluate_async()` using `async fn` in your own `impl PolicyOracle for
+    /// MyOracle` block, you must also add `#[async_trait]` to that `impl`:
+    ///
+    /// ```rust,ignore
+    /// #[async_trait]
+    /// impl PolicyOracle for MyOracle {
+    ///     async fn evaluate_async(&self, req: &PolicyRequest) -> PolicyDecision {
+    ///         // ..
+    ///     }
+    /// }
+    /// ```
     async fn evaluate_async(&self, request: &PolicyRequest) -> PolicyDecision {
         self.evaluate(request)
     }
