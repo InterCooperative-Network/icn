@@ -865,6 +865,13 @@ impl TrustGraph {
     /// * `target` - The DID to compute trust for
     /// * `scope` - The scope to filter edges by
     ///
+    /// # Performance
+    ///
+    /// Makes O(n) storage queries where n = number of scoped intermediaries.
+    /// Each intermediary triggers a separate `get_outgoing_edges` call.
+    /// For large trust graphs (>100 intermediaries per scope), consider
+    /// batch edge fetching or scope-aware pathfinder (future optimization).
+    ///
     /// # Firewall Compliance
     ///
     /// This method is in `icn-trust` (app layer). The kernel never calls this.
@@ -1699,5 +1706,94 @@ mod tests {
         let empty_scope = ScopeId::cooperative("");
         let result = graph.compute_trust_score_in_scope(bob.did(), &empty_scope);
         assert!(result.is_err(), "Empty scope ID should be rejected");
+    }
+
+    #[test]
+    fn test_whitespace_scope_id_rejected() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let store = SledStore::temporary().unwrap();
+        let graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        let whitespace_scope = ScopeId::cooperative("   ");
+        let result = graph.compute_trust_score_in_scope(bob.did(), &whitespace_scope);
+        assert!(
+            result.is_err(),
+            "Whitespace-only scope ID should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_expired_edges_excluded_from_scope() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let scope = ScopeId::cooperative("coop-1");
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Add scoped edge that is already expired (expires_at in the past)
+        let mut edge = TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.9),
+        )
+        .with_scope(scope.clone());
+        edge.expires_at = Some(1); // Expired at epoch second 1
+        graph.add_edge(edge).unwrap();
+
+        // Expired edge should not contribute to scope trust
+        let score = graph
+            .compute_trust_score_in_scope(bob.did(), &scope)
+            .unwrap();
+        assert_eq!(score, 0.0, "Expired edge should be excluded from scope");
+    }
+
+    #[test]
+    fn test_different_targets_in_different_scopes() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let carol = KeyPair::generate().unwrap();
+        let scope1 = ScopeId::cooperative("coop-1");
+        let scope2 = ScopeId::federation("fed-1");
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Add Alice → Bob in scope1
+        let edge1 = TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.8),
+        )
+        .with_scope(scope1.clone());
+        graph.add_edge(edge1).unwrap();
+
+        // Add Alice → Carol in scope2
+        let edge2 = TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            TrustScore::unchecked(0.6),
+        )
+        .with_scope(scope2.clone());
+        graph.add_edge(edge2).unwrap();
+
+        // Bob should have trust in scope1 but not scope2
+        let bob_scope1 = graph
+            .compute_trust_score_in_scope(bob.did(), &scope1)
+            .unwrap();
+        let bob_scope2 = graph
+            .compute_trust_score_in_scope(bob.did(), &scope2)
+            .unwrap();
+        assert!(bob_scope1 > 0.0, "Bob should have trust in scope1");
+        assert_eq!(bob_scope2, 0.0, "Bob should have no trust in scope2");
+
+        // Carol should have trust in scope2 but not scope1
+        let carol_scope1 = graph
+            .compute_trust_score_in_scope(carol.did(), &scope1)
+            .unwrap();
+        let carol_scope2 = graph
+            .compute_trust_score_in_scope(carol.did(), &scope2)
+            .unwrap();
+        assert_eq!(carol_scope1, 0.0, "Carol should have no trust in scope1");
+        assert!(carol_scope2 > 0.0, "Carol should have trust in scope2");
     }
 }

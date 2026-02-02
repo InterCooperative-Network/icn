@@ -257,60 +257,21 @@ println!("Top 10% hold: {:.1}% of trust", metrics.top_10_percent_share * 100.0);
 
 ---
 
-## Bridge Nodes (Constrained Scope)
+## Bridge Nodes (Future Work)
 
-### Phase 2a: Observational + Explicit Declaration
+**Status**: Not yet implemented. Included here for design reference.
 
-**Bridge nodes** span multiple scopes and require special handling to prevent centralization.
+**Bridge nodes** span multiple scopes and could accumulate cross-scope influence. When implemented, bridges will require explicit declaration and stricter constraints.
 
-#### BridgeDeclaration (Future)
+### Planned Design
 
-```rust
-pub struct BridgeDeclaration {
-    pub did: Did,
-    pub scopes: Vec<ScopeId>,
-    pub declared_at: u64,
-    pub signature: Signature,
-}
-```
+- `BridgeDeclaration` struct with DID, scopes, timestamp, and signature
+- Gossip topic `bridges:declarations` for discovery
+- PolicyOracles apply stricter constraints (reduced rate limits, fewer topics)
+- Governance policies can formalize "approved bridges" through voting
+- **Firewall compliance**: Bridge status → PolicyOracle → ConstraintSet (kernel never sees bridge semantics)
 
-#### Gossip Topic
-
-Bridge declarations are gossiped on `bridges:declarations` topic.
-
-#### Constraints (Not Kernel Logic)
-
-PolicyOracles apply stricter constraints to declared bridges:
-
-```rust
-// In PolicyOracle implementation (app layer)
-impl PolicyOracle for TrustPolicyOracle {
-    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        let is_bridge = self.bridge_registry.is_declared_bridge(&request.actor);
-        
-        if is_bridge {
-            // Apply stricter rate limits
-            PolicyDecision::allow_with(
-                ConstraintSet::new()
-                    .with_rate_limit(RateLimit::throttled()) // 20 msg/s
-                    .with_max_topics(25) // Reduced from 100
-            )
-        } else {
-            // Standard constraints
-            PolicyDecision::allow_with(
-                ConstraintSet::new()
-                    .with_rate_limit(RateLimit::standard()) // 100 msg/s
-            )
-        }
-    }
-}
-```
-
-**Firewall Compliance**: Bridge status → PolicyOracle → ConstraintSet. Kernel sees only constraint values.
-
-#### Phase 2b (Future)
-
-Governance policies can formalize "approved bridges" through voting.
+See [Merge Gate](#merge-gate) for tracking.
 
 ---
 
