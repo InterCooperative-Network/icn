@@ -717,7 +717,14 @@ impl TrustGraphAnalyzer {
             betweenness.insert(node.clone(), 0.0);
         }
 
-        // For each pair of nodes, find shortest paths and count intermediate nodes
+        // For each pair of nodes, find shortest paths and count intermediate nodes.
+        // O(n² * (V+E)) — may be slow for large scopes.
+        if nodes.len() > 1000 {
+            tracing::warn!(
+                "Betweenness computation for {} nodes may be slow; consider sampling",
+                nodes.len()
+            );
+        }
         for start in &nodes {
             let shortest_paths = self.compute_shortest_paths(start, &adj);
 

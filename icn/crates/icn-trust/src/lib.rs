@@ -906,19 +906,29 @@ impl TrustGraph {
             if e.target == *target {
                 continue; // Skip direct edge
             }
-            // Query intermediary's outgoing edges and filter by scope
-            if let Ok(intermediary_edges) = self.get_outgoing_edges(&e.target) {
-                for ie in &intermediary_edges {
-                    if ie.target != *target || ie.is_expired(now) {
-                        continue;
-                    }
-                    let scope_match = match &ie.scope_id {
-                        Some(edge_scope) => edge_scope == scope,
-                        None => scope.is_global(),
-                    };
-                    if scope_match {
-                        intermediate_scores.push((e.score.value(), ie.score.value()));
-                        break; // Only count first matching edge per intermediary
+            // Query intermediary's outgoing edges and filter by scope.
+            // TODO: Optimize with batch edge fetching for large graphs.
+            match self.get_outgoing_edges(&e.target) {
+                Err(err) => {
+                    tracing::warn!(
+                        "Failed to load edges for intermediary {:?}: {}",
+                        e.target, err
+                    );
+                    continue;
+                }
+                Ok(intermediary_edges) => {
+                    for ie in &intermediary_edges {
+                        if ie.target != *target || ie.is_expired(now) {
+                            continue;
+                        }
+                        let scope_match = match &ie.scope_id {
+                            Some(edge_scope) => edge_scope == scope,
+                            None => scope.is_global(),
+                        };
+                        if scope_match {
+                            intermediate_scores.push((e.score.value(), ie.score.value()));
+                            break; // Only count first matching edge per intermediary
+                        }
                     }
                 }
             }
