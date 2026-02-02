@@ -554,15 +554,15 @@ pub fn init_descriptions() {
         "Total number of trust attestations broadcasted to network"
     );
     describe_counter!(
-        "icn_trust_attestation_ingested_total",
+        "icn_trust_attestations_ingested_total",
         "Total number of trust attestations successfully ingested (accepted after validation)"
     );
     describe_counter!(
-        "icn_trust_attestation_signed_total",
+        "icn_trust_attestations_signed_total",
         "Total number of trust attestations signed at submission (outbound attestations)"
     );
     describe_counter!(
-        "icn_trust_attestation_rejections_total",
+        "icn_trust_attestations_rejections_total",
         "Total number of trust attestations rejected during ingestion, labeled by rejection reason"
     );
     describe_counter!(
@@ -2741,16 +2741,16 @@ pub mod trust {
     }
 
     pub fn attestations_ingested_inc() {
-        counter!("icn_trust_attestation_ingested_total").increment(1);
+        counter!("icn_trust_attestations_ingested_total").increment(1);
     }
 
     pub fn attestations_signed_inc() {
-        counter!("icn_trust_attestation_signed_total").increment(1);
+        counter!("icn_trust_attestations_signed_total").increment(1);
     }
 
     pub fn attestations_rejected_inc(reason: &str) {
         counter!(
-            "icn_trust_attestation_rejections_total",
+            "icn_trust_attestations_rejections_total",
             "reason" => reason.to_string()
         )
         .increment(1);
@@ -2773,8 +2773,12 @@ pub mod trust {
     }
 
     pub fn attestations_rejected_invalid_evidence_inc() {
-        counter!("icn_trust_attestation_rejections_total", "reason" => "invalid_evidence")
-            .increment(1);
+        counter!("icn_trust_attestations_rejected_invalid_evidence_total").increment(1);
+        counter!(
+            "icn_trust_attestations_rejections_total",
+            "reason" => "invalid_evidence"
+        )
+        .increment(1);
     }
 
     pub fn attestations_new_inc() {
