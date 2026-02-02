@@ -22,6 +22,9 @@ icn-store = { path = "../../icn/crates/icn-store" }
 # Security primitives (MisbehaviorDetector for init)
 icn-security = { path = "../../icn/crates/icn-security" }
 
+# Metrics (for observability)
+icn-obs = { path = "../../icn/crates/icn-obs" }
+
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
 
