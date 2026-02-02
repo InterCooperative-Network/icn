@@ -897,32 +897,33 @@ impl TrustGraph {
             .map(|e| e.score.value())
             .unwrap_or(0.0);
 
-        // Build a map for O(1) lookup of indirect edges
-        let edge_map: std::collections::HashMap<&Did, Vec<(&Did, f64)>> = {
-            let mut map: std::collections::HashMap<&Did, Vec<(&Did, f64)>> = std::collections::HashMap::new();
-            for edge in &scoped_edges {
-                map.entry(&edge.source)
-                    .or_default()
-                    .push((&edge.target, edge.score.value()));
+        // Compute transitive scores through intermediaries.
+        // For each intermediary we trust, look up THEIR edges to the target
+        // (filtering by scope). We must query the graph for each intermediary's
+        // outgoing edges — we cannot reuse our own scoped_edges here.
+        let mut intermediate_scores = Vec::new();
+        for e in &scoped_edges {
+            if e.target == *target {
+                continue; // Skip direct edge
             }
-            map
-        };
-
-        // Compute transitive scores through intermediaries
-        let intermediates = scoped_edges
-            .iter()
-            .filter(|e| e.target != *target) // Don't count direct edge as transitive
-            .filter_map(|e| {
-                // Look for edges from intermediate to target using the map
-                edge_map
-                    .get(&e.target)
-                    .and_then(|targets| {
-                        targets
-                            .iter()
-                            .find(|(t, _)| *t == target)
-                            .map(|(_, score)| (e.score.value(), *score))
-                    })
-            });
+            // Query intermediary's outgoing edges and filter by scope
+            if let Ok(intermediary_edges) = self.get_outgoing_edges(&e.target) {
+                for ie in &intermediary_edges {
+                    if ie.target != *target || ie.is_expired(now) {
+                        continue;
+                    }
+                    let scope_match = match &ie.scope_id {
+                        Some(edge_scope) => edge_scope == scope,
+                        None => scope.is_global(),
+                    };
+                    if scope_match {
+                        intermediate_scores.push((e.score.value(), ie.score.value()));
+                        break; // Only count first matching edge per intermediary
+                    }
+                }
+            }
+        }
+        let intermediates = intermediate_scores.into_iter();
 
         let weights = crate::ScoringWeights::legacy();
         let score = crate::computation::compute_trust_score(direct_score, intermediates, weights);
@@ -1511,6 +1512,164 @@ mod tests {
             "Carol's score should decrease when Alice's trust in Bob decreases: {} -> {}",
             carol_score_before,
             carol_score_after,
+        );
+    }
+
+    // ================================================================
+    // Scope-bounded trust tests (Wave 2)
+    // ================================================================
+
+    #[test]
+    fn test_direct_trust_in_scope() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let scope = ScopeId::cooperative("coop-1");
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Add scoped edge Alice → Bob
+        let edge = TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.8),
+        )
+        .with_scope(scope.clone());
+        graph.add_edge(edge).unwrap();
+
+        // Direct trust should be found in scope
+        let score = graph
+            .compute_trust_score_in_scope(bob.did(), &scope)
+            .unwrap();
+        assert!(score > 0.0, "Direct scoped trust should be non-zero: {score}");
+
+        // Different scope should return 0
+        let other_scope = ScopeId::cooperative("coop-2");
+        let score_other = graph
+            .compute_trust_score_in_scope(bob.did(), &other_scope)
+            .unwrap();
+        assert_eq!(score_other, 0.0, "Wrong scope should return 0.0");
+    }
+
+    #[test]
+    fn test_transitive_trust_in_scope() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let carol = KeyPair::generate().unwrap();
+        let scope = ScopeId::cooperative("coop-1");
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Alice → Bob (scoped)
+        graph
+            .add_edge(
+                TrustEdge::new(
+                    alice.did().clone(),
+                    bob.did().clone(),
+                    TrustScore::unchecked(0.8),
+                )
+                .with_scope(scope.clone()),
+            )
+            .unwrap();
+
+        // Bob → Carol (scoped, same scope)
+        graph
+            .add_edge(
+                TrustEdge::new(
+                    bob.did().clone(),
+                    carol.did().clone(),
+                    TrustScore::unchecked(0.7),
+                )
+                .with_scope(scope.clone()),
+            )
+            .unwrap();
+
+        // Alice should have transitive trust in Carol within scope
+        let score = graph
+            .compute_trust_score_in_scope(carol.did(), &scope)
+            .unwrap();
+        assert!(
+            score > 0.0,
+            "Transitive scoped trust should be non-zero: {score}"
+        );
+    }
+
+    #[test]
+    fn test_scope_isolation() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let carol = KeyPair::generate().unwrap();
+        let scope1 = ScopeId::cooperative("coop-1");
+        let scope2 = ScopeId::cooperative("coop-2");
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Alice → Bob in scope1
+        graph
+            .add_edge(
+                TrustEdge::new(
+                    alice.did().clone(),
+                    bob.did().clone(),
+                    TrustScore::unchecked(0.8),
+                )
+                .with_scope(scope1.clone()),
+            )
+            .unwrap();
+
+        // Bob → Carol in scope2 (DIFFERENT scope)
+        graph
+            .add_edge(
+                TrustEdge::new(
+                    bob.did().clone(),
+                    carol.did().clone(),
+                    TrustScore::unchecked(0.7),
+                )
+                .with_scope(scope2.clone()),
+            )
+            .unwrap();
+
+        // Alice should NOT have transitive trust in Carol in scope1
+        // because the Bob→Carol edge is in a different scope
+        let score = graph
+            .compute_trust_score_in_scope(carol.did(), &scope1)
+            .unwrap();
+        assert_eq!(
+            score, 0.0,
+            "Cross-scope transitive trust should be 0.0: {score}"
+        );
+    }
+
+    #[test]
+    fn test_global_scope_matches_unscoped_edges() {
+        let store = SledStore::temporary().unwrap();
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let mut graph = TrustGraph::new(Arc::new(store), alice.did().clone());
+
+        // Add edge with no scope (global)
+        graph
+            .add_edge(TrustEdge::new(
+                alice.did().clone(),
+                bob.did().clone(),
+                TrustScore::unchecked(0.8),
+            ))
+            .unwrap();
+
+        // Global scope query should find it
+        let score = graph
+            .compute_trust_score_in_scope(bob.did(), &ScopeId::Global)
+            .unwrap();
+        assert!(
+            score > 0.0,
+            "Global scope should match unscoped edges: {score}"
+        );
+
+        // Cooperative scope query should NOT find it
+        let score = graph
+            .compute_trust_score_in_scope(bob.did(), &ScopeId::cooperative("coop-1"))
+            .unwrap();
+        assert_eq!(
+            score, 0.0,
+            "Cooperative scope should not match unscoped edges"
         );
     }
 }

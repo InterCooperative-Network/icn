@@ -529,7 +529,13 @@ pub struct CentralizationMetrics {
     pub betweenness: BetweennessStats,
 }
 
-/// Betweenness centrality statistics
+/// Betweenness centrality statistics.
+///
+/// **Limitation**: Uses a simplified BFS that counts only the first shortest
+/// path discovered between each node pair, not all shortest paths.  This may
+/// undercount betweenness for nodes that lie on multiple equally-short paths.
+/// A full Brandes-style all-paths algorithm would be more accurate but is
+/// deferred until profiling shows the approximation is insufficient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BetweennessStats {
     /// Maximum betweenness centrality (most central node)

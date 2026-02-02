@@ -435,8 +435,7 @@ impl PolicyOracle for ScopedTrustOracle {
         
         PolicyDecision::allow_with(
             ConstraintSet::new()
-                .with_rate_limit(rate_limit)
-                .with_custom("scope_level", ConstraintValue::Int(scope.level()))
+                .with_rate_limit(rate_limit),
         )
     }
 }
