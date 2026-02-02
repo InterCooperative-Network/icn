@@ -438,8 +438,10 @@ attestations from multiple parties simultaneously (coordination event).
   - Pros: Preserves determinism, mitigates correlation attacks
   - Cons: Adds latency, complex implementation
 
+**Existing Baseline Protection**: Current trust-gated rate limits (10–200 msg/sec by trust class) apply to all messages, including trust score queries, providing baseline protection against polling attacks.
+
 **Cross-References**:
-- `icn-privacy` metadata protection primitives (traffic obfuscation: random delay, padding, cover traffic)
+- `icn-privacy` traffic obfuscation primitives (random delay, padding, cover traffic) — implemented but not yet wired into trust score query paths
 - Planned trust score caching layer in the trust service (forward-looking; implementation location TBD)
 - `TrustScoreResult` definition in `icn/crates/icn-kernel-api/src/services.rs:116-144`
 
@@ -847,7 +849,7 @@ However, timing precision could enable targeted attacks:
 **Implementation Path**:
 - **Phase 1** (Low effort): Document trade-off in operator manual, add warning in API docs
 - **Phase 2** (Medium effort): Add configurable timestamp truncation (hourly/daily buckets)
-- **Phase 3** (High effort): Integrate with `icn-privacy` traffic obfuscation (random delays, cover traffic)
+- **Phase 3** (High effort): Wire `icn-privacy` traffic obfuscation into trust score query paths (primitives exist, integration needed)
 
 **Related**:
 - Threat TR-I2 in Section 4.3 (Trust System - Information Disclosure)
