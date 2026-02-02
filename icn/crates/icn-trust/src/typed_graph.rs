@@ -91,6 +91,18 @@ impl TypedTrustGraph {
         self.inner.storage_prefix()
     }
 
+    /// Returns a reference to the inner TrustGraph
+    ///
+    /// This is useful for scope-aware operations and metrics computation.
+    pub fn inner(&self) -> &TrustGraph {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner TrustGraph
+    pub fn inner_mut(&mut self) -> &mut TrustGraph {
+        &mut self.inner
+    }
+
     // ============================================================
     // Edge Management (delegated to inner graph)
     // ============================================================
@@ -193,14 +205,6 @@ impl TypedTrustGraph {
     // ============================================================
     // Advanced Access (for TrustGraphFacade)
     // ============================================================
-
-    /// Get mutable access to the underlying TrustGraph
-    ///
-    /// This is primarily used by `TrustGraphFacade` for operations
-    /// that need direct access to the inner graph.
-    pub fn inner_mut(&mut self) -> &mut TrustGraph {
-        &mut self.inner
-    }
 }
 
 #[cfg(test)]

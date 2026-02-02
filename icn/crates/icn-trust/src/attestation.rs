@@ -12,6 +12,42 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+/// Maximum number of labels allowed in an attestation (DoS prevention).
+///
+/// Labels are metadata tags (e.g., "partner", "validator") that can be
+/// attached to attestations. We limit this to prevent malicious nodes from
+/// creating attestations with thousands of labels that would consume
+/// excessive memory and network bandwidth.
+///
+/// Rationale: Typical attestations use 1-3 labels. 10 allows for rich
+/// multi-role attestations while preventing abuse. At ~128 bytes per label,
+/// 10 labels ≈ 1.3KB which is negligible per gossip message.
+pub const MAX_LABELS: usize = 10;
+
+/// Maximum number of evidence references allowed in an attestation (DoS prevention).
+///
+/// Evidence references are content hashes that support an attestation.
+/// We limit this to prevent memory exhaustion attacks while still allowing
+/// reasonable evidence documentation.
+///
+/// Rationale: Evidence entries are typically content-addressed hashes (32-64 bytes).
+/// 20 entries allows thorough provenance documentation. At ~256 bytes per entry,
+/// 20 entries ≈ 5KB which fits comfortably within gossip message size limits.
+pub const MAX_EVIDENCE: usize = 20;
+
+/// Maximum length in bytes for a single label string (DoS prevention).
+///
+/// Prevents memory exhaustion via a few very long label strings.
+/// Gossip message size limits provide primary protection, but this is
+/// defense-in-depth for well-formed payloads with oversized individual fields.
+pub const MAX_LABEL_LENGTH: usize = 128;
+
+/// Maximum length in bytes for a single evidence reference string (DoS prevention).
+///
+/// Evidence strings are typically content-addressed hashes (hex or base58).
+/// 256 bytes allows generous formatting while preventing abuse.
+pub const MAX_EVIDENCE_LENGTH: usize = 256;
+
 /// A signed trust attestation that can be broadcast over the network
 ///
 /// This represents a cryptographically signed statement: "I (issuer) trust
@@ -352,6 +388,55 @@ impl TrustAttestation {
         now > self.created_at + self.ttl_seconds
     }
 
+    /// Validate attestation size limits (DoS prevention)
+    ///
+    /// Checks that labels and evidence arrays are within acceptable bounds
+    /// to prevent memory exhaustion attacks. Returns an error if limits are exceeded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `labels.len() > MAX_LABELS` (default: 10)
+    /// - `evidence.len() > MAX_EVIDENCE` (default: 20)
+    pub fn validate_size_limits(&self) -> Result<()> {
+        if self.labels.len() > MAX_LABELS {
+            return Err(anyhow::anyhow!(
+                "Too many labels: {} (max: {})",
+                self.labels.len(),
+                MAX_LABELS
+            ));
+        }
+        if self.evidence.len() > MAX_EVIDENCE {
+            return Err(anyhow::anyhow!(
+                "Too many evidence entries: {} (max: {})",
+                self.evidence.len(),
+                MAX_EVIDENCE
+            ));
+        }
+        // Check individual string lengths (defense-in-depth against oversized fields)
+        for (i, label) in self.labels.iter().enumerate() {
+            if label.len() > MAX_LABEL_LENGTH {
+                return Err(anyhow::anyhow!(
+                    "Label[{}] too long: {} bytes (max: {})",
+                    i,
+                    label.len(),
+                    MAX_LABEL_LENGTH
+                ));
+            }
+        }
+        for (i, evidence) in self.evidence.iter().enumerate() {
+            if evidence.len() > MAX_EVIDENCE_LENGTH {
+                return Err(anyhow::anyhow!(
+                    "Evidence[{}] too long: {} bytes (max: {})",
+                    i,
+                    evidence.len(),
+                    MAX_EVIDENCE_LENGTH
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Calculate the expiration timestamp
     pub fn expires_at(&self) -> u64 {
         self.created_at + self.ttl_seconds
@@ -471,6 +556,7 @@ impl TrustAttestation {
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
             graph_type: self.graph_type,
+            scope_id: None, // Attestations default to global scope
         }
     }
 
@@ -491,6 +577,7 @@ impl TrustAttestation {
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
             graph_type: self.graph_type,
+            scope_id: None, // Attestations default to global scope
         }
     }
 
@@ -1569,5 +1656,122 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("does not match revocation issuer"));
+    }
+
+    #[test]
+    fn test_validate_size_limits_accepts_within_limits() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Add MAX_LABELS labels
+        for i in 0..MAX_LABELS {
+            attestation.labels.push(format!("label_{}", i));
+        }
+
+        // Add MAX_EVIDENCE evidence entries
+        for i in 0..MAX_EVIDENCE {
+            attestation.evidence.push(format!("evidence_{}", i));
+        }
+
+        let result = attestation.validate_size_limits();
+        assert!(result.is_ok(), "Should accept attestation at size limits");
+    }
+
+    #[test]
+    fn test_validate_size_limits_rejects_too_many_labels() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Add MAX_LABELS + 1 labels
+        for i in 0..=MAX_LABELS {
+            attestation.labels.push(format!("label_{}", i));
+        }
+
+        let result = attestation.validate_size_limits();
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many labels"
+        );
+        assert!(result.unwrap_err().to_string().contains("Too many labels"));
+    }
+
+    #[test]
+    fn test_validate_size_limits_rejects_too_many_evidence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        // Add MAX_EVIDENCE + 1 evidence entries
+        for i in 0..=MAX_EVIDENCE {
+            attestation.evidence.push(format!("evidence_{}", i));
+        }
+
+        let result = attestation.validate_size_limits();
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many evidence entries"
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many evidence"));
+    }
+
+    #[test]
+    fn test_validate_size_limits_empty_arrays() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+        let result = attestation.validate_size_limits();
+        assert!(
+            result.is_ok(),
+            "Should accept attestation with empty arrays"
+        );
+    }
+
+    #[test]
+    fn test_validate_size_limits_rejects_long_label() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        attestation
+            .labels
+            .push("x".repeat(super::MAX_LABEL_LENGTH + 1));
+
+        let result = attestation.validate_size_limits();
+        assert!(result.is_err(), "Should reject attestation with long label");
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Label[0] too long"));
+    }
+
+    #[test]
+    fn test_validate_size_limits_rejects_long_evidence() {
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
+        attestation
+            .evidence
+            .push("x".repeat(super::MAX_EVIDENCE_LENGTH + 1));
+
+        let result = attestation.validate_size_limits();
+        assert!(
+            result.is_err(),
+            "Should reject attestation with long evidence"
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Evidence[0] too long"));
     }
 }

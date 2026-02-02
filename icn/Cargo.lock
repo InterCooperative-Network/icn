@@ -3606,6 +3606,7 @@ dependencies = [
  "anyhow",
  "icn-identity",
  "icn-kernel-api",
+ "icn-obs",
  "icn-store",
  "icn-trust",
  "parking_lot 0.12.5",

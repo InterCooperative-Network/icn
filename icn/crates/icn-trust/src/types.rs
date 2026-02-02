@@ -548,6 +548,141 @@ impl<'de> Deserialize<'de> for TrustScore {
     }
 }
 
+// ============================================================================
+// Scope-Bounded Trust (Wave 2)
+// ============================================================================
+
+/// Scope identifier for scope-bounded trust.
+///
+/// Trust edges can be scoped to specific organizational boundaries to prevent
+/// trust centralization across scopes. This is a **structural** mechanism, not
+/// a damping mechanism.
+///
+/// # Design Principle (Wave 2 Firewall Compliance)
+///
+/// `ScopeId` lives ONLY in `icn-trust`. It never crosses into kernel crates.
+/// The kernel receives `ConstraintSet` with opaque constraint values computed
+/// from scope-bounded trust, but the kernel does NOT pattern-match on scope.
+///
+/// # Scope Types
+///
+/// - **Cooperative**: Trust within a single cooperative (e.g., `coop:food-coop-123`)
+/// - **Federation**: Trust within a federation of cooperatives (e.g., `federation:regional-food-network`)
+/// - **Domain**: Trust within a governance domain (e.g., `domain:dispute-resolution`)
+/// - **TopicClass**: Trust within a topic class (e.g., `topic:compute`, `topic:storage`)
+/// - **Global**: Trust without scope boundaries (default for backward compatibility)
+///
+/// # Examples
+///
+/// ```
+/// use icn_trust::ScopeId;
+///
+/// // Cooperative-scoped trust
+/// let coop_scope = ScopeId::cooperative("food-coop-123");
+/// assert_eq!(coop_scope.to_string(), "coop:food-coop-123");
+///
+/// // Federation-scoped trust
+/// let fed_scope = ScopeId::federation("regional-food-network");
+/// assert_eq!(fed_scope.to_string(), "federation:regional-food-network");
+///
+/// // Global scope (no boundaries)
+/// let global = ScopeId::global();
+/// assert!(global.is_global());
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScopeId {
+    /// Trust within a single cooperative
+    Cooperative(String),
+    /// Trust within a federation of cooperatives
+    Federation(String),
+    /// Trust within a governance domain
+    Domain(String),
+    /// Trust within a topic class (e.g., compute, storage)
+    TopicClass(String),
+    /// Trust without scope boundaries (default)
+    #[default]
+    Global,
+}
+
+impl ScopeId {
+    /// Create a cooperative-scoped identifier
+    pub fn cooperative(id: impl Into<String>) -> Self {
+        Self::Cooperative(id.into())
+    }
+
+    /// Create a federation-scoped identifier
+    pub fn federation(id: impl Into<String>) -> Self {
+        Self::Federation(id.into())
+    }
+
+    /// Create a domain-scoped identifier
+    pub fn domain(id: impl Into<String>) -> Self {
+        Self::Domain(id.into())
+    }
+
+    /// Create a topic-class-scoped identifier
+    pub fn topic_class(id: impl Into<String>) -> Self {
+        Self::TopicClass(id.into())
+    }
+
+    /// Validate that the scope identifier is well-formed.
+    /// Returns `false` for scoped variants with empty or whitespace-only identifiers.
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::Cooperative(id)
+            | Self::Federation(id)
+            | Self::Domain(id)
+            | Self::TopicClass(id) => !id.trim().is_empty(),
+            Self::Global => true,
+        }
+    }
+
+    /// Create a global scope identifier (no boundaries)
+    pub fn global() -> Self {
+        Self::Global
+    }
+
+    /// Check if this is a global scope
+    pub fn is_global(&self) -> bool {
+        matches!(self, Self::Global)
+    }
+
+    /// Get the scope type as a string
+    pub fn scope_type(&self) -> &'static str {
+        match self {
+            Self::Cooperative(_) => "cooperative",
+            Self::Federation(_) => "federation",
+            Self::Domain(_) => "domain",
+            Self::TopicClass(_) => "topic_class",
+            Self::Global => "global",
+        }
+    }
+
+    /// Get the scope identifier string (for non-global scopes)
+    pub fn identifier(&self) -> Option<&str> {
+        match self {
+            Self::Cooperative(id) => Some(id),
+            Self::Federation(id) => Some(id),
+            Self::Domain(id) => Some(id),
+            Self::TopicClass(id) => Some(id),
+            Self::Global => None,
+        }
+    }
+}
+
+impl fmt::Display for ScopeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Cooperative(id) => write!(f, "coop:{}", id),
+            Self::Federation(id) => write!(f, "federation:{}", id),
+            Self::Domain(id) => write!(f, "domain:{}", id),
+            Self::TopicClass(id) => write!(f, "topic:{}", id),
+            Self::Global => write!(f, "global"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -863,5 +998,113 @@ mod tests {
         assert_eq!(keys[0].value(), 0.3);
         assert_eq!(keys[1].value(), 0.5);
         assert_eq!(keys[2].value(), 0.7);
+    }
+
+    // ========================================================================
+    // ScopeId Tests (Wave 2)
+    // ========================================================================
+
+    #[test]
+    fn test_scope_id_constructors() {
+        let coop = ScopeId::cooperative("food-coop-123");
+        assert_eq!(coop, ScopeId::Cooperative("food-coop-123".to_string()));
+
+        let fed = ScopeId::federation("regional-network");
+        assert_eq!(fed, ScopeId::Federation("regional-network".to_string()));
+
+        let domain = ScopeId::domain("dispute-resolution");
+        assert_eq!(domain, ScopeId::Domain("dispute-resolution".to_string()));
+
+        let topic = ScopeId::topic_class("compute");
+        assert_eq!(topic, ScopeId::TopicClass("compute".to_string()));
+
+        let global = ScopeId::global();
+        assert_eq!(global, ScopeId::Global);
+    }
+
+    #[test]
+    fn test_scope_id_is_global() {
+        assert!(ScopeId::global().is_global());
+        assert!(!ScopeId::cooperative("test").is_global());
+        assert!(!ScopeId::federation("test").is_global());
+        assert!(!ScopeId::domain("test").is_global());
+        assert!(!ScopeId::topic_class("test").is_global());
+    }
+
+    #[test]
+    fn test_scope_id_scope_type() {
+        assert_eq!(ScopeId::cooperative("test").scope_type(), "cooperative");
+        assert_eq!(ScopeId::federation("test").scope_type(), "federation");
+        assert_eq!(ScopeId::domain("test").scope_type(), "domain");
+        assert_eq!(ScopeId::topic_class("test").scope_type(), "topic_class");
+        assert_eq!(ScopeId::global().scope_type(), "global");
+    }
+
+    #[test]
+    fn test_scope_id_identifier() {
+        assert_eq!(
+            ScopeId::cooperative("food-coop-123").identifier(),
+            Some("food-coop-123")
+        );
+        assert_eq!(
+            ScopeId::federation("regional-network").identifier(),
+            Some("regional-network")
+        );
+        assert_eq!(ScopeId::global().identifier(), None);
+    }
+
+    #[test]
+    fn test_scope_id_display() {
+        assert_eq!(
+            ScopeId::cooperative("food-coop-123").to_string(),
+            "coop:food-coop-123"
+        );
+        assert_eq!(
+            ScopeId::federation("regional-network").to_string(),
+            "federation:regional-network"
+        );
+        assert_eq!(
+            ScopeId::domain("dispute-resolution").to_string(),
+            "domain:dispute-resolution"
+        );
+        assert_eq!(ScopeId::topic_class("compute").to_string(), "topic:compute");
+        assert_eq!(ScopeId::global().to_string(), "global");
+    }
+
+    #[test]
+    fn test_scope_id_default() {
+        assert_eq!(ScopeId::default(), ScopeId::Global);
+    }
+
+    #[test]
+    fn test_scope_id_serde_roundtrip() {
+        let scopes = vec![
+            ScopeId::cooperative("test-coop"),
+            ScopeId::federation("test-fed"),
+            ScopeId::domain("test-domain"),
+            ScopeId::topic_class("test-topic"),
+            ScopeId::global(),
+        ];
+
+        for scope in scopes {
+            let json = serde_json::to_string(&scope).unwrap();
+            let parsed: ScopeId = serde_json::from_str(&json).unwrap();
+            assert_eq!(scope, parsed);
+        }
+    }
+
+    #[test]
+    fn test_scope_id_equality_and_hash() {
+        use std::collections::HashSet;
+
+        let mut set = HashSet::new();
+        set.insert(ScopeId::cooperative("coop-1"));
+        set.insert(ScopeId::cooperative("coop-2"));
+        set.insert(ScopeId::cooperative("coop-1")); // Duplicate
+
+        assert_eq!(set.len(), 2); // Only 2 unique scopes
+        assert!(set.contains(&ScopeId::cooperative("coop-1")));
+        assert!(set.contains(&ScopeId::cooperative("coop-2")));
+        assert!(!set.contains(&ScopeId::cooperative("coop-3")));
     }
 }
