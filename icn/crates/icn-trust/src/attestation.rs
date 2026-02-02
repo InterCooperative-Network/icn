@@ -1620,12 +1620,12 @@ mod tests {
         let bob = KeyPair::generate().unwrap();
 
         let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
-        
+
         // Add MAX_LABELS labels
         for i in 0..MAX_LABELS {
             attestation.labels.push(format!("label_{}", i));
         }
-        
+
         // Add MAX_EVIDENCE evidence entries
         for i in 0..MAX_EVIDENCE {
             attestation.evidence.push(format!("evidence_{}", i));
@@ -1641,14 +1641,17 @@ mod tests {
         let bob = KeyPair::generate().unwrap();
 
         let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
-        
+
         // Add MAX_LABELS + 1 labels
         for i in 0..=MAX_LABELS {
             attestation.labels.push(format!("label_{}", i));
         }
 
         let result = attestation.validate_size_limits();
-        assert!(result.is_err(), "Should reject attestation with too many labels");
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many labels"
+        );
         assert!(result.unwrap_err().to_string().contains("Too many labels"));
     }
 
@@ -1658,15 +1661,21 @@ mod tests {
         let bob = KeyPair::generate().unwrap();
 
         let mut attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
-        
+
         // Add MAX_EVIDENCE + 1 evidence entries
         for i in 0..=MAX_EVIDENCE {
             attestation.evidence.push(format!("evidence_{}", i));
         }
 
         let result = attestation.validate_size_limits();
-        assert!(result.is_err(), "Should reject attestation with too many evidence entries");
-        assert!(result.unwrap_err().to_string().contains("Too many evidence"));
+        assert!(
+            result.is_err(),
+            "Should reject attestation with too many evidence entries"
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many evidence"));
     }
 
     #[test]
@@ -1677,6 +1686,9 @@ mod tests {
         let attestation = TrustAttestation::new(alice.did().clone(), bob.did().clone(), 0.5);
 
         let result = attestation.validate_size_limits();
-        assert!(result.is_ok(), "Should accept attestation with empty arrays");
+        assert!(
+            result.is_ok(),
+            "Should accept attestation with empty arrays"
+        );
     }
 }

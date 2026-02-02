@@ -586,6 +586,14 @@ pub fn init_descriptions() {
         "Total number of attestations rejected due to rate limiting"
     );
     describe_counter!(
+        "icn_trust_attestations_rejected_malformed_total",
+        "Total number of attestations rejected due to malformed data"
+    );
+    describe_counter!(
+        "icn_trust_attestations_rejected_invalid_evidence_total",
+        "Total number of attestations rejected due to invalid evidence"
+    );
+    describe_counter!(
         "icn_trust_attestations_new_total",
         "Total number of new trust edges created from attestations"
     );
@@ -2783,6 +2791,11 @@ pub mod trust {
     pub fn attestations_rejected_size_limit_inc() {
         counter!("icn_trust_attestations_rejected_size_limit_total").increment(1);
         attestations_rejected_inc("size_limit");
+    }
+
+    pub fn attestations_rejected_malformed_inc() {
+        counter!("icn_trust_attestations_rejected_malformed_total").increment(1);
+        attestations_rejected_inc("malformed");
     }
 
     pub fn attestations_rejected_invalid_evidence_inc() {
