@@ -3,7 +3,8 @@
 //! In-memory registry for service endpoints with background expiry.
 
 use icn_kernel_api::naming::{
-    NamingError, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId, ServiceType,
+    AsyncScopedDiscovery, NamingError, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
+    ServiceType,
 };
 use icn_kernel_api::scope::ScopeLevel;
 use std::collections::HashMap;
@@ -225,6 +226,57 @@ impl ScopedDiscovery for ServiceDiscoveryManager {
         reg.get(service_id)
             .filter(|ep| !ep.is_expired())
             .cloned()
+            .ok_or_else(|| NamingError::NotFound(service_id.to_string()))
+    }
+}
+
+/// `AsyncScopedDiscovery` implementation using native async methods.
+///
+/// This implementation delegates to the existing async methods (`announce()`,
+/// `withdraw()`, `discover()`, `get()`), avoiding the need for `blocking_read()`
+/// or `blocking_write()` calls in async contexts.
+///
+/// Use this trait when calling from async contexts (e.g., async HTTP handlers,
+/// async actor methods). Use the sync `ScopedDiscovery` trait only from blocking
+/// contexts or inside `tokio::task::spawn_blocking`.
+impl AsyncScopedDiscovery for ServiceDiscoveryManager {
+    async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
+        self.announce(endpoint).await
+    }
+
+    async fn withdraw_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+        provider: &icn_kernel_api::types::Did,
+    ) -> Result<(), NamingError> {
+        self.withdraw(service_id, provider).await
+    }
+
+    async fn discover_endpoints(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+    ) -> Result<Vec<ServiceEndpoint>, NamingError> {
+        Ok(self.discover(scope, Some(service_type), &[]).await)
+    }
+
+    async fn discover_endpoints_filtered(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+        required_capabilities: &[String],
+    ) -> Result<Vec<ServiceEndpoint>, NamingError> {
+        Ok(self
+            .discover(scope, Some(service_type), required_capabilities)
+            .await)
+    }
+
+    async fn get_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+    ) -> Result<ServiceEndpoint, NamingError> {
+        self.get(service_id)
+            .await
             .ok_or_else(|| NamingError::NotFound(service_id.to_string()))
     }
 }

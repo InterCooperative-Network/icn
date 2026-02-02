@@ -37,6 +37,7 @@
 //! - Any policy logic (just enforcement)
 
 use crate::types::{CapabilityId, Did, LogicalTimestamp};
+use async_trait::async_trait;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -547,21 +548,31 @@ impl PolicyRequest {
 /// into kernel-enforceable constraints. The kernel never knows the
 /// semantic origin of these constraints.
 ///
-/// # Synchronous Design
+/// # Sync and Async Paths
 ///
-/// This trait is intentionally synchronous to enable efficient caching
-/// and avoid async overhead on the hot path. Oracle implementations that
-/// need to access async resources (like tokio RwLocks) should:
+/// This trait provides both synchronous and asynchronous evaluation paths:
 ///
+/// - `evaluate()`: Synchronous method for hot-path performance
+/// - `evaluate_async()`: Asynchronous method for native async implementations
+///
+/// Oracle implementations that need to access async resources have two options:
+///
+/// **Option 1: Sync-optimized (default)**
 /// 1. Use `parking_lot::RwLock` instead of `tokio::sync::RwLock`
 /// 2. Pre-compute values during async initialization
 /// 3. Cache results internally
+/// 4. Rely on default `evaluate_async()` calling `evaluate()`
 ///
-/// **Tech Debt** (see #874): If evaluation latency becomes a bottleneck, consider
-/// adding an `async fn evaluate_async()` method with default impl calling
-/// `evaluate()`. This would allow gradual migration without breaking changes.
+/// **Option 2: Native async (opt-in)**
+/// 1. Override `evaluate_async()` with native async implementation
+/// 2. Use `tokio::sync::RwLock` or other async primitives
+/// 3. Default `evaluate()` can use `tokio::task::block_in_place()` for sync callers
+///
+/// Most implementations should use Option 1 for better hot-path performance.
+/// Option 2 is for cases where async I/O or contended tokio locks are unavoidable.
+#[async_trait]
 pub trait PolicyOracle: Send + Sync {
-    /// Evaluate whether a request should be allowed.
+    /// Evaluate whether a request should be allowed (synchronous).
     ///
     /// Returns Allow with constraints or Deny with reason.
     /// The kernel enforces the decision without understanding it.
@@ -572,7 +583,38 @@ pub trait PolicyOracle: Send + Sync {
     /// - Complete in <1ms for cached results
     /// - Avoid blocking I/O or async runtime operations
     /// - Use internal caching for expensive computations
+    ///
+    /// # Default Implementation
+    ///
+    /// If your implementation overrides `evaluate_async()` for native async support,
+    /// you should provide a `evaluate()` implementation that uses
+    /// `tokio::task::block_in_place()` to bridge to the async path when called
+    /// from a tokio runtime context.
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
+
+    /// Evaluate whether a request should be allowed (asynchronous).
+    ///
+    /// Returns Allow with constraints or Deny with reason.
+    /// The kernel enforces the decision without understanding it.
+    ///
+    /// # Default Implementation
+    ///
+    /// By default, this delegates to the synchronous `evaluate()` method.
+    /// Override this method if your oracle can benefit from native async
+    /// operations (e.g., async I/O, tokio locks).
+    ///
+    /// # When to Override
+    ///
+    /// Override this method when:
+    /// - Your oracle uses `tokio::sync::RwLock` or other async primitives
+    /// - Evaluation requires async I/O (database, network)
+    /// - Lock contention is high and async locks provide better fairness
+    ///
+    /// Most implementations should NOT override this - the default sync path
+    /// is more efficient for cached in-memory decisions.
+    async fn evaluate_async(&self, request: &PolicyRequest) -> PolicyDecision {
+        self.evaluate(request)
+    }
 
     /// Get cache TTL for decisions from this oracle.
     ///
