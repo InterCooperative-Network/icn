@@ -1,7 +1,7 @@
 //! Trust Service Performance Benchmarks
 //!
-//! Benchmarks comparing trust_score() vs trust_score_detailed() to quantify
-//! the SHA-256 computation overhead added by the provenance hash.
+//! Benchmarks comparing trust_score() vs trust_score_detailed() to identify
+//! performance bottlenecks in the enriched trust score computation path.
 //!
 //! Related: Issue #1001, PR #987
 
@@ -36,8 +36,8 @@ fn did_from_seed(seed: u32) -> Did {
     Did::from_public_key(&verifying_key)
 }
 
-/// Create a trust service with a test graph of specified size
-/// Each node trusts ~5-10 other nodes randomly
+/// Create a trust service with a test graph of specified size.
+/// Total edges are approximately size × input_edges_per_target, randomly distributed.
 fn create_test_service(
     size: usize,
     input_edges_per_target: usize,

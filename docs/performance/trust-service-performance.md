@@ -67,6 +67,8 @@ The ~21,700x slowdown in `trust_score_detailed()` (1000-node network) breaks dow
    - Hash computation is actually quite fast
    - Minimal impact compared to edge collection
 
+**Note:** These percentage breakdowns are algorithmic-complexity-based estimates, not profiler-measured values. For production performance tuning and architecture decisions, validate these assumptions with profiling tools (e.g., flamegraphs) on representative workloads.
+
 ## Optimization Considerations
 
 ### 1. Reverse Edge Index
