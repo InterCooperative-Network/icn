@@ -49,3 +49,8 @@ icn-time = { path = "../../icn/crates/icn-time" }
 tempfile = "3"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"
+criterion = "0.5"
+
+[[bench]]
+name = "trust_service_bench"
+harness = false
