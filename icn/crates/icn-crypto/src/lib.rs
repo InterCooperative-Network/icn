@@ -12,9 +12,9 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use icn_crypto::KeyPair;
-//! 
-//! let keypair = KeyPair::generate_hybrid()?;
+//! use icn_crypto::HybridKeypair;
+//!
+//! let keypair = HybridKeypair::generate()?;
 //! let signature = keypair.sign(b"message")?;
 //! ```
 

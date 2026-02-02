@@ -5,7 +5,7 @@
 
 ## Summary
 
-Phase 6 successfully consolidated ICN kernel crates from 28 to a clear 12-crate kernel structure using the facade pattern. Three new "unified" crates were created that re-export existing crates under cleaner namespaces.
+Phase 6 defined a clear 12-crate kernel facade structure for the ICN API surface using the facade pattern, without removing or merging existing crates. Three new "unified" crates were created that re-export existing crates under cleaner namespaces.
 
 ## Changes
 
@@ -33,7 +33,7 @@ pub use icn_gateway as gateway;
 pub use icn_crypto_pq::*;
 ```
 - Unifies cryptography layer
-- Usage: `use icn_crypto::KeyPair;`
+- Usage: `use icn_crypto::HybridKeypair;`
 
 ## Final Kernel Structure (12 Crates)
 
@@ -62,7 +62,7 @@ Rather than merging source code (which would be disruptive), we used the "facade
 ## Verification
 
 - ✅ All 12 kernel crates compile
-- ✅ All tests pass (221 passed, 1 DNS-related failure not related to changes)
+- ✅ Test suite: 221 tests passed; 1 DNS-related failure unrelated to these changes
 - ✅ No circular dependencies verified with `cargo tree`
 - ✅ Full workspace builds successfully
 
