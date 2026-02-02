@@ -151,8 +151,7 @@ mod tests {
     #[test]
     fn test_all_entity_types_supported() {
         // Test that all entity types can be created
-        let _individual =
-            EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
+        let _individual = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
         let _coop = EntityId::cooperative("test-coop").expect("Invalid coop ID");
         let _community = EntityId::community("test-comm").expect("Invalid community ID");
         let _federation = EntityId::federation("test-fed").expect("Invalid federation ID");

@@ -165,7 +165,8 @@ impl UnifiedMembership {
             });
         }
         self.status = MembershipStatus::Suspended;
-        self.metadata.insert("suspension_reason".to_string(), reason);
+        self.metadata
+            .insert("suspension_reason".to_string(), reason);
         self.updated_at = icn_time::current_timestamp_secs();
         Ok(())
     }
@@ -208,9 +209,7 @@ impl MembershipTrait for UnifiedMembership {
     }
 
     fn can_vote(&self) -> bool {
-        self.is_active()
-            && self.shares > 0
-            && self.has_capability(&MembershipCapability::Vote)
+        self.is_active() && self.shares > 0 && self.has_capability(&MembershipCapability::Vote)
     }
 
     fn can_propose(&self) -> bool {
@@ -387,7 +386,8 @@ mod tests {
         let member_id = create_test_entity_id();
         let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
-        let membership = UnifiedMembership::new(member_id.clone(), parent_id, MembershipRole::Worker);
+        let membership =
+            UnifiedMembership::new(member_id.clone(), parent_id, MembershipRole::Worker);
 
         assert_eq!(membership.member_id, member_id);
         assert!(matches!(membership.status, MembershipStatus::Pending));
@@ -399,8 +399,7 @@ mod tests {
         let member_id = create_test_entity_id();
         let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
-        let mut membership =
-            UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
+        let mut membership = UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
 
         // Approve
         assert!(membership.approve().is_ok());
@@ -431,10 +430,7 @@ mod tests {
         let manager = MembershipManager::new();
 
         let mut data = HashMap::new();
-        data.insert(
-            "verified_address".to_string(),
-            serde_json::json!(true),
-        );
+        data.insert("verified_address".to_string(), serde_json::json!(true));
 
         let criteria = MembershipCriteria {
             all: vec![crate::entity::Condition {

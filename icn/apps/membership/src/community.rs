@@ -115,10 +115,9 @@ impl CommunityMembershipManager {
         };
 
         // Store member type in metadata
-        membership.metadata.insert(
-            "member_type".to_string(),
-            format!("{:?}", member_type),
-        );
+        membership
+            .metadata
+            .insert("member_type".to_string(), format!("{:?}", member_type));
 
         Ok(membership)
     }
@@ -172,24 +171,26 @@ pub mod compat {
     pub fn from_community_member(
         member: &icn_community::types::Member,
         community_id: &str,
-    ) -> UnifiedMembership {
+    ) -> Result<UnifiedMembership, MembershipError> {
         // Parse member type from metadata
         let member_type = match &member.member_type {
             icn_community::MemberType::Individual(did_str) => {
-                let did: icn_identity::Did = did_str
-                    .as_str()
-                    .parse()
-                    .expect("Invalid DID in community member record");
+                let did: icn_identity::Did = did_str.as_str().parse().map_err(|_| {
+                    MembershipError::InvalidCriteria(format!(
+                        "Invalid DID in community member: {}",
+                        did_str.as_str()
+                    ))
+                })?;
                 EntityId::from_did(&did)
             }
-            icn_community::MemberType::Cooperative(id) => {
-                EntityId::cooperative(id).expect("Invalid coop ID")
-            }
+            icn_community::MemberType::Cooperative(id) => EntityId::cooperative(id)
+                .map_err(|e| MembershipError::InvalidCriteria(e.to_string()))?,
         };
 
-        let parent_id = EntityId::community(community_id).expect("Invalid community ID");
+        let parent_id = EntityId::community(community_id)
+            .map_err(|e| MembershipError::InvalidCriteria(e.to_string()))?;
 
-        UnifiedMembership {
+        Ok(UnifiedMembership {
             member_id: member_type,
             parent_id,
             role: MembershipRole::Member,
@@ -207,7 +208,7 @@ pub mod compat {
             assignments: Vec::new(),
             labor_shares: Vec::new(),
             is_primary: false,
-        }
+        })
     }
 }
 

@@ -114,9 +114,12 @@ pub mod compat {
     use super::*;
 
     /// Convert icn-coop Member to UnifiedMembership
-    pub fn from_coop_member(member: &icn_coop::Member) -> UnifiedMembership {
+    pub fn from_coop_member(
+        member: &icn_coop::Member,
+    ) -> Result<UnifiedMembership, MembershipError> {
         let member_id = EntityId::from_did(&member.did);
-        let parent_id = EntityId::cooperative(&member.coop_id).expect("Invalid coop ID");
+        let parent_id = EntityId::cooperative(&member.coop_id)
+            .map_err(|e| MembershipError::InvalidCriteria(e.to_string()))?;
 
         let role = match member.role {
             icn_coop::MemberRole::Founder => MembershipRole::Founder,
@@ -140,7 +143,7 @@ pub mod compat {
             icn_coop::MemberStatus::Removed => icn_entity::MembershipStatus::Removed,
         };
 
-        UnifiedMembership {
+        Ok(UnifiedMembership {
             member_id,
             parent_id,
             role: role.clone(),
@@ -154,7 +157,7 @@ pub mod compat {
             assignments: Vec::new(),
             labor_shares: Vec::new(),
             is_primary: true,
-        }
+        })
     }
 }
 
@@ -203,8 +206,7 @@ mod tests {
         let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
         let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
-        let mut membership =
-            UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
+        let mut membership = UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
 
         assert!(manager.update_shares(&mut membership, 100).is_ok());
         assert_eq!(membership.shares, 100);
@@ -216,8 +218,7 @@ mod tests {
         let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
         let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
 
-        let mut membership =
-            UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
+        let mut membership = UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
 
         manager.add_assignment(&mut membership, "assignment-1".to_string());
         assert_eq!(membership.assignments.len(), 1);
