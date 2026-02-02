@@ -1009,22 +1009,25 @@ impl TrustGraph {
             Ok(outgoing) => {
                 let total_count = outgoing.len() as u64;
                 let mut invalidated_count = 0u64;
-                
+
                 for edge in &outgoing {
                     // Skip self-loops (A→A) — already invalidated above
                     if edge.target == *target {
                         continue;
                     }
-                    
+
                     // Selective invalidation: only invalidate if cached
                     if self.cache.invalidate_if_cached(&edge.target) {
                         invalidated_count += 1;
                     }
                 }
-                
+
                 if total_count > 0 {
-                    icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(invalidated_count);
-                    
+                    icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(
+                        total_count,
+                        invalidated_count,
+                    );
+
                     if total_count > 50 {
                         // High-fanout scenario - log for monitoring
                         info!(

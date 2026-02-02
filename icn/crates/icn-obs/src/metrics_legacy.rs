@@ -391,7 +391,7 @@ pub fn init_descriptions() {
     );
     describe_histogram!(
         "icn_trust_cache_downstream_count",
-        "Distribution of downstream invalidation counts per edge mutation"
+        "Distribution of total downstream fanout per edge mutation (for hub detection)"
     );
     describe_gauge!(
         "icn_trust_cache_max_downstream_count",
@@ -2306,15 +2306,25 @@ pub mod scalability {
     ///
     /// Emitted when an edge mutation triggers one-hop-out invalidation
     /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
-    pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
+    ///
+    /// - `total_downstream_count`: total number of downstream edges considered
+    ///   for transitive invalidation (fanout).
+    /// - `invalidated_count`: number of downstream DIDs that actually had
+    ///   cached entries and were invalidated.
+    pub fn trust_cache_transitive_invalidations_inc(
+        total_downstream_count: u64,
+        invalidated_count: u64,
+    ) {
+        // Count how many cache entries were actually invalidated.
         counter!("icn_trust_cache_transitive_invalidations_total")
-            .increment(downstream_count);
-        
-        // Record distribution for monitoring fanout patterns
-        histogram!("icn_trust_cache_downstream_count").record(downstream_count as f64);
-        
-        // Track maximum for hub detection
-        gauge!("icn_trust_cache_max_downstream_count").set(downstream_count as f64);
+            .increment(invalidated_count);
+
+        // Record distribution of total downstream fanout for monitoring
+        // and hub detection.
+        histogram!("icn_trust_cache_downstream_count").record(total_downstream_count as f64);
+
+        // Track maximum observed fanout.
+        gauge!("icn_trust_cache_max_downstream_count").set(total_downstream_count as f64);
     }
 
     /// Record a selective invalidation skip.

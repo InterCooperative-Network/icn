@@ -19,19 +19,19 @@ The transitive cache invalidation fix (issue #878, PR #988) invalidates cached t
 ### Core Metrics
 
 1. **`icn_trust_cache_transitive_invalidations_total`** (counter)
-   - Total number of cache entries invalidated transitively
-   - Incremented by the actual number of invalidations performed
+   - Number of cache entries actually invalidated transitively
+   - Incremented only for downstream DIDs that had cached entries
    - Use `rate()` to track invalidations per second
 
 2. **`icn_trust_cache_downstream_count`** (histogram)
-   - Distribution of downstream invalidation counts per edge mutation
-   - Shows fanout patterns across the network
+   - Distribution of total downstream fanout per edge mutation
+   - Records total outgoing edges (regardless of cache state)
    - Percentiles reveal high-fanout "hub" nodes
 
 3. **`icn_trust_cache_max_downstream_count`** (gauge)
-   - Maximum downstream count observed
-   - Quick indicator of highest fanout in the network
-   - Helps detect hub nodes that may need optimization
+   - Most recent downstream fanout count observed
+   - Note: this gauge tracks the latest value, not the all-time maximum
+   - Use `histogram_quantile(0.99, ...)` on the histogram for reliable hub detection
 
 4. **`icn_trust_cache_selective_skips_total`** (counter)
    - Number of transitive invalidations skipped (selective optimization)
@@ -114,13 +114,17 @@ When this threshold is exceeded, the system logs detailed information:
 **Alert 1: High Fanout Detected**
 ```yaml
 alert: HighFanoutCacheInvalidation
-expr: max(icn_trust_cache_max_downstream_count) > 50
+expr: |
+  histogram_quantile(
+    0.99,
+    sum(rate(icn_trust_cache_downstream_count_bucket[5m])) by (le)
+  ) > 50
 for: 5m
 labels:
   severity: info
 annotations:
   summary: "High-fanout cache invalidation detected"
-  description: "Maximum downstream count is {{ $value }}, which may impact performance."
+  description: "Recent downstream fanout (p99) is {{ $value }}, which may impact performance."
 ```
 
 **Alert 2: Low Selective Efficiency**
