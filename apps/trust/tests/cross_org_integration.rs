@@ -23,11 +23,7 @@ fn create_test_graph(owner_keypair: &KeyPair) -> Arc<RwLock<TrustGraph>> {
 }
 
 /// Helper to create a PolicyRequest with org_id metadata.
-fn create_cross_org_request(
-    actor_did: String,
-    org_id: &str,
-    action: ActionKind,
-) -> PolicyRequest {
+fn create_cross_org_request(actor_did: String, org_id: &str, action: ActionKind) -> PolicyRequest {
     let core = PolicyRequestCore::new(actor_did, action, Domain::trust());
     let context = PolicyContext::new().with_metadata("org_id", org_id);
     PolicyRequest::with_context(core, context)
@@ -120,7 +116,8 @@ fn test_trust_score_computation_across_federation_boundaries() {
 
     // With 1.0 direct trust and 70% weighting: 1.0 * 0.7 = 0.7 (exactly at threshold)
     assert_eq!(
-        rate.messages_per_second, u32::MAX,
+        rate.messages_per_second,
+        u32::MAX,
         "High trust should grant unlimited rate"
     );
     assert_eq!(constraints.max_topics, Some(500));
@@ -219,7 +216,8 @@ fn test_multiple_federation_scopes_with_different_trust_levels() {
     let constraints1 = decision1.constraints().unwrap();
     let rate1 = constraints1.rate_limit.as_ref().unwrap();
     assert_eq!(
-        rate1.messages_per_second, u32::MAX,
+        rate1.messages_per_second,
+        u32::MAX,
         "High trust actor should get unlimited rate"
     );
 
