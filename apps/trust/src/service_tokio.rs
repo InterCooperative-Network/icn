@@ -309,11 +309,10 @@ impl TrustService for TrustServiceImplTokio {
         use icn_trust::TrustAttestation;
 
         // Deserialize
-        let attestation: TrustAttestation = serde_json::from_slice(bytes)
-            .map_err(|e| {
-                icn_obs::metrics::trust::attestations_rejected_inc("malformed");
-                format!("Invalid attestation: {e}")
-            })?;
+        let attestation: TrustAttestation = serde_json::from_slice(bytes).map_err(|e| {
+            icn_obs::metrics::trust::attestations_rejected_inc("malformed");
+            format!("Invalid attestation: {e}")
+        })?;
 
         // Validate size limits EARLY (before expensive signature verification)
         if let Err(e) = attestation.validate_size_limits() {
@@ -1214,11 +1213,8 @@ mod tests {
         let issuer = icn_identity::KeyPair::generate().unwrap();
 
         // Create attestation with MAX_LABELS + 1 labels
-        let mut attestation = icn_trust::TrustAttestation::new(
-            issuer.did().clone(),
-            target.did().clone(),
-            0.5,
-        );
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
         for i in 0..=icn_trust::attestation::MAX_LABELS {
             attestation.labels.push(format!("label_{}", i));
         }
@@ -1248,11 +1244,8 @@ mod tests {
         let issuer = icn_identity::KeyPair::generate().unwrap();
 
         // Create attestation with MAX_EVIDENCE + 1 evidence entries
-        let mut attestation = icn_trust::TrustAttestation::new(
-            issuer.did().clone(),
-            target.did().clone(),
-            0.5,
-        );
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
         for i in 0..=icn_trust::attestation::MAX_EVIDENCE {
             attestation.evidence.push(format!("evidence_{}", i));
         }
@@ -1282,11 +1275,8 @@ mod tests {
         let issuer = icn_identity::KeyPair::generate().unwrap();
 
         // Create attestation with exactly MAX_LABELS and MAX_EVIDENCE
-        let mut attestation = icn_trust::TrustAttestation::new(
-            issuer.did().clone(),
-            target.did().clone(),
-            0.5,
-        );
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), target.did().clone(), 0.5);
         for i in 0..icn_trust::attestation::MAX_LABELS {
             attestation.labels.push(format!("label_{}", i));
         }
