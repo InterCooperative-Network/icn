@@ -11,7 +11,7 @@ on:
 jobs:
   check-api-types:
     name: Check API Types Drift
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 

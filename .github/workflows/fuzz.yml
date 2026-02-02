@@ -21,7 +21,7 @@ env:
 jobs:
   fuzz:
     name: CCL Fuzz Testing
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
 
     steps:
       - uses: actions/checkout@v6

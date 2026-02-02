@@ -18,7 +18,7 @@ on:
 jobs:
   publish:
     name: Publish TypeScript SDK
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     defaults:
       run:
         working-directory: ./sdk/typescript

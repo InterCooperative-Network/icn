@@ -13,7 +13,7 @@ env:
 jobs:
   secrets-check:
     name: Secrets Placeholder Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -54,7 +54,7 @@ jobs:
 
   fmt:
     name: Format Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -68,7 +68,7 @@ jobs:
 
   meaning-firewall:
     name: Meaning Firewall Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     # Non-blocking until Phase 2 completes (#865, #866, #867)
     continue-on-error: true
     steps:
@@ -81,7 +81,7 @@ jobs:
 
   kernel-deps:
     name: Kernel Forbidden Dependencies
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -116,7 +116,7 @@ jobs:
 
   firewall-contract:
     name: Firewall Contract Enforcement
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     # Non-blocking until Wave 2 completes (icn-core migrations)
     continue-on-error: true
     steps:
@@ -131,7 +131,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -152,7 +152,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -181,7 +181,7 @@ jobs:
 
   backup-validation:
     name: Backup Validation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -219,7 +219,7 @@ jobs:
 
   coverage:
     name: Test Coverage
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -263,7 +263,7 @@ jobs:
 
   security:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -292,7 +292,7 @@ jobs:
 
   build:
     name: Build Release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -320,7 +320,7 @@ jobs:
 
   sdk:
     name: TypeScript SDK
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     defaults:
       run:
         working-directory: ./sdk/typescript
@@ -348,7 +348,7 @@ jobs:
 
   web-ui:
     name: Web UI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     defaults:
       run:
         working-directory: ./web/pilot-ui
@@ -372,7 +372,7 @@ jobs:
 
   accessibility:
     name: Accessibility Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     defaults:
       run:
         working-directory: ./web/pilot-ui

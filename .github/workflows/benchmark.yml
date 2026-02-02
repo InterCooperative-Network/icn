@@ -30,7 +30,7 @@ jobs:
   # Run benchmarks and save baseline (only on main branch pushes)
   benchmark:
     name: Save Benchmark Baseline
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v6
@@ -60,7 +60,7 @@ jobs:
   # Compare PR benchmarks against base commit (only on PRs)
   compare:
     name: Compare Against Base
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, homelab, k3s]
     if: github.event_name == 'pull_request'
     steps:
       # Checkout PR base commit for baseline (deterministic - won't change during run)
