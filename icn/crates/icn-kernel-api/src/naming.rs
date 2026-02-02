@@ -165,6 +165,48 @@ pub enum EndpointType {
 /// - `ScopeLevel` for hierarchical visibility
 /// - Multiple endpoints per service
 /// - TTL-based expiry
+///
+/// # Example
+///
+/// ```
+/// use icn_kernel_api::{ServiceEndpoint, EndpointType, ScopeLevel};
+/// use icn_kernel_api::naming::ServiceType;
+/// use icn_kernel_api::types::Signature;
+///
+/// // Get current timestamp
+/// let now = std::time::SystemTime::now()
+///     .duration_since(std::time::UNIX_EPOCH)
+///     .unwrap()
+///     .as_secs();
+///
+/// // Create a service endpoint
+/// let endpoint = ServiceEndpoint {
+///     service_id: "ledger-svc-1".to_string(),
+///     provider: "did:icn:alice".to_string(),
+///     endpoint_type: EndpointType::Grpc,
+///     service_type: ServiceType {
+///         name: "ledger".to_string(),
+///         version: "1.0".to_string(),
+///     },
+///     endpoints: vec![],
+///     addresses: vec!["grpc://ledger.coop.local:50051".to_string()],
+///     capabilities: vec!["read".to_string(), "write".to_string()],
+///     trust_threshold: 0.5,
+///     scope_visibility: ScopeLevel::Org,
+///     cell_id: None,
+///     ttl_secs: 3600,
+///     signature: Signature::new(vec![0; 64]), // Should be actual Ed25519 signature
+///     created_at: now,
+///     updated_at: now,
+/// };
+///
+/// // Check if endpoint is stale
+/// assert!(!endpoint.is_stale());
+///
+/// // Compute signing payload (for signing before creation)
+/// let payload = endpoint.signing_payload();
+/// assert!(!payload.is_empty());
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ServiceEndpoint {
     /// Unique identifier for this service registration
