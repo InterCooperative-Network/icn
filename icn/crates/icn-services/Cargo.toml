@@ -1,0 +1,19 @@
+[package]
+name = "icn-services"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified services layer for ICN (API + RPC + Gateway)"
+
+[features]
+default = []
+sled-storage = ["icn-gateway/sled-storage"]
+
+[dependencies]
+# Re-export existing crates
+icn-api.workspace = true
+icn-rpc.workspace = true
+icn-gateway.workspace = true
+
+[lints]
+workspace = true

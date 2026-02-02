@@ -3,84 +3,16 @@ name = "icn-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Protocol layer for ICN: gossip and networking"
+description = "Unified protocol layer for ICN (gossip + networking)"
 
 [features]
 default = []
-post-quantum = ["icn-identity/post-quantum", "icn-crypto-pq"]
+post-quantum = ["icn-net/post-quantum"]
 
 [dependencies]
-# Async runtime
-tokio.workspace = true
-
-# Networking & Transport
-quinn.workspace = true
-rustls.workspace = true
-tokio-rustls.workspace = true
-mdns-sd.workspace = true
-
-# ICN crates
-icn-identity.workspace = true
-icn-encoding = { path = "../icn-encoding" }
-icn-crypto-pq = { path = "../icn-crypto-pq", optional = true }
-icn-time = { path = "../icn-time" }
-icn-kernel-api = { path = "../icn-kernel-api" }
-icn-store.workspace = true
-icn-obs.workspace = true
-icn-snapshot.workspace = true
-icn-security.workspace = true
-icn-privacy.workspace = true
-
-# Serialization
-serde.workspace = true
-serde_json = "1.0"
-
-# Error handling
-anyhow.workspace = true
-thiserror.workspace = true
-
-# Logging
-tracing.workspace = true
-
-# Utilities
-bytes.workspace = true
-futures.workspace = true
-rand.workspace = true
-
-# Cryptography
-sha2.workspace = true
-ed25519-dalek.workspace = true
-x25519-dalek.workspace = true
-chacha20poly1305.workspace = true
-zeroize.workspace = true
-rcgen = "0.14"
-hex = "0.4"
-blake3 = "1.8"
-
-# Compression
-zstd = "0.13"
-
-# Other
-time = "0.3"
-hostname = "0.4"
-x509-parser = "0.18"
-bitflags = "2.4"
-
-[dev-dependencies]
-icn-store.workspace = true
-tracing-subscriber.workspace = true
-rand_core.workspace = true
-criterion = "0.5"
-tempfile = "3.24"
-portpicker.workspace = true
-
-[[bench]]
-name = "gossip_bench"
-harness = false
-
-[[bench]]
-name = "net_bench"
-harness = false
+# Re-export existing crates
+icn-gossip.workspace = true
+icn-net.workspace = true
 
 [lints]
 workspace = true
