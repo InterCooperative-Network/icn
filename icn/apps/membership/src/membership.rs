@@ -265,6 +265,9 @@ impl MembershipManager {
     /// Maximum number of conditions allowed in a single criteria block.
     const MAX_CONDITIONS: usize = 64;
 
+    /// Maximum number of elements allowed in an `in` operator array.
+    const MAX_IN_ARRAY_SIZE: usize = 1000;
+
     /// Evaluate membership criteria using CCL
     pub async fn evaluate_criteria(
         &self,
@@ -338,6 +341,13 @@ impl MembershipManager {
             }
             "in" => {
                 if let (Some(v1), Some(arr)) = (field_value, condition.value.as_array()) {
+                    if arr.len() > MembershipManager::MAX_IN_ARRAY_SIZE {
+                        return Err(MembershipError::InvalidCriteria(format!(
+                            "'in' operator array too large: {} elements (max: {})",
+                            arr.len(),
+                            MembershipManager::MAX_IN_ARRAY_SIZE
+                        )));
+                    }
                     Ok(arr.contains(v1))
                 } else {
                     Ok(false)
@@ -443,5 +453,117 @@ mod tests {
 
         let result = manager.evaluate_criteria(&data, &criteria).await.unwrap();
         assert!(result);
+    }
+
+    #[test]
+    fn test_invalid_state_transition_approve_active() {
+        let member_id = create_test_entity_id();
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
+        let mut membership =
+            UnifiedMembership::active(member_id, parent_id, MembershipRole::Worker);
+
+        // Already active, can't approve again
+        let err = membership.approve().unwrap_err();
+        assert!(matches!(err, MembershipError::InvalidStateTransition { .. }));
+    }
+
+    #[test]
+    fn test_invalid_state_transition_suspend_pending() {
+        let member_id = create_test_entity_id();
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
+        let mut membership =
+            UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
+
+        // Pending member can't be suspended
+        let err = membership.suspend("reason".to_string()).unwrap_err();
+        assert!(matches!(err, MembershipError::InvalidStateTransition { .. }));
+    }
+
+    #[test]
+    fn test_change_role_on_inactive_fails() {
+        let member_id = create_test_entity_id();
+        let parent_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
+        let mut membership =
+            UnifiedMembership::new(member_id, parent_id, MembershipRole::Worker);
+
+        let err = membership.change_role(MembershipRole::Founder).unwrap_err();
+        assert!(matches!(err, MembershipError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_unknown_operator_returns_error() {
+        let manager = MembershipManager::new();
+        let data = HashMap::new();
+
+        let criteria = MembershipCriteria {
+            all: vec![crate::entity::Condition {
+                field: "x".to_string(),
+                op: "~=".to_string(),
+                value: serde_json::json!(1),
+            }],
+            any: vec![],
+        };
+
+        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        assert!(matches!(err, MembershipError::InvalidCriteria(_)));
+    }
+
+    #[tokio::test]
+    async fn test_max_conditions_exceeded() {
+        let manager = MembershipManager::new();
+        let data = HashMap::new();
+
+        let too_many: Vec<crate::entity::Condition> = (0..65)
+            .map(|i| crate::entity::Condition {
+                field: format!("f{}", i),
+                op: "==".to_string(),
+                value: serde_json::json!(true),
+            })
+            .collect();
+
+        let criteria = MembershipCriteria {
+            all: too_many,
+            any: vec![],
+        };
+
+        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        assert!(matches!(err, MembershipError::InvalidCriteria(_)));
+    }
+
+    #[tokio::test]
+    async fn test_empty_any_array_passes() {
+        let manager = MembershipManager::new();
+        let data = HashMap::new();
+
+        // Empty `any` array should not block (no "any" requirement)
+        let criteria = MembershipCriteria {
+            all: vec![],
+            any: vec![],
+        };
+
+        let result = manager.evaluate_criteria(&data, &criteria).await.unwrap();
+        assert!(result, "Empty criteria should pass");
+    }
+
+    #[tokio::test]
+    async fn test_in_operator_array_size_limit() {
+        let manager = MembershipManager::new();
+        let mut data = HashMap::new();
+        data.insert("role".to_string(), serde_json::json!("admin"));
+
+        let big_array: Vec<serde_json::Value> =
+            (0..1001).map(|i| serde_json::json!(format!("v{}", i))).collect();
+
+        let criteria = MembershipCriteria {
+            all: vec![crate::entity::Condition {
+                field: "role".to_string(),
+                op: "in".to_string(),
+                value: serde_json::Value::Array(big_array),
+            }],
+            any: vec![],
+        };
+
+        let err = manager.evaluate_criteria(&data, &criteria).await.unwrap_err();
+        assert!(matches!(err, MembershipError::InvalidCriteria(_)));
     }
 }
