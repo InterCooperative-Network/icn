@@ -5,6 +5,7 @@ members = [
     "crates/icn-core",
     "crates/icn-identity",
     "crates/icn-trust",
+    "crates/icn-protocol",
     "crates/icn-net",
     "crates/icn-gossip",
     "crates/icn-ledger",
@@ -113,6 +114,7 @@ icn-kernel-api = { path = "crates/icn-kernel-api" }
 icn-core = { path = "crates/icn-core" }
 icn-identity = { path = "crates/icn-identity" }
 icn-trust = { path = "crates/icn-trust" }
+icn-protocol = { path = "crates/icn-protocol" }
 icn-net = { path = "crates/icn-net" }
 icn-gossip = { path = "crates/icn-gossip" }
 icn-ledger = { path = "crates/icn-ledger" }

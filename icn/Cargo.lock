@@ -3418,6 +3418,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.10.0",
+ "blake3",
+ "bytes",
+ "chacha20poly1305",
+ "criterion",
+ "ed25519-dalek",
+ "futures",
+ "hex",
+ "hostname",
+ "icn-crypto-pq",
+ "icn-encoding",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-obs",
+ "icn-privacy",
+ "icn-security",
+ "icn-snapshot",
+ "icn-store",
+ "icn-time",
+ "mdns-sd",
+ "portpicker",
+ "quinn",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "rcgen",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+ "tracing-subscriber",
+ "x25519-dalek",
+ "x509-parser",
+ "zeroize",
+ "zstd",
+]
+
+[[package]]
 name = "icn-rpc"
 version = "0.1.0"
 dependencies = [
