@@ -19,6 +19,9 @@ icn-identity = { path = "../../icn/crates/icn-identity" }
 # Storage for tests
 icn-store = { path = "../../icn/crates/icn-store" }
 
+# Metrics (for observability)
+icn-obs = { path = "../../icn/crates/icn-obs" }
+
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
 
