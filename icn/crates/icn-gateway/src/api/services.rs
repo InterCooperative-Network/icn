@@ -195,6 +195,7 @@ pub async fn announce_service(
     let endpoint = ServiceEndpoint {
         service_id: req.service_id.clone(),
         provider: req.provider.clone(),
+        endpoint_type: icn_kernel_api::naming::EndpointType::Http, // Default to HTTP for now
         service_type: ServiceType {
             name: req.service_type.clone(),
             version: req.service_version.clone(),
@@ -210,12 +211,15 @@ pub async fn announce_service(
                 ep
             })
             .collect(),
+        addresses: vec![], // No string addresses for now
         capabilities: req.capabilities.clone(),
         trust_threshold: req.trust_threshold,
         scope_visibility: parse_scope(&req.scope_visibility),
+        cell_id: None, // No cell ID in current API
         ttl_secs: req.ttl_secs,
         signature: Signature::new(sig_bytes),
         created_at: req.created_at,
+        updated_at: req.created_at, // Initially same as created_at
     };
 
     // Verify Ed25519 signature before accepting the endpoint

@@ -262,17 +262,21 @@ mod tests {
         ServiceEndpoint {
             service_id: id.to_string(),
             provider: "did:icn:test".to_string(),
+            endpoint_type: icn_kernel_api::naming::EndpointType::Http,
             service_type: ServiceType {
                 name: "ledger".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![Endpoint::new("https", "example.com", 8080)],
+            addresses: vec![],
             capabilities: vec!["read".to_string()],
             trust_threshold: 0.1,
             scope_visibility: scope,
+            cell_id: None,
             ttl_secs: ttl,
             signature: Signature::new(vec![0; 64]),
             created_at: now,
+            updated_at: now,
         }
     }
 
@@ -358,8 +362,8 @@ mod tests {
     async fn test_expired_endpoints_filtered() {
         let mgr = ServiceDiscoveryManager::new();
         let mut ep = make_endpoint("expired-svc", ScopeLevel::Org, 1);
-        // Set created_at to the past so it's expired
-        ep.created_at = 1000;
+        // Set updated_at to the past so it's expired
+        ep.updated_at = 1000;
         mgr.announce(ep).await.unwrap();
 
         let results = mgr.discover(ScopeLevel::Commons, None, &[]).await;
@@ -372,7 +376,7 @@ mod tests {
     async fn test_remove_expired() {
         let mgr = ServiceDiscoveryManager::new();
         let mut ep = make_endpoint("expired-svc", ScopeLevel::Org, 1);
-        ep.created_at = 1000;
+        ep.updated_at = 1000;
         mgr.announce(ep).await.unwrap();
 
         let fresh = make_endpoint("fresh-svc", ScopeLevel::Org, 3600);

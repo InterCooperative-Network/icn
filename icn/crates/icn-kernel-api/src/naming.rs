@@ -21,7 +21,7 @@
 //! - Dispute resolution (just enforces signatures)
 //! - Global namespace (scoped by design)
 
-use crate::scope::ScopeLevel;
+use crate::scope::{CellId, ScopeLevel};
 use crate::types::{
     Did, Duration, Endpoint, Hash, Name, Namespace, Scope, Signature, Subscription,
 };
@@ -145,6 +145,19 @@ pub struct ServiceAnnouncement {
 /// Unique identifier for a service endpoint registration.
 pub type ServiceEndpointId = String;
 
+/// Type of network endpoint for a service.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum EndpointType {
+    /// QUIC transport
+    Quic,
+    /// HTTP/HTTPS endpoint
+    Http,
+    /// gRPC endpoint
+    Grpc,
+    /// WebSocket endpoint
+    WebSocket,
+}
+
 /// Service endpoint with signing, scope awareness, and multi-endpoint support.
 ///
 /// Complements the existing `ServiceAnnouncement` with:
@@ -158,22 +171,30 @@ pub struct ServiceEndpoint {
     pub service_id: ServiceEndpointId,
     /// DID of the service provider
     pub provider: Did,
+    /// Type of endpoint (transport protocol)
+    pub endpoint_type: EndpointType,
     /// Type of service being provided
     pub service_type: ServiceType,
     /// Network endpoints where the service is reachable
     pub endpoints: Vec<Endpoint>,
+    /// Simple string addresses (alternative to structured endpoints)
+    pub addresses: Vec<String>,
     /// Capabilities offered by this service
     pub capabilities: Vec<String>,
     /// Minimum trust score required to access this service
     pub trust_threshold: f64,
     /// Scope at which this service is visible
     pub scope_visibility: ScopeLevel,
+    /// Optional cell identifier for cell-scoped services
+    pub cell_id: Option<CellId>,
     /// Time-to-live in seconds
     pub ttl_secs: u64,
     /// Ed25519 signature over the signing payload
     pub signature: Signature,
     /// Unix timestamp of creation
     pub created_at: u64,
+    /// Unix timestamp of last update
+    pub updated_at: u64,
 }
 
 impl ServiceEndpoint {
@@ -185,8 +206,19 @@ impl ServiceEndpoint {
         let mut payload = Vec::new();
         payload.extend_from_slice(self.service_id.as_bytes());
         payload.extend_from_slice(self.provider.as_bytes());
+        
+        // Endpoint type
+        let endpoint_type_byte = match self.endpoint_type {
+            EndpointType::Quic => 0u8,
+            EndpointType::Http => 1u8,
+            EndpointType::Grpc => 2u8,
+            EndpointType::WebSocket => 3u8,
+        };
+        payload.push(endpoint_type_byte);
+        
         payload.extend_from_slice(self.service_type.name.as_bytes());
         payload.extend_from_slice(self.service_type.version.as_bytes());
+        
         // Endpoints: encode count then each endpoint
         payload.extend_from_slice(&(self.endpoints.len() as u32).to_le_bytes());
         for ep in &self.endpoints {
@@ -200,6 +232,15 @@ impl ServiceEndpoint {
                 payload.push(0);
             }
         }
+        
+        // Addresses: sorted for determinism
+        let mut sorted_addrs = self.addresses.clone();
+        sorted_addrs.sort();
+        payload.extend_from_slice(&(sorted_addrs.len() as u32).to_le_bytes());
+        for addr in &sorted_addrs {
+            payload.extend_from_slice(addr.as_bytes());
+        }
+        
         // Capabilities: sorted for determinism
         let mut sorted_caps = self.capabilities.clone();
         sorted_caps.sort();
@@ -207,20 +248,74 @@ impl ServiceEndpoint {
         for cap in &sorted_caps {
             payload.extend_from_slice(cap.as_bytes());
         }
+        
         payload.extend_from_slice(&self.trust_threshold.to_le_bytes());
         payload.push(self.scope_visibility.as_u8());
+        
+        // Cell ID: optional
+        if let Some(ref cell_id) = self.cell_id {
+            payload.push(1);
+            payload.extend_from_slice(cell_id.as_bytes());
+        } else {
+            payload.push(0);
+        }
+        
         payload.extend_from_slice(&self.ttl_secs.to_le_bytes());
         payload.extend_from_slice(&self.created_at.to_le_bytes());
+        payload.extend_from_slice(&self.updated_at.to_le_bytes());
         payload
     }
 
-    /// Check if this endpoint registration has expired.
+    /// Verify the Ed25519 signature on this endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `public_key_bytes` - The 32-byte Ed25519 public key of the provider
+    ///
+    /// # Returns
+    ///
+    /// `Ok(true)` if signature is valid, `Ok(false)` if invalid,
+    /// or `Err` if the public key or signature format is invalid.
+    pub fn verify_signature(&self, public_key_bytes: &[u8; 32]) -> Result<bool, String> {
+        use ed25519_dalek::{Signature as Ed25519Signature, VerifyingKey, Verifier};
+        
+        // Parse the public key
+        let verifying_key = VerifyingKey::from_bytes(public_key_bytes)
+            .map_err(|e| format!("Invalid public key: {}", e))?;
+        
+        // Parse the signature (expecting 64 bytes for Ed25519)
+        if self.signature.as_bytes().len() != 64 {
+            return Err(format!(
+                "Invalid signature length: expected 64 bytes, got {}",
+                self.signature.as_bytes().len()
+            ));
+        }
+        
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(self.signature.as_bytes());
+        let signature = Ed25519Signature::from_bytes(&sig_bytes);
+        
+        // Compute the signing payload
+        let payload = self.signing_payload();
+        
+        // Verify the signature
+        Ok(verifying_key.verify(&payload, &signature).is_ok())
+    }
+
+    /// Check if this endpoint registration has expired (alias for compatibility).
     pub fn is_expired(&self) -> bool {
+        self.is_stale()
+    }
+
+    /// Check if this endpoint registration is stale (TTL expired).
+    ///
+    /// Returns `true` if the current time exceeds `updated_at + ttl_secs`.
+    pub fn is_stale(&self) -> bool {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        now > self.created_at.saturating_add(self.ttl_secs)
+        now > self.updated_at.saturating_add(self.ttl_secs)
     }
 }
 
@@ -459,17 +554,21 @@ mod tests {
         let ep = ServiceEndpoint {
             service_id: "svc-1".to_string(),
             provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Http,
             service_type: ServiceType {
                 name: "ledger".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![Endpoint::new("https", "example.com", 8080)],
+            addresses: vec![],
             capabilities: vec!["read".to_string(), "write".to_string()],
             trust_threshold: 0.1,
             scope_visibility: ScopeLevel::Org,
+            cell_id: None,
             ttl_secs: 3600,
             signature: Signature::new(vec![0; 64]),
             created_at: 1700000000,
+            updated_at: 1700000000,
         };
 
         let payload1 = ep.signing_payload();
@@ -483,17 +582,21 @@ mod tests {
         let make_ep = |caps: Vec<String>| ServiceEndpoint {
             service_id: "svc-1".to_string(),
             provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Quic,
             service_type: ServiceType {
                 name: "ledger".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![],
+            addresses: vec![],
             capabilities: caps,
             trust_threshold: 0.0,
             scope_visibility: ScopeLevel::Local,
+            cell_id: None,
             ttl_secs: 60,
             signature: Signature::new(vec![]),
             created_at: 0,
+            updated_at: 0,
         };
 
         let ep1 = make_ep(vec!["b".to_string(), "a".to_string()]);
@@ -511,26 +614,32 @@ mod tests {
         let fresh = ServiceEndpoint {
             service_id: "svc-1".to_string(),
             provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::WebSocket,
             service_type: ServiceType {
                 name: "test".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![],
+            addresses: vec![],
             capabilities: vec![],
             trust_threshold: 0.0,
             scope_visibility: ScopeLevel::Local,
+            cell_id: None,
             ttl_secs: 3600,
             signature: Signature::new(vec![]),
             created_at: now,
+            updated_at: now,
         };
         assert!(!fresh.is_expired());
+        assert!(!fresh.is_stale());
 
         let expired = ServiceEndpoint {
-            created_at: now - 7200,
+            updated_at: now - 7200,
             ttl_secs: 3600,
             ..fresh.clone()
         };
         assert!(expired.is_expired());
+        assert!(expired.is_stale());
     }
 
     #[test]
@@ -538,17 +647,21 @@ mod tests {
         let ep = ServiceEndpoint {
             service_id: "svc-1".to_string(),
             provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Grpc,
             service_type: ServiceType {
                 name: "ledger".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![Endpoint::new("https", "example.com", 443)],
+            addresses: vec!["https://example.com:443".to_string()],
             capabilities: vec!["read".to_string()],
             trust_threshold: 0.5,
             scope_visibility: ScopeLevel::Federation,
+            cell_id: None,
             ttl_secs: 1800,
             signature: Signature::new(vec![1, 2, 3]),
             created_at: 1700000000,
+            updated_at: 1700000100,
         };
 
         let json = serde_json::to_string(&ep).unwrap();
@@ -563,5 +676,196 @@ mod tests {
 
         let err = NamingError::NotFound("/org/app".to_string());
         assert!(err.to_string().contains("/org/app"));
+    }
+
+    #[test]
+    fn test_service_endpoint_verify_signature_valid() {
+        use ed25519_dalek::{SigningKey, Signer};
+        use rand::rngs::OsRng;
+        
+        // Generate a keypair
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let verifying_key = signing_key.verifying_key();
+        let public_key_bytes = verifying_key.to_bytes();
+        
+        // Create an endpoint
+        let mut ep = ServiceEndpoint {
+            service_id: "svc-sig-test".to_string(),
+            provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Http,
+            service_type: ServiceType {
+                name: "test".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            addresses: vec!["http://localhost:8080".to_string()],
+            capabilities: vec!["test".to_string()],
+            trust_threshold: 0.1,
+            scope_visibility: ScopeLevel::Org,
+            cell_id: None,
+            ttl_secs: 3600,
+            signature: Signature::new(vec![0; 64]), // Placeholder
+            created_at: 1700000000,
+            updated_at: 1700000000,
+        };
+        
+        // Sign the payload
+        let payload = ep.signing_payload();
+        let signature = signing_key.sign(&payload);
+        ep.signature = Signature::new(signature.to_bytes().to_vec());
+        
+        // Verify the signature
+        let result = ep.verify_signature(&public_key_bytes);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[test]
+    fn test_service_endpoint_verify_signature_invalid() {
+        use ed25519_dalek::{SigningKey, Signer};
+        use rand::rngs::OsRng;
+        
+        // Generate a keypair
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let verifying_key = signing_key.verifying_key();
+        let public_key_bytes = verifying_key.to_bytes();
+        
+        // Create an endpoint with a bad signature
+        let ep = ServiceEndpoint {
+            service_id: "svc-bad-sig".to_string(),
+            provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Quic,
+            service_type: ServiceType {
+                name: "test".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            addresses: vec!["quic://localhost:9090".to_string()],
+            capabilities: vec![],
+            trust_threshold: 0.1,
+            scope_visibility: ScopeLevel::Local,
+            cell_id: None,
+            ttl_secs: 600,
+            signature: Signature::new(vec![0; 64]), // Invalid signature
+            created_at: 1700000000,
+            updated_at: 1700000000,
+        };
+        
+        // Verify should fail
+        let result = ep.verify_signature(&public_key_bytes);
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // Signature is invalid
+    }
+
+    #[test]
+    fn test_service_endpoint_tampered_detection() {
+        use ed25519_dalek::{SigningKey, Signer};
+        use rand::rngs::OsRng;
+        
+        // Generate a keypair
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let verifying_key = signing_key.verifying_key();
+        let public_key_bytes = verifying_key.to_bytes();
+        
+        // Create and sign an endpoint
+        let mut ep = ServiceEndpoint {
+            service_id: "svc-tamper-test".to_string(),
+            provider: "did:icn:alice".to_string(),
+            endpoint_type: EndpointType::Http,
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![],
+            addresses: vec!["http://example.com:8080".to_string()],
+            capabilities: vec!["read".to_string()],
+            trust_threshold: 0.5,
+            scope_visibility: ScopeLevel::Org,
+            cell_id: None,
+            ttl_secs: 3600,
+            signature: Signature::new(vec![0; 64]),
+            created_at: 1700000000,
+            updated_at: 1700000000,
+        };
+        
+        let payload = ep.signing_payload();
+        let signature = signing_key.sign(&payload);
+        ep.signature = Signature::new(signature.to_bytes().to_vec());
+        
+        // Verify original is valid
+        assert!(ep.verify_signature(&public_key_bytes).unwrap());
+        
+        // Tamper with the address
+        ep.addresses = vec!["http://malicious.com:8080".to_string()];
+        
+        // Verification should now fail
+        let result = ep.verify_signature(&public_key_bytes);
+        assert!(result.is_ok());
+        assert!(!result.unwrap(), "Tampered endpoint should fail verification");
+    }
+
+    #[test]
+    fn test_endpoint_type_variants() {
+        let types = vec![
+            EndpointType::Quic,
+            EndpointType::Http,
+            EndpointType::Grpc,
+            EndpointType::WebSocket,
+        ];
+        
+        // Ensure serde works
+        for endpoint_type in types {
+            let json = serde_json::to_string(&endpoint_type).unwrap();
+            let parsed: EndpointType = serde_json::from_str(&json).unwrap();
+            assert_eq!(endpoint_type, parsed);
+        }
+    }
+
+    #[test]
+    fn test_service_endpoint_with_cell_id() {
+        use ed25519_dalek::{SigningKey, Signer};
+        use rand::rngs::OsRng;
+        
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let verifying_key = signing_key.verifying_key();
+        let public_key_bytes = verifying_key.to_bytes();
+        
+        let cell_id = CellId::derive(b"org123", "cell-alpha", &[42u8; 32]);
+        
+        let mut ep = ServiceEndpoint {
+            service_id: "svc-cell-test".to_string(),
+            provider: "did:icn:bob".to_string(),
+            endpoint_type: EndpointType::Grpc,
+            service_type: ServiceType {
+                name: "storage".to_string(),
+                version: "2.0".to_string(),
+            },
+            endpoints: vec![],
+            addresses: vec!["grpc://storage.local:5000".to_string()],
+            capabilities: vec!["write".to_string(), "read".to_string()],
+            trust_threshold: 0.7,
+            scope_visibility: ScopeLevel::Cell,
+            cell_id: Some(cell_id),
+            ttl_secs: 1800,
+            signature: Signature::new(vec![0; 64]),
+            created_at: 1700000000,
+            updated_at: 1700000500,
+        };
+        
+        // Sign with cell_id included
+        let payload = ep.signing_payload();
+        let signature = signing_key.sign(&payload);
+        ep.signature = Signature::new(signature.to_bytes().to_vec());
+        
+        // Verify signature
+        assert!(ep.verify_signature(&public_key_bytes).unwrap());
+        
+        // Tampering with cell_id should break signature
+        ep.cell_id = None;
+        assert!(!ep.verify_signature(&public_key_bytes).unwrap());
     }
 }
