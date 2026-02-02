@@ -412,7 +412,7 @@ This document provides a formal threat model for the InterCooperative Network (I
 | TR-I1 | Enumerate trust relationships | ⚠️ Trust graph queryable | 🟡 By Design |
 | TR-I2 | `inputs_hash` timing attack | Raw timestamps in hash leak attestation arrival patterns | 🟡 Documented |
 
-**TR-I2 Details**: The `inputs_hash` field in `TrustScoreResult` (see `apps/trust/src/reducer.rs:211-222`) 
+**TR-I2 Details**: The `inputs_hash` field in `TrustScoreResult` (see `icn/crates/icn-trust/src/attestation.rs`, where `created_at.to_le_bytes()` is incorporated into signing payloads)
 includes raw `created_at` timestamps (Unix seconds) from trust attestations. When nodes exchange 
 `inputs_hash` values in P2P queries or gossip, an attacker can:
 
@@ -439,8 +439,8 @@ attestations from multiple parties simultaneously (coordination event).
   - Cons: Adds latency, complex implementation
 
 **Cross-References**:
-- `icn-privacy` metadata protection primitives (traffic obfuscation - planned)
-- Trust score caching in `apps/trust/src/service_tokio.rs`
+- `icn-privacy` metadata protection primitives (traffic obfuscation: random delay, padding, cover traffic)
+- Planned trust score caching layer in the trust service (forward-looking; implementation location TBD)
 - `TrustScoreResult` definition in `icn/crates/icn-kernel-api/src/services.rs:116-144`
 
 #### Denial of Service
@@ -818,8 +818,8 @@ attestations from multiple parties simultaneously (coordination event).
 | GAP-M4 | Votes visible during voting | Enables vote buying | Implement commit-reveal scheme | Medium |
 | GAP-M5 | Trust score `inputs_hash` timing leak | Raw timestamps reveal attestation arrival patterns | Truncate timestamps to coarser granularity or add traffic obfuscation | Low-Medium |
 
-**GAP-M5 Details**: The `inputs_hash` computation in the trust attestation reducer 
-(`apps/trust/src/reducer.rs:211-222`) includes raw Unix timestamps from attestations. 
+**GAP-M5 Details**: The `inputs_hash` computation in the trust attestation reducer implementation
+(within the trust computation logic of the `icn-trust` crate) includes raw Unix timestamps from attestations. 
 This creates a timing side-channel that allows adversaries to:
 
 - **Correlation Attack**: Query `inputs_hash` from multiple nodes. Identical hashes indicate nodes 
@@ -851,7 +851,7 @@ However, timing precision could enable targeted attacks:
 
 **Related**:
 - Threat TR-I2 in Section 4.3 (Trust System - Information Disclosure)
-- `icn-privacy` traffic obfuscation module (planned)
+- `icn-privacy` traffic obfuscation module (implemented in `icn-privacy/src/traffic_obfuscation.rs`)
 - Trust score caching and invalidation strategy
 
 ### 6.3 Low Priority Gaps
