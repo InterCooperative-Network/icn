@@ -1,7 +1,9 @@
 //! Cross-organization trust bridging integration tests.
 //!
-//! Tests verify that the trust oracle correctly handles PolicyRequests with
-//! org_id metadata and computes trust scores across federation boundaries.
+//! Tests verify that the trust oracle accepts PolicyRequests with `org_id`
+//! metadata. The current oracle implementation uses global trust edges; a
+//! future scope-bounded implementation would query `compute_trust_score_in_scope()`
+//! using `org_id` to filter by `ScopeId::federation()` or `ScopeId::cooperative()`.
 
 use icn_identity::KeyPair;
 use icn_kernel_api::authz::{
@@ -81,10 +83,10 @@ fn test_trust_score_computation_across_federation_boundaries() {
     let actor = KeyPair::generate().unwrap();
     let graph = create_test_graph(&owner);
 
-    // Add high trust edge - note that trust computation uses weighted scoring
-    // Direct trust of 0.9 with legacy weights (70% direct, 30% transitive) gives:
-    // score = 0.9 * 0.7 + 0.0 * 0.3 = 0.63 (standard rate)
-    // To get unlimited rate (>= 0.7), we need to ensure the computed score is high enough
+    // Add high trust edge - note that trust computation uses weighted scoring.
+    // Direct trust of 1.0 with legacy weights (70% direct, 30% transitive) gives:
+    // score = 1.0 * 0.7 + 0.0 * 0.3 = 0.7 (exactly at unlimited rate threshold).
+    // We need to ensure the computed score is high enough to reach unlimited rate (>= 0.7).
     {
         let mut g = graph.write();
         // Add a higher direct trust edge that will result in >= 0.7 after weighting
@@ -258,7 +260,9 @@ fn test_cross_org_request_without_org_id_uses_global_scope() {
 
     let oracle = TrustPolicyOracle::new(graph);
 
-    // Create request WITHOUT org_id metadata (should use global scope)
+    // Create request WITHOUT org_id metadata (should use global scope).
+    // NOTE: Currently the oracle always uses global scope even when org_id IS provided.
+    // This test will differentiate behavior once scope-bounded trust is implemented.
     let request = PolicyRequest::new(
         actor.did().as_str().to_string(),
         ActionKind::Write,
@@ -271,7 +275,7 @@ fn test_cross_org_request_without_org_id_uses_global_scope() {
     let constraints = decision.constraints().unwrap();
     let rate = constraints.rate_limit.as_ref().unwrap();
 
-    // Trust score 0.6 maps to standard rate (0.4-0.7 range)
+    // Computed trust score 0.42 (0.6 direct * 0.7 weight) maps to standard rate (0.4-0.7 range)
     assert_eq!(rate.messages_per_second, 100);
 }
 
