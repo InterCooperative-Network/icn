@@ -239,8 +239,11 @@ async fn spawn_actors_with_identity(
     // Extract TrustService early so it can be wired into the MisbehaviorDetector.
     let trust_service_from_registry = service_registry.and_then(|r| r.trust().cloned());
 
-    let trust_services =
-        super::init_trust::init_trust_services(config, trust_service_from_registry.clone()).await?;
+    let trust_services = icn_trust_app::init::init_trust_services(
+        &config.store_path(),
+        trust_service_from_registry.clone(),
+    )
+    .await?;
     let misbehavior_detector = trust_services.misbehavior_detector.clone();
     let recovery_store = trust_services.recovery_store.clone();
     let security_store = trust_services.security_store.clone();

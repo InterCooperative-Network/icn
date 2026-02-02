@@ -32,6 +32,7 @@
 //! `TrustService` trait from `icn-kernel-api`. This provides a clean
 //! abstraction that the kernel can use without domain knowledge.
 
+pub mod init;
 pub mod oracle;
 pub mod oracle_tokio;
 pub mod reducer;
@@ -41,6 +42,7 @@ pub mod service_tokio;
 
 use std::sync::Arc;
 
+pub use init::TrustServices;
 pub use oracle::TrustPolicyOracle;
 pub use oracle_tokio::TrustPolicyOracleTokio;
 pub use sequence::{SequenceTracker, SharedSequenceTracker};
