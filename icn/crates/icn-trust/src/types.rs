@@ -589,7 +589,7 @@ impl<'de> Deserialize<'de> for TrustScore {
 /// let global = ScopeId::global();
 /// assert!(global.is_global());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScopeId {
     /// Trust within a single cooperative
@@ -601,6 +601,7 @@ pub enum ScopeId {
     /// Trust within a topic class (e.g., compute, storage)
     TopicClass(String),
     /// Trust without scope boundaries (default)
+    #[default]
     Global,
 }
 
@@ -667,12 +668,6 @@ impl fmt::Display for ScopeId {
             Self::TopicClass(id) => write!(f, "topic:{}", id),
             Self::Global => write!(f, "global"),
         }
-    }
-}
-
-impl Default for ScopeId {
-    fn default() -> Self {
-        Self::Global
     }
 }
 
