@@ -77,7 +77,7 @@ impl CoopMembershipManager {
             ));
         }
 
-        membership.voting_weight = new_shares;
+        membership.shares = new_shares;
         membership.updated_at = icn_time::current_timestamp_secs();
         Ok(())
     }
@@ -125,6 +125,8 @@ pub mod compat {
             icn_coop::MemberRole::Consumer => MembershipRole::Consumer,
             icn_coop::MemberRole::Producer => MembershipRole::Producer,
             icn_coop::MemberRole::BoardMember => MembershipRole::BoardMember,
+            // TODO: icn_coop::MemberRole::Officer doesn't carry a title;
+            // use a generic placeholder until the source crate is extended.
             icn_coop::MemberRole::Officer => MembershipRole::Officer {
                 title: "Officer".to_string(),
             },
@@ -143,13 +145,10 @@ pub mod compat {
             parent_id,
             role: role.clone(),
             status,
-            joined_at: member
-                .joined_at
-                .timestamp()
-                .try_into()
-                .unwrap_or(0),
+            // Clamp pre-1970 timestamps to 0 (icn-entity expects u64)
+            joined_at: member.joined_at.timestamp().max(0) as u64,
             updated_at: icn_time::current_timestamp_secs(),
-            voting_weight: member.shares,
+            shares: member.shares,
             capabilities: role.default_capabilities(),
             metadata: member.metadata.clone(),
             assignments: Vec::new(),
@@ -208,7 +207,7 @@ mod tests {
             UnifiedMembership::active(member_id, coop_id, MembershipRole::Worker);
 
         assert!(manager.update_shares(&mut membership, 100).is_ok());
-        assert_eq!(membership.voting_weight, 100);
+        assert_eq!(membership.shares, 100);
     }
 
     #[test]

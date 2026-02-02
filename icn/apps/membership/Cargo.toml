@@ -18,9 +18,6 @@ icn-community = { path = "../../crates/icn-community" }
 # Identity types (for Did)
 icn-identity = { path = "../../crates/icn-identity" }
 
-# CCL for membership rules (second CCL consumer)
-icn-ccl = { path = "../../crates/icn-ccl" }
-
 # Storage
 icn-store = { path = "../../crates/icn-store" }
 

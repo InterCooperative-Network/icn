@@ -145,7 +145,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(membership.voting_weight, 1);
+        assert_eq!(membership.shares, 1);
     }
 
     #[test]

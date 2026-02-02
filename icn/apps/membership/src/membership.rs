@@ -38,7 +38,7 @@ pub trait MembershipTrait {
     fn can_propose(&self) -> bool;
 
     /// Get voting shares/weight
-    fn voting_weight(&self) -> u64;
+    fn shares(&self) -> u64;
 }
 
 /// Unified membership record that works for all entity types
@@ -63,7 +63,7 @@ pub struct UnifiedMembership {
     pub updated_at: u64,
 
     /// Voting shares/weight
-    pub voting_weight: u64,
+    pub shares: u64,
 
     /// Capabilities granted by this membership
     pub capabilities: Vec<MembershipCapability>,
@@ -102,7 +102,7 @@ impl UnifiedMembership {
             status: MembershipStatus::Pending,
             joined_at: now,
             updated_at: now,
-            voting_weight: 1,
+            shares: 1,
             capabilities,
             metadata: HashMap::new(),
             assignments: Vec::new(),
@@ -119,8 +119,8 @@ impl UnifiedMembership {
     }
 
     /// Set voting weight
-    pub fn with_voting_weight(mut self, weight: u64) -> Self {
-        self.voting_weight = weight;
+    pub fn with_shares(mut self, weight: u64) -> Self {
+        self.shares = weight;
         self
     }
 
@@ -209,7 +209,7 @@ impl MembershipTrait for UnifiedMembership {
 
     fn can_vote(&self) -> bool {
         self.is_active()
-            && self.voting_weight > 0
+            && self.shares > 0
             && self.has_capability(&MembershipCapability::Vote)
     }
 
@@ -217,8 +217,8 @@ impl MembershipTrait for UnifiedMembership {
         self.is_active() && self.has_capability(&MembershipCapability::Propose)
     }
 
-    fn voting_weight(&self) -> u64 {
-        self.voting_weight
+    fn shares(&self) -> u64 {
+        self.shares
     }
 }
 
@@ -262,12 +262,22 @@ impl MembershipManager {
         Ok(UnifiedMembership::new(member_id, parent_id, role))
     }
 
+    /// Maximum number of conditions allowed in a single criteria block.
+    const MAX_CONDITIONS: usize = 64;
+
     /// Evaluate membership criteria using CCL
     pub async fn evaluate_criteria(
         &self,
         member_data: &HashMap<String, serde_json::Value>,
         criteria: &MembershipCriteria,
     ) -> Result<bool, MembershipError> {
+        if criteria.all.len() > Self::MAX_CONDITIONS || criteria.any.len() > Self::MAX_CONDITIONS {
+            return Err(MembershipError::InvalidCriteria(format!(
+                "Too many conditions (max {} per block)",
+                Self::MAX_CONDITIONS
+            )));
+        }
+
         // Evaluate "all" conditions
         for condition in &criteria.all {
             if !Self::evaluate_condition(member_data, condition)? {
@@ -277,10 +287,13 @@ impl MembershipManager {
 
         // Evaluate "any" conditions (at least one must be true)
         if !criteria.any.is_empty() {
-            let any_true = criteria
-                .any
-                .iter()
-                .any(|c| Self::evaluate_condition(member_data, c).unwrap_or(false));
+            let mut any_true = false;
+            for condition in &criteria.any {
+                if Self::evaluate_condition(member_data, condition)? {
+                    any_true = true;
+                    break;
+                }
+            }
             if !any_true {
                 return Ok(false);
             }
@@ -381,7 +394,7 @@ mod tests {
 
         assert_eq!(membership.member_id, member_id);
         assert!(matches!(membership.status, MembershipStatus::Pending));
-        assert_eq!(membership.voting_weight, 1);
+        assert_eq!(membership.shares, 1);
     }
 
     #[test]

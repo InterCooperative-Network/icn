@@ -85,3 +85,18 @@ ccl_schemas:
                                   - type: string
                                   - type: number
                                   - type: boolean
+                        any:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              field:
+                                type: string
+                              op:
+                                type: string
+                                enum: ["==", "!=", ">", ">=", "<", "<=", "in"]
+                              value:
+                                oneOf:
+                                  - type: string
+                                  - type: number
+                                  - type: boolean

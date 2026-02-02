@@ -108,7 +108,7 @@ impl CommunityMembershipManager {
             .await?;
 
         // Set voting weight based on member type
-        membership.voting_weight = match member_type {
+        membership.shares = match member_type {
             MemberType::Individual => config.voting_config.individual_weight as u64,
             MemberType::Cooperative => config.voting_config.cooperative_weight as u64,
             MemberType::Organization => config.voting_config.organization_weight as u64,
@@ -141,7 +141,7 @@ impl CommunityMembershipManager {
     }
 
     /// Update voting weight
-    pub fn update_voting_weight(
+    pub fn update_shares(
         &self,
         membership: &mut UnifiedMembership,
         new_weight: u32,
@@ -152,7 +152,7 @@ impl CommunityMembershipManager {
             ));
         }
 
-        membership.voting_weight = new_weight as u64;
+        membership.shares = new_weight as u64;
         membership.updated_at = icn_time::current_timestamp_secs();
         Ok(())
     }
@@ -179,7 +179,7 @@ pub mod compat {
                 let did: icn_identity::Did = did_str
                     .as_str()
                     .parse()
-                    .unwrap_or_else(|_| icn_identity::KeyPair::generate().unwrap().did().clone());
+                    .expect("Invalid DID in community member record");
                 EntityId::from_did(&did)
             }
             icn_community::MemberType::Cooperative(id) => {
@@ -198,9 +198,10 @@ pub mod compat {
             } else {
                 icn_entity::MembershipStatus::Inactive
             },
-            joined_at: member.joined_at.timestamp().try_into().unwrap_or(0),
+            // Clamp pre-1970 timestamps to 0 (icn-entity expects u64)
+            joined_at: member.joined_at.timestamp().max(0) as u64,
             updated_at: icn_time::current_timestamp_secs(),
-            voting_weight: member.voting_weight as u64,
+            shares: member.voting_weight as u64,
             capabilities: MembershipRole::Member.default_capabilities(),
             metadata: std::collections::HashMap::new(),
             assignments: Vec::new(),
@@ -249,11 +250,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(membership.voting_weight, 1);
+        assert_eq!(membership.shares, 1);
     }
 
     #[tokio::test]
-    async fn test_cooperative_voting_weight() {
+    async fn test_cooperative_shares() {
         let manager = CommunityMembershipManager::new();
         let config = create_test_community_config();
 
@@ -271,7 +272,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(membership.voting_weight, 5);
+        assert_eq!(membership.shares, 5);
     }
 
     #[test]

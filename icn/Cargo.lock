@@ -3314,7 +3314,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ed25519-dalek",
- "icn-ccl",
  "icn-community",
  "icn-coop",
  "icn-entity",
