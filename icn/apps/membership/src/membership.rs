@@ -251,7 +251,8 @@ impl MembershipManager {
             self.trust_threshold
         };
 
-        // TODO: Query trust graph for actual trust score
+        // TODO: Query trust PolicyOracle for actual trust score and reject
+        // members below threshold. Currently all members are accepted as Pending.
         tracing::debug!(
             "Adding member {:?} to {:?} with trust threshold {}",
             member_id,
@@ -312,33 +313,29 @@ impl MembershipManager {
         match condition.op.as_str() {
             "==" => Ok(field_value == Some(&condition.value)),
             "!=" => Ok(field_value != Some(&condition.value)),
-            ">" => {
-                if let (Some(v1), Some(v2)) = (field_value, condition.value.as_f64()) {
-                    Ok(v1.as_f64().unwrap_or(0.0) > v2)
-                } else {
-                    Ok(false)
-                }
-            }
-            ">=" => {
-                if let (Some(v1), Some(v2)) = (field_value, condition.value.as_f64()) {
-                    Ok(v1.as_f64().unwrap_or(0.0) >= v2)
-                } else {
-                    Ok(false)
-                }
-            }
-            "<" => {
-                if let (Some(v1), Some(v2)) = (field_value, condition.value.as_f64()) {
-                    Ok(v1.as_f64().unwrap_or(0.0) < v2)
-                } else {
-                    Ok(false)
-                }
-            }
-            "<=" => {
-                if let (Some(v1), Some(v2)) = (field_value, condition.value.as_f64()) {
-                    Ok(v1.as_f64().unwrap_or(0.0) <= v2)
-                } else {
-                    Ok(false)
-                }
+            ">" | ">=" | "<" | "<=" => {
+                let v2 = condition.value.as_f64().ok_or_else(|| {
+                    MembershipError::InvalidCriteria(format!(
+                        "Non-numeric comparison value for operator '{}'",
+                        condition.op
+                    ))
+                })?;
+                let v1 = match field_value {
+                    Some(v) => v.as_f64().ok_or_else(|| {
+                        MembershipError::InvalidCriteria(format!(
+                            "Field '{}' is not numeric",
+                            condition.field
+                        ))
+                    })?,
+                    None => return Ok(false), // Missing field ⇒ condition not met
+                };
+                Ok(match condition.op.as_str() {
+                    ">" => v1 > v2,
+                    ">=" => v1 >= v2,
+                    "<" => v1 < v2,
+                    "<=" => v1 <= v2,
+                    _ => unreachable!(),
+                })
             }
             "in" => {
                 if let (Some(v1), Some(arr)) = (field_value, condition.value.as_array()) {
