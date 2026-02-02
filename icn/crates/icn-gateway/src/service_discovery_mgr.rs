@@ -436,4 +436,92 @@ mod tests {
         // Fresh endpoint should still be there
         assert!(mgr.get("fresh-svc").await.is_some());
     }
+
+    #[tokio::test]
+    async fn test_async_scoped_discovery_announce() {
+        // Test that AsyncScopedDiscovery trait works correctly
+        let mgr = ServiceDiscoveryManager::new();
+        let ep = make_endpoint("async-svc", ScopeLevel::Org, 3600);
+
+        // Use the trait method
+        use icn_kernel_api::naming::AsyncScopedDiscovery;
+        AsyncScopedDiscovery::announce_endpoint(&mgr, ep).await.unwrap();
+
+        // Verify via trait method
+        let service_id = "async-svc".to_string();
+        let result = AsyncScopedDiscovery::get_endpoint(&mgr, &service_id).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().service_id, "async-svc");
+    }
+
+    #[tokio::test]
+    async fn test_async_scoped_discovery_withdraw() {
+        let mgr = ServiceDiscoveryManager::new();
+        let ep = make_endpoint("async-svc", ScopeLevel::Org, 3600);
+
+        use icn_kernel_api::naming::AsyncScopedDiscovery;
+        AsyncScopedDiscovery::announce_endpoint(&mgr, ep).await.unwrap();
+        
+        let service_id = "async-svc".to_string();
+        let provider = "did:icn:test".to_string();
+        AsyncScopedDiscovery::withdraw_endpoint(&mgr, &service_id, &provider)
+            .await
+            .unwrap();
+
+        let result = AsyncScopedDiscovery::get_endpoint(&mgr, &service_id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_async_scoped_discovery_discover_endpoints() {
+        let mgr = ServiceDiscoveryManager::new();
+        mgr.announce(make_endpoint("svc-1", ScopeLevel::Local, 3600))
+            .await
+            .unwrap();
+        mgr.announce(make_endpoint("svc-2", ScopeLevel::Org, 3600))
+            .await
+            .unwrap();
+
+        use icn_kernel_api::naming::AsyncScopedDiscovery;
+        let service_type = ServiceType {
+            name: "ledger".to_string(),
+            version: "1.0".to_string(),
+        };
+
+        let results = AsyncScopedDiscovery::discover_endpoints(&mgr, ScopeLevel::Org, &service_type)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_async_scoped_discovery_discover_filtered() {
+        let mgr = ServiceDiscoveryManager::new();
+        let mut ep1 = make_endpoint("svc-rw", ScopeLevel::Org, 3600);
+        ep1.capabilities = vec!["read".to_string(), "write".to_string()];
+        mgr.announce(ep1).await.unwrap();
+
+        let mut ep2 = make_endpoint("svc-r", ScopeLevel::Org, 3600);
+        ep2.capabilities = vec!["read".to_string()];
+        mgr.announce(ep2).await.unwrap();
+
+        use icn_kernel_api::naming::AsyncScopedDiscovery;
+        let service_type = ServiceType {
+            name: "ledger".to_string(),
+            version: "1.0".to_string(),
+        };
+
+        let results = AsyncScopedDiscovery::discover_endpoints_filtered(
+                &mgr,
+                ScopeLevel::Commons,
+                &service_type,
+                &["read".to_string(), "write".to_string()],
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].service_id, "svc-rw");
+    }
 }

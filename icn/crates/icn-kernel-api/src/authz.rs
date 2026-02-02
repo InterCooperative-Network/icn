@@ -1009,4 +1009,58 @@ mod tests {
         );
         assert_eq!(constraints.custom.get("key"), Some(&"value".to_string()));
     }
+
+    #[tokio::test]
+    async fn test_policy_oracle_evaluate_async_default() {
+        // Test that default evaluate_async() delegates to evaluate()
+        let oracle = AllowAllOracle::default();
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate_async(&request).await;
+        assert!(decision.is_allowed());
+    }
+
+    #[tokio::test]
+    async fn test_deny_all_oracle_async() {
+        // Test that default evaluate_async() works for deny scenarios
+        let oracle = DenyAllOracle::new(Domain::trust(), "async test lockdown");
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Write,
+            Domain::trust(),
+        );
+
+        let decision = oracle.evaluate_async(&request).await;
+        assert!(!decision.is_allowed());
+
+        match decision {
+            PolicyDecision::Deny { reason } => {
+                assert!(matches!(
+                    reason,
+                    PolicyError::Denied(r) if r.contains("async test lockdown")
+                ));
+            }
+            _ => panic!("Expected Deny"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_policy_oracle_sync_and_async_equivalence() {
+        // Verify that sync and async paths produce same results
+        let oracle = AllowAllOracle::default();
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Execute,
+            Domain::governance(),
+        );
+
+        let sync_decision = oracle.evaluate(&request);
+        let async_decision = oracle.evaluate_async(&request).await;
+
+        assert_eq!(sync_decision.is_allowed(), async_decision.is_allowed());
+    }
 }
