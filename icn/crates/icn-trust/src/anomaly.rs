@@ -648,18 +648,14 @@ impl TrustGraphAnalyzer {
             .sum();
 
         let gini = (2.0 * weighted_sum) / (n * sum) - (n + 1.0) / n;
-        gini.max(0.0).min(1.0) // Clamp to [0, 1]
+        gini.clamp(0.0, 1.0) // Clamp to [0, 1]
     }
 
     /// Compute concentration in top percentile
     ///
     /// Returns the fraction of total trust held by the top `percentile` of nodes.
     /// E.g., `percentile=0.1` returns the share held by the top 10% of nodes.
-    fn compute_top_concentration(
-        &self,
-        inbound_trust: &HashMap<Did, f64>,
-        percentile: f64,
-    ) -> f64 {
+    fn compute_top_concentration(&self, inbound_trust: &HashMap<Did, f64>, percentile: f64) -> f64 {
         if inbound_trust.is_empty() {
             return 0.0;
         }
@@ -684,10 +680,7 @@ impl TrustGraphAnalyzer {
     /// between other nodes. High betweenness indicates bridge/bottleneck nodes.
     ///
     /// This uses a simplified all-pairs shortest paths approach.
-    fn compute_betweenness_stats(
-        &self,
-        edges: &[crate::TrustEdge],
-    ) -> BetweennessStats {
+    fn compute_betweenness_stats(&self, edges: &[crate::TrustEdge]) -> BetweennessStats {
         // Extract nodes from edges
         let mut nodes = HashSet::new();
         for edge in edges {
@@ -735,7 +728,9 @@ impl TrustGraphAnalyzer {
 
                 // Count intermediate nodes (exclude start and end)
                 for node in path.iter().skip(1).take(path.len().saturating_sub(2)) {
-                    *betweenness.get_mut(node).unwrap() += 1.0;
+                    if let Some(score) = betweenness.get_mut(node) {
+                        *score += 1.0;
+                    }
                 }
             }
         }
@@ -744,10 +739,7 @@ impl TrustGraphAnalyzer {
         let n = nodes.len() as f64;
         let normalization = if n > 2.0 { (n - 1.0) * (n - 2.0) } else { 1.0 };
 
-        let normalized: Vec<f64> = betweenness
-            .values()
-            .map(|&bc| bc / normalization)
-            .collect();
+        let normalized: Vec<f64> = betweenness.values().map(|&bc| bc / normalization).collect();
 
         let max = normalized.iter().copied().fold(0.0, f64::max);
         let mean = if normalized.is_empty() {
@@ -759,7 +751,11 @@ impl TrustGraphAnalyzer {
         let variance = if normalized.is_empty() {
             0.0
         } else {
-            normalized.iter().map(|&bc| (bc - mean).powi(2)).sum::<f64>() / normalized.len() as f64
+            normalized
+                .iter()
+                .map(|&bc| (bc - mean).powi(2))
+                .sum::<f64>()
+                / normalized.len() as f64
         };
 
         let std_dev = variance.sqrt();

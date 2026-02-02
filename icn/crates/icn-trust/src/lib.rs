@@ -889,7 +889,7 @@ impl TrustGraph {
 
         // Use pathfinder with scope-filtered edges
         // TODO: Could optimize with a scoped pathfinder implementation
-        
+
         // Compute direct score
         let direct_score = scoped_edges
             .iter()
@@ -912,7 +912,8 @@ impl TrustGraph {
                 Err(err) => {
                     tracing::warn!(
                         "Failed to load edges for intermediary {:?}: {}",
-                        e.target, err
+                        e.target,
+                        err
                     );
                     continue;
                 }
@@ -1550,7 +1551,10 @@ mod tests {
         let score = graph
             .compute_trust_score_in_scope(bob.did(), &scope)
             .unwrap();
-        assert!(score > 0.0, "Direct scoped trust should be non-zero: {score}");
+        assert!(
+            score > 0.0,
+            "Direct scoped trust should be non-zero: {score}"
+        );
 
         // Different scope should return 0
         let other_scope = ScopeId::cooperative("coop-2");
