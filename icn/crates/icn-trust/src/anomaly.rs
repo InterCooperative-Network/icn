@@ -1116,8 +1116,7 @@ mod tests {
     #[test]
     fn test_gini_coefficient_all_zero_trust() {
         let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let mut graph =
-            TypedTrustGraph::new(store, test_did(0), TrustGraphType::Social);
+        let mut graph = TypedTrustGraph::new(store, test_did(0), TrustGraphType::Social);
 
         // Add edges with zero trust scores
         graph
@@ -1151,8 +1150,7 @@ mod tests {
     #[test]
     fn test_gini_coefficient_single_edge() {
         let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let mut graph =
-            TypedTrustGraph::new(store, test_did(0), TrustGraphType::Social);
+        let mut graph = TypedTrustGraph::new(store, test_did(0), TrustGraphType::Social);
 
         graph
             .add_edge(TrustEdge::new(
