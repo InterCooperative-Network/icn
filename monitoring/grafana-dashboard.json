@@ -1922,8 +1922,17 @@
             "uid": "prometheus"
           },
           "expr": "rate(icn_trust_cache_transitive_invalidations_total[1m])",
-          "legendFormat": "Invalidations/sec",
+          "legendFormat": "Total Fanout/sec",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(icn_trust_cache_actual_invalidations_total[1m])",
+          "legendFormat": "Actual Invalidations/sec",
+          "refId": "C"
         }
       ],
       "title": "Selective Invalidation Optimization",

@@ -19,38 +19,48 @@ The transitive cache invalidation fix (issue #878, PR #988) invalidates cached t
 ### Core Metrics
 
 1. **`icn_trust_cache_transitive_invalidations_total`** (counter)
-   - Number of cache entries actually invalidated transitively
+   - Total fanout volume (all downstream edges from mutated targets)
+   - Counts every outgoing edge regardless of whether it's cached
+   - Use for capacity planning and fanout rate tracking
+   - `rate()` gives fanout volume per second
+
+2. **`icn_trust_cache_actual_invalidations_total`** (counter)
+   - Number of cache entries actually invalidated (subset of fanout)
    - Incremented only for downstream DIDs that had cached entries
-   - Use `rate()` to track invalidations per second
+   - Use to measure cache hit rate effectiveness
+   - Compare with transitive_invalidations_total to see selective optimization impact
 
-2. **`icn_trust_cache_downstream_count`** (histogram)
-   - Distribution of total downstream fanout per edge mutation
-   - Records total outgoing edges (regardless of cache state)
-   - Percentiles reveal high-fanout "hub" nodes
+3. **`icn_trust_cache_downstream_count`** (histogram)
+   - Distribution of downstream fanout per edge mutation
+   - Records total outgoing edges from each mutated target
+   - Use percentiles to detect high-fanout "hub" nodes
+   - `histogram_quantile(0.99, ...)` reveals maximum observed fanout
 
-3. **`icn_trust_cache_max_downstream_count`** (gauge)
+4. **`icn_trust_cache_max_downstream_count`** (gauge)
    - Most recent downstream fanout count observed
-   - Note: this gauge tracks the latest value, not the all-time maximum
-   - Use `histogram_quantile(0.99, ...)` on the histogram for reliable hub detection
+   - Note: tracks latest value, not all-time maximum (use histogram p99 instead)
+   - Kept for dashboard compatibility; prefer histogram for accurate max detection
 
-4. **`icn_trust_cache_selective_skips_total`** (counter)
-   - Number of transitive invalidations skipped (selective optimization)
-   - Indicates effectiveness of the selective invalidation strategy
-   - High skip rate = optimization is working well
+5. **`icn_trust_cache_selective_skips_total`** (counter)
+   - Number of downstream DIDs skipped (no cached entry)
+   - High skip rate = selective optimization is effective
+   - Formula: skips / (skips + actual_invalidations) = optimization efficiency
 
 ### Derived Metrics
 
-**Average Downstream Count** (PromQL):
+**Cache Hit Rate During Invalidation** (PromQL):
 ```promql
-rate(icn_trust_cache_transitive_invalidations_total[5m]) / 
-rate(icn_trust_cache_invalidations_total[5m])
+rate(icn_trust_cache_actual_invalidations_total[5m]) / 
+rate(icn_trust_cache_transitive_invalidations_total[5m])
 ```
+Interpretation: 0.20 = 20% of downstream nodes were cached
 
 **Selective Invalidation Efficiency** (PromQL):
 ```promql
 rate(icn_trust_cache_selective_skips_total[5m]) / 
-(rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_transitive_invalidations_total[5m]))
+(rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_actual_invalidations_total[5m]))
 ```
+Interpretation: 0.80 = 80% of invalidation checks were skipped (good)
 
 **Fanout Distribution** (PromQL):
 ```promql
@@ -133,7 +143,7 @@ alert: LowSelectiveInvalidationEfficiency
 expr: |
   (
     rate(icn_trust_cache_selective_skips_total[5m]) / 
-    (rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_transitive_invalidations_total[5m]))
+    (rate(icn_trust_cache_selective_skips_total[5m]) + rate(icn_trust_cache_actual_invalidations_total[5m]))
   ) < 0.5
 for: 10m
 labels:

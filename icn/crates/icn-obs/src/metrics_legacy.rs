@@ -391,15 +391,19 @@ pub fn init_descriptions() {
     );
     describe_histogram!(
         "icn_trust_cache_downstream_count",
-        "Distribution of total downstream fanout per edge mutation (for hub detection)"
+        "Distribution of total downstream fanout per edge mutation (number of outgoing edges from mutated target)"
     );
     describe_gauge!(
         "icn_trust_cache_max_downstream_count",
-        "Maximum downstream count observed (high-fanout hub detection)"
+        "Most recent downstream fanout count (use histogram p99 for max detection)"
     );
     describe_counter!(
         "icn_trust_cache_selective_skips_total",
-        "Total number of transitive invalidations skipped (selective optimization)"
+        "Total number of downstream DIDs skipped because they had no cached entry (selective optimization)"
+    );
+    describe_counter!(
+        "icn_trust_cache_actual_invalidations_total",
+        "Total number of cache entries actually invalidated (subset of total fanout based on cache hit rate)"
     );
     describe_counter!(
         "icn_scalability_batch_verify_success_total",
@@ -2307,23 +2311,29 @@ pub mod scalability {
     /// Emitted when an edge mutation triggers one-hop-out invalidation
     /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
     ///
-    /// - `total_downstream_count`: total number of downstream edges considered
-    ///   for transitive invalidation (fanout).
+    /// - `total_downstream_count`: total number of downstream edges from the
+    ///   mutated target (fanout). This represents the maximum possible invalidations.
     /// - `invalidated_count`: number of downstream DIDs that actually had
-    ///   cached entries and were invalidated.
+    ///   cached entries and were invalidated (selective optimization effectiveness).
     pub fn trust_cache_transitive_invalidations_inc(
         total_downstream_count: u64,
         invalidated_count: u64,
     ) {
-        // Count how many cache entries were actually invalidated.
+        // Track total fanout volume for capacity planning.
+        // This counts all downstream edges regardless of cache hit rate.
         counter!("icn_trust_cache_transitive_invalidations_total")
+            .increment(total_downstream_count);
+
+        // Track actual invalidations performed (after selective optimization).
+        counter!("icn_trust_cache_actual_invalidations_total")
             .increment(invalidated_count);
 
-        // Record distribution of total downstream fanout for monitoring
-        // and hub detection.
+        // Record distribution of total downstream fanout for hub detection.
+        // Use histogram p99 in Grafana instead of gauge for accurate max tracking.
         histogram!("icn_trust_cache_downstream_count").record(total_downstream_count as f64);
 
-        // Track maximum observed fanout.
+        // Track most recent fanout count (not true maximum - use histogram p99 for that).
+        // Kept for backward compatibility with existing dashboards.
         gauge!("icn_trust_cache_max_downstream_count").set(total_downstream_count as f64);
     }
 
