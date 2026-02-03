@@ -109,6 +109,7 @@ fn bench_trust_score_baseline(c: &mut Criterion) {
             BenchmarkId::new("trust_score", network_size),
             network_size,
             |b, &network_size| {
+                // Keep _temp_dir alive for benchmark duration to prevent cleanup
                 let (service, dids, _temp_dir) = create_test_service(network_size, 5);
                 let mut rng = rand::thread_rng();
 

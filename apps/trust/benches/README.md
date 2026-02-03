@@ -23,7 +23,7 @@ cd apps/trust && cargo bench --bench trust_service_bench hash_by_input_count
 
 Tests the fast path (`trust_score()`) at various network sizes:
 - 100 nodes
-- 1000 nodes  
+- 1000 nodes
 - 5000 nodes
 
 **Expected:** ~5-7 µs regardless of network size (due to optimizations)
