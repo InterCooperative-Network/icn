@@ -1,9 +1,23 @@
 //! Cross-organization trust bridging integration tests.
 //!
-//! Tests verify that the trust oracle accepts PolicyRequests with `org_id`
-//! metadata. The current oracle implementation uses global trust edges; a
-//! future scope-bounded implementation would query `compute_trust_score_in_scope()`
-//! using `org_id` to filter by `ScopeId::federation()` or `ScopeId::cooperative()`.
+//! # Current Status
+//!
+//! These tests verify that the trust oracle **accepts** PolicyRequests with `org_id`
+//! metadata without errors. The oracle implementation (`apps/trust/src/oracle.rs`)
+//! currently **ignores** `org_id` and always uses global scope trust computation.
+//!
+//! The tests validate:
+//! - `org_id` metadata can be passed through PolicyRequest without errors
+//! - Trust score → constraint mapping works correctly at all thresholds
+//! - Unknown actors receive minimal trust constraints (security boundary)
+//!
+//! # Future Work
+//!
+//! TODO(#1046): Implement scope-bounded evaluation by checking
+//! `request.context.metadata.get("org_id")` and calling
+//! `compute_trust_score_in_scope()` with the appropriate ScopeId.
+//! Once implemented, these tests should be updated to verify that different
+//! scopes produce different trust scores for the same actor.
 
 use icn_identity::KeyPair;
 use icn_kernel_api::authz::{
@@ -314,8 +328,10 @@ fn test_unknown_actor_in_cross_org_request_gets_minimal_trust() {
 }
 
 #[test]
-fn test_cross_org_with_cooperative_scope() {
-    // Test that cooperative scope metadata works in cross-org scenarios
+fn test_cross_org_request_accepts_cooperative_org_id() {
+    // Test that cooperative org_id metadata is accepted without errors.
+    // NOTE: Currently the oracle ignores org_id and uses global scope.
+    // This test verifies metadata acceptance, not scope-bounded computation.
     let owner = KeyPair::generate().unwrap();
     let actor = KeyPair::generate().unwrap();
     let graph = create_test_graph(&owner);
