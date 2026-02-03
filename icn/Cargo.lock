@@ -3245,7 +3245,6 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "blake3",
- "ed25519-dalek",
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",
  "rand 0.8.5",

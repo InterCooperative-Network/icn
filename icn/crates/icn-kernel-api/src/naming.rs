@@ -332,41 +332,6 @@ impl ServiceEndpoint {
     }
 
     /// Verify the Ed25519 signature on this endpoint.
-    ///
-    /// # Arguments
-    ///
-    /// * `public_key_bytes` - The 32-byte Ed25519 public key of the provider
-    ///
-    /// # Returns
-    ///
-    /// `Ok(true)` if signature is valid, `Ok(false)` if invalid,
-    /// or `Err` if the public key or signature format is invalid.
-    pub fn verify_signature(&self, public_key_bytes: &[u8; 32]) -> Result<bool, String> {
-        use ed25519_dalek::{Signature as Ed25519Signature, Verifier, VerifyingKey};
-
-        // Parse the public key
-        let verifying_key = VerifyingKey::from_bytes(public_key_bytes)
-            .map_err(|e| format!("Invalid public key: {}", e))?;
-
-        // Parse the signature (expecting 64 bytes for Ed25519)
-        if self.signature.as_bytes().len() != 64 {
-            return Err(format!(
-                "Invalid signature length: expected 64 bytes, got {}",
-                self.signature.as_bytes().len()
-            ));
-        }
-
-        let mut sig_bytes = [0u8; 64];
-        sig_bytes.copy_from_slice(self.signature.as_bytes());
-        let signature = Ed25519Signature::from_bytes(&sig_bytes);
-
-        // Compute the signing payload
-        let payload = self.signing_payload();
-
-        // Verify the signature
-        Ok(verifying_key.verify(&payload, &signature).is_ok())
-    }
-
     /// Check if this endpoint registration has expired (alias for compatibility).
     pub fn is_expired(&self) -> bool {
         self.is_stale()
@@ -743,100 +708,14 @@ mod tests {
         assert!(err.to_string().contains("/org/app"));
     }
 
+    // NOTE: Signature verification tests are in icn-gossip/src/service_discovery.rs
+    // which properly handles DID-based key resolution per kernel/app separation.
+    // These tests verify the signing payload functionality only.
+
     #[test]
-    fn test_service_endpoint_verify_signature_valid() {
-        use ed25519_dalek::{Signer, SigningKey};
-        use rand::rngs::OsRng;
-
-        // Generate a keypair
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let verifying_key = signing_key.verifying_key();
-        let public_key_bytes = verifying_key.to_bytes();
-
+    fn test_signing_payload_changes_on_tamper() {
         // Create an endpoint
-        let mut ep = ServiceEndpoint {
-            service_id: "svc-sig-test".to_string(),
-            provider: "did:icn:alice".to_string(),
-            endpoint_type: EndpointType::Http,
-            service_type: ServiceType {
-                name: "test".to_string(),
-                version: "1.0".to_string(),
-            },
-            endpoints: vec![],
-            addresses: vec!["http://localhost:8080".to_string()],
-            capabilities: vec!["test".to_string()],
-            trust_threshold: 0.1,
-            scope_visibility: ScopeLevel::Org,
-            cell_id: None,
-            ttl_secs: 3600,
-            signature: Signature::new(vec![0; 64]), // Placeholder
-            created_at: 1700000000,
-            updated_at: 1700000000,
-        };
-
-        // Sign the payload
-        let payload = ep.signing_payload();
-        let signature = signing_key.sign(&payload);
-        ep.signature = Signature::new(signature.to_bytes().to_vec());
-
-        // Verify the signature
-        let result = ep.verify_signature(&public_key_bytes);
-        assert!(result.is_ok());
-        assert!(result.unwrap());
-    }
-
-    #[test]
-    fn test_service_endpoint_verify_signature_invalid() {
-        use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
-
-        // Generate a keypair
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let verifying_key = signing_key.verifying_key();
-        let public_key_bytes = verifying_key.to_bytes();
-
-        // Create an endpoint with a bad signature
         let ep = ServiceEndpoint {
-            service_id: "svc-bad-sig".to_string(),
-            provider: "did:icn:alice".to_string(),
-            endpoint_type: EndpointType::Quic,
-            service_type: ServiceType {
-                name: "test".to_string(),
-                version: "1.0".to_string(),
-            },
-            endpoints: vec![],
-            addresses: vec!["quic://localhost:9090".to_string()],
-            capabilities: vec![],
-            trust_threshold: 0.1,
-            scope_visibility: ScopeLevel::Local,
-            cell_id: None,
-            ttl_secs: 600,
-            signature: Signature::new(vec![0; 64]), // Invalid signature
-            created_at: 1700000000,
-            updated_at: 1700000000,
-        };
-
-        // Verify should fail
-        let result = ep.verify_signature(&public_key_bytes);
-        assert!(result.is_ok());
-        assert!(!result.unwrap()); // Signature is invalid
-    }
-
-    #[test]
-    fn test_service_endpoint_tampered_detection() {
-        use ed25519_dalek::{Signer, SigningKey};
-        use rand::rngs::OsRng;
-
-        // Generate a keypair
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let verifying_key = signing_key.verifying_key();
-        let public_key_bytes = verifying_key.to_bytes();
-
-        // Create and sign an endpoint
-        let mut ep = ServiceEndpoint {
             service_id: "svc-tamper-test".to_string(),
             provider: "did:icn:alice".to_string(),
             endpoint_type: EndpointType::Http,
@@ -856,22 +735,17 @@ mod tests {
             updated_at: 1700000000,
         };
 
-        let payload = ep.signing_payload();
-        let signature = signing_key.sign(&payload);
-        ep.signature = Signature::new(signature.to_bytes().to_vec());
-
-        // Verify original is valid
-        assert!(ep.verify_signature(&public_key_bytes).unwrap());
+        let original_payload = ep.signing_payload();
 
         // Tamper with the address
-        ep.addresses = vec!["http://malicious.com:8080".to_string()];
+        let mut tampered = ep.clone();
+        tampered.addresses = vec!["http://malicious.com:8080".to_string()];
 
-        // Verification should now fail
-        let result = ep.verify_signature(&public_key_bytes);
-        assert!(result.is_ok());
-        assert!(
-            !result.unwrap(),
-            "Tampered endpoint should fail verification"
+        // Payload should be different after tampering
+        let tampered_payload = tampered.signing_payload();
+        assert_ne!(
+            original_payload, tampered_payload,
+            "Tampered endpoint should produce different signing payload"
         );
     }
 
@@ -893,18 +767,10 @@ mod tests {
     }
 
     #[test]
-    fn test_service_endpoint_with_cell_id() {
-        use ed25519_dalek::{Signer, SigningKey};
-        use rand::rngs::OsRng;
-
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let verifying_key = signing_key.verifying_key();
-        let public_key_bytes = verifying_key.to_bytes();
-
+    fn test_signing_payload_includes_cell_id() {
         let cell_id = CellId::derive(b"org123", "cell-alpha", &[42u8; 32]);
 
-        let mut ep = ServiceEndpoint {
+        let ep_with_cell = ServiceEndpoint {
             service_id: "svc-cell-test".to_string(),
             provider: "did:icn:bob".to_string(),
             endpoint_type: EndpointType::Grpc,
@@ -924,16 +790,16 @@ mod tests {
             updated_at: 1700000500,
         };
 
-        // Sign with cell_id included
-        let payload = ep.signing_payload();
-        let signature = signing_key.sign(&payload);
-        ep.signature = Signature::new(signature.to_bytes().to_vec());
+        let mut ep_without_cell = ep_with_cell.clone();
+        ep_without_cell.cell_id = None;
 
-        // Verify signature
-        assert!(ep.verify_signature(&public_key_bytes).unwrap());
+        // Payloads should differ when cell_id changes
+        let payload_with = ep_with_cell.signing_payload();
+        let payload_without = ep_without_cell.signing_payload();
 
-        // Tampering with cell_id should break signature
-        ep.cell_id = None;
-        assert!(!ep.verify_signature(&public_key_bytes).unwrap());
+        assert_ne!(
+            payload_with, payload_without,
+            "cell_id should affect signing payload"
+        );
     }
 }
