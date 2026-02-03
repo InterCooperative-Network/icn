@@ -634,7 +634,7 @@ mod tests {
         {
             let sled_store: Arc<dyn Store> =
                 Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            let store = AgreementStore::new(sled_store.clone());
 
             let proposer = test_did();
             party_did = proposer.clone();
@@ -657,8 +657,13 @@ mod tests {
 
             // Verify it's stored
             assert!(store.get_agreement(&agreement_id).unwrap().is_some());
+            
+            // Explicitly flush before dropping to release file lock
+            drop(store);
+            drop(sled_store);
         }
-        // Store is dropped here, simulating daemon shutdown
+        // Wait for file lock to be fully released
+        std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Second "session" - reopen and verify data persists
         {
