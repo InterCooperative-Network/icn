@@ -341,7 +341,8 @@ fn apply_admit_member(
         joined_at,
         governance_weight,
         credit_limits,
-        public_key: [0u8; 32],  // TODO: Extract from DID or proof
+        // Extract public key from DID: `did:icn:<base58-pubkey>` -> base58-decode to 32 bytes
+        public_key: extract_public_key_from_did(coop_did)?
         status: MemberStatus::Active,
     };
     

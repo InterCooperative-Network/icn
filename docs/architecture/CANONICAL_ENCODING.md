@@ -498,8 +498,10 @@ pub trait CanonicalEncode: Canonicalize + Serialize {
     /// Encode to canonical CBOR
     fn encode_canonical(&mut self) -> Result<Vec<u8>> {
         self.canonicalize();
-        ciborium::ser::into_writer(self, Vec::new())
-            .map_err(|e| Error::EncodingError(e.to_string()))
+        let mut buf = Vec::new();
+        ciborium::ser::into_writer(self, &mut buf)
+            .map_err(|e| Error::EncodingError(e.to_string()))?;
+        Ok(buf)
     }
     
     /// Compute typed hash
@@ -539,8 +541,17 @@ impl Canonicalize for GovernanceProof {
         }
         
         // Check identifier normalization
-        if self.federation_id != self.federation_id.normalize().unwrap() {
-            return false;
+        // Note: federation_id is a String; to verify normalization, parse as Did
+        if let Ok(did) = Did::new(&self.federation_id) {
+            if let Ok(normalized) = did.normalize() {
+                if self.federation_id != normalized.as_str() {
+                    return false;
+                }
+            } else {
+                return false; // Invalid DID format
+            }
+        } else {
+            return false; // Not a valid DID
         }
         
         true

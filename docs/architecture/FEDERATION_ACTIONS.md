@@ -143,23 +143,31 @@ pub struct CreditLimitUpdate {
 }
 
 /// Governance decision outcome
+/// 
+/// NOTE: This extends the base `DecisionOutcome` from GOVERNANCE_STATE_MACHINE.md
+/// with an additional `Vetoed` variant for federation-specific veto actions.
+/// Implementations MUST support all four variants.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionOutcome {
     Approved,
     Rejected,
     NoQuorum,
-    Vetoed,
+    Vetoed,  // Federation-specific: veto by privileged actor
 }
 
 /// Vote tally for a decision
+///
+/// NOTE: This extends the base `VoteTally` from GOVERNANCE_STATE_MACHINE.md
+/// with an additional `signatories` field to track which members voted.
+/// The `signatories` field MUST be sorted for canonical encoding.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VoteTally {
     pub votes_for: u64,
     pub votes_against: u64,
     pub votes_abstain: u64,
     pub eligible_voters: u64,
-    pub signatories: Vec<String>,  // Sorted DIDs of voters
+    pub signatories: Vec<String>,  // Sorted DIDs of voters (federation extension)
 }
 ```
 
@@ -343,8 +351,19 @@ impl Canonicalize for FederationAction {
     }
     
     fn is_canonical(&self) -> bool {
-        // Verify sorting and normalization (implementation omitted for brevity)
-        true
+        // NOTE: This is pseudocode for the specification.
+        //
+        // Production implementations MUST verify:
+        // - All DID fields are normalized (lowercase prefix, valid base58btc)
+        // - All currency codes are normalized (scope lowercase, symbol uppercase)
+        // - All Vec fields representing sets are sorted and deduplicated
+        // - All BTreeMap fields have keys in ascending order
+        //
+        // Returns true only if the action is already in canonical form.
+        // See CANONICAL_ENCODING.md for complete normalization rules.
+        self.verify_dids_normalized() 
+            && self.verify_currencies_normalized()
+            && self.verify_collections_sorted()
     }
 }
 
