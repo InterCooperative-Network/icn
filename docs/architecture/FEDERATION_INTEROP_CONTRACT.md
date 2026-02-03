@@ -202,14 +202,13 @@ pub struct GovernanceProof {
     /// Unix timestamp (seconds since epoch)
     pub timestamp: u64,
     
-    /// DIDs of confirming cooperatives (sorted)
-    pub confirmations: Vec<String>,
-    
     /// Decision records (proposal IDs -> decision hashes)
     pub decision_records: BTreeMap<String, Vec<u8>>,
     
-    /// Ed25519 signature over canonical payload
-    pub signature: [u8; 64],
+    /// Ed25519 signatures from confirming cooperatives (DID -> signature)
+    /// Each confirmer signs the canonical payload independently.
+    /// Keys MUST be sorted (BTreeMap ensures this).
+    pub signatures: BTreeMap<String, [u8; 64]>,
 }
 ```
 
@@ -224,9 +223,8 @@ pub struct GovernanceProof {
 | `prev_state_root` | [u8; 32] | Previous state root (0x00...00 for genesis) |
 | `sequence` | u64 | sequence > prev_sequence |
 | `timestamp` | u64 | Unix seconds, must be ≤ current_time + 300s |
-| `confirmations` | Vec<String> | Sorted DIDs, ≥ threshold signers |
 | `decision_records` | BTreeMap | Optional, sorted keys, bounded size ≤ 10MB |
-| `signature` | [u8; 64] | Ed25519 signature |
+| `signatures` | BTreeMap<String, [u8; 64]> | Multi-sig: DID → Ed25519 signature, ≥ threshold signers |
 
 ### 3.3 Required Fields
 
@@ -253,7 +251,7 @@ struct SignaturePayload {
 }
 ```
 
-**Note:** `confirmations`, `decision_records`, and `signature` are EXCLUDED from the signature payload.
+**Note:** `decision_records` and `signatures` are EXCLUDED from the signature payload to avoid circular dependencies (signatures can't sign themselves).
 
 ### 4.2 Domain Separation
 
@@ -354,32 +352,52 @@ The state root is a Merkle root over:
 ```rust
 /// Domain-separated BLAKE3 state-root hash.
 /// 
-/// NOTE: The canonical encoding of `GovernanceState` is defined
-/// normatively in `GOVERNANCE_STATE_MACHINE.md` under CANONICAL_ENCODING.
-/// Implementations MUST follow that specification for
-/// `encode_governance_state_canonical`.
+/// NOTE: The canonical computation is defined normatively in
+/// `GOVERNANCE_STATE_MACHINE.md` §4.1. This is a summary; implementations
+/// MUST follow the full specification for interoperability.
 fn compute_state_root(state: &GovernanceState) -> [u8; 32] {
-    const DOMAIN: &[u8] = b"ICN::GovernanceStateRoot::v1";
-
     let mut hasher = blake3::Hasher::new();
 
-    // Prefix with domain string for robustness against cross-protocol collisions.
-    hasher.update(DOMAIN);
+    // Domain separation prefix
+    hasher.update(b"icn-federation:state-root:v1");
+    hasher.update(&[0x00]);
 
-    // Encode the full governance state using the canonical, field-by-field
-    // layout described in GOVERNANCE_STATE_MACHINE.md (CANONICAL_ENCODING).
-    //
-    // This function is conceptual here; its exact behavior is defined by the
-    // governance state-machine specification and MUST NOT rely on `bincode`
-    // or any other non-canonical, implementation-defined serialization.
-    let encoded: Vec<u8> = encode_governance_state_canonical(state);
+    // Hash federation ID
+    hasher.update(state.federation_id.as_bytes());
+    hasher.update(&[0x00]);
 
-    hasher.update(&encoded);
+    // Hash members (sorted by DID, via BTreeMap iteration order)
+    for (did, member_info) in &state.members {
+        hasher.update(did.as_bytes());
+        hasher.update(&[0x00]);
+        hasher.update(&member_info.public_key);
+        hasher.update(&member_info.governance_weight.to_le_bytes());
+        hasher.update(&[member_info.status as u8]);
+    }
+    hasher.update(&[0x00]);
 
-    // Finalize and return the 32-byte state-root digest.
+    // Hash balances (sorted by (DID, currency), via BTreeMap iteration order)
+    for ((did, currency), balance) in &state.balances {
+        hasher.update(did.as_bytes());
+        hasher.update(&[0x00]);
+        hasher.update(currency.as_bytes());
+        hasher.update(&[0x00]);
+        hasher.update(&balance.to_le_bytes());
+    }
+    hasher.update(&[0x00]);
+
+    // Hash constitution
+    hasher.update(&state.constitution_hash);
+
+    // Hash sequence metadata
+    hasher.update(&state.sequence.to_le_bytes());
+    hasher.update(&state.timestamp.to_le_bytes());
+
     *hasher.finalize().as_bytes()
 }
 ```
+
+> **Normative Reference:** See [GOVERNANCE_STATE_MACHINE.md §4.1](./GOVERNANCE_STATE_MACHINE.md#41-state-root-computation) for the complete specification including proposal and decision hashing.
 
 ### 6.2 State Root Chain
 
@@ -859,32 +877,56 @@ fn validate_timestamp(proof: &GovernanceProof) -> Result<()> {
 }
 ```
 
-#### Step 7: Verify Signature
+#### Step 7: Verify Signatures (Multi-Sig)
 
 ```rust
-fn verify_signature(
+fn verify_signatures(
     proof: &GovernanceProof,
     current_state: &GovernanceState,
 ) -> Result<()> {
     let payload_hash = compute_signature_payload(proof);
     
-    for confirmation_did in &proof.confirmations {
+    // Calculate governance weight of signers
+    let mut total_weight = 0u64;
+    let required_threshold = current_state.constitution.approval_threshold;
+    
+    for (signer_did, signature_bytes) in &proof.signatures {
         // Lookup public key from state
-        let member_info = current_state.members.get(confirmation_did)
-            .ok_or(Error::UnknownMember(confirmation_did.clone()))?;
+        let member_info = current_state.members.get(signer_did)
+            .ok_or(Error::UnknownMember(signer_did.clone()))?;
+        
+        // Verify member is active
+        if member_info.status != MemberStatus::Active {
+            return Err(Error::InactiveSigner(signer_did.clone()));
+        }
         
         let verifying_key = VerifyingKey::from_bytes(&member_info.public_key)?;
-        let signature = Signature::from_bytes(&proof.signature)?;
+        let signature = Signature::from_bytes(signature_bytes)?;
         
-        // Verify signature (Ed25519)
+        // Verify this signer's signature (Ed25519)
         verifying_key.verify(&payload_hash, &signature)?;
+        
+        // Accumulate governance weight
+        total_weight = total_weight.checked_add(member_info.governance_weight)
+            .ok_or(Error::IntegerOverflow)?;
+    }
+    
+    // Verify quorum is met
+    if total_weight < required_threshold {
+        return Err(Error::InsufficientQuorum {
+            required: required_threshold,
+            actual: total_weight,
+        });
     }
     
     Ok(())
 }
 ```
 
-**Note:** This example shows single-signature verification. Multi-signature proofs would have one signature per confirming DID.
+**Note:** Each confirming cooperative signs the canonical payload independently. The `signatures` field maps signer DID to their Ed25519 signature. Verification ensures:
+1. Each signature is valid for the signer's public key
+2. All signers are active members
+3. Total governance weight meets the threshold
 
 #### Step 8: Verify Action-Specific Constraints
 
