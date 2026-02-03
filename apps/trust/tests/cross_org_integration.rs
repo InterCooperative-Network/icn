@@ -49,8 +49,11 @@ fn create_cross_org_request(actor_did: String, org_id: &str, action: ActionKind)
 // Cross-Org Request Tests
 // ============================================================================
 
+/// Verifies that the oracle accepts PolicyRequests with org_id metadata
+/// without errors. NOTE: Oracle currently ignores org_id (uses global scope).
+/// TODO(#1046): Update to verify scope-bounded scoring.
 #[test]
-fn test_cross_org_request_with_org_id_metadata() {
+fn test_cross_org_request_accepts_org_id_metadata() {
     // Setup
     let owner = KeyPair::generate().unwrap();
     let actor = KeyPair::generate().unwrap();
@@ -92,8 +95,11 @@ fn test_cross_org_request_with_org_id_metadata() {
     );
 }
 
+/// Verifies high trust actors get unlimited rate in cross-org requests.
+/// NOTE: Oracle currently ignores org_id - this tests global trust computation.
+/// TODO(#1046): Update to test different scores for different federation scopes.
 #[test]
-fn test_trust_score_computation_across_federation_boundaries() {
+fn test_high_trust_actor_gets_unlimited_rate_in_cross_org_request() {
     // Setup: Two nodes with high global trust edge
     let owner = KeyPair::generate().unwrap();
     let actor = KeyPair::generate().unwrap();
@@ -142,6 +148,8 @@ fn test_trust_score_computation_across_federation_boundaries() {
     assert_eq!(constraints.max_connections, Some(100));
 }
 
+/// Verifies constraint generation for medium-trust actors in cross-org requests.
+/// NOTE: Oracle currently ignores org_id - this tests global trust → constraint mapping.
 #[test]
 fn test_constraint_generation_for_cross_org_requests() {
     // Setup
@@ -191,8 +199,12 @@ fn test_constraint_generation_for_cross_org_requests() {
     assert!(constraints.custom.contains_key("trust_score"));
 }
 
+/// Verifies different actors get different constraints based on global trust levels.
+/// NOTE: "federation scopes" in name refers to future capability - currently tests
+/// that different actors with different trust get different constraints.
+/// TODO(#1046): Update to test same actor with different trust in different scopes.
 #[test]
-fn test_multiple_federation_scopes_with_different_trust_levels() {
+fn test_multiple_actors_with_different_trust_levels() {
     // Setup: Two actors with different global trust levels
     // This demonstrates how different actors get different constraints based on trust
     let owner = KeyPair::generate().unwrap();
@@ -256,8 +268,11 @@ fn test_multiple_federation_scopes_with_different_trust_levels() {
     );
 }
 
+/// Verifies requests without org_id use global scope trust computation.
+/// NOTE: Currently all requests use global scope regardless of org_id presence.
+/// TODO(#1046): This test will verify fallback behavior when scope-bounded trust is implemented.
 #[test]
-fn test_cross_org_request_without_org_id_uses_global_scope() {
+fn test_request_without_org_id_uses_global_scope() {
     // Setup
     let owner = KeyPair::generate().unwrap();
     let actor = KeyPair::generate().unwrap();
@@ -295,8 +310,10 @@ fn test_cross_org_request_without_org_id_uses_global_scope() {
     assert_eq!(rate.messages_per_second, 100);
 }
 
+/// Verifies unknown actors receive minimal trust constraints (security boundary).
+/// This is critical: zero-trust principle ensures unknown actors are restricted.
 #[test]
-fn test_unknown_actor_in_cross_org_request_gets_minimal_trust() {
+fn test_unknown_actor_gets_minimal_trust_constraints() {
     // Setup
     let owner = KeyPair::generate().unwrap();
     let unknown_actor = KeyPair::generate().unwrap();
