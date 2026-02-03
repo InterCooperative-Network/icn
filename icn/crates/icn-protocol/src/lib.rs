@@ -22,3 +22,26 @@ pub use icn_gossip as gossip;
 
 /// Network transport re-exports
 pub use icn_net as net;
+
+#[cfg(test)]
+mod tests {
+    //! Smoke tests verifying facade re-exports work correctly.
+
+    #[test]
+    fn facade_exports_gossip_types() {
+        // Verify gossip module types are accessible via facade
+        let _: fn() -> &'static str = || {
+            // GossipMessage exists in gossip module
+            std::any::type_name::<crate::gossip::GossipMessage>()
+        };
+    }
+
+    #[test]
+    fn facade_exports_net_types() {
+        // Verify net module types are accessible via facade
+        let _: fn() -> &'static str = || {
+            // NetworkMessage exists in net module
+            std::any::type_name::<crate::net::NetworkMessage>()
+        };
+    }
+}
