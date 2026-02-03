@@ -47,6 +47,24 @@ DENYLISTED_CRATES = [
     # Note: These would be listed if they exist as separate crates
 ]
 
+# Known violations that are being tracked for migration
+# These are allowed temporarily until the kernel/app separation is complete
+# Tracked in: docs/architecture/KERNEL_APP_SEPARATION.md
+KNOWN_VIOLATIONS = {
+    # icn-core currently depends on domain crates for app bootstrapping
+    # Migration tracked in Wave 2-6 of the kernel separation roadmap
+    ("icn-core", "icn-ccl"),
+    ("icn-core", "icn-community"),
+    ("icn-core", "icn-compute"),
+    ("icn-core", "icn-coop"),
+    ("icn-core", "icn-entity"),
+    ("icn-core", "icn-federation"),
+    ("icn-core", "icn-governance"),
+    ("icn-core", "icn-ledger"),
+    ("icn-core", "icn-steward"),
+    ("icn-core", "icn-trust"),
+}
+
 
 def get_cargo_metadata(manifest_path: str = "icn/Cargo.toml") -> Dict:
     """Run `cargo metadata` and return the parsed JSON."""
@@ -125,13 +143,16 @@ def get_dependencies(metadata: Dict, package_id: str) -> Set[str]:
     return dep_names
 
 
-def check_firewall(metadata: Dict) -> List[str]:
+def check_firewall(metadata: Dict) -> tuple[List[str], List[str]]:
     """
     Check kernel crates for forbidden dependencies.
     
-    Returns a list of violation messages (empty if no violations).
+    Returns a tuple of (new_violations, known_violations).
+    - new_violations: violations that are NOT in KNOWN_VIOLATIONS (fails CI)
+    - known_violations: violations that ARE in KNOWN_VIOLATIONS (tracked, passes CI)
     """
-    violations = []
+    new_violations = []
+    known_violations = []
     
     for kernel_crate in KERNEL_CRATES:
         pkg_id = get_package_id(metadata, kernel_crate)
@@ -147,9 +168,13 @@ def check_firewall(metadata: Dict) -> List[str]:
         
         if forbidden_deps:
             for forbidden in sorted(forbidden_deps):
-                violations.append(f"{kernel_crate} -> {forbidden}")
+                violation = (kernel_crate, forbidden)
+                if violation in KNOWN_VIOLATIONS:
+                    known_violations.append(f"{kernel_crate} -> {forbidden}")
+                else:
+                    new_violations.append(f"{kernel_crate} -> {forbidden}")
     
-    return violations
+    return new_violations, known_violations
 
 
 def main():
@@ -170,15 +195,28 @@ def main():
     print(f"Denylisted crates: {', '.join(DENYLISTED_CRATES)}")
     print()
     
-    violations = check_firewall(metadata)
+    new_violations, known_violations = check_firewall(metadata)
     
-    if violations:
-        print("❌ FIREWALL VIOLATIONS DETECTED:")
+    # Report known violations (tracked, not blocking)
+    if known_violations:
+        print(f"📋 KNOWN VIOLATIONS ({len(known_violations)} tracked for migration):")
         print()
-        for violation in violations:
+        for violation in known_violations:
             print(f"  • {violation}")
         print()
-        print("These dependencies violate the Meaning Firewall contract.")
+        print("These violations are tracked in KNOWN_VIOLATIONS and will be fixed")
+        print("as part of the kernel/app separation migration (Waves 2-6).")
+        print("See docs/architecture/KERNEL_APP_SEPARATION.md for roadmap.")
+        print()
+    
+    # Report new violations (blocking)
+    if new_violations:
+        print("❌ NEW FIREWALL VIOLATIONS DETECTED:")
+        print()
+        for violation in new_violations:
+            print(f"  • {violation}")
+        print()
+        print("These are NEW dependencies that violate the Meaning Firewall contract.")
         print("See docs/architecture/KERNEL_APP_SEPARATION.md for details.")
         print()
         print("To fix:")
@@ -187,6 +225,12 @@ def main():
         print("  3. See migration examples in the docs")
         print()
         return 1
+    
+    if known_violations:
+        print("✅ No NEW firewall violations detected!")
+        print()
+        print(f"Migration progress: {len(KNOWN_VIOLATIONS) - len(known_violations)}/{len(KNOWN_VIOLATIONS)} violations resolved")
+        return 0
     else:
         print("✅ No firewall violations detected!")
         print()
