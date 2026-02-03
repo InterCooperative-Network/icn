@@ -282,11 +282,21 @@ pub trait ScopedDiscovery: Send + Sync {
 ///
 /// If your implementation is purely in-memory with sync locks (`parking_lot::RwLock`),
 /// prefer implementing only `ScopedDiscovery`.
-#[async_trait::async_trait]
-/// Async-friendly service discovery trait.
 ///
-/// Uses `async-trait` to ensure `Send` futures and trait object compatibility.
-/// This avoids the `async_fn_in_trait` lint and allows dynamic dispatch.
+/// # Implementation Note
+///
+/// This trait uses `#[async_trait]` for `Send` futures and dyn-compatibility.
+/// Implementations must also add `#[async_trait]` to their impl blocks:
+///
+/// ```rust,ignore
+/// #[async_trait::async_trait]
+/// impl AsyncScopedDiscovery for MyDiscovery {
+///     async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
+///         // ...
+///     }
+///     // ... other methods
+/// }
+/// ```
 #[async_trait::async_trait]
 pub trait AsyncScopedDiscovery: Send + Sync {
     /// Announce a service endpoint (async).
