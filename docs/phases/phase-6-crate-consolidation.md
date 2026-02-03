@@ -62,7 +62,7 @@ Rather than merging source code (which would be disruptive), we used the "facade
 ## Verification
 
 - ✅ All 12 kernel crates compile
-- ✅ Test suite: 221 tests passed; 1 DNS-related failure unrelated to these changes
+- ✅ Test suite: 221/222 tests pass (1 DNS resolution failure unrelated to changes)
 - ✅ No circular dependencies verified with `cargo tree`
 - ✅ Full workspace builds successfully
 
