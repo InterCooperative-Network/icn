@@ -7,11 +7,9 @@ description = "Unified cryptography layer for ICN"
 
 [features]
 default = []
-# Post-quantum cryptography
-post-quantum = ["icn-crypto-pq/post-quantum"]
-# Threshold cryptography
+# Threshold cryptography (forwards to icn-crypto-pq)
 threshold = ["icn-crypto-pq/threshold"]
-# Blind signatures
+# Blind signatures (forwards to icn-crypto-pq)
 blind = ["icn-crypto-pq/blind"]
 
 [dependencies]
