@@ -126,6 +126,8 @@ pub enum ProposalState {
     Rejected,
     NoQuorum,
     Expired,
+    /// Emergency veto by privileged actor
+    Vetoed,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -142,6 +144,8 @@ pub enum DecisionOutcome {
     Approved,
     Rejected,
     NoQuorum,
+    /// Federation-specific: veto by privileged actor (e.g., emergency council)
+    Vetoed,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -317,7 +321,47 @@ fn apply_settle_cross_coop(
 }
 ```
 
-#### 3.3.2 AdmitMember
+#### 3.3.2 Helper: DID Public Key Extraction
+
+```rust
+/// Extracts the 32-byte Ed25519 public key from an ICN DID.
+/// 
+/// DID format: `did:icn:<base58btc-encoded-pubkey>`
+/// 
+/// # Errors
+/// - `InvalidDidFormat`: DID does not start with `did:icn:`
+/// - `InvalidBase58`: Identifier is not valid Base58btc
+/// - `InvalidKeyLength`: Decoded key is not exactly 32 bytes
+fn extract_public_key_from_did(did: &str) -> Result<[u8; 32]> {
+    // Validate DID prefix
+    if !did.to_lowercase().starts_with("did:icn:") {
+        return Err(Error::InvalidDidFormat);
+    }
+    
+    // Extract the identifier portion (after "did:icn:")
+    let identifier = &did[8..];
+    
+    // Base58btc decode
+    let decoded = bs58::decode(identifier)
+        .into_vec()
+        .map_err(|_| Error::InvalidBase58)?;
+    
+    // Validate length (Ed25519 public key = 32 bytes)
+    if decoded.len() != 32 {
+        return Err(Error::InvalidKeyLength {
+            expected: 32,
+            actual: decoded.len(),
+        });
+    }
+    
+    // Convert to fixed-size array
+    let mut pubkey = [0u8; 32];
+    pubkey.copy_from_slice(&decoded);
+    Ok(pubkey)
+}
+```
+
+#### 3.3.3 AdmitMember
 
 ```rust
 fn apply_admit_member(
@@ -341,8 +385,8 @@ fn apply_admit_member(
         joined_at,
         governance_weight,
         credit_limits,
-        // Extract public key from DID: `did:icn:<base58-pubkey>` -> base58-decode to 32 bytes
-        public_key: extract_public_key_from_did(coop_did)?
+        // Extract public key from DID using helper function above
+        public_key: extract_public_key_from_did(coop_did)?,
         status: MemberStatus::Active,
     };
     
@@ -356,7 +400,7 @@ fn apply_admit_member(
 }
 ```
 
-#### 3.3.3 ExpelMember
+#### 3.3.4 ExpelMember
 
 ```rust
 fn apply_expel_member(
@@ -379,7 +423,7 @@ fn apply_expel_member(
 }
 ```
 
-#### 3.3.4 UpdateConstitution
+#### 3.3.5 UpdateConstitution
 
 ```rust
 fn apply_update_constitution(
@@ -397,7 +441,7 @@ fn apply_update_constitution(
 }
 ```
 
-#### 3.3.5 UpdateCreditLimits
+#### 3.3.6 UpdateCreditLimits
 
 ```rust
 fn apply_update_credit_limits(
@@ -417,7 +461,7 @@ fn apply_update_credit_limits(
 }
 ```
 
-#### 3.3.6 PauseMember / ResumeMember
+#### 3.3.7 PauseMember / ResumeMember
 
 ```rust
 fn apply_pause_member(
@@ -443,7 +487,7 @@ fn apply_resume_member(
 }
 ```
 
-#### 3.3.7 RecordDecision
+#### 3.3.8 RecordDecision
 
 ```rust
 fn apply_record_decision(
@@ -458,6 +502,7 @@ fn apply_record_decision(
             DecisionOutcome::Approved => ProposalState::Approved,
             DecisionOutcome::Rejected => ProposalState::Rejected,
             DecisionOutcome::NoQuorum => ProposalState::NoQuorum,
+            DecisionOutcome::Vetoed => ProposalState::Vetoed,
         };
     }
     

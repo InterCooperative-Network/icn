@@ -48,49 +48,16 @@ The ICN Federation Interoperability Contract defines:
 
 ## 2. Kernel Invariants
 
-These are **non-overridable** protocol rules enforced by the ICN kernel. Governance MAY parameterize thresholds but MUST NOT violate invariants.
+These are **non-overridable** protocol rules enforced by the ICN kernel. Governance MAY NOT override these invariants.
 
-### 2.1 Federation Membership
+> **Architecture Note (Meaning Firewall):** Per ICN's kernel/app separation, the kernel enforces
+> constraints WITHOUT understanding their semantic origin. The invariants below are generic
+> safety properties that the kernel can enforce blindly. Domain-specific policies (membership
+> rules, governance thresholds, etc.) belong in PolicyOracles and are covered in Section 2.5.
 
-**Invariant 2.1.1:** A federation MUST have ≥2 member organizations (cooperatives or other federations).
+### 2.1 Settlement Conservation
 
-**Rationale:** Prevents single-entity "federations" that violate the cooperative principle.
-
-**Enforcement:**
-```rust
-fn validate_federation_size(members: &[Did]) -> Result<()> {
-    if members.len() < 2 {
-        return Err(Error::InsufficientMembers {
-            required: 2,
-            actual: members.len(),
-        });
-    }
-    Ok(())
-}
-```
-
-**Invariant 2.1.2:** Individual nodes MUST NOT contribute directly to federations.
-
-**Rationale:** Federations coordinate between organizations, not individuals.
-
-**Enforcement:**
-- DIDs in federation actions MUST be canonical ICN DIDs as defined by CANONICAL_ENCODING (`did:icn:<base58btc-pubkey>`)
-- Each such DID MUST resolve to an organization-level entity (cooperative or federation), not an individual
-- Implementations MUST reject any federation action where a participant DID resolves to an individual entity
-
-### 2.2 Cell Requirement
-
-**Invariant 2.2.1:** Federations MUST operate a Cell (distributed gossip topic).
-
-**Rationale:** Ensures state synchronization without central servers.
-
-**Cell Properties:**
-- **Topic ID**: Derived from federation constitution hash
-- **Access Control**: TrustGated (only members can write)
-- **Persistence**: Immutable append-only log
-- **Replication**: ≥3 nodes per member cooperative (recommended)
-
-### 2.3 Settlement Conservation
+**Invariant 2.1.1:** Cross-cooperative settlements MUST sum to zero per currency.
 
 **Invariant 2.3.1:** Cross-cooperative settlements MUST sum to zero per currency.
 
@@ -125,13 +92,13 @@ fn validate_settlement_conservation(settlements: &[Settlement]) -> Result<()> {
 }
 ```
 
-**Invariant 2.3.2:** Settlement amounts MUST be positive integers.
+**Invariant 2.1.2:** Settlement amounts MUST be positive integers.
 
 **Rationale:** Prevents negative-amount exploits and ambiguous direction.
 
-### 2.4 Anti-Equivocation
+### 2.2 Anti-Equivocation
 
-**Invariant 2.4.1:** A cooperative signing two different actions at the same sequence number is AUTOMATICALLY penalized.
+**Invariant 2.2.1:** A cooperative signing two different actions at the same sequence number is AUTOMATICALLY penalized.
 
 **Rationale:** Byzantine fault tolerance requires equivocation detection.
 
@@ -166,9 +133,9 @@ fn detect_equivocation(
 }
 ```
 
-### 2.5 Arithmetic Safety
+### 2.3 Arithmetic Safety
 
-**Invariant 2.5.1:** All arithmetic operations MUST use checked arithmetic (no overflow/underflow).
+**Invariant 2.3.1:** All arithmetic operations MUST use checked arithmetic (no overflow/underflow).
 
 **Rationale:** Prevents integer overflow exploits.
 
@@ -176,6 +143,31 @@ fn detect_equivocation(
 - Use `checked_add`, `checked_sub`, `checked_mul`
 - Return `Error::IntegerOverflow` on overflow
 - Use i64 for balances (signed to represent debt/credit)
+
+### 2.4 Default Federation Policies
+
+> **Note:** These policies are enforced by the **FederationPolicyOracle** (app layer), not the kernel.
+> Federations MAY customize these through their constitution, but the defaults below represent
+> recommended practices for cooperative networks.
+
+**Policy 2.4.1 (Membership Minimum):** Federations SHOULD have ≥2 member organizations.
+
+**Rationale:** Prevents single-entity "federations" that violate cooperative principles.
+
+**Policy 2.4.2 (Organization-Level Participation):** Federation actions SHOULD involve organization-level
+entities (cooperatives or sub-federations), not individual nodes.
+
+**Rationale:** Federations coordinate between organizations. Individual participation belongs in
+cooperative-level governance.
+
+**Policy 2.4.3 (Cell Operation):** Federations SHOULD operate a Cell (distributed gossip topic) for
+state synchronization.
+
+**Recommended Cell Properties:**
+- **Topic ID**: Derived from federation constitution hash
+- **Access Control**: TrustGated (only members can write)
+- **Persistence**: Immutable append-only log
+- **Replication**: ≥3 nodes per member cooperative
 
 ---
 
