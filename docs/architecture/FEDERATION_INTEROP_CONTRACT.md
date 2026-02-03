@@ -74,8 +74,9 @@ fn validate_federation_size(members: &[Did]) -> Result<()> {
 **Rationale:** Federations coordinate between organizations, not individuals.
 
 **Enforcement:**
-- DIDs in federation actions MUST have cooperative prefix: `did:icn:<coop-name>:...`
-- Individual DIDs (`did:icn:<pubkey>`) MUST be rejected
+- DIDs in federation actions MUST be canonical ICN DIDs as defined by CANONICAL_ENCODING (`did:icn:<base58btc-pubkey>`)
+- Each such DID MUST resolve to an organization-level entity (cooperative or federation), not an individual
+- Implementations MUST reject any federation action where a participant DID resolves to an individual entity
 
 ### 2.2 Cell Requirement
 
@@ -359,42 +360,32 @@ The state root is a Merkle root over:
 5. **Sequence metadata**: Current sequence, timestamp
 
 ```rust
+/// Domain-separated BLAKE3 state-root hash.
+/// 
+/// NOTE: The canonical encoding of `GovernanceState` is defined
+/// normatively in `GOVERNANCE_STATE_MACHINE.md` under CANONICAL_ENCODING.
+/// Implementations MUST follow that specification for
+/// `encode_governance_state_canonical`.
 fn compute_state_root(state: &GovernanceState) -> [u8; 32] {
+    const DOMAIN: &[u8] = b"ICN::GovernanceStateRoot::v1";
+
     let mut hasher = blake3::Hasher::new();
-    
-    // Hash member registry (sorted by DID)
-    let mut members: Vec<_> = state.members.iter().collect();
-    members.sort_by_key(|(did, _)| *did);
-    for (did, info) in members {
-        hasher.update(did.as_bytes());
-        hasher.update(&bincode::serialize(info).unwrap());
-    }
-    
-    // Hash balances (sorted by (DID, currency))
-    let mut balances: Vec<_> = state.balances.iter().collect();
-    balances.sort_by_key(|(key, _)| *key);
-    for ((did, currency), balance) in balances {
-        hasher.update(did.as_bytes());
-        hasher.update(currency.as_bytes());
-        hasher.update(&balance.to_le_bytes());
-    }
-    
-    // Hash constitution
-    hasher.update(&state.constitution_hash);
-    
-    // Hash proposals (sorted by ID)
-    let mut proposals: Vec<_> = state.proposals.iter().collect();
-    proposals.sort_by_key(|(id, _)| *id);
-    for (id, proposal_state) in proposals {
-        hasher.update(id.as_bytes());
-        hasher.update(&bincode::serialize(proposal_state).unwrap());
-    }
-    
-    // Hash sequence metadata
-    hasher.update(&state.sequence.to_le_bytes());
-    hasher.update(&state.timestamp.to_le_bytes());
-    
-    (*hasher.finalize().as_bytes()).into()
+
+    // Prefix with domain string for robustness against cross-protocol collisions.
+    hasher.update(DOMAIN);
+
+    // Encode the full governance state using the canonical, field-by-field
+    // layout described in GOVERNANCE_STATE_MACHINE.md (CANONICAL_ENCODING).
+    //
+    // This function is conceptual here; its exact behavior is defined by the
+    // governance state-machine specification and MUST NOT rely on `bincode`
+    // or any other non-canonical, implementation-defined serialization.
+    let encoded: Vec<u8> = encode_governance_state_canonical(state);
+
+    hasher.update(&encoded);
+
+    // Finalize and return the 32-byte state-root digest.
+    *hasher.finalize().as_bytes()
 }
 ```
 
