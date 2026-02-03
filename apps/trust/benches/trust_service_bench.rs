@@ -45,7 +45,7 @@ fn create_test_service(
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
     let store_dyn: Arc<dyn icn_store::Store> = store.clone();
-    
+
     let keypair = icn_identity::KeyPair::generate().unwrap();
     let own_did = keypair.did().clone();
     let mut graph = TrustGraph::new(store.clone(), own_did.clone());
@@ -172,15 +172,11 @@ fn bench_comparison(c: &mut Criterion) {
     let target_did = &dids[target_idx];
 
     group.bench_function("trust_score_1000", |b| {
-        b.iter(|| {
-            rt.block_on(async { service.trust_score(black_box(target_did)) })
-        })
+        b.iter(|| rt.block_on(async { service.trust_score(black_box(target_did)) }))
     });
 
     group.bench_function("trust_score_detailed_1000", |b| {
-        b.iter(|| {
-            rt.block_on(async { service.trust_score_detailed(black_box(target_did)) })
-        })
+        b.iter(|| rt.block_on(async { service.trust_score_detailed(black_box(target_did)) }))
     });
 
     group.finish();
