@@ -144,9 +144,9 @@ pub struct CreditLimitUpdate {
 
 /// Governance decision outcome
 /// 
-/// NOTE: This extends the base `DecisionOutcome` from GOVERNANCE_STATE_MACHINE.md
-/// with an additional `Vetoed` variant for federation-specific veto actions.
-/// Implementations MUST support all four variants.
+/// NOTE: This enum MUST match `DecisionOutcome` from GOVERNANCE_STATE_MACHINE.md
+/// exactly (same variants, same encoding). This document repeats it for federation
+/// action context. Implementations MUST support all four variants.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionOutcome {
@@ -158,16 +158,15 @@ pub enum DecisionOutcome {
 
 /// Vote tally for a decision
 ///
-/// NOTE: This extends the base `VoteTally` from GOVERNANCE_STATE_MACHINE.md
-/// with an additional `signatories` field to track which members voted.
-/// The `signatories` field MUST be sorted for canonical encoding.
+/// NOTE: This struct MUST match `VoteTally` from GOVERNANCE_STATE_MACHINE.md
+/// exactly. The `signatories` field MUST be sorted lexicographically for canonical encoding.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VoteTally {
     pub votes_for: u64,
     pub votes_against: u64,
     pub votes_abstain: u64,
     pub eligible_voters: u64,
-    pub signatories: Vec<String>,  // Sorted DIDs of voters (federation extension)
+    pub signatories: Vec<String>,  // Sorted DIDs of voters
 }
 ```
 
@@ -360,7 +359,8 @@ impl Canonicalize for FederationAction {
         // - All BTreeMap fields have keys in ascending order
         //
         // Returns true only if the action is already in canonical form.
-        // See CANONICAL_ENCODING.md for complete normalization rules.
+        // Normalization rules are defined in CANONICAL_ENCODING.md §5 (Identifier Normalization)
+        // and §3.2 (Set-Like Vectors). These helper methods verify compliance:
         self.verify_dids_normalized() 
             && self.verify_currencies_normalized()
             && self.verify_collections_sorted()
@@ -393,6 +393,48 @@ fn normalize_currency(currency: &str) -> String {
     } else {
         currency.to_uppercase()
     }
+}
+```
+
+### 4.3 Validation Helper Functions
+
+The following helper functions verify that data is already in canonical form.
+These are used by the `is_canonical()` method in §4.1.
+
+```rust
+// Note: These are conceptual helpers. Actual implementations should validate
+// according to the rules in CANONICAL_ENCODING.md §5 and §3.2.
+
+fn verify_dids_normalized(action: &FederationAction) -> bool {
+    // Check that all DID fields use lowercase "did:icn:" prefix
+    // while preserving Base58btc identifier case.
+    // See CANONICAL_ENCODING.md §5.1 for complete DID normalization rules.
+    //
+    // Implementation: iterate through all DID fields in the action and verify:
+    // 1. Prefix is lowercase: "did:icn:"
+    // 2. Optional coop-name component is lowercase: "[a-z0-9-]+"
+    // 3. Identifier is valid Base58btc (case-preserved)
+    true  // Placeholder
+}
+
+fn verify_currencies_normalized(action: &FederationAction) -> bool {
+    // Check that all currency identifiers follow normalized format:
+    // - Scope is lowercase (e.g., "fed", "global")
+    // - Symbol is uppercase (e.g., "USD", "EUR")
+    // Format: "scope:SYMBOL" or just "SYMBOL" for scopeless currencies
+    // See CANONICAL_ENCODING.md §5.2 for currency normalization rules.
+    true  // Placeholder
+}
+
+fn verify_collections_sorted(action: &FederationAction) -> bool {
+    // Check that all Vec<String> fields representing sets are:
+    // 1. Sorted lexicographically
+    // 2. Deduplicated (no duplicate entries)
+    // See CANONICAL_ENCODING.md §3.2 for set-like vector rules.
+    //
+    // Also verify that all BTreeMap fields maintain sorted key order
+    // (BTreeMap guarantees this by construction, so this is always true).
+    true  // Placeholder
 }
 ```
 

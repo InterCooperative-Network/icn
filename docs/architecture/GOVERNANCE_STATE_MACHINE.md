@@ -130,6 +130,22 @@ pub enum ProposalState {
     Vetoed,
 }
 
+// Canonical numeric mapping for ProposalState
+// These values MUST be used when serializing as u8 for canonical encoding.
+// If enum declaration order differs from this mapping, this numeric mapping wins.
+impl ProposalState {
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            ProposalState::Open => 0,
+            ProposalState::Approved => 1,
+            ProposalState::Rejected => 2,
+            ProposalState::NoQuorum => 3,
+            ProposalState::Expired => 4,
+            ProposalState::Vetoed => 5,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Decision {
     pub proposal_id: String,
@@ -154,6 +170,8 @@ pub struct VoteTally {
     pub votes_against: u64,
     pub votes_abstain: u64,
     pub eligible_voters: u64,
+    /// DIDs of voters (MUST be sorted lexicographically in canonical encoding)
+    pub signatories: Vec<String>,
 }
 ```
 
@@ -585,7 +603,7 @@ pub fn compute_state_root(state: &GovernanceState) -> [u8; 32] {
     for (id, proposal) in proposals {
         hasher.update(id.as_bytes());
         hasher.update(&proposal.constitution_hash);
-        hasher.update(&(proposal.state as u8).to_le_bytes());
+        hasher.update(&proposal.state.to_u8().to_le_bytes());
     }
     
     // Hash decisions (sorted by ID)

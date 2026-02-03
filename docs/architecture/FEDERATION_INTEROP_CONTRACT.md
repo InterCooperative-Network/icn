@@ -287,7 +287,7 @@ fn sign_proof(proof: &GovernanceProof, signing_key: &SigningKey) -> [u8; 64] {
 
 For multi-signature proofs:
 1. Each cooperative signs the SAME payload hash
-2. Signatures are collected in `confirmations` list (sorted by DID)
+2. Signatures are collected in `signatures` BTreeMap (keyed by signer DID)
 3. Verification checks ALL signatures against the payload
 
 **Note:** ICN does not use signature aggregation (e.g., BLS). Each signature is verified independently.
@@ -737,16 +737,14 @@ fn validate_proof_structure(proof: &GovernanceProof) -> Result<()> {
         return Err(Error::InvalidTimestamp);
     }
     
-    if proof.confirmations.is_empty() {
-        return Err(Error::NoConfirmations);
+    // Extract signers from signatures map (treat as a set; order MUST NOT affect verification)
+    let signers: Vec<&String> = proof.signatures.keys().collect();
+    
+    if signers.is_empty() {
+        return Err(Error::NoSignatures);
     }
     
-    // Verify confirmations are sorted and unique
-    for i in 1..proof.confirmations.len() {
-        if proof.confirmations[i] <= proof.confirmations[i - 1] {
-            return Err(Error::UnsortedConfirmations);
-        }
-    }
+    // Note: BTreeMap guarantees sorted keys, so signatures.keys() is already canonical
     
     // Verify decision records size
     let decision_records_size: usize = proof.decision_records.iter()
@@ -1014,11 +1012,12 @@ fn verify_governance_threshold(
     proof: &GovernanceProof,
     current_state: &GovernanceState,
 ) -> Result<()> {
-    let action_type = derive_action_type_from_proof(proof);
+    // Action type is derived from the action structure (see §9 Action Type Derivation)
+    let action_type = proof.action_type;
     let required_threshold = current_state.constitution.get_threshold(action_type);
     
-    // Compute governance weight of confirmations
-    let confirmed_weight: u64 = proof.confirmations.iter()
+    // Compute governance weight of signers
+    let confirmed_weight: u64 = proof.signatures.keys()
         .filter_map(|did| {
             current_state.members.get(did).map(|m| m.governance_weight)
         })
@@ -1179,7 +1178,7 @@ Implementations MUST satisfy the following requirements to be interoperable:
 **Threat:** Arithmetic overflow corrupts balances.
 
 **Mitigation:**
-- Checked arithmetic (§2.5)
+- Checked arithmetic (§2.3)
 - i64 balances support large values (±9 quintillion)
 - Explicit overflow errors
 

@@ -170,18 +170,21 @@ pub struct GovernanceProof {
 }
 
 // INCORRECT: Non-deterministic ordering
+// This example shows what NOT to do - HashMap iteration order is undefined,
+// causing different implementations to produce different byte sequences for
+// the same logical data, breaking cross-language interoperability.
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
-pub struct GovernanceProof {
-    pub metadata: HashMap<String, String>,    // ❌ Non-deterministic
-    pub confirmations: Vec<Did>,              // ⚠️  Must be sorted
+pub struct BadGovernanceProof {
+    pub metadata: HashMap<String, String>,    // ❌ Non-deterministic iteration order
+    pub confirmations: Vec<Did>,              // ⚠️  Must be sorted (but not enforced here)
 }
 ```
 
 **Rules:**
-- Use `BTreeMap<K, V>`, not `HashMap<K, V>`
-- Use `BTreeSet<T>`, not `HashSet<T>`
+- Use `BTreeMap<K, V>`, not `HashMap<K, V>` (deterministic key ordering)
+- Use `BTreeSet<T>`, not `HashSet<T>` (deterministic element ordering)
 - For `Vec<T>` representing sets, explicitly sort before encoding (see 3.2)
 
 ### 3.2 Set-Like Vectors
@@ -239,6 +242,30 @@ pub struct SignedData {
     pub signature: [u8; 64],  // JSON: "0xabcd..." / CBOR: byte string
 }
 ```
+
+### 3.5 Enum Serialization
+
+Enum types (such as `ActionType`, `ProposalState`, `DecisionOutcome`) MUST serialize consistently across implementations:
+
+**String Serialization (for JSON and human-readable formats):**
+- Enum variants MUST serialize as **snake_case** ASCII strings
+- Transformation rule: Convert PascalCase to snake_case by inserting underscores before uppercase letters (except the first) and lowercasing all characters
+- Acronyms are treated as single words and lowercased as a unit
+
+**Examples:**
+```rust
+ActionType::SettleCrossCoop   → "settle_cross_coop"
+ActionType::AdmitMember       → "admit_member"
+ActionType::RotateKey         → "rotate_key"
+ActionType::DIDRotate         → "did_rotate"  // Acronym treated as single word
+```
+
+**Numeric Serialization (for binary formats):**
+- When serializing to u8 (e.g., in CBOR or state root computation), use the explicit numeric mapping defined for each enum type
+- Numeric mappings are defined in the specification for each enum (see GOVERNANCE_STATE_MACHINE.md for ProposalState mapping)
+
+**Cross-Language Consistency:**
+All implementations MUST produce identical string and numeric representations for the same enum variant to ensure interoperability.
 
 ---
 
@@ -814,29 +841,21 @@ pub struct GovernanceProof {
     pub prev_state_root: [u8; 32],
     pub sequence: u64,
     pub timestamp: u64,
-    pub confirmations: Vec<String>,  // Sorted DIDs
     pub decision_records: BTreeMap<String, Vec<u8>>,  // Ordered map
-    pub signature: [u8; 64],
+    /// Multi-signature map: keyed by signer DID (string form), values are Ed25519 signatures.
+    /// BTreeMap ensures deterministic ordering for canonical encoding.
+    pub signatures: BTreeMap<String, [u8; 64]>,
 }
 
 impl Canonicalize for GovernanceProof {
     fn canonicalize(&mut self) {
-        // Sort confirmations
-        self.confirmations.sort();
-        self.confirmations.dedup();
-        
-        // BTreeMap is already ordered by key
+        // BTreeMap fields (signatures, decision_records) are already ordered by key
         
         // Normalize identifiers (omitted for brevity)
     }
     
     fn is_canonical(&self) -> bool {
-        // Verify confirmations are sorted and unique
-        for i in 1..self.confirmations.len() {
-            if self.confirmations[i] <= self.confirmations[i - 1] {
-                return false;
-            }
-        }
+        // BTreeMap guarantees sorted keys, so signatures are already canonical
         true
     }
 }
