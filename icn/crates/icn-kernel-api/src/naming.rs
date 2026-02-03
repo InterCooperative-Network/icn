@@ -297,6 +297,7 @@ pub trait ScopedDiscovery: Send + Sync {
 ///     // ... other methods
 /// }
 /// ```
+// #[async_trait] provides Send bounds on futures for dyn-compatibility with trait objects
 #[async_trait::async_trait]
 pub trait AsyncScopedDiscovery: Send + Sync {
     /// Announce a service endpoint (async).

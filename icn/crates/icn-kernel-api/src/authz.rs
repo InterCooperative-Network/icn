@@ -570,6 +570,13 @@ impl PolicyRequest {
 ///
 /// Most implementations should use Option 1 for better hot-path performance.
 /// Option 2 is for cases where async I/O or contended tokio locks are unavoidable.
+///
+/// # Existing Implementations
+///
+/// All existing `PolicyOracle` implementations (e.g., `TrustPolicyOracle`, `AllowAllOracle`,
+/// `DenyAllOracle`) automatically gain an async path via the default `evaluate_async()`
+/// implementation. No changes are required for existing code.
+// #[async_trait] provides Send bounds on futures for dyn-compatibility with trait objects
 #[async_trait]
 pub trait PolicyOracle: Send + Sync {
     /// Evaluate whether a request should be allowed (synchronous).
