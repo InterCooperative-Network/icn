@@ -1048,7 +1048,7 @@ impl TrustGraph {
                         );
                     }
                 }
-                
+
                 // Batch update cache size metric once after all invalidations
                 icn_obs::metrics::scalability::trust_cache_size_set(self.cache.size());
             }

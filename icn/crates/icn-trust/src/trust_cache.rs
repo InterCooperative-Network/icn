@@ -136,7 +136,7 @@ impl TrustCache {
             }
         }
     }
-    
+
     /// Get the current cache size (for batched metric updates).
     pub fn size(&self) -> usize {
         self.cache.lock().map(|c| c.len()).unwrap_or(0)
