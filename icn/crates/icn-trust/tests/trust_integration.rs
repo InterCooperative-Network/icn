@@ -1180,8 +1180,8 @@ fn test_high_fanout_cache_invalidation() {
     }
 
     // Cache scores for a subset of spokes (simulating low cache hit rate ~20%)
-    for i in 0..20 {
-        let score = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+    for spoke in spokes.iter().take(20) {
+        let score = multi.social().compute_trust_score(spoke.did()).unwrap();
         // Score is now cached
         assert!(score >= 0.0);
     }
@@ -1202,9 +1202,9 @@ fn test_high_fanout_cache_invalidation() {
     // (the ones that had cached entries), saving 80% of the work
 
     // Verify system still works correctly after high-fanout invalidation
-    for i in 50..70 {
+    for spoke in spokes.iter().skip(50).take(20) {
         // These were never cached, compute them now
-        let score = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+        let score = multi.social().compute_trust_score(spoke.did()).unwrap();
         assert!(score >= 0.0);
     }
 }
@@ -1235,8 +1235,8 @@ fn test_selective_invalidation_reduces_work() {
     }
 
     // Only cache a few scores (10% cache hit rate)
-    for i in 0..5 {
-        let _ = multi.social().compute_trust_score(spokes[i].did()).unwrap();
+    for spoke in spokes.iter().take(5) {
+        let _ = multi.social().compute_trust_score(spoke.did()).unwrap();
     }
 
     // Modify an incoming edge to hub
