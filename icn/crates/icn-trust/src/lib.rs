@@ -105,6 +105,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+/// Threshold for logging high-fanout cache invalidation events.
+///
+/// When a trust edge change triggers invalidation of >= this many downstream
+/// DIDs, an INFO log is emitted for monitoring. This helps identify hub nodes
+/// that may need optimization attention.
+const HIGH_FANOUT_LOG_THRESHOLD: u64 = 50;
+
 /// Trust classification for a peer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TrustClass {
@@ -1028,7 +1035,7 @@ impl TrustGraph {
                         invalidated_count,
                     );
 
-                    if total_count >= 50 {
+                    if total_count >= HIGH_FANOUT_LOG_THRESHOLD {
                         // High-fanout scenario - log for monitoring
                         info!(
                             target = %target,
