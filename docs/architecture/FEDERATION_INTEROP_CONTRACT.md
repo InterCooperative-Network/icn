@@ -53,13 +53,11 @@ These are **non-overridable** protocol rules enforced by the ICN kernel. Governa
 > **Architecture Note (Meaning Firewall):** Per ICN's kernel/app separation, the kernel enforces
 > constraints WITHOUT understanding their semantic origin. The invariants below are generic
 > safety properties that the kernel can enforce blindly. Domain-specific policies (membership
-> rules, governance thresholds, etc.) belong in PolicyOracles and are covered in Section 2.5.
+> rules, governance thresholds, etc.) belong in PolicyOracles and are covered in Section 2.4.
 
 ### 2.1 Settlement Conservation
 
 **Invariant 2.1.1:** Cross-cooperative settlements MUST sum to zero per currency.
-
-**Invariant 2.3.1:** Cross-cooperative settlements MUST sum to zero per currency.
 
 **Rationale:** Prevents value creation/destruction exploits.
 
@@ -122,9 +120,9 @@ fn detect_equivocation(
         return None;  // Same action, no equivocation
     }
     
-    // Find common signer
-    for did in &proof_a.confirmations {
-        if proof_b.confirmations.contains(did) {
+    // Find common signer (using signatures map keys)
+    for did in proof_a.signatures.keys() {
+        if proof_b.signatures.contains_key(did) {
             return Some(did.clone());  // Equivocating signer found
         }
     }
