@@ -83,7 +83,9 @@ fn test_cross_org_request_with_org_id_metadata() {
     assert!(decision.is_allowed());
     assert!(oracle.handles_cross_org());
 
-    // Verify org_id is in metadata
+    // Verify metadata was set correctly in the request.
+    // Note: This tests the request builder, not the oracle's handling of metadata.
+    // The oracle currently ignores org_id (see TODO #1046 for scope-bounded implementation).
     assert_eq!(
         request.context.metadata.get("org_id"),
         Some(&"regional-food-network".to_string())
