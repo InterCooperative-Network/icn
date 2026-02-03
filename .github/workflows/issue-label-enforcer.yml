@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   enforce-labels:
-    runs-on: [self-hosted, homelab, k3s]
+    runs-on: ubuntu-latest
     steps:
       - name: Enforce required labels
         uses: actions/github-script@v8
