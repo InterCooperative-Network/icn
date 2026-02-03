@@ -331,8 +331,7 @@ impl ServiceEndpoint {
         payload
     }
 
-    /// Verify the Ed25519 signature on this endpoint.
-    /// Check if this endpoint registration has expired (alias for compatibility).
+    /// Check if this endpoint registration has expired (alias for `is_stale()` for backward compatibility).
     pub fn is_expired(&self) -> bool {
         self.is_stale()
     }
