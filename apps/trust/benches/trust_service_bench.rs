@@ -37,7 +37,10 @@ fn did_from_seed(seed: u32) -> Did {
 }
 
 /// Create a trust service with a test graph of specified size.
-/// Total edges are approximately size × input_edges_per_target, randomly distributed.
+///
+/// Generates ~size × input_edges_per_target total edges, randomly distributed across targets
+/// (not evenly distributed per node). Includes ~10% direct edges from own_did.
+/// This distribution models realistic trust graphs where some nodes are hubs.
 fn create_test_service(
     size: usize,
     input_edges_per_target: usize,
@@ -112,7 +115,9 @@ fn bench_trust_score_baseline(c: &mut Criterion) {
                 b.iter(|| {
                     // Run in tokio context for block_in_place
                     rt.block_on(async {
-                        // Query a random DID
+                        // Query a random DID - intentionally random to measure average-case
+                        // performance across varied cache hit patterns and graph positions.
+                        // The comparison benchmark uses fixed targets for apples-to-apples.
                         let target_idx = rng.gen_range(1..network_size);
                         service.trust_score(black_box(&dids[target_idx]))
                     })
@@ -144,7 +149,8 @@ fn bench_trust_score_detailed(c: &mut Criterion) {
                 b.iter(|| {
                     // Run in tokio context for block_in_place
                     rt.block_on(async {
-                        // Query a random DID
+                        // Query a random DID - intentionally random to measure average-case
+                        // performance across varied input edge counts and graph positions.
                         let target_idx = rng.gen_range(1..network_size);
                         service.trust_score_detailed(black_box(&dids[target_idx]))
                     })
