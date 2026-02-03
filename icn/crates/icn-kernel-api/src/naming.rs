@@ -158,6 +158,22 @@ pub enum EndpointType {
     WebSocket,
 }
 
+impl EndpointType {
+    /// Convert to canonical byte representation for signing payloads.
+    ///
+    /// These values are part of the signing protocol and MUST NOT change
+    /// without incrementing the signing payload version.
+    #[inline]
+    pub fn to_canonical_byte(&self) -> u8 {
+        match self {
+            EndpointType::Quic => 0,
+            EndpointType::Http => 1,
+            EndpointType::Grpc => 2,
+            EndpointType::WebSocket => 3,
+        }
+    }
+}
+
 /// Service endpoint with signing, scope awareness, and multi-endpoint support.
 ///
 /// Complements the existing `ServiceAnnouncement` with:
@@ -263,13 +279,7 @@ impl ServiceEndpoint {
         extend_with_length(&mut payload, &self.provider);
 
         // Endpoint type (fixed 1 byte)
-        let endpoint_type_byte = match self.endpoint_type {
-            EndpointType::Quic => 0u8,
-            EndpointType::Http => 1u8,
-            EndpointType::Grpc => 2u8,
-            EndpointType::WebSocket => 3u8,
-        };
-        payload.push(endpoint_type_byte);
+        payload.push(self.endpoint_type.to_canonical_byte());
 
         extend_with_length(&mut payload, &self.service_type.name);
         extend_with_length(&mut payload, &self.service_type.version);
