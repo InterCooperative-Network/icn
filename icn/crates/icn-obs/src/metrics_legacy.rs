@@ -2354,6 +2354,14 @@ pub mod scalability {
         counter!("icn_trust_cache_invalidation_errors_total").increment(1);
     }
 
+    /// Record a cache lock failure (poisoned mutex).
+    ///
+    /// This should be extremely rare in practice. Non-zero values indicate
+    /// a panic occurred while the lock was held. Investigate immediately.
+    pub fn trust_cache_lock_failures_inc() {
+        counter!("icn_trust_cache_lock_failures_total").increment(1);
+    }
+
     pub fn trust_cache_size_set(size: usize) {
         gauge!("icn_trust_cache_size").set(size as f64);
     }

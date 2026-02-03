@@ -118,19 +118,28 @@ impl TrustCache {
     /// This optimization reduces lock contention and metric noise for high-fanout
     /// scenarios where most downstream nodes have no cached scores.
     pub fn invalidate_if_cached(&self, did: &Did) -> bool {
-        if let Ok(mut cache) = self.cache.lock() {
-            if cache.peek(did).is_some() {
-                cache.pop(did);
-                icn_obs::metrics::scalability::trust_cache_invalidations_inc();
-                icn_obs::metrics::scalability::trust_cache_size_set(cache.len());
-                true
-            } else {
-                icn_obs::metrics::scalability::trust_cache_selective_skips_inc();
+        match self.cache.lock() {
+            Ok(mut cache) => {
+                // Use pop() directly for atomic check-and-remove
+                if cache.pop(did).is_some() {
+                    icn_obs::metrics::scalability::trust_cache_invalidations_inc();
+                    true
+                } else {
+                    icn_obs::metrics::scalability::trust_cache_selective_skips_inc();
+                    false
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Cache lock poisoned during invalidation of {did}: {e}");
+                icn_obs::metrics::scalability::trust_cache_lock_failures_inc();
                 false
             }
-        } else {
-            false
         }
+    }
+    
+    /// Get the current cache size (for batched metric updates).
+    pub fn size(&self) -> usize {
+        self.cache.lock().map(|c| c.len()).unwrap_or(0)
     }
 
     /// Clear all cached entries

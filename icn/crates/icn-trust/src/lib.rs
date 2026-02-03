@@ -1028,7 +1028,7 @@ impl TrustGraph {
                         invalidated_count,
                     );
 
-                    if total_count > 50 {
+                    if total_count >= 50 {
                         // High-fanout scenario - log for monitoring
                         info!(
                             target = %target,
@@ -1048,6 +1048,9 @@ impl TrustGraph {
                         );
                     }
                 }
+                
+                // Batch update cache size metric once after all invalidations
+                icn_obs::metrics::scalability::trust_cache_size_set(self.cache.size());
             }
             Err(e) => {
                 icn_obs::metrics::scalability::trust_cache_invalidation_errors_inc();

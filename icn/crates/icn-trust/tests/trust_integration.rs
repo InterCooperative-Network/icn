@@ -1270,7 +1270,7 @@ fn test_fanout_threshold_logging() {
 
     let mut multi = MultiTrustGraph::new(store.clone(), hub.did().clone());
 
-    // Create a hub with exactly 51 outgoing edges (just over the threshold)
+    // Create a hub with 51 outgoing edges (at or above the threshold of 50)
     let mut spokes: Vec<KeyPair> = Vec::new();
     for _ in 0..51 {
         spokes.push(KeyPair::generate().unwrap());
