@@ -75,7 +75,9 @@ impl ServiceDiscoveryManager {
 
             let registry = registry_for_callback.clone();
             tokio::spawn(async move {
-                Self::handle_gossip_entry(registry, entry).await;
+                if let Err(e) = Self::handle_gossip_entry(registry, entry).await {
+                    warn!("Failed to handle gossip entry for service discovery: {}", e);
+                }
             });
         });
 
@@ -109,47 +111,39 @@ impl ServiceDiscoveryManager {
     }
 
     /// Handle a single gossip entry for service discovery.
+    ///
+    /// Returns an error if message processing fails (for logging purposes).
     async fn handle_gossip_entry(
         registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
         entry: icn_gossip::GossipEntry,
-    ) {
+    ) -> Result<(), String> {
         // Decode the message
-        let msg: icn_gossip::ServiceDiscoveryMessage = match icn_encoding::decode(&entry.data) {
-            Ok(m) => m,
-            Err(e) => {
-                warn!("Failed to decode service discovery message: {}", e);
-                return;
-            }
-        };
+        let msg: icn_gossip::ServiceDiscoveryMessage = icn_encoding::decode(&entry.data)
+            .map_err(|e| format!("Failed to decode: {e}"))?;
 
         match msg {
             icn_gossip::ServiceDiscoveryMessage::Announce { endpoint } => {
                 // Verify signature
                 if let Err(e) = icn_gossip::verify_service_endpoint(&endpoint) {
-                    warn!(
-                        "Received service announcement with invalid signature: {} ({})",
+                    return Err(format!(
+                        "Invalid signature for {}: {}",
                         endpoint.service_id, e
-                    );
-                    return;
+                    ));
                 }
 
                 // Check if expired
                 if endpoint.is_expired() {
-                    debug!(
-                        "Ignoring expired service announcement: {}",
-                        endpoint.service_id
-                    );
-                    return;
+                    debug!("Ignoring expired service announcement: {}", endpoint.service_id);
+                    return Ok(());
                 }
 
                 // Store in registry (deduplication by service_id)
                 let mut reg = registry.write().await;
                 if reg.len() >= MAX_REGISTRY_SIZE && !reg.contains_key(&endpoint.service_id) {
-                    warn!(
-                        "Service registry full, ignoring announcement: {}",
+                    return Err(format!(
+                        "Registry full, ignoring announcement: {}",
                         endpoint.service_id
-                    );
-                    return;
+                    ));
                 }
 
                 let service_id = endpoint.service_id.clone();
@@ -157,6 +151,7 @@ impl ServiceDiscoveryManager {
 
                 debug!("Received service announcement via gossip: {}", service_id);
                 icn_obs::metrics::service_discovery::gossip_announcements_received_inc();
+                Ok(())
             }
             icn_gossip::ServiceDiscoveryMessage::Withdraw {
                 service_id,
@@ -166,22 +161,27 @@ impl ServiceDiscoveryManager {
                 let mut reg = registry.write().await;
                 // Only withdraw if the provider matches
                 if let Some(ep) = reg.get(&service_id) {
-                    if ep.provider == provider.to_string() {
+                    if ep.provider == provider.as_str() {
                         reg.remove(&service_id);
                         debug!("Received service withdrawal via gossip: {}", service_id);
                         icn_obs::metrics::service_discovery::gossip_withdrawals_received_inc();
+                        Ok(())
                     } else {
-                        warn!(
+                        Err(format!(
                             "Ignoring withdrawal from non-owner: {} (owner: {}, requestor: {})",
                             service_id, ep.provider, provider
-                        );
+                        ))
                     }
+                } else {
+                    // Not an error - service might have already been withdrawn
+                    Ok(())
                 }
             }
             icn_gossip::ServiceDiscoveryMessage::Query { .. }
             | icn_gossip::ServiceDiscoveryMessage::Response { .. } => {
                 // Query/Response not handled in this callback
                 // (would need additional wiring for interactive query/response)
+                Ok(())
             }
         }
     }

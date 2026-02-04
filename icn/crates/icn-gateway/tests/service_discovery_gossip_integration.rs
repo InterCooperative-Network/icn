@@ -16,6 +16,9 @@ use icn_kernel_api::types::{Endpoint, Signature};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Delay to allow gossip callback processing (milliseconds)
+const CALLBACK_PROCESSING_DELAY_MS: u64 = 100;
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -215,7 +218,7 @@ async fn test_incoming_announcement_stored() {
     drop(g);
     
     // Give the callback time to process
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(CALLBACK_PROCESSING_DELAY_MS)).await;
     
     // Node B should have stored the endpoint
     let discovered = mgr_b.get("svc-remote").await;
