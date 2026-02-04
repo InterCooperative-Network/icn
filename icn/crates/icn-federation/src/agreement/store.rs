@@ -632,6 +632,8 @@ mod tests {
         let agreement_id;
         let party_did;
         {
+            // Keep concrete Arc<SledStore> so we can call flush() explicitly,
+            // then cast to trait object for AgreementStore.
             let sled_store = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
             let store = AgreementStore::new(sled_store.clone() as Arc<dyn Store>);
 
@@ -679,6 +681,7 @@ mod tests {
                             "Attempt {}/{} to open store failed: {}. Retrying...",
                             attempts, max_attempts, e
                         );
+                        // Linear backoff: 100ms, 200ms, 300ms, 400ms, 500ms
                         std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
                     }
                     Err(e) => panic!(
@@ -721,9 +724,10 @@ mod tests {
 
         // First session - create agreement and amendment
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            // Keep concrete Arc<SledStore> so we can call flush() explicitly,
+            // then cast to trait object for AgreementStore.
+            let sled_store = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store.clone() as Arc<dyn Store>);
 
             let agreement = create_test_agreement();
             agreement_id = agreement.id.clone();
@@ -737,13 +741,42 @@ mod tests {
             // Verify
             let amendments = store.get_amendments(&agreement_id).unwrap();
             assert_eq!(amendments.len(), 1);
+
+            // Explicitly flush and drop in correct order to release file lock
+            sled_store.flush().unwrap();
+            drop(store);
+            drop(sled_store);
         }
 
-        // Second session - verify amendments persist
+        // Wait for OS-level lock release
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        // Second session - reopen with retry logic to handle lock contention
+        let sled_store = {
+            let mut attempts = 0;
+            let max_attempts = 5;
+            loop {
+                match icn_store::SledStore::open(&store_path) {
+                    Ok(store) => break Arc::new(store),
+                    Err(e) if attempts < max_attempts => {
+                        attempts += 1;
+                        eprintln!(
+                            "Attempt {}/{} to open store failed: {}. Retrying...",
+                            attempts, max_attempts, e
+                        );
+                        // Linear backoff: 100ms, 200ms, 300ms, 400ms, 500ms
+                        std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
+                    }
+                    Err(e) => panic!(
+                        "Failed to reopen store after {} attempts: {}",
+                        max_attempts, e
+                    ),
+                }
+            }
+        };
+
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            let store = AgreementStore::new(sled_store as Arc<dyn Store>);
 
             let amendments = store.get_amendments(&agreement_id).unwrap();
             assert_eq!(
