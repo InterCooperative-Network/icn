@@ -31,6 +31,14 @@ pub fn init_descriptions() {
         "icn_service_discovery_registry_full_rejections_total",
         "Total number of announcements rejected because the registry is full"
     );
+    describe_counter!(
+        "icn_service_discovery_gossip_announcements_received_total",
+        "Total number of service announcements received via gossip"
+    );
+    describe_counter!(
+        "icn_service_discovery_gossip_withdrawals_received_total",
+        "Total number of service withdrawals received via gossip"
+    );
 }
 
 /// Increment service announcements counter
@@ -61,4 +69,14 @@ pub fn queries_inc() {
 /// Increment registry-full rejections counter
 pub fn registry_full_rejections_inc() {
     counter!("icn_service_discovery_registry_full_rejections_total").increment(1);
+}
+
+/// Increment gossip announcements received counter
+pub fn gossip_announcements_received_inc() {
+    counter!("icn_service_discovery_gossip_announcements_received_total").increment(1);
+}
+
+/// Increment gossip withdrawals received counter
+pub fn gossip_withdrawals_received_inc() {
+    counter!("icn_service_discovery_gossip_withdrawals_received_total").increment(1);
 }
