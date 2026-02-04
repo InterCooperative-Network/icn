@@ -218,9 +218,7 @@ pub async fn announce_service(
     // Prevent absurd future timestamps (allow 1 hour clock skew)
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| {
-            crate::error::GatewayError::InternalError("System time error".to_string())
-        })?
+        .map_err(|_| crate::error::GatewayError::InternalError("System time error".to_string()))?
         .as_secs();
     let max_future = now + 3600;
     if req.created_at > max_future || req.updated_at > max_future {
