@@ -211,19 +211,21 @@ pub async fn announce_service(
     // Validate timestamp consistency
     if req.updated_at < req.created_at {
         return Err(crate::error::GatewayError::BadRequest(
-            "updated_at cannot be before created_at".to_string()
+            "updated_at cannot be before created_at".to_string(),
         ));
     }
 
     // Prevent absurd future timestamps (allow 1 hour clock skew)
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .map_err(|_| {
+            crate::error::GatewayError::InternalError("System time error".to_string())
+        })?
         .as_secs();
     let max_future = now + 3600;
     if req.created_at > max_future || req.updated_at > max_future {
         return Err(crate::error::GatewayError::BadRequest(
-            "Timestamps too far in the future".to_string()
+            "Timestamps too far in the future".to_string(),
         ));
     }
 
