@@ -126,14 +126,17 @@ pub struct DiscoverResponse {
 pub struct ServiceEndpointResponse {
     pub service_id: String,
     pub provider: String,
+    pub endpoint_type: String,
     pub service_type: String,
     pub service_version: String,
     pub endpoints: Vec<EndpointResponse>,
+    pub addresses: Vec<String>,
     pub capabilities: Vec<String>,
     pub trust_threshold: f64,
     pub scope_visibility: String,
     pub ttl_secs: u64,
     pub created_at: u64,
+    pub updated_at: u64,
 }
 
 /// Network endpoint in API response format.
@@ -164,10 +167,20 @@ fn scope_to_string(scope: ScopeLevel) -> String {
     scope.to_string()
 }
 
+fn endpoint_type_to_string(endpoint_type: &icn_kernel_api::naming::EndpointType) -> String {
+    match endpoint_type {
+        icn_kernel_api::naming::EndpointType::Quic => "quic".to_string(),
+        icn_kernel_api::naming::EndpointType::Http => "http".to_string(),
+        icn_kernel_api::naming::EndpointType::Grpc => "grpc".to_string(),
+        icn_kernel_api::naming::EndpointType::WebSocket => "websocket".to_string(),
+    }
+}
+
 fn to_response(ep: &ServiceEndpoint) -> ServiceEndpointResponse {
     ServiceEndpointResponse {
         service_id: ep.service_id.clone(),
         provider: ep.provider.clone(),
+        endpoint_type: endpoint_type_to_string(&ep.endpoint_type),
         service_type: ep.service_type.name.clone(),
         service_version: ep.service_type.version.clone(),
         endpoints: ep
@@ -180,11 +193,13 @@ fn to_response(ep: &ServiceEndpoint) -> ServiceEndpointResponse {
                 path: e.path.clone(),
             })
             .collect(),
+        addresses: ep.addresses.clone(),
         capabilities: ep.capabilities.clone(),
         trust_threshold: ep.trust_threshold,
         scope_visibility: scope_to_string(ep.scope_visibility),
         ttl_secs: ep.ttl_secs,
         created_at: ep.created_at,
+        updated_at: ep.updated_at,
     }
 }
 
@@ -416,5 +431,74 @@ mod tests {
     fn test_default_scope_and_ttl() {
         assert_eq!(default_scope(), "org");
         assert_eq!(default_ttl(), 3600);
+    }
+
+    #[test]
+    fn test_endpoint_type_to_string() {
+        use icn_kernel_api::naming::EndpointType;
+        assert_eq!(
+            endpoint_type_to_string(&EndpointType::Quic),
+            "quic"
+        );
+        assert_eq!(
+            endpoint_type_to_string(&EndpointType::Http),
+            "http"
+        );
+        assert_eq!(
+            endpoint_type_to_string(&EndpointType::Grpc),
+            "grpc"
+        );
+        assert_eq!(
+            endpoint_type_to_string(&EndpointType::WebSocket),
+            "websocket"
+        );
+    }
+
+    #[test]
+    fn test_to_response_includes_new_fields() {
+        use icn_kernel_api::naming::EndpointType;
+        use icn_kernel_api::types::{Endpoint, Signature};
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let endpoint = ServiceEndpoint {
+            service_id: "test-svc".to_string(),
+            provider: "did:icn:test".to_string(),
+            endpoint_type: EndpointType::Grpc,
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            endpoints: vec![Endpoint::new("https", "example.com", 8080)],
+            addresses: vec![
+                "/ip4/127.0.0.1/tcp/8080".to_string(),
+                "/dns/example.com/tcp/8080".to_string(),
+            ],
+            capabilities: vec!["read".to_string(), "write".to_string()],
+            trust_threshold: 0.5,
+            scope_visibility: ScopeLevel::Org,
+            cell_id: None,
+            ttl_secs: 3600,
+            signature: Signature::new(vec![0; 64]),
+            created_at: now - 100,
+            updated_at: now,
+        };
+
+        let response = to_response(&endpoint);
+
+        // Verify new fields are present
+        assert_eq!(response.endpoint_type, "grpc");
+        assert_eq!(response.addresses.len(), 2);
+        assert_eq!(response.addresses[0], "/ip4/127.0.0.1/tcp/8080");
+        assert_eq!(response.addresses[1], "/dns/example.com/tcp/8080");
+        assert_eq!(response.updated_at, now);
+        
+        // Verify existing fields still work
+        assert_eq!(response.service_id, "test-svc");
+        assert_eq!(response.provider, "did:icn:test");
+        assert_eq!(response.created_at, now - 100);
     }
 }
