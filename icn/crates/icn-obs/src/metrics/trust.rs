@@ -21,14 +21,8 @@ pub fn init_descriptions() {
 
     // Legacy metrics (used by icn-trust crate)
     describe_counter!("icn_trust_lookups_total", "Total trust score lookups");
-    describe_counter!(
-        "icn_trust_cache_hits_total",
-        "Total trust cache hits"
-    );
-    describe_counter!(
-        "icn_trust_cache_misses_total",
-        "Total trust cache misses"
-    );
+    describe_counter!("icn_trust_cache_hits_total", "Total trust cache hits");
+    describe_counter!("icn_trust_cache_misses_total", "Total trust cache misses");
     describe_histogram!(
         "icn_trust_score_distribution",
         "Distribution of trust scores"
