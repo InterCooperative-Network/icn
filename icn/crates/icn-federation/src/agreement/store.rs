@@ -657,7 +657,7 @@ mod tests {
 
             // Verify it's stored
             assert!(store.get_agreement(&agreement_id).unwrap().is_some());
-            
+
             // Explicitly flush before dropping to release file lock
             drop(store);
             drop(sled_store);
