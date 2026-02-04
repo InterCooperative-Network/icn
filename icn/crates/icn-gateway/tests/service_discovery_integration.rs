@@ -25,9 +25,7 @@ async fn test_announce_rejects_far_future_timestamps() {
     let app = test::init_service(
         App::new()
             .app_data(actix_web::web::Data::new(mgr.clone()))
-            .service(
-                actix_web::web::scope("/api/services").configure(services::configure),
-            ),
+            .service(actix_web::web::scope("/api/services").configure(services::configure)),
     )
     .await;
 
@@ -92,9 +90,7 @@ async fn test_announce_rejects_updated_at_before_created_at() {
     let app = test::init_service(
         App::new()
             .app_data(actix_web::web::Data::new(mgr.clone()))
-            .service(
-                actix_web::web::scope("/api/services").configure(services::configure),
-            ),
+            .service(actix_web::web::scope("/api/services").configure(services::configure)),
     )
     .await;
 
@@ -156,9 +152,7 @@ async fn test_announce_accepts_valid_timestamps() {
     let app = test::init_service(
         App::new()
             .app_data(actix_web::web::Data::new(mgr.clone()))
-            .service(
-                actix_web::web::scope("/api/services").configure(services::configure),
-            ),
+            .service(actix_web::web::scope("/api/services").configure(services::configure)),
     )
     .await;
 
@@ -205,7 +199,7 @@ async fn test_announce_accepts_valid_timestamps() {
     if resp.status() == actix_web::http::StatusCode::BAD_REQUEST {
         let body = test::read_body(resp).await;
         let body_str = String::from_utf8(body.to_vec()).unwrap();
-        
+
         // Should fail on signature, not timestamp
         assert!(
             body_str.contains("signature") || body_str.contains("Invalid endpoint signature"),
@@ -224,15 +218,15 @@ async fn test_announce_accepts_valid_timestamps() {
 async fn test_discover_response_includes_new_fields() {
     // This test validates that the ServiceEndpointResponse includes
     // endpoint_type, addresses, and updated_at fields
-    
+
     let mgr = Arc::new(ServiceDiscoveryManager::new());
-    
+
     // Manually register a valid endpoint (bypassing signature verification)
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    
+
     let endpoint = icn_kernel_api::naming::ServiceEndpoint {
         service_id: "test-discovery-1".to_string(),
         provider: "did:icn:alice".to_string(),
@@ -241,9 +235,11 @@ async fn test_discover_response_includes_new_fields() {
             name: "ledger".to_string(),
             version: "1.0".to_string(),
         },
-        endpoints: vec![
-            icn_kernel_api::types::Endpoint::new("quic", "ledger.coop.local", 4433)
-        ],
+        endpoints: vec![icn_kernel_api::types::Endpoint::new(
+            "quic",
+            "ledger.coop.local",
+            4433,
+        )],
         addresses: vec![
             "/ip4/10.0.0.5/udp/4433/quic".to_string(),
             "/dns/ledger.coop.local/udp/4433/quic".to_string(),
@@ -257,41 +253,39 @@ async fn test_discover_response_includes_new_fields() {
         created_at: now - 500,
         updated_at: now - 50,
     };
-    
+
     mgr.announce(endpoint).await.unwrap();
-    
+
     let app = test::init_service(
         App::new()
             .app_data(actix_web::web::Data::new(mgr.clone()))
-            .service(
-                actix_web::web::scope("/api/services").configure(services::configure),
-            ),
+            .service(actix_web::web::scope("/api/services").configure(services::configure)),
     )
     .await;
-    
+
     // Query the specific service
     let req = test::TestRequest::get()
         .uri("/api/services/test-discovery-1")
         .to_request();
-    
+
     let resp = test::call_service(&app, req).await;
-    
+
     assert_eq!(
         resp.status(),
         actix_web::http::StatusCode::OK,
         "Should successfully retrieve the service"
     );
-    
+
     let body = test::read_body(resp).await;
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Verify new fields are present
     assert_eq!(
         json["endpoint_type"].as_str().unwrap(),
         "quic",
         "Response should include endpoint_type field"
     );
-    
+
     assert!(
         json["addresses"].is_array(),
         "Response should include addresses array"
@@ -309,7 +303,7 @@ async fn test_discover_response_includes_new_fields() {
         json["addresses"][1].as_str().unwrap(),
         "/dns/ledger.coop.local/udp/4433/quic"
     );
-    
+
     assert!(
         json["updated_at"].is_u64() || json["updated_at"].is_number(),
         "Response should include updated_at field"
@@ -319,7 +313,7 @@ async fn test_discover_response_includes_new_fields() {
         now - 50,
         "updated_at should match the endpoint value"
     );
-    
+
     // Verify existing fields still work
     assert_eq!(json["service_id"].as_str().unwrap(), "test-discovery-1");
     assert_eq!(json["provider"].as_str().unwrap(), "did:icn:alice");
@@ -330,12 +324,12 @@ async fn test_discover_response_includes_new_fields() {
 #[actix_web::test]
 async fn test_discover_all_includes_new_fields() {
     let mgr = Arc::new(ServiceDiscoveryManager::new());
-    
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    
+
     // Register multiple endpoints with different endpoint types
     for (i, endpoint_type) in [
         icn_kernel_api::naming::EndpointType::Http,
@@ -366,32 +360,30 @@ async fn test_discover_all_includes_new_fields() {
         };
         mgr.announce(endpoint).await.unwrap();
     }
-    
+
     let app = test::init_service(
         App::new()
             .app_data(actix_web::web::Data::new(mgr.clone()))
-            .service(
-                actix_web::web::scope("/api/services").configure(services::configure),
-            ),
+            .service(actix_web::web::scope("/api/services").configure(services::configure)),
     )
     .await;
-    
+
     // Query all services
     let req = test::TestRequest::get()
         .uri("/api/services/discover?scope=commons")
         .to_request();
-    
+
     let resp = test::call_service(&app, req).await;
-    
+
     assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
-    
+
     let body = test::read_body(resp).await;
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     assert_eq!(json["count"].as_u64().unwrap(), 3);
-    
+
     let endpoints = json["endpoints"].as_array().unwrap();
-    
+
     // Verify each endpoint has the new fields
     for endpoint in endpoints {
         assert!(
@@ -407,13 +399,13 @@ async fn test_discover_all_includes_new_fields() {
             "Each endpoint should have updated_at"
         );
     }
-    
+
     // Verify different endpoint types are represented
     let endpoint_types: Vec<&str> = endpoints
         .iter()
         .map(|e| e["endpoint_type"].as_str().unwrap())
         .collect();
-    
+
     assert!(endpoint_types.contains(&"http"));
     assert!(endpoint_types.contains(&"grpc"));
     assert!(endpoint_types.contains(&"websocket"));

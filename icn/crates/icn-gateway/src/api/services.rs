@@ -436,18 +436,9 @@ mod tests {
     #[test]
     fn test_endpoint_type_to_string() {
         use icn_kernel_api::naming::EndpointType;
-        assert_eq!(
-            endpoint_type_to_string(&EndpointType::Quic),
-            "quic"
-        );
-        assert_eq!(
-            endpoint_type_to_string(&EndpointType::Http),
-            "http"
-        );
-        assert_eq!(
-            endpoint_type_to_string(&EndpointType::Grpc),
-            "grpc"
-        );
+        assert_eq!(endpoint_type_to_string(&EndpointType::Quic), "quic");
+        assert_eq!(endpoint_type_to_string(&EndpointType::Http), "http");
+        assert_eq!(endpoint_type_to_string(&EndpointType::Grpc), "grpc");
         assert_eq!(
             endpoint_type_to_string(&EndpointType::WebSocket),
             "websocket"
@@ -495,7 +486,7 @@ mod tests {
         assert_eq!(response.addresses[0], "/ip4/127.0.0.1/tcp/8080");
         assert_eq!(response.addresses[1], "/dns/example.com/tcp/8080");
         assert_eq!(response.updated_at, now);
-        
+
         // Verify existing fields still work
         assert_eq!(response.service_id, "test-svc");
         assert_eq!(response.provider, "did:icn:test");
