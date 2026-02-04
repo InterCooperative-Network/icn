@@ -461,6 +461,20 @@ mod tests {
         assert!(scope.is_none());
     }
 
+    #[test]
+    fn test_parse_scope_from_org_id_empty_string() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_none(), "Empty org_id should return None");
+    }
+
     // ================================================================
     // Full evaluate() flow tests
     // ================================================================
