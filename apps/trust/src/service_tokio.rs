@@ -124,8 +124,9 @@ impl TrustService for TrustServiceImplTokio {
     }
 
     fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        let start = std::time::Instant::now();
         // Use block_in_place to safely access tokio lock from sync context.
-        tokio::task::block_in_place(|| {
+        let result = tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
@@ -135,7 +136,9 @@ impl TrustService for TrustServiceImplTokio {
                     0.0
                 }
             })
-        })
+        });
+        icn_obs::metrics::trust::trust_score_duration_record(start.elapsed());
+        result
     }
 
     /// Get an enriched trust score with provenance metadata.
@@ -171,7 +174,8 @@ impl TrustService for TrustServiceImplTokio {
     /// - `computed_at`: Unix timestamp
     /// - `reducer_version`: Algorithm version string
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
-        tokio::task::block_in_place(|| {
+        let start = std::time::Instant::now();
+        let result = tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
@@ -219,7 +223,9 @@ impl TrustService for TrustServiceImplTokio {
                 result.score = score;
                 result
             })
-        })
+        });
+        icn_obs::metrics::trust::trust_score_detailed_duration_record(start.elapsed());
+        result
     }
 
     fn record_event(&self, actor: &icn_kernel_api::types::Did, event: TrustEvent) {
