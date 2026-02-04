@@ -632,9 +632,8 @@ mod tests {
         let agreement_id;
         let party_did;
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store.clone());
+            let sled_store = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store.clone() as Arc<dyn Store>);
 
             let proposer = test_did();
             party_did = proposer.clone();
@@ -658,18 +657,34 @@ mod tests {
             // Verify it's stored
             assert!(store.get_agreement(&agreement_id).unwrap().is_some());
 
-            // Explicitly flush before dropping to release file lock
+            // Explicitly flush to disk and drop in correct order
+            sled_store.flush().unwrap();
             drop(store);
             drop(sled_store);
         }
-        // Wait for file lock to be fully released
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Wait for OS-level lock release (Sled uses file locks)
+        std::thread::sleep(std::time::Duration::from_millis(200));
 
-        // Second "session" - reopen and verify data persists
+        // Second "session" - reopen with retry logic to handle lock contention
+        let sled_store = {
+            let mut attempts = 0;
+            let max_attempts = 5;
+            loop {
+                match icn_store::SledStore::open(&store_path) {
+                    Ok(store) => break Arc::new(store),
+                    Err(e) if attempts < max_attempts => {
+                        attempts += 1;
+                        eprintln!("Attempt {}/{} to open store failed: {}. Retrying...", attempts, max_attempts, e);
+                        std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
+                    }
+                    Err(e) => panic!("Failed to reopen store after {} attempts: {}", max_attempts, e),
+                }
+            }
+        };
+        
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            let store = AgreementStore::new(sled_store as Arc<dyn Store>);
 
             // Agreement should still exist
             let loaded = store.get_agreement(&agreement_id).unwrap();
