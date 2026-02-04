@@ -662,7 +662,7 @@ mod tests {
             drop(store);
             drop(sled_store);
         }
-        
+
         // Wait for OS-level lock release (Sled uses file locks)
         std::thread::sleep(std::time::Duration::from_millis(200));
 
@@ -675,14 +675,20 @@ mod tests {
                     Ok(store) => break Arc::new(store),
                     Err(e) if attempts < max_attempts => {
                         attempts += 1;
-                        eprintln!("Attempt {}/{} to open store failed: {}. Retrying...", attempts, max_attempts, e);
+                        eprintln!(
+                            "Attempt {}/{} to open store failed: {}. Retrying...",
+                            attempts, max_attempts, e
+                        );
                         std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
                     }
-                    Err(e) => panic!("Failed to reopen store after {} attempts: {}", max_attempts, e),
+                    Err(e) => panic!(
+                        "Failed to reopen store after {} attempts: {}",
+                        max_attempts, e
+                    ),
                 }
             }
         };
-        
+
         {
             let store = AgreementStore::new(sled_store as Arc<dyn Store>);
 
