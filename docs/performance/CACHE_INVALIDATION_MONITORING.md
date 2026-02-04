@@ -112,9 +112,9 @@ For a hub with 100 outgoing edges and 20% cache hit rate:
 
 ### Detection Threshold
 
-**High-fanout logging trigger**: Downstream count > 50
+**High-fanout logging trigger**: Downstream count >= 50
 
-When this threshold is exceeded, the system logs detailed information:
+When this threshold is met or exceeded, the system logs detailed information:
 - Total downstream count
 - Actual invalidations performed
 - Cache hit rate for this invalidation event

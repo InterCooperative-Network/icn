@@ -406,6 +406,10 @@ pub fn init_descriptions() {
         "Total number of cache entries actually invalidated (subset of total fanout based on cache hit rate)"
     );
     describe_counter!(
+        "icn_trust_cache_lock_failures_total",
+        "Total number of cache lock acquisition failures (poisoned lock). Should be extremely rare."
+    );
+    describe_counter!(
         "icn_scalability_batch_verify_success_total",
         "Total number of successful batch verifications"
     );

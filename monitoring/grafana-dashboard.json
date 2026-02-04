@@ -1687,7 +1687,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(icn_trust_cache_max_downstream_count)",
+          "expr": "histogram_quantile(0.99, rate(icn_trust_cache_downstream_count_bucket[5m]))",
           "refId": "A"
         }
       ],
