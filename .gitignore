@@ -55,6 +55,9 @@ check_output.txt
 # Testing
 /coverage/
 
+# Node.js
+node_modules/
+
 # Misc
 .env
 .env.local

@@ -389,6 +389,26 @@ pub fn init_descriptions() {
         "icn_trust_cache_size",
         "Current number of entries in trust cache"
     );
+    describe_histogram!(
+        "icn_trust_cache_downstream_count",
+        "Distribution of total downstream fanout per edge mutation (number of outgoing edges from mutated target)"
+    );
+    describe_gauge!(
+        "icn_trust_cache_max_downstream_count",
+        "Most recent downstream fanout count (use histogram p99 for max detection)"
+    );
+    describe_counter!(
+        "icn_trust_cache_selective_skips_total",
+        "Total number of downstream DIDs skipped because they had no cached entry (selective optimization)"
+    );
+    describe_counter!(
+        "icn_trust_cache_actual_invalidations_total",
+        "Total number of cache entries actually invalidated (subset of total fanout based on cache hit rate)"
+    );
+    describe_counter!(
+        "icn_trust_cache_lock_failures_total",
+        "Total number of cache lock acquisition failures (poisoned lock). Should be extremely rare."
+    );
     describe_counter!(
         "icn_scalability_batch_verify_success_total",
         "Total number of successful batch verifications"
@@ -2294,9 +2314,39 @@ pub mod scalability {
     ///
     /// Emitted when an edge mutation triggers one-hop-out invalidation
     /// of downstream DIDs (e.g., A→B change invalidates B's outgoing targets).
-    pub fn trust_cache_transitive_invalidations_inc(downstream_count: u64) {
+    ///
+    /// - `total_downstream_count`: total number of downstream edges from the
+    ///   mutated target (fanout). This represents the maximum possible invalidations.
+    /// - `invalidated_count`: number of downstream DIDs that actually had
+    ///   cached entries and were invalidated (selective optimization effectiveness).
+    pub fn trust_cache_transitive_invalidations_inc(
+        total_downstream_count: u64,
+        invalidated_count: u64,
+    ) {
+        // Track total fanout volume for capacity planning.
+        // This counts all downstream edges regardless of cache hit rate.
         counter!("icn_trust_cache_transitive_invalidations_total")
-            .increment(downstream_count);
+            .increment(total_downstream_count);
+
+        // Track actual invalidations performed (after selective optimization).
+        counter!("icn_trust_cache_actual_invalidations_total")
+            .increment(invalidated_count);
+
+        // Record distribution of total downstream fanout for hub detection.
+        // Use histogram p99 in Grafana instead of gauge for accurate max tracking.
+        histogram!("icn_trust_cache_downstream_count").record(total_downstream_count as f64);
+
+        // Track most recent fanout count (not true maximum - use histogram p99 for that).
+        // Kept for backward compatibility with existing dashboards.
+        gauge!("icn_trust_cache_max_downstream_count").set(total_downstream_count as f64);
+    }
+
+    /// Record a selective invalidation skip.
+    ///
+    /// When the selective optimization is enabled, this counts how many
+    /// transitive invalidations were skipped because the target had no cached entry.
+    pub fn trust_cache_selective_skips_inc() {
+        counter!("icn_trust_cache_selective_skips_total").increment(1);
     }
 
     /// Record a cache invalidation error (storage failure during transitive lookup).
@@ -2306,6 +2356,14 @@ pub mod scalability {
     /// TTL expiry. Monitor this metric to detect storage issues.
     pub fn trust_cache_invalidation_errors_inc() {
         counter!("icn_trust_cache_invalidation_errors_total").increment(1);
+    }
+
+    /// Record a cache lock failure (poisoned mutex).
+    ///
+    /// This should be extremely rare in practice. Non-zero values indicate
+    /// a panic occurred while the lock was held. Investigate immediately.
+    pub fn trust_cache_lock_failures_inc() {
+        counter!("icn_trust_cache_lock_failures_total").increment(1);
     }
 
     pub fn trust_cache_size_set(size: usize) {

@@ -105,6 +105,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+/// Threshold for logging high-fanout cache invalidation events.
+///
+/// When a trust edge change triggers invalidation of >= this many downstream
+/// DIDs, an INFO log is emitted for monitoring. This helps identify hub nodes
+/// that may need optimization attention.
+const HIGH_FANOUT_LOG_THRESHOLD: u64 = 50;
+
 /// Trust classification for a peer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TrustClass {
@@ -983,6 +990,14 @@ impl TrustGraph {
     /// full graph. The scoring algorithm is two-hop (direct + transitive),
     /// so one additional hop of invalidation is sufficient.
     ///
+    /// # Optimization: Selective Invalidation
+    ///
+    /// For high-fanout "hub" nodes with 100+ outgoing edges, most downstream
+    /// DIDs won't have cached scores. The selective invalidation strategy
+    /// checks if an entry exists before invalidating, reducing lock contention
+    /// and metric overhead. This optimization is particularly effective when
+    /// cache hit rate is low (<20%) or fanout is high (>50).
+    ///
     /// # Thread safety
     ///
     /// This method must be called while the caller holds a write lock on the
@@ -999,23 +1014,50 @@ impl TrustGraph {
         // These scores may depend on trust flowing through `target`.
         match self.get_outgoing_edges(target) {
             Ok(outgoing) => {
-                let mut count = 0u64;
+                let total_count = outgoing.len() as u64;
+                let mut invalidated_count = 0u64;
+
                 for edge in &outgoing {
                     // Skip self-loops (A→A) — already invalidated above
                     if edge.target == *target {
                         continue;
                     }
-                    self.cache.invalidate(&edge.target);
-                    count += 1;
+
+                    // Selective invalidation: only invalidate if cached
+                    if self.cache.invalidate_if_cached(&edge.target) {
+                        invalidated_count += 1;
+                    }
                 }
-                if count > 0 {
-                    icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(count);
-                    debug!(
-                        target = %target,
-                        downstream_count = count,
-                        "Transitive cache invalidation for {target}: {count} downstream DIDs",
+
+                if total_count > 0 {
+                    icn_obs::metrics::scalability::trust_cache_transitive_invalidations_inc(
+                        total_count,
+                        invalidated_count,
                     );
+
+                    if total_count >= HIGH_FANOUT_LOG_THRESHOLD {
+                        // High-fanout scenario - log for monitoring
+                        info!(
+                            target = %target,
+                            downstream_count = total_count,
+                            invalidated_count = invalidated_count,
+                            cache_hit_rate = format!("{:.1}%", (invalidated_count as f64 / total_count as f64) * 100.0),
+                            "High-fanout cache invalidation: {}/{} downstream DIDs had cached entries",
+                            invalidated_count, total_count,
+                        );
+                    } else if invalidated_count > 0 {
+                        debug!(
+                            target = %target,
+                            downstream_count = total_count,
+                            invalidated_count = invalidated_count,
+                            "Transitive cache invalidation: {}/{} downstream DIDs had cached entries",
+                            invalidated_count, total_count,
+                        );
+                    }
                 }
+
+                // Batch update cache size metric once after all invalidations
+                icn_obs::metrics::scalability::trust_cache_size_set(self.cache.size());
             }
             Err(e) => {
                 icn_obs::metrics::scalability::trust_cache_invalidation_errors_inc();

@@ -112,6 +112,36 @@ impl TrustCache {
         }
     }
 
+    /// Selective invalidation: only invalidate if entry exists in cache.
+    ///
+    /// Returns true if an entry was invalidated, false if skipped.
+    /// This optimization reduces lock contention and metric noise for high-fanout
+    /// scenarios where most downstream nodes have no cached scores.
+    pub fn invalidate_if_cached(&self, did: &Did) -> bool {
+        match self.cache.lock() {
+            Ok(mut cache) => {
+                // Use pop() directly for atomic check-and-remove
+                if cache.pop(did).is_some() {
+                    icn_obs::metrics::scalability::trust_cache_invalidations_inc();
+                    true
+                } else {
+                    icn_obs::metrics::scalability::trust_cache_selective_skips_inc();
+                    false
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Cache lock poisoned during invalidation of {did}: {e}");
+                icn_obs::metrics::scalability::trust_cache_lock_failures_inc();
+                false
+            }
+        }
+    }
+
+    /// Get the current cache size (for batched metric updates).
+    pub fn size(&self) -> usize {
+        self.cache.lock().map(|c| c.len()).unwrap_or(0)
+    }
+
     /// Clear all cached entries
     pub fn clear(&self) {
         if let Ok(mut cache) = self.cache.lock() {
@@ -346,5 +376,44 @@ mod tests {
         let did = make_test_did();
         cache.put(did, 0.5);
         assert!(!cache.is_empty());
+    }
+
+    #[test]
+    fn test_selective_invalidation() {
+        let cache = TrustCache::new();
+        let did1 = make_test_did();
+        let did2 = make_test_did();
+
+        // Put one entry in cache
+        cache.put(did1.clone(), 0.5);
+
+        // Selective invalidation on cached entry should return true
+        assert!(cache.invalidate_if_cached(&did1));
+        assert_eq!(cache.get(&did1), None);
+
+        // Selective invalidation on non-cached entry should return false
+        assert!(!cache.invalidate_if_cached(&did2));
+    }
+
+    #[test]
+    fn test_selective_invalidation_skip_count() {
+        let cache = TrustCache::new();
+        let did1 = make_test_did();
+        let did2 = make_test_did();
+        let did3 = make_test_did();
+
+        // Cache only did1 and did2
+        cache.put(did1.clone(), 0.5);
+        cache.put(did2.clone(), 0.6);
+
+        // Invalidate cached entries
+        assert!(cache.invalidate_if_cached(&did1));
+        assert!(cache.invalidate_if_cached(&did2));
+
+        // Invalidate non-cached entry (should be skipped)
+        assert!(!cache.invalidate_if_cached(&did3));
+
+        // Verify cache is now empty
+        assert!(cache.is_empty());
     }
 }
