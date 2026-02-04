@@ -44,6 +44,9 @@ jobs:
         with:
           workspaces: "icn -> target"
           cache-on-failure: true
+          # Add unique suffix to avoid cache key conflicts when multiple runs occur simultaneously
+          prefix-key: "v0-rust-benchmark"
+          shared-key: "${{ github.sha }}"
 
       - name: Run benchmarks
         run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline main

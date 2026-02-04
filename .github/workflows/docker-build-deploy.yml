@@ -24,6 +24,8 @@ on:
 env:
   IMAGE_NAME: icn
   IMAGE_TAG: ${{ github.sha }}
+  # Increase rustc stack size to prevent compiler crashes (SIGSEGV) on large crates
+  RUST_MIN_STACK: 268435456
 
 jobs:
   # Standard CI jobs run on GitHub-hosted runners
