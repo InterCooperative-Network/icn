@@ -31,16 +31,12 @@ mod tests {
     #[test]
     fn facade_exports_hybrid_keypair() {
         // Verify HybridKeypair is accessible via facade
-        let _: fn() -> &'static str = || {
-            std::any::type_name::<crate::HybridKeypair>()
-        };
+        let _: fn() -> &'static str = || std::any::type_name::<crate::HybridKeypair>();
     }
 
     #[test]
     fn facade_exports_signature() {
         // Verify HybridSignature is accessible via facade
-        let _: fn() -> &'static str = || {
-            std::any::type_name::<crate::HybridSignature>()
-        };
+        let _: fn() -> &'static str = || std::any::type_name::<crate::HybridSignature>();
     }
 }
