@@ -419,6 +419,8 @@ pub async fn query_services(
             return scope_cmp;
         }
         // Then by trust threshold (higher trust first, so reverse order)
+        // Note: NaN trust values are treated as equal (should not occur as trust_threshold
+        // is validated at registration, but unwrap_or provides safe fallback)
         b.trust_threshold
             .partial_cmp(&a.trust_threshold)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -454,10 +456,14 @@ pub async fn get_service(
 ///
 /// Routes:
 /// - `POST /announce` - Register a service
-/// - `GET /discover` - Discover services (legacy, filters by type)
-/// - `GET /` - Query services with flexible filtering (Issue #936)
+/// - `GET /discover` - Discover services (legacy: filters by service type, use for type-based discovery)
+/// - `GET /` - Query services with flexible filtering (preferred: filters by scope, trust, service_id)
 /// - `GET /{service_id}` - Get specific service
 /// - `DELETE /{service_id}` - Withdraw a service
+///
+/// **Usage Guidelines**:
+/// - Use `/discover` when filtering by service type name (e.g., "ledger", "governance")
+/// - Use `/` (new query API) when filtering by scope level, trust threshold, or service ID
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(announce_service)
         .service(discover_services)
