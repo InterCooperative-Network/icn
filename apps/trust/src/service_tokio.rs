@@ -138,6 +138,38 @@ impl TrustService for TrustServiceImplTokio {
         })
     }
 
+    /// Get an enriched trust score with provenance metadata.
+    ///
+    /// # Performance Tradeoff
+    ///
+    /// **This method is significantly slower than `trust_score()`** due to:
+    /// 1. Iterating all DIDs in the graph to find input edges
+    /// 2. Converting edges to attestations for hashing
+    /// 3. Computing SHA-256 hash over all inputs
+    ///
+    /// Benchmark results (1000-node network, 5 edges/node):
+    /// - `trust_score()`: ~5.5 µs
+    /// - `trust_score_detailed()`: ~121 ms (~21,700x slower)
+    ///
+    /// **Use cases:**
+    /// - Cache validation (checking if inputs changed via `inputs_hash`)
+    /// - Debugging trust computation
+    /// - Low-frequency queries where metadata is required
+    ///
+    /// **NOT recommended for:**
+    /// - High-frequency authorization checks (use `trust_score()`)
+    /// - Request path hot loops
+    /// - Real-time decision making
+    ///
+    /// # Returns
+    ///
+    /// `TrustScoreResult` with:
+    /// - `score`: Same value as `trust_score()`
+    /// - `epoch`: Monotonic counter incremented on graph mutations
+    /// - `inputs_hash`: SHA-256 hash of all input edges (for cache validation)
+    /// - `input_count`: Number of edges used in computation
+    /// - `computed_at`: Unix timestamp
+    /// - `reducer_version`: Algorithm version string
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
         tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
