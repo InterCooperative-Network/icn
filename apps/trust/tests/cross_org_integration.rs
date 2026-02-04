@@ -384,14 +384,15 @@ fn test_cross_org_request_accepts_cooperative_org_id() {
 }
 
 /// Verifies that the same actor can have different trust scores in different scopes.
-/// This is the core scope-bounded trust behavior.
 ///
-/// NOTE: Currently limited by TrustGraph storage schema - edge_key uses only source:target,
-/// not source:target:scope, so multiple edges between the same pair with different scopes
-/// will overwrite each other. This test verifies the intended behavior once icn-trust
-/// supports multi-scope edges (requires storage schema update).
+/// **Test Validates**: Same actor with high trust in "coop-a" and low trust in "coop-b"
+/// should get different rate limits when requesting with each org_id.
 ///
-/// TODO(#1046): Update TrustGraph storage to include scope_id in edge_key to support
+/// **Current Limitation**: TrustGraph storage uses `source:target` keys without scope,
+/// so the second edge overwrites the first. This test documents the intended behavior
+/// once icn-trust supports multi-scope edges (requires storage schema update).
+///
+/// **TODO(#1046)**: Update TrustGraph storage to include scope_id in edge_key to support
 /// multiple edges between the same DIDs with different scopes.
 #[test]
 #[ignore = "Requires TrustGraph storage schema update to support multiple edges per DID pair with different scopes"]

@@ -129,6 +129,11 @@ impl TrustPolicyOracle {
     fn parse_scope_from_org_id(request: &PolicyRequest) -> Option<ScopeId> {
         let org_id = request.context.metadata.get("org_id")?;
 
+        // Empty string is invalid
+        if org_id.is_empty() {
+            return None;
+        }
+
         // Check for DID-style org_id patterns
         if let Some(stripped) = org_id.strip_prefix("did:icn:fed:") {
             return Some(ScopeId::federation(stripped));
@@ -139,11 +144,7 @@ impl TrustPolicyOracle {
 
         // Fallback: treat as cooperative scope for plain names
         // This supports legacy org_id formats like "regional-food-network"
-        if !org_id.is_empty() {
-            return Some(ScopeId::cooperative(org_id));
-        }
-
-        None
+        Some(ScopeId::cooperative(org_id))
     }
 }
 
