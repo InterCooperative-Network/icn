@@ -3254,6 +3254,7 @@ dependencies = [
  "blake3",
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

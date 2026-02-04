@@ -188,17 +188,21 @@ mod tests {
         ServiceEndpoint {
             service_id: "svc-test".to_string(),
             provider: did.to_string(),
+            endpoint_type: icn_kernel_api::naming::EndpointType::Http,
             service_type: ServiceType {
                 name: "ledger".to_string(),
                 version: "1.0".to_string(),
             },
             endpoints: vec![Endpoint::new("https", "example.com", 8080)],
+            addresses: vec![],
             capabilities: vec!["read".to_string()],
             trust_threshold: 0.1,
             scope_visibility: ScopeLevel::Org,
+            cell_id: None,
             ttl_secs: 3600,
             signature: Signature::new(vec![0; 64]),
             created_at: 1700000000,
+            updated_at: 1700000000,
         }
     }
 

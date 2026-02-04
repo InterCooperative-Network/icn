@@ -32,23 +32,28 @@ fn make_endpoint(
     scope: ScopeLevel,
     caps: Vec<&str>,
 ) -> ServiceEndpoint {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     ServiceEndpoint {
         service_id: id.to_string(),
         provider: did.to_string(),
+        endpoint_type: icn_kernel_api::naming::EndpointType::Http,
         service_type: ServiceType {
             name: "ledger".to_string(),
             version: "1.0".to_string(),
         },
         endpoints: vec![Endpoint::new("https", "node.example.com", 8443)],
+        addresses: vec![],
         capabilities: caps.into_iter().map(String::from).collect(),
         trust_threshold: 0.1,
         scope_visibility: scope,
+        cell_id: None,
         ttl_secs: 3600,
         signature: Signature::new(vec![0; 64]),
-        created_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
+        created_at: now,
+        updated_at: now,
     }
 }
 

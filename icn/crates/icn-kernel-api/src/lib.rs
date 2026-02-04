@@ -63,7 +63,9 @@ pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use identity::{DidResolver, IdentityService, Keystore};
-pub use naming::{Discovery, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId};
+pub use naming::{
+    Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
+};
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
