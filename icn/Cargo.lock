@@ -3063,6 +3063,7 @@ dependencies = [
  "actix-web-httpauth",
  "actix-web-prom",
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "chrono",
  "criterion",

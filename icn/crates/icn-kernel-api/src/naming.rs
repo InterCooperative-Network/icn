@@ -382,6 +382,80 @@ pub trait ScopedDiscovery: Send + Sync {
     fn get_endpoint(&self, service_id: &ServiceEndpointId) -> Result<ServiceEndpoint, NamingError>;
 }
 
+/// Async scope-aware service discovery using `ScopeLevel`.
+///
+/// Provides async variants of `ScopedDiscovery` methods for use in async contexts.
+/// Implementations that already use async primitives (like `tokio::sync::RwLock`)
+/// can implement this trait to avoid forcing `blocking_read()`/`blocking_write()`
+/// workarounds.
+///
+/// # Relationship to ScopedDiscovery
+///
+/// This trait mirrors `ScopedDiscovery` but with async methods. Types can implement
+/// both traits if they want to support both sync and async callers.
+///
+/// - Use `ScopedDiscovery` when called from blocking/sync contexts
+/// - Use `AsyncScopedDiscovery` when called from async contexts
+///
+/// # When to Implement
+///
+/// Implement this trait when:
+/// - Your implementation uses `tokio::sync::RwLock` or other async primitives
+/// - You want to avoid `blocking_read()`/`blocking_write()` in async contexts
+/// - You need to perform async I/O during discovery operations
+///
+/// If your implementation is purely in-memory with sync locks (`parking_lot::RwLock`),
+/// prefer implementing only `ScopedDiscovery`.
+///
+/// # Implementation Note
+///
+/// This trait uses `#[async_trait]` for `Send` futures and dyn-compatibility.
+/// Implementations must also add `#[async_trait]` to their impl blocks:
+///
+/// ```rust,ignore
+/// #[async_trait::async_trait]
+/// impl AsyncScopedDiscovery for MyDiscovery {
+///     async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
+///         // ...
+///     }
+///     // ... other methods
+/// }
+/// ```
+// #[async_trait] provides Send bounds on futures for dyn-compatibility with trait objects
+#[async_trait::async_trait]
+pub trait AsyncScopedDiscovery: Send + Sync {
+    /// Announce a service endpoint (async).
+    async fn announce_endpoint(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError>;
+
+    /// Withdraw a service endpoint (async).
+    async fn withdraw_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+        provider: &Did,
+    ) -> Result<(), NamingError>;
+
+    /// Discover service endpoints at a given scope level and type (async).
+    async fn discover_endpoints(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+    ) -> Result<Vec<ServiceEndpoint>, NamingError>;
+
+    /// Discover service endpoints with capability filtering (async).
+    async fn discover_endpoints_filtered(
+        &self,
+        scope: ScopeLevel,
+        service_type: &ServiceType,
+        required_capabilities: &[String],
+    ) -> Result<Vec<ServiceEndpoint>, NamingError>;
+
+    /// Get a specific service endpoint by ID (async).
+    async fn get_endpoint(
+        &self,
+        service_id: &ServiceEndpointId,
+    ) -> Result<ServiceEndpoint, NamingError>;
+}
+
 /// Naming service for name registration and resolution.
 pub trait NamingService: Send + Sync {
     /// Register a name.
