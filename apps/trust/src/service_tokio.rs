@@ -1330,4 +1330,27 @@ mod tests {
             result
         );
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_metrics_recorded() {
+        // Test that metrics are recorded when calling trust_score and trust_score_detailed
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair, store);
+
+        // Create a test actor
+        let test_keypair = icn_identity::KeyPair::generate().unwrap();
+        let test_did = icn_kernel_api::types::Did::from(test_keypair.did().to_string());
+
+        // Call trust_score - should record metric
+        let score = service.trust_score(&test_did);
+        assert_eq!(score, 0.0); // Unknown actor should have 0.0 trust
+
+        // Call trust_score_detailed - should record metric
+        let result = service.trust_score_detailed(&test_did);
+        assert_eq!(result.score, 0.0);
+
+        // Note: We can't easily verify histogram recordings in tests without
+        // instrumenting the metrics backend, but we can verify the methods
+        // execute without panicking and return correct values.
+    }
 }

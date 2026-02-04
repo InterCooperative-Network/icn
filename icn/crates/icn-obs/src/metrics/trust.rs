@@ -67,6 +67,10 @@ pub fn init_descriptions() {
         "icn_trust_attestations_rejected_size_limit_total",
         "Total trust attestations rejected due to size limit"
     );
+    describe_counter!(
+        "icn_trust_attestations_rejected_rate_limited_total",
+        "Total trust attestations rejected due to rate limiting"
+    );
 }
 
 /// Record trust_score() query duration
@@ -156,6 +160,11 @@ pub fn attestations_rejected_size_limit_inc() {
     counter!("icn_trust_attestations_rejected_size_limit_total").increment(1);
 }
 
+/// Increment attestations rejected due to rate limiting
+pub fn attestations_rejected_rate_limited_inc() {
+    counter!("icn_trust_attestations_rejected_rate_limited_total").increment(1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +207,6 @@ mod tests {
         attestations_rejected_malformed_inc();
         attestations_rejected_outdated_inc();
         attestations_rejected_size_limit_inc();
+        attestations_rejected_rate_limited_inc();
     }
 }
