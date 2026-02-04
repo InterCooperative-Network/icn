@@ -97,7 +97,10 @@ fn test_cross_org_request_accepts_org_id_metadata() {
     let constraints = decision.constraints().unwrap();
     let rate = constraints.rate_limit.as_ref().unwrap();
     // 0.8 direct * 0.7 weight = 0.56 -> standard rate (0.4-0.7 range)
-    assert_eq!(rate.messages_per_second, 100, "Should use scope-bounded trust");
+    assert_eq!(
+        rate.messages_per_second, 100,
+        "Should use scope-bounded trust"
+    );
 }
 
 /// Verifies high trust actors get unlimited rate in cross-org requests with scope-bounded trust.
@@ -392,8 +395,8 @@ fn test_cross_org_request_accepts_cooperative_org_id() {
 /// so the second edge overwrites the first. This test documents the intended behavior
 /// once icn-trust supports multi-scope edges (requires storage schema update).
 ///
-/// **TODO(#1046)**: Update TrustGraph storage to include scope_id in edge_key to support
-/// multiple edges between the same DIDs with different scopes.
+/// **TODO**: Update TrustGraph storage to include scope_id in edge_key to support
+/// multiple edges between the same DIDs with different scopes (separate follow-up issue).
 #[test]
 #[ignore = "Requires TrustGraph storage schema update to support multiple edges per DID pair with different scopes"]
 fn test_same_actor_different_trust_in_different_scopes() {
@@ -426,11 +429,8 @@ fn test_same_actor_different_trust_in_different_scopes() {
     let oracle = TrustPolicyOracle::new(graph);
 
     // Test high-trust scope
-    let request_a = create_cross_org_request(
-        actor.did().as_str().to_string(),
-        "coop-a",
-        ActionKind::Read,
-    );
+    let request_a =
+        create_cross_org_request(actor.did().as_str().to_string(), "coop-a", ActionKind::Read);
     let decision_a = oracle.evaluate(&request_a);
     assert!(decision_a.is_allowed());
 
@@ -444,11 +444,8 @@ fn test_same_actor_different_trust_in_different_scopes() {
     );
 
     // Test low-trust scope
-    let request_b = create_cross_org_request(
-        actor.did().as_str().to_string(),
-        "coop-b",
-        ActionKind::Read,
-    );
+    let request_b =
+        create_cross_org_request(actor.did().as_str().to_string(), "coop-b", ActionKind::Read);
     let decision_b = oracle.evaluate(&request_b);
     assert!(decision_b.is_allowed());
 

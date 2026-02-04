@@ -125,26 +125,41 @@ impl TrustPolicyOracle {
     /// - `did:icn:coop:<id>` -> `ScopeId::Cooperative(id)`
     /// - Other formats (e.g., plain names) -> `ScopeId::Cooperative(org_id)`
     ///
-    /// Returns None if org_id is not present or invalid.
+    /// Returns None if org_id is not present or invalid (empty, whitespace-only, or invalid ScopeId).
     fn parse_scope_from_org_id(request: &PolicyRequest) -> Option<ScopeId> {
-        let org_id = request.context.metadata.get("org_id")?;
+        let org_id = request.context.metadata.get("org_id")?.trim();
 
-        // Empty string is invalid
+        // Empty or whitespace-only string is invalid
         if org_id.is_empty() {
             return None;
         }
 
         // Check for DID-style org_id patterns
         if let Some(stripped) = org_id.strip_prefix("did:icn:fed:") {
-            return Some(ScopeId::federation(stripped));
+            let stripped = stripped.trim();
+            if stripped.is_empty() {
+                return None;
+            }
+            let scope = ScopeId::federation(stripped);
+            return if scope.is_valid() { Some(scope) } else { None };
         }
         if let Some(stripped) = org_id.strip_prefix("did:icn:coop:") {
-            return Some(ScopeId::cooperative(stripped));
+            let stripped = stripped.trim();
+            if stripped.is_empty() {
+                return None;
+            }
+            let scope = ScopeId::cooperative(stripped);
+            return if scope.is_valid() { Some(scope) } else { None };
         }
 
         // Fallback: treat as cooperative scope for plain names
         // This supports legacy org_id formats like "regional-food-network"
-        Some(ScopeId::cooperative(org_id))
+        let scope = ScopeId::cooperative(org_id);
+        if scope.is_valid() {
+            Some(scope)
+        } else {
+            None
+        }
     }
 }
 
@@ -444,10 +459,7 @@ mod tests {
 
         let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
         assert!(scope.is_some());
-        assert_eq!(
-            scope.unwrap(),
-            icn_trust::ScopeId::cooperative("food-coop")
-        );
+        assert_eq!(scope.unwrap(), icn_trust::ScopeId::cooperative("food-coop"));
     }
 
     #[test]
@@ -474,6 +486,74 @@ mod tests {
 
         let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
         assert!(scope.is_none(), "Empty org_id should return None");
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_whitespace_only() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "   ");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_none(), "Whitespace-only org_id should return None");
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_empty_suffix_fed() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:fed:");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with empty suffix should return None (fed)"
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_empty_suffix_coop() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:coop:");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with empty suffix should return None (coop)"
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_whitespace_suffix() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:fed:   ");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with whitespace-only suffix should return None"
+        );
     }
 
     // ================================================================
