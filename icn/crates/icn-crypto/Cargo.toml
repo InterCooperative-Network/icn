@@ -1,0 +1,20 @@
+[package]
+name = "icn-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified cryptography layer for ICN"
+
+[features]
+default = []
+# Threshold cryptography (forwards to icn-crypto-pq)
+threshold = ["icn-crypto-pq/threshold"]
+# Blind signatures (forwards to icn-crypto-pq)
+blind = ["icn-crypto-pq/blind"]
+
+[dependencies]
+# Re-export post-quantum crypto
+icn-crypto-pq.workspace = true
+
+[lints]
+workspace = true

@@ -11,6 +11,51 @@ This document contains detailed history of all completed development phases. For
 
 ---
 
+## Phase 6: Crate Consolidation — ✅ Complete
+
+**Tracking Issue**: [#861](https://github.com/InterCooperative-Network/icn/issues/861)
+**Completed**: 2026-02-03
+**PR**: [#1037](https://github.com/InterCooperative-Network/icn/pull/1037)
+
+Phase 6 established a clean 12-crate kernel facade structure using the facade pattern. Three new crates re-export existing kernel crates under cleaner namespaces, providing organizational benefits without source-level churn.
+
+**New Facade Crates:**
+- **icn-protocol**: Unified protocol layer (re-exports `icn-gossip` + `icn-net`)
+- **icn-services**: Unified service layer (re-exports `icn-api` + `icn-rpc` + `icn-gateway`)
+- **icn-crypto**: Unified crypto layer (re-exports `icn-crypto-pq`)
+
+**Target 12-Crate Kernel Structure:**
+1. `icn-kernel-api` - Trait definitions
+2. `icn-identity` - DID + keystore
+3. `icn-store` - Persistent storage
+4. `icn-protocol` - Gossip + networking ⭐
+5. `icn-core` - Runtime + supervisor
+6. `icn-services` - API surfaces ⭐
+7. `icn-security` - Security primitives
+8. `icn-crypto` - Cryptography ⭐
+9. `icn-obs` - Observability
+10. `icn-encoding` - Serialization
+11. `icn-time` - Time primitives
+12. `icn-testkit` - Test utilities
+
+**Usage (Migration Example):**
+```rust
+// Before: scattered imports
+use icn_gossip::GossipActor;
+use icn_net::NetworkActor;
+
+// After: unified namespace
+use icn_protocol::{gossip::GossipActor, net::NetworkActor};
+```
+
+**Key Design Decisions:**
+- Facade pattern chosen over crate merging to avoid source churn
+- Old crates remain for backward compatibility
+- Migration can proceed incrementally in future phases
+- All 221/222 tests passing (1 DNS-related failure unrelated)
+
+---
+
 ## Kernel/App Separation - Phase 2 & Epics (Jan 26–30)
 
 ### Phase 2: Trust Extraction — ✅ Complete

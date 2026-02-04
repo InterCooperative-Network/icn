@@ -1,0 +1,18 @@
+[package]
+name = "icn-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified protocol layer for ICN (gossip + networking)"
+
+[features]
+default = []
+post-quantum = ["icn-net/post-quantum"]
+
+[dependencies]
+# Re-export existing crates
+icn-gossip.workspace = true
+icn-net.workspace = true
+
+[lints]
+workspace = true

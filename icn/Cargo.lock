@@ -2960,6 +2960,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-crypto"
+version = "0.1.0"
+dependencies = [
+ "icn-crypto-pq",
+]
+
+[[package]]
 name = "icn-crypto-pq"
 version = "0.1.0"
 dependencies = [
@@ -3418,6 +3425,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-protocol"
+version = "0.1.0"
+dependencies = [
+ "icn-gossip",
+ "icn-net",
+]
+
+[[package]]
 name = "icn-rpc"
 version = "0.1.0"
 dependencies = [
@@ -3470,6 +3485,15 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "icn-services"
+version = "0.1.0"
+dependencies = [
+ "icn-api",
+ "icn-gateway",
+ "icn-rpc",
 ]
 
 [[package]]

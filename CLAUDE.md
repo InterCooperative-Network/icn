@@ -68,6 +68,9 @@ The Cargo workspace is located in the `icn/` subdirectory. All build/test comman
 - `icn-api` - Shared service layer for RPC and Gateway (unified validation, error handling)
 - `icn-encoding` - Serialization utilities
 - `icn-testkit` - Test utilities for multi-node scenarios
+- `icn-protocol` - Unified protocol layer (facade re-exporting icn-gossip + icn-net)
+- `icn-services` - Unified service layer (facade re-exporting icn-api + icn-rpc + icn-gateway)
+- `icn-crypto` - Unified crypto layer (facade re-exporting icn-crypto-pq)
 
 **Binaries** (in `icn/bins/`):
 - `icnd` - The ICN daemon
