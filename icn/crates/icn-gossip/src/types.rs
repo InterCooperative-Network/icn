@@ -301,6 +301,42 @@ pub enum GossipMessage {
         size_bytes: u64,
     },
 
+    /// Request a blob from a provider (Pilot - blob transfer protocol)
+    ///
+    /// MUST be wrapped in SignedEnvelope. Handlers MUST reject unsigned requests.
+    /// The `request_id` binds the request to its response for replay protection.
+    BlobRequest {
+        /// Nonce binding this request to its response
+        request_id: ContentHash,
+        /// blake3 hash of the blob being requested
+        blob_hash: ContentHash,
+        /// DID of the requester (must match SignedEnvelope.from)
+        requester_did: Did,
+        /// Unix timestamp (seconds) after which this request is invalid
+        expires_at: u64,
+    },
+
+    /// Transfer a chunk of blob data in response to BlobRequest (Pilot)
+    ///
+    /// MUST be wrapped in SignedEnvelope. Provider sends one chunk per message.
+    /// Requester reassembles chunks by index, then verifies the full blob hash.
+    BlobTransferChunk {
+        /// Must match the request_id from the corresponding BlobRequest
+        request_id: ContentHash,
+        /// blake3 hash of the complete blob
+        blob_hash: ContentHash,
+        /// Zero-based chunk index
+        chunk_index: u32,
+        /// Total number of chunks in the transfer
+        total_chunks: u32,
+        /// blake3 hash of this chunk's data (verified on receipt)
+        chunk_hash: ContentHash,
+        /// Total blob size in bytes
+        total_size: u64,
+        /// Raw chunk data (max 64 KB)
+        data: Vec<u8>,
+    },
+
     /// Request replica for a content hash (Phase 17 - data durability)
     ReplicaRequest {
         /// Content hash to replicate
@@ -387,6 +423,8 @@ impl GossipMessage {
             GossipMessage::PullRequest { .. } => "PullRequest",
             GossipMessage::PullResponse { .. } => "PullResponse",
             GossipMessage::BlobAnnounce { .. } => "BlobAnnounce",
+            GossipMessage::BlobRequest { .. } => "BlobRequest",
+            GossipMessage::BlobTransferChunk { .. } => "BlobTransferChunk",
             GossipMessage::ReplicaRequest { .. } => "ReplicaRequest",
             GossipMessage::ReplicaOffer { .. } => "ReplicaOffer",
             GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",

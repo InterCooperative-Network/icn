@@ -211,6 +211,38 @@ impl GossipActor {
                 self.handle_blob_announce(sender, blob_hash, peer_did, size_bytes),
             ),
 
+            GossipMessage::BlobRequest {
+                request_id,
+                blob_hash,
+                requester_did,
+                expires_at,
+            } => DispatchResult::Sync(self.handle_blob_request(
+                sender,
+                request_id,
+                blob_hash,
+                requester_did,
+                expires_at,
+            )),
+
+            GossipMessage::BlobTransferChunk {
+                request_id,
+                blob_hash,
+                chunk_index,
+                total_chunks,
+                chunk_hash,
+                total_size,
+                data,
+            } => DispatchResult::Sync(self.handle_blob_transfer_chunk(
+                sender,
+                request_id,
+                blob_hash,
+                chunk_index,
+                total_chunks,
+                chunk_hash,
+                total_size,
+                data,
+            )),
+
             GossipMessage::ReplicaRequest {
                 content_hash,
                 requesting_peer,
