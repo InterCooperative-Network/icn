@@ -4,10 +4,6 @@ description: >
   Trust + Identity specialist. Use for DIDs, credentials, trust graphs, scope-bounded trust,
   trust-gated behavior, SDIS enrollment, and membership credentials.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Trust + Identity Specialist**.

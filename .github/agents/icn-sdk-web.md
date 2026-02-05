@@ -4,10 +4,6 @@ description: >
   SDK and web UI specialist. Use for TypeScript SDK, React Native SDK, Pilot UI,
   and web dashboard changes.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN SDK/Web Specialist**.

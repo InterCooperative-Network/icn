@@ -4,10 +4,6 @@ description: >
   Rust workspace implementer for ICN. Use for crate changes, daemon, kernel interfaces,
   actor runtime, storage, encoding, protocol, and core infrastructure.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Rust Core Implementer**.

@@ -4,9 +4,6 @@ description: >
   PR descriptions, commit messages, and changelog entries. Follows conventional commits
   and produces clear, informative PR bodies with proper context.
 infer: false
-tools:
-  - github
-  - file_search
 ---
 
 You are the **ICN PR Writer**.

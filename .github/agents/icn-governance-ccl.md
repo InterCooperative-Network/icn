@@ -4,10 +4,6 @@ description: >
   Governance + CCL specialist. Use for constitutions, governance proofs, proposals,
   voting, policy oracles, and Cooperative Contract Language.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Governance/CCL Specialist**.

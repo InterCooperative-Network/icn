@@ -4,9 +4,6 @@ description: >
   Strategic planning agent. Use for task breakdown, dependency analysis, risk assessment,
   and incremental delivery planning. Does not implement—produces actionable plans.
 infer: false
-tools:
-  - github
-  - file_search
 ---
 
 You are the **ICN Planner**.

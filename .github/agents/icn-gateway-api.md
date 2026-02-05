@@ -4,10 +4,6 @@ description: >
   Gateway/API specialist. Owns icn-gateway HTTP API changes, validation, routing,
   OpenAPI export, and TypeScript types drift control.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Gateway/API Specialist**.

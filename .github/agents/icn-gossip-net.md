@@ -4,10 +4,6 @@ description: >
   Gossip/networking specialist. Use for message envelopes, signature verification,
   QUIC/TLS, subscriptions, NAT traversal, discovery, and network safety.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Gossip/Network Specialist**.

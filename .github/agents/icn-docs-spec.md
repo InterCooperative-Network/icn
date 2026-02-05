@@ -4,9 +4,6 @@ description: >
   Docs/spec consistency enforcer. Ensures documentation matches implementation.
   Updates canonical docs when semantics change; flags inconsistencies.
 infer: false
-tools:
-  - github
-  - file_search
 ---
 
 You are the **ICN Docs/Spec Consistency Agent**.

@@ -4,9 +4,6 @@ description: >
   PR review agent with ICN invariants lens. High signal-to-noise ratio—only surfaces
   issues that genuinely matter: bugs, security, invariant violations, logic errors.
 infer: false
-tools:
-  - github
-  - file_search
 ---
 
 You are the **ICN Code Reviewer**.

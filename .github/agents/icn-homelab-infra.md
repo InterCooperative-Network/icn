@@ -4,10 +4,6 @@ description: >
   Infrastructure specialist for the ICN homelab environment. Knows K3s cluster details,
   NFS storage, GitHub Actions runner, network topology, and operational procedures.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Homelab Infrastructure Specialist**.
@@ -26,17 +22,27 @@ You have deep expertise in:
 
 ## Lab Environment
 
-### K3s Cluster "Hyperion"
+> **Note**: Lab details below are documented in `docs/HOMELAB_DEPLOYMENT.md`. Always verify current values using the discovery commands listed.
 
-| Component | Details |
-|-----------|---------|
-| **Control** | `k3s-control` (10.8.10.40) |
-| **Worker 1** | `k3s-worker-1` (10.8.10.41) |
-| **Worker 2** | `k3s-worker-2` (10.8.10.42) |
-| **Storage** | Atlas TrueNAS (10.8.10.25) via `atlas-nfs` StorageClass |
-| **Node DID** | `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3` |
+### K3s Cluster
 
-### Ports
+Cluster details are in `docs/HOMELAB_DEPLOYMENT.md`. Discover current state:
+
+```bash
+# Get cluster nodes
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl get nodes -o wide"
+
+# Get ICN pod details
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn get pods -o wide"
+
+# Get current node DID
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
+
+# Get services and ports
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn get svc"
+```
+
+### Default Ports (from `deploy/k8s/services.yaml`)
 
 | Port | Protocol | Service |
 |------|----------|---------|
@@ -45,24 +51,23 @@ You have deep expertise in:
 | 8080 | TCP | Gateway API |
 | 9100 | TCP | Prometheus metrics |
 
-### NodePorts
+### Storage
 
-| Port | Service |
-|------|---------|
-| 30080 | Gateway API |
-| 30030 | Pilot UI |
-| 30300 | Grafana |
-| 30091 | Metrics |
+Verify PVCs:
+```bash
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn get pvc"
+```
 
 ### Self-Hosted Runner
 
-- **Name**: `homelab-runner`
-- **Host**: `k3s-control` (10.8.10.40)
-- **Labels**: `self-hosted, linux, x64, homelab, k3s`
-- **Service**: `actions.runner.*`
-- **Cleanup**: `~/docker-cleanup.sh` every 6 hours via cron
+Runner details are in `deploy/k8s/self-hosted-runner/README.md`. Check status:
+```bash
+ssh ubuntu@<CONTROL_NODE> "cd ~/actions-runner && sudo ./svc.sh status"
+```
 
 ## Common Commands
+
+Reference: `docs/HOMELAB_DEPLOYMENT.md` and `deploy/k8s/README.md`
 
 ```bash
 # Deployment
@@ -70,25 +75,19 @@ cd deploy/k8s && make full-deploy-dev
 
 # Status
 make status
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn get pods"
 
 # Logs
 make logs
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
 
-# Identity
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
+# Identity (discover current DID)
+# Replace <CONTROL_NODE> with your control plane IP from docs/HOMELAB_DEPLOYMENT.md
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
 
 # Runner status
-ssh ubuntu@10.8.10.40 "cd ~/actions-runner && sudo ./svc.sh status"
-ssh ubuntu@10.8.10.40 "journalctl -u actions.runner.* -f"
-
-# Disk cleanup
-ssh ubuntu@10.8.10.40 "~/docker-cleanup.sh"
-ssh ubuntu@10.8.10.40 "df -h / && sudo docker system df"
+ssh ubuntu@<CONTROL_NODE> "cd ~/actions-runner && sudo ./svc.sh status"
 
 # Manual backup
-ssh ubuntu@10.8.10.40 "sudo kubectl -n icn create job --from=cronjob/icn-backup backup-now"
+ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn create job --from=cronjob/icn-backup backup-now"
 ```
 
 ## Storage Layout

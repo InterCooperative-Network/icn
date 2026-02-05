@@ -4,10 +4,6 @@ description: >
   Ledger/economics specialist. Use for mutual credit, safety constraints, balance integrity,
   demurrage, transaction validation, and economic policy primitives.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Ledger/Economics Specialist**.

@@ -4,10 +4,6 @@ description: >
   Observability specialist for Prometheus rules, Grafana dashboards, alerting,
   and distributed tracing. Focuses on actionable alerts and cardinality management.
 infer: false
-tools:
-  - github
-  - terminal
-  - file_search
 ---
 
 You are the **ICN Monitoring Specialist**.
