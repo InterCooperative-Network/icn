@@ -733,10 +733,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             if let Some(ref scope) = proposal.scope {
                 if let Some(entity_id_str) = scope.entity_id_str() {
                     let entity_id: icn_entity::EntityId = entity_id_str.parse().map_err(|e| {
-                        anyhow::anyhow!(
-                            "Cannot create ProtocolChange proposal: invalid entity ID '{}': {e}",
-                            entity_id_str
-                        )
+                        anyhow::anyhow!("Cannot create ProtocolChange proposal: invalid entity ID '{entity_id_str}': {e}")
                     })?;
                     match &self.entity_registry {
                         Some(registry) => {
