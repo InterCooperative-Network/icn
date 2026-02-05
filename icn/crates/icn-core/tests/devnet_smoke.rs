@@ -46,6 +46,7 @@ async fn wait_for_node(client: &Client, base_url: &str, max_attempts: u32) -> Re
 }
 
 #[tokio::test]
+#[ignore = "requires running devnet (make devnet-up)"]
 async fn test_all_nodes_reachable() {
     let client = Client::new();
 
@@ -64,6 +65,7 @@ async fn test_all_nodes_reachable() {
 }
 
 #[tokio::test]
+#[ignore = "requires running devnet (make devnet-up)"]
 async fn test_nodes_have_unique_identities() {
     let client = Client::new();
 
@@ -124,6 +126,7 @@ async fn test_nodes_have_unique_identities() {
 }
 
 #[tokio::test]
+#[ignore = "requires running devnet (make devnet-up)"]
 async fn test_gossip_network_connectivity() {
     let client = Client::new();
 
