@@ -2641,8 +2641,7 @@ mod tests {
         let result = access.validate_handoff_completion();
         assert!(
             result.is_ok(),
-            "Should pass with all authorized witnesses: {:?}",
-            result
+            "Should pass with all authorized witnesses: {result:?}"
         );
     }
 
@@ -2674,8 +2673,7 @@ mod tests {
         if let Err(AccessError::DutyUnfulfilled(msg)) = result {
             assert!(
                 msg.contains("5 witness signatures but only 1 witnesses are configured"),
-                "Error message should explain the impossible configuration: {}",
-                msg
+                "Error message should explain the impossible configuration: {msg}"
             );
         }
     }

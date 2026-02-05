@@ -942,7 +942,7 @@ mod tests {
         let mut ids = std::collections::HashSet::new();
         for i in 0..300 {
             let cap = genesis
-                .issue_simple("state:*", "write", &format!("did:icn:holder{}", i))
+                .issue_simple("state:*", "write", &format!("did:icn:holder{i}"))
                 .expect("Should issue capability");
             // Verify ID is unique
             assert!(
@@ -973,7 +973,7 @@ mod tests {
                     for j in 0..100 {
                         let oracle = Arc::new(DenyAllOracle::new(
                             Domain::trust(),
-                            format!("test-{}-{}", i, j),
+                            format!("test-{i}-{j}"),
                         ));
                         reg.register(Domain::trust(), oracle);
 

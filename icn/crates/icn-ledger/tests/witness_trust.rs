@@ -174,15 +174,14 @@ async fn test_witness_trust_validation_insufficient_trust() {
     // Append should fail due to insufficient trust
     let result = ledger.append_witnessed_entry(witnessed).await;
     if let Err(e) = &result {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
     }
     assert!(result.is_err(), "Expected error for insufficient trust");
     let err_msg = result.unwrap_err().to_string();
-    eprintln!("Error message: {}", err_msg);
+    eprintln!("Error message: {err_msg}");
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'",
-        err_msg
+        "Error should mention trust or insufficient: got '{err_msg}'"
     );
 
     // Verify entry was NOT stored
@@ -231,15 +230,14 @@ async fn test_witness_trust_validation_unknown_witness() {
     // Append should fail due to unknown witness (trust score = 0.0)
     let result = ledger.append_witnessed_entry(witnessed).await;
     if let Err(e) = &result {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
     }
     assert!(result.is_err(), "Expected error for unknown witness");
     let err_msg = result.unwrap_err().to_string();
-    eprintln!("Error message: {}", err_msg);
+    eprintln!("Error message: {err_msg}");
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'",
-        err_msg
+        "Error should mention trust or insufficient: got '{err_msg}'"
     );
 
     // Verify entry was NOT stored
@@ -528,15 +526,14 @@ async fn test_witness_trust_validation_quorum_insufficient_trusted_witnesses() {
     // Append should fail because witness 2 has insufficient trust
     let result = ledger.append_witnessed_entry(witnessed).await;
     if let Err(e) = &result {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
     }
     assert!(result.is_err(), "Expected error for insufficient trust");
     let err_msg = result.unwrap_err().to_string();
-    eprintln!("Error message: {}", err_msg);
+    eprintln!("Error message: {err_msg}");
     assert!(
         err_msg.to_lowercase().contains("trust") || err_msg.to_lowercase().contains("insufficient"),
-        "Error should mention trust or insufficient: got '{}'",
-        err_msg
+        "Error should mention trust or insufficient: got '{err_msg}'"
     );
 
     // Verify entry was NOT stored

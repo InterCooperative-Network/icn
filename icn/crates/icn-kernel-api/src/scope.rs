@@ -474,7 +474,7 @@ mod tests {
     fn test_cell_id_debug() {
         let salt = [0u8; 32];
         let id = CellId::derive(b"test", "test", &salt);
-        let debug = format!("{:?}", id);
+        let debug = format!("{id:?}");
         assert!(debug.starts_with("CellId(cell:"));
     }
 

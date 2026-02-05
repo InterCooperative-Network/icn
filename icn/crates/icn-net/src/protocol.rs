@@ -1695,11 +1695,7 @@ mod tests {
         let result = proof.verify(keypair.did(), &[0xDE, 0xAD, 0xBE, 0xEF]);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(
-            err.contains("Invalid ML-DSA public key"),
-            "Error should mention invalid key: {}",
-            err
-        );
+        assert!(err.contains("Invalid ML-DSA public key"), "Error should mention invalid key: {err}");
     }
 
     #[test]
