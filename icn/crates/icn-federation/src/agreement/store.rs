@@ -623,6 +623,43 @@ mod tests {
         assert!(store.get_agreement(&id).unwrap().is_none());
     }
 
+    /// Helper to open a SledStore with retry logic to handle OS-level file lock contention.
+    ///
+    /// Sled uses file locks that may not release deterministically on drop. This helper
+    /// retries with exponential backoff to handle intermittent lock contention in tests.
+    ///
+    /// # Arguments
+    /// * `store_path` - Path to the Sled database
+    /// * `max_attempts` - Maximum number of attempts (1 = no retries)
+    ///
+    /// # Returns
+    /// Arc<icn_store::SledStore> on success, panics after max_attempts failures.
+    fn retry_open_sled(
+        store_path: &std::path::Path,
+        max_attempts: usize,
+    ) -> Arc<icn_store::SledStore> {
+        let mut attempt = 1;
+        loop {
+            match icn_store::SledStore::open(store_path) {
+                Ok(store) => return Arc::new(store),
+                Err(e) if attempt < max_attempts => {
+                    eprintln!(
+                        "Attempt {}/{} to open store failed: {}. Retrying...",
+                        attempt, max_attempts, e
+                    );
+                    // Exponential backoff: 100ms, 200ms, 400ms, 800ms, ...
+                    let delay_ms = 100 * (1u64 << (attempt - 1));
+                    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                    attempt += 1;
+                }
+                Err(e) => panic!(
+                    "Failed to open store after {} attempts: {}",
+                    max_attempts, e
+                ),
+            }
+        }
+    }
+
     #[test]
     fn test_persistent_store_survives_restart() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -632,9 +669,10 @@ mod tests {
         let agreement_id;
         let party_did;
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store.clone());
+            // Keep concrete Arc<SledStore> so we can call flush() explicitly,
+            // then cast to trait object for AgreementStore.
+            let sled_store = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store.clone() as Arc<dyn Store>);
 
             let proposer = test_did();
             party_did = proposer.clone();
@@ -658,18 +696,20 @@ mod tests {
             // Verify it's stored
             assert!(store.get_agreement(&agreement_id).unwrap().is_some());
 
-            // Explicitly flush before dropping to release file lock
+            // Explicitly flush to disk and drop in correct order
+            sled_store.flush().unwrap();
             drop(store);
             drop(sled_store);
         }
-        // Wait for file lock to be fully released
-        std::thread::sleep(std::time::Duration::from_millis(100));
 
-        // Second "session" - reopen and verify data persists
+        // Wait for OS-level lock release (Sled uses file locks)
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        // Second "session" - reopen with retry logic to handle lock contention
+        let sled_store = retry_open_sled(&store_path, 5);
+
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            let store = AgreementStore::new(sled_store as Arc<dyn Store>);
 
             // Agreement should still exist
             let loaded = store.get_agreement(&agreement_id).unwrap();
@@ -700,9 +740,10 @@ mod tests {
 
         // First session - create agreement and amendment
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            // Keep concrete Arc<SledStore> so we can call flush() explicitly,
+            // then cast to trait object for AgreementStore.
+            let sled_store = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store.clone() as Arc<dyn Store>);
 
             let agreement = create_test_agreement();
             agreement_id = agreement.id.clone();
@@ -716,13 +757,21 @@ mod tests {
             // Verify
             let amendments = store.get_amendments(&agreement_id).unwrap();
             assert_eq!(amendments.len(), 1);
+
+            // Explicitly flush and drop in correct order to release file lock
+            sled_store.flush().unwrap();
+            drop(store);
+            drop(sled_store);
         }
 
-        // Second session - verify amendments persist
+        // Wait for OS-level lock release
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        // Second session - reopen with retry logic to handle lock contention
+        let sled_store = retry_open_sled(&store_path, 5);
+
         {
-            let sled_store: Arc<dyn Store> =
-                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
-            let store = AgreementStore::new(sled_store);
+            let store = AgreementStore::new(sled_store as Arc<dyn Store>);
 
             let amendments = store.get_amendments(&agreement_id).unwrap();
             assert_eq!(
