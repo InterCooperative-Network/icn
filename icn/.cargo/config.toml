@@ -1,0 +1,21 @@
+[build]
+# On icn-dev (6 vCPU): build fast but don't bully the scheduler
+jobs = 5
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "debuginfo=1"]
+
+[profile.dev]
+opt-level = 0
+debug = 1
+incremental = true
+codegen-units = 256
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+strip = true
