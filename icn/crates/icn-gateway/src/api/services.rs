@@ -398,7 +398,16 @@ pub async fn query_services(
     query: web::Query<QueryServicesParams>,
 ) -> crate::error::Result<HttpResponse> {
     let scope = parse_scope(&query.scope);
-    let min_trust = query.min_trust;
+    let raw_min_trust = query.min_trust;
+
+    // Validate min_trust to catch obvious client bugs early.
+    // Trust scores are expected to be within [0.0, 1.0] and finite.
+    if !raw_min_trust.is_finite() || raw_min_trust < 0.0 || raw_min_trust > 1.0 {
+        return Ok(HttpResponse::BadRequest()
+            .body("invalid min_trust: must be a finite value between 0.0 and 1.0"));
+    }
+
+    let min_trust = raw_min_trust;
 
     // Get all endpoints at the requested scope (already filters by scope and excludes stale)
     let mut results = mgr.discover(scope, None, &[]).await;
@@ -419,8 +428,8 @@ pub async fn query_services(
             return scope_cmp;
         }
         // Then by trust threshold (higher trust first, so reverse order)
-        // Note: NaN trust values are treated as equal (should not occur as trust_threshold
-        // is validated at registration, but unwrap_or provides safe fallback)
+        // Note: NaN or otherwise invalid trust_threshold values (if present) are treated
+        // as equal here; partial_cmp may return None, and unwrap_or provides a safe fallback.
         b.trust_threshold
             .partial_cmp(&a.trust_threshold)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -456,15 +465,20 @@ pub async fn get_service(
 ///
 /// Routes:
 /// - `POST /announce` - Register a service
-/// - `GET /discover` - Discover services (legacy: filters by service type, use for type-based discovery)
+/// - `GET /discover` - Discover services (type-based: filters by service type name)
 /// - `GET /` - Query services with flexible filtering (preferred: filters by scope, trust, service_id)
 /// - `GET /{service_id}` - Get specific service
 /// - `DELETE /{service_id}` - Withdraw a service
 ///
 /// **Usage Guidelines**:
-/// - Use `/discover` when filtering by service type name (e.g., "ledger", "governance")
-/// - Use `/` (new query API) when filtering by scope level, trust threshold, or service ID
+/// - Use `/discover` for type-based discovery by service type name (e.g., "ledger", "governance")
+/// - Use `/` (query API) when filtering by scope level, trust threshold, or service ID
 pub fn configure(cfg: &mut web::ServiceConfig) {
+    // Route registration order matters for actix-web:
+    // 1. `discover_services` ("/discover") - specific path, must come before root
+    // 2. `query_services` ("/") - root path 
+    // 3. `get_service` ("/{service_id}") - path parameter, matches after specific paths
+    // 4. `withdraw_service` ("/{service_id}") - DELETE method, same pattern as get_service
     cfg.service(announce_service)
         .service(discover_services)
         .service(query_services)
