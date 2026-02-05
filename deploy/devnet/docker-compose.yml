@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  node-a:
+    build:
+      context: ../../icn
+      dockerfile: ../deploy/Dockerfile.icnd
+    container_name: icn-devnet-node-a
+    hostname: node-a
+    environment:
+      - ICN_NODE_NAME=node-a
+      - ICN_RPC_PORT=7000
+      - ICN_GATEWAY_PORT=8000
+      - ICN_GOSSIP_PORT=9000
+      - ICN_DATA_DIR=/data/node-a
+      - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
+    ports:
+      - "7000:7000"  # RPC
+      - "8000:8000"  # Gateway
+      - "9000:9000"  # Gossip
+    volumes:
+      - node-a-data:/data/node-a
+    networks:
+      - icn-devnet
+    command: ["icnd", "--config", "/data/node-a/config.toml"]
+
+  node-b:
+    build:
+      context: ../../icn
+      dockerfile: ../deploy/Dockerfile.icnd
+    container_name: icn-devnet-node-b
+    hostname: node-b
+    environment:
+      - ICN_NODE_NAME=node-b
+      - ICN_RPC_PORT=7001
+      - ICN_GATEWAY_PORT=8001
+      - ICN_GOSSIP_PORT=9001
+      - ICN_DATA_DIR=/data/node-b
+      - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
+    ports:
+      - "7001:7001"  # RPC
+      - "8001:8001"  # Gateway
+      - "9001:9001"  # Gossip
+    volumes:
+      - node-b-data:/data/node-b
+    networks:
+      - icn-devnet
+    depends_on:
+      - node-a
+    command: ["icnd", "--config", "/data/node-b/config.toml"]
+
+  node-c:
+    build:
+      context: ../../icn
+      dockerfile: ../deploy/Dockerfile.icnd
+    container_name: icn-devnet-node-c
+    hostname: node-c
+    environment:
+      - ICN_NODE_NAME=node-c
+      - ICN_RPC_PORT=7002
+      - ICN_GATEWAY_PORT=8002
+      - ICN_GOSSIP_PORT=9002
+      - ICN_DATA_DIR=/data/node-c
+      - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
+    ports:
+      - "7002:7002"  # RPC
+      - "8002:8002"  # Gateway
+      - "9002:9002"  # Gossip
+    volumes:
+      - node-c-data:/data/node-c
+    networks:
+      - icn-devnet
+    depends_on:
+      - node-a
+      - node-b
+    command: ["icnd", "--config", "/data/node-c/config.toml"]
+
+volumes:
+  node-a-data:
+  node-b-data:
+  node-c-data:
+
+networks:
+  icn-devnet:
+    driver: bridge

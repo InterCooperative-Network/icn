@@ -64,6 +64,7 @@ sha2 = "0.10"
 icn-governance.workspace = true
 icn-trust.workspace = true
 portpicker.workspace = true
+reqwest.workspace = true
 # Enable test-util for time mocking in integration tests
 tokio = { version = "1.49", features = ["test-util"] }
 
