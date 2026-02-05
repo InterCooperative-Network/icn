@@ -332,21 +332,24 @@ async fn test_malicious_withdrawal_rejected() {
         .publish(topic, encoded_forged)
         .await
         .expect("publish should succeed");
-    
+
     // Get the specific entry we just published by its hash
     let forged_entry = g
         .get_entry(topic, &forged_hash)
         .expect("Should be able to retrieve published entry");
-    
+
     // Verify this is a withdrawal message
     let forged_data = forged_entry.get_data().expect("get data");
     let decoded: icn_gossip::ServiceDiscoveryMessage =
         icn_encoding::decode(&forged_data).expect("decode");
     assert!(
-        matches!(decoded, icn_gossip::ServiceDiscoveryMessage::Withdraw { .. }),
+        matches!(
+            decoded,
+            icn_gossip::ServiceDiscoveryMessage::Withdraw { .. }
+        ),
         "Expected Withdraw message"
     );
-    
+
     drop(g);
 
     // Step 3: Process the forged withdrawal - should fail

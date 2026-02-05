@@ -103,7 +103,10 @@ impl ServiceDiscoveryManager {
     /// discovery message is received on the `services:announce` topic.
     ///
     /// Returns an error if message processing fails (for logging purposes).
-    pub async fn handle_incoming_gossip(&self, entry: icn_gossip::GossipEntry) -> Result<(), String> {
+    pub async fn handle_incoming_gossip(
+        &self,
+        entry: icn_gossip::GossipEntry,
+    ) -> Result<(), String> {
         Self::handle_gossip_entry_internal(self.registry.clone(), entry).await
     }
 
