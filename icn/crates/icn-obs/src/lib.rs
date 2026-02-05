@@ -136,7 +136,7 @@ pub async fn start_metrics_server(port: u16) -> Result<()> {
             ),
             &[0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
         )
-        .expect("Failed to set trust_oracle buckets")
+        .context("Failed to set trust_oracle buckets")?
         // Fast path trust query buckets: 1µs, 2µs, 5µs, 10µs, 20µs, 50µs, 100µs, 1ms, 10ms
         .set_buckets_for_metric(
             metrics_exporter_prometheus::Matcher::Full(
@@ -146,7 +146,7 @@ pub async fn start_metrics_server(port: u16) -> Result<()> {
                 0.000001, 0.000002, 0.000005, 0.00001, 0.00002, 0.00005, 0.0001, 0.001, 0.01,
             ],
         )
-        .expect("Failed to set trust_score buckets")
+        .context("Failed to set trust_score buckets")?
         // Enriched path trust query buckets: 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s
         .set_buckets_for_metric(
             metrics_exporter_prometheus::Matcher::Full(
@@ -154,7 +154,7 @@ pub async fn start_metrics_server(port: u16) -> Result<()> {
             ),
             &[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
         )
-        .expect("Failed to set trust_score_detailed buckets");
+        .context("Failed to set trust_score_detailed buckets")?;
 
     builder
         .with_http_listener(addr)
