@@ -623,6 +623,40 @@ mod tests {
         assert!(store.get_agreement(&id).unwrap().is_none());
     }
 
+    /// Helper to open a SledStore with retry logic to handle OS-level file lock contention.
+    ///
+    /// Sled uses file locks that may not release deterministically on drop. This helper
+    /// retries with exponential backoff to handle intermittent lock contention in tests.
+    ///
+    /// # Arguments
+    /// * `store_path` - Path to the Sled database
+    /// * `max_attempts` - Maximum number of attempts (1 = no retries)
+    ///
+    /// # Returns
+    /// Arc<icn_store::SledStore> on success, panics after max_attempts failures.
+    fn retry_open_sled(store_path: &std::path::Path, max_attempts: usize) -> Arc<icn_store::SledStore> {
+        let mut attempt = 1;
+        loop {
+            match icn_store::SledStore::open(store_path) {
+                Ok(store) => return Arc::new(store),
+                Err(e) if attempt < max_attempts => {
+                    eprintln!(
+                        "Attempt {}/{} to open store failed: {}. Retrying...",
+                        attempt, max_attempts, e
+                    );
+                    // Exponential backoff: 100ms, 200ms, 400ms, 800ms, ...
+                    let delay_ms = 100 * (1u64 << (attempt - 1));
+                    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+                    attempt += 1;
+                }
+                Err(e) => panic!(
+                    "Failed to open store after {} attempts: {}",
+                    max_attempts, e
+                ),
+            }
+        }
+    }
+
     #[test]
     fn test_persistent_store_survives_restart() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -669,28 +703,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         // Second "session" - reopen with retry logic to handle lock contention
-        let sled_store = {
-            let mut attempts = 0;
-            let max_attempts = 5;
-            loop {
-                match icn_store::SledStore::open(&store_path) {
-                    Ok(store) => break Arc::new(store),
-                    Err(e) if attempts < max_attempts => {
-                        attempts += 1;
-                        eprintln!(
-                            "Attempt {}/{} to open store failed: {}. Retrying...",
-                            attempts, max_attempts, e
-                        );
-                        // Linear backoff: 100ms, 200ms, 300ms, 400ms, 500ms
-                        std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
-                    }
-                    Err(e) => panic!(
-                        "Failed to reopen store after {} attempts: {}",
-                        max_attempts, e
-                    ),
-                }
-            }
-        };
+        let sled_store = retry_open_sled(&store_path, 5);
 
         {
             let store = AgreementStore::new(sled_store as Arc<dyn Store>);
@@ -752,28 +765,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(200));
 
         // Second session - reopen with retry logic to handle lock contention
-        let sled_store = {
-            let mut attempts = 0;
-            let max_attempts = 5;
-            loop {
-                match icn_store::SledStore::open(&store_path) {
-                    Ok(store) => break Arc::new(store),
-                    Err(e) if attempts < max_attempts => {
-                        attempts += 1;
-                        eprintln!(
-                            "Attempt {}/{} to open store failed: {}. Retrying...",
-                            attempts, max_attempts, e
-                        );
-                        // Linear backoff: 100ms, 200ms, 300ms, 400ms, 500ms
-                        std::thread::sleep(std::time::Duration::from_millis(100 * attempts));
-                    }
-                    Err(e) => panic!(
-                        "Failed to reopen store after {} attempts: {}",
-                        max_attempts, e
-                    ),
-                }
-            }
-        };
+        let sled_store = retry_open_sled(&store_path, 5);
 
         {
             let store = AgreementStore::new(sled_store as Arc<dyn Store>);
