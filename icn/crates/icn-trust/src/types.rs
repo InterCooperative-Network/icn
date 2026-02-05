@@ -883,10 +883,10 @@ mod tests {
     #[test]
     fn test_trust_score_display() {
         let score = TrustScore::new(0.7).unwrap();
-        assert_eq!(format!("{}", score), "0.70");
+        assert_eq!(format!("{score}"), "0.70");
 
         let score = TrustScore::new(0.123).unwrap();
-        assert_eq!(format!("{}", score), "0.12");
+        assert_eq!(format!("{score}"), "0.12");
     }
 
     #[test]

@@ -1572,9 +1572,7 @@ mod tests {
         let carol_score_after = graph.compute_trust_score(&carol).unwrap();
         assert!(
             carol_score_after < carol_score_before,
-            "Carol's score should decrease when Alice's trust in Bob decreases: {} -> {}",
-            carol_score_before,
-            carol_score_after,
+            "Carol's score should decrease when Alice's trust in Bob decreases: {carol_score_before} -> {carol_score_after}"
         );
     }
 

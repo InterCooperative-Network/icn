@@ -1667,12 +1667,12 @@ mod tests {
 
         // Add MAX_LABELS labels
         for i in 0..MAX_LABELS {
-            attestation.labels.push(format!("label_{}", i));
+            attestation.labels.push(format!("label_{i}"));
         }
 
         // Add MAX_EVIDENCE evidence entries
         for i in 0..MAX_EVIDENCE {
-            attestation.evidence.push(format!("evidence_{}", i));
+            attestation.evidence.push(format!("evidence_{i}"));
         }
 
         let result = attestation.validate_size_limits();
@@ -1688,7 +1688,7 @@ mod tests {
 
         // Add MAX_LABELS + 1 labels
         for i in 0..=MAX_LABELS {
-            attestation.labels.push(format!("label_{}", i));
+            attestation.labels.push(format!("label_{i}"));
         }
 
         let result = attestation.validate_size_limits();
@@ -1708,7 +1708,7 @@ mod tests {
 
         // Add MAX_EVIDENCE + 1 evidence entries
         for i in 0..=MAX_EVIDENCE {
-            attestation.evidence.push(format!("evidence_{}", i));
+            attestation.evidence.push(format!("evidence_{i}"));
         }
 
         let result = attestation.validate_size_limits();

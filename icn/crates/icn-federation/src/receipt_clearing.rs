@@ -137,8 +137,7 @@ impl ReceiptClearingManager {
             ScopeLevel::Federation | ScopeLevel::Commons => {}
             other => {
                 return Err(FederationError::InvalidTransfer(format!(
-                    "receipt scope {:?} must be settled locally, not via clearing",
-                    other
+                    "receipt scope {other:?} must be settled locally, not via clearing"
                 )));
             }
         }

@@ -163,8 +163,7 @@ impl EconomicsSchema {
             }
             if total > 1.0 + f64::EPSILON {
                 return Err(SchemaError::Validation(format!(
-                    "Surplus allocation fractions sum to {} (> 1.0)",
-                    total
+                    "Surplus allocation fractions sum to {total} (> 1.0)"
                 )));
             }
         }

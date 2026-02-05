@@ -402,15 +402,12 @@ impl ExecutionReceipt {
         let hash_hex = self.receipt_hash_hex();
         if executor_did.to_string() != self.executor {
             return Err(ComputeError::InvalidSignature(format!(
-                "DID mismatch: receipt {} claims executor={}, but verifying against {}",
-                hash_hex, self.executor, executor_did
+                "DID mismatch: receipt {hash_hex} claims executor={}, but verifying against {executor_did}",
+                self.executor
             )));
         }
         let sig = self.executor_signature.as_ref().ok_or_else(|| {
-            ComputeError::InvalidSignature(format!(
-                "executor signature missing (receipt {})",
-                hash_hex
-            ))
+            ComputeError::InvalidSignature(format!("executor signature missing (receipt {hash_hex})"))
         })?;
         self.verify_sig(executor_did, sig, &self.executor_sign_payload(), &hash_hex)
     }
@@ -430,18 +427,17 @@ impl ExecutionReceipt {
         let hash_hex = self.receipt_hash_hex();
         if submitter_did.to_string() != self.submitter {
             return Err(ComputeError::InvalidSignature(format!(
-                "DID mismatch: receipt {} claims submitter={}, but verifying against {}",
-                hash_hex, self.submitter, submitter_did
+                "DID mismatch: receipt {hash_hex} claims submitter={}, but verifying against {submitter_did}",
+                self.submitter
             )));
         }
         if self.executor_signature.is_none() {
             return Err(ComputeError::InvalidSignature(format!(
-                "cannot verify submitter ack: executor signature missing (receipt {})",
-                hash_hex
+                "cannot verify submitter ack: executor signature missing (receipt {hash_hex})"
             )));
         }
         let sig = self.submitter_ack.as_ref().ok_or_else(|| {
-            ComputeError::InvalidSignature(format!("submitter ack missing (receipt {})", hash_hex))
+            ComputeError::InvalidSignature(format!("submitter ack missing (receipt {hash_hex})"))
         })?;
         self.verify_sig(
             submitter_did,
@@ -464,29 +460,23 @@ impl ExecutionReceipt {
         match &self.attester {
             None => {
                 return Err(ComputeError::InvalidSignature(format!(
-                    "cannot verify attester: attester DID not set on receipt {}",
-                    hash_hex
+                    "cannot verify attester: attester DID not set on receipt {hash_hex}"
                 )));
             }
             Some(claimed) if claimed != &attester_did.to_string() => {
                 return Err(ComputeError::InvalidSignature(format!(
-                    "DID mismatch: receipt {} claims attester={claimed}, but verifying against {attester_did}",
-                    hash_hex
+                    "DID mismatch: receipt {hash_hex} claims attester={claimed}, but verifying against {attester_did}"
                 )));
             }
             _ => {}
         }
         if self.executor_signature.is_none() || self.submitter_ack.is_none() {
             return Err(ComputeError::InvalidSignature(format!(
-                "cannot verify attester: prior signatures missing (receipt {})",
-                hash_hex
+                "cannot verify attester: prior signatures missing (receipt {hash_hex})"
             )));
         }
         let sig = self.attester_signature.as_ref().ok_or_else(|| {
-            ComputeError::InvalidSignature(format!(
-                "attester signature missing (receipt {})",
-                hash_hex
-            ))
+            ComputeError::InvalidSignature(format!("attester signature missing (receipt {hash_hex})"))
         })?;
         self.verify_sig(attester_did, sig, &self.attester_sign_payload(), &hash_hex)
     }

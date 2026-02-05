@@ -416,14 +416,12 @@ impl EvalContext {
     fn validate_finite(value: f64, operation: &str) -> Result<(), SchemaError> {
         if value.is_nan() {
             return Err(SchemaError::Expression(format!(
-                "{} produced NaN (not a number)",
-                operation
+                "{operation} produced NaN (not a number)"
             )));
         }
         if value.is_infinite() {
             return Err(SchemaError::Expression(format!(
-                "{} produced Infinity (overflow)",
-                operation
+                "{operation} produced Infinity (overflow)"
             )));
         }
         Ok(())
@@ -542,10 +540,7 @@ impl EvalContext {
                     )),
                 }
             }
-            _ => Err(SchemaError::Expression(format!(
-                "Unknown function: {}",
-                name
-            ))),
+            _ => Err(SchemaError::Expression(format!("Unknown function: {name}"))),
         }
     }
 }

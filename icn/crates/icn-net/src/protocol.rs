@@ -1830,8 +1830,7 @@ mod tests {
         let result = proof.verify(&did, &ml_dsa_public);
         assert!(
             result.is_ok(),
-            "Should accept timestamp at edge of tolerance: {:?}",
-            result
+            "Should accept timestamp at edge of tolerance: {result:?}"
         );
     }
 
@@ -1867,8 +1866,7 @@ mod tests {
         let result = proof.verify(&did, &ml_dsa_public);
         assert!(
             result.is_ok(),
-            "Should accept timestamp at edge of max age: {:?}",
-            result
+            "Should accept timestamp at edge of max age: {result:?}"
         );
     }
 

@@ -218,8 +218,7 @@ impl EntitySchema {
             for class_name in membership.rights_by_class.keys() {
                 if !class_names.contains(&class_name) {
                     return Err(SchemaError::Reference(format!(
-                        "rights_by_class references unknown class: {}",
-                        class_name
+                        "rights_by_class references unknown class: {class_name}"
                     )));
                 }
             }
