@@ -2,14 +2,53 @@
 
 Instructions for agentic coding agents operating in this repo.
 
+---
+
+## Operating mode (must follow)
+
+1. **Plan first.** Before edits, produce:
+   - Goal + success criteria
+   - Files/crates you will touch
+   - Commands you will run to verify
+2. **Keep diffs small and reviewable.** Prefer multiple PRs over one mega-PR.
+3. **No "fixing" by weakening safety.**
+   - Do not relax validation, trust gates, signature checks, or encoding rules to make tests pass.
+4. **Run the right checks for the area you touched** (see "Change routing" below).
+5. **Docs/specs must match reality.** If you change semantics, update the relevant doc/spec in the same PR,
+   or create a blocking issue and reference it in the PR description.
+6. **No new tooling.** Do not introduce new linters, build systems, or frameworks unless explicitly requested.
+
+---
+
+## ICN invariants (non-negotiable)
+
+These are the protocol invariants that must never be violated:
+
+| Invariant | Description |
+|-----------|-------------|
+| **Adversarial-by-default** | Treat peers as untrusted until trust is established. No implicit trust shortcuts. |
+| **Determinism** | Protocol state transitions, proofs, and derived roots must be deterministic. Same inputs → same outputs. |
+| **Canonical encodings** | Do not change wire/proof/encoding structures without explicit intent + docs + tests. |
+| **No panics in protocol paths** | Never panic in network/protocol/actor runtime/deserialization paths. Use `Result<T, E>`. |
+| **Kernel/app boundaries** | Keep crate layering clean; avoid dependency cycles; follow forbidden-deps policy. |
+
+If a change might impact any invariant:
+- Call it out explicitly in the plan
+- Add tests proving the invariant still holds
+- Update the relevant docs/specs
+
+---
+
 ## Repo layout (critical)
 
-- Rust workspace is in `icn/` (repo root is NOT a Cargo workspace).
+- **Rust workspace is in `icn/`** (repo root is NOT a Cargo workspace).
 - Non-Rust projects:
   - `sdk/typescript/` (TypeScript SDK)
   - `sdk/react-native/` (React Native SDK)
   - `web/pilot-ui/` (vanilla JS PWA)
   - `web/dashboard/` (static dashboard)
+
+---
 
 ## Build / lint / test
 
@@ -112,6 +151,22 @@ cd web/dashboard
 npm run dev  # python3 -m http.server 8080
 ```
 
+---
+
+## Change routing (run the right verification)
+
+| If you touch... | Run these checks |
+|-----------------|------------------|
+| **Rust crates** (`icn/crates/**`) | `cargo fmt --all --check`, `cargo clippy ...`, appropriate `cargo test` scope |
+| **Gateway API** (`icn-gateway`) | `cargo test -p icn-gateway --features sled-storage`, regenerate OpenAPI + TS types if API changed |
+| **TypeScript SDK** (`sdk/typescript/`) | `npm ci && npm run build && npm test && npm run lint` |
+| **React Native SDK** (`sdk/react-native/`) | `npm test && npm run build` |
+| **Pilot UI** (`web/pilot-ui/`) | `npm run test && npm run test:e2e && npm run test:a11y` |
+| **Deploy manifests** (`deploy/`) | Ensure no secrets committed; keep placeholders; update deploy docs if behavior changes |
+| **Documentation** (`docs/`) | Verify links, check terminology consistency |
+
+---
+
 ## Code style and engineering conventions
 
 ### General
@@ -119,23 +174,24 @@ npm run dev  # python3 -m http.server 8080
 - Prefer small, reviewable changes; follow existing patterns.
 - Do not commit secrets; CI checks deployment manifests for placeholder secrets.
 - Do not add documentation files to repo root; docs belong under `docs/`.
+- Do not introduce new tooling (linters/build systems) unless explicitly requested.
 
 ### Rust (`icn/`)
 
-- Formatting: let `cargo fmt` handle formatting.
-- Imports: prefer explicit imports; avoid glob imports except common test preludes; order as `std`, external crates, `crate`.
-- Naming: `PascalCase` types/traits/enums; `snake_case` modules/functions/vars; `SCREAMING_SNAKE_CASE` constants/statics.
-- Errors:
+- **Formatting**: let `cargo fmt` handle formatting.
+- **Imports**: prefer explicit imports; avoid glob imports except common test preludes; order as `std`, external crates, `crate`.
+- **Naming**: `PascalCase` types/traits/enums; `snake_case` modules/functions/vars; `SCREAMING_SNAKE_CASE` constants/statics.
+- **Errors**:
   - Use `Result<T, E>`; prefer `thiserror` for crate-local error enums.
   - Use `anyhow` at app/service boundaries; add context (`.context("...")`).
   - Avoid `unwrap()`/`expect()` in non-test code (clippy warns).
   - Never panic in protocol/network/actor runtime/deserialization paths.
-- Async/concurrency:
+- **Async/concurrency**:
   - Tokio runtime; no blocking I/O in async code (`tokio::fs` or `spawn_blocking`).
   - Prefer message passing (mpsc/oneshot) over shared mutable state.
-  - If shared state is unavoidable: use `tokio::sync`; don’t hold locks across `.await`.
-- Serialization/API: use `serde`; for JSON structs prefer `#[serde(rename_all = "camelCase")]`.
-- Clippy: workspace thresholds are tuned in `icn/clippy.toml`; prefer refactors over broad `#[allow]`.
+  - If shared state is unavoidable: use `tokio::sync`; don't hold locks across `.await`.
+- **Serialization/API**: use `serde`; for JSON structs prefer `#[serde(rename_all = "camelCase")]`.
+- **Clippy**: workspace thresholds are tuned in `icn/clippy.toml`; prefer refactors over broad `#[allow]`.
 
 ### TypeScript (SDKs)
 
@@ -151,8 +207,18 @@ npm run dev  # python3 -m http.server 8080
 - Handle errors with user-friendly messages; log technical details to console.
 - Use semantic HTML and accessible patterns.
 
+---
+
+## Custom agents
+
+This repo provides specialized Copilot agents in `.github/agents/`. The orchestrator (`icn-orchestrator`) auto-selects and routes to specialists.
+
+See `.github/agents/README.md` for the full list and usage instructions.
+
+---
+
 ## Repo-provided agent rules (must follow)
 
-- Copilot instructions: `.github/copilot-instructions.md`
-- Path-specific rules: `.github/instructions/` (`rust-core.md`, `sdk.md`, `web-ui.md`, `documentation.md`)
-- Cursor rules: none found in `.cursor/rules/` or `.cursorrules`
+- **Copilot instructions**: `.github/copilot-instructions.md`
+- **Path-specific rules**: `.github/instructions/` (`rust-core.md`, `sdk.md`, `web-ui.md`, `documentation.md`)
+- **Custom agents**: `.github/agents/` (ICN-specific specialists)

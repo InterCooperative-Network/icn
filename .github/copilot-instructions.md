@@ -2,7 +2,17 @@
 
 This file provides guidance to GitHub Copilot when working with the ICN (Intercooperative Network) codebase.
 
-> **Note**: This file contains repository-wide instructions. For path-specific instructions (Rust, web, SDK, docs), see `.github/instructions/` directory.
+## Absolute Rules (must follow)
+
+1. **Read `AGENTS.md` first** for operating mode, invariants, and change routing.
+2. **Never weaken safety to fix tests**: Do not relax validation, trust gates, signature checks, encoding rules, or determinism requirements.
+3. **Verify before claiming**: Do not claim tests passed without showing output. Run the actual commands.
+4. **Follow change routing**: Run the right checks for what you touched (see `AGENTS.md`).
+5. **Docs must match code**: If you change semantics, update the relevant doc/spec in the same PR.
+
+> Custom agents are available in `.github/agents/` - use `@icn-orchestrator` to route multi-subsystem requests.
+
+> For path-specific instructions (Rust, web, SDK, docs), see `.github/instructions/` directory.
 
 ## Project Overview
 
