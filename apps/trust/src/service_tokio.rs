@@ -201,7 +201,7 @@ impl TrustService for TrustServiceImplTokio {
                 // Note: Edges from storage don't have signatures but are already validated
                 let attestations: Vec<icn_trust::TrustAttestation> = input_edges
                     .iter()
-                    .map(|edge| icn_trust::TrustAttestation::from_trust_edge(edge))
+                    .map(icn_trust::TrustAttestation::from_trust_edge)
                     .collect();
 
                 // Use AttestationReducer only for provenance hash and input count
