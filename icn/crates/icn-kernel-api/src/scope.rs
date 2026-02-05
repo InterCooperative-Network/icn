@@ -188,7 +188,7 @@ impl CellId {
 
 impl std::fmt::Debug for CellId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CellId({})", self)
+        write!(f, "CellId({self})")
     }
 }
 
@@ -197,7 +197,7 @@ impl std::fmt::Display for CellId {
         // Full 32 bytes as hex — fixed-width, no truncation ambiguity
         write!(f, "cell:")?;
         for byte in &self.0 {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         Ok(())
     }

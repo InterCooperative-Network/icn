@@ -127,7 +127,7 @@ pub enum PolicyError {
 impl std::fmt::Display for PolicyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Denied(reason) => write!(f, "Denied: {}", reason),
+            Self::Denied(reason) => write!(f, "Denied: {reason}"),
             Self::UnknownActor => write!(f, "Unknown actor"),
             Self::ResourceNotFound => write!(f, "Resource not found"),
             Self::InsufficientPrivilege => write!(f, "Insufficient privilege"),

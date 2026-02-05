@@ -304,7 +304,7 @@ impl OracleRegistry {
                 let decision = match phase {
                     BootstrapPhase::Genesis | BootstrapPhase::CoreApps => PolicyDecision::allow(),
                     BootstrapPhase::Running => {
-                        PolicyDecision::deny(format!("No oracle registered for domain: {}", domain))
+                        PolicyDecision::deny(format!("No oracle registered for domain: {domain}"))
                     }
                 };
                 // Cache the deny decision to avoid repeated lookups
@@ -525,7 +525,7 @@ impl GenesisCapabilities {
                 0
             }
         };
-        let cap_id = format!("genesis:{:016x}:{}", timestamp, seq);
+        let cap_id = format!("genesis:{timestamp:016x}:{seq}");
 
         Ok(Capability {
             id: cap_id,
