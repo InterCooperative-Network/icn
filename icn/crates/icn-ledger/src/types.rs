@@ -509,8 +509,7 @@ impl WitnessConfig {
     pub fn counterparty_with_trust(threshold: u64, min_trust: f64) -> Self {
         assert!(
             (0.0..=1.0).contains(&min_trust) && !min_trust.is_nan(),
-            "min_trust must be in range [0.0, 1.0], got {}",
-            min_trust
+            "min_trust must be in range [0.0, 1.0], got {min_trust}"
         );
         WitnessConfig {
             default_policy: WitnessPolicy::Counterparty,
@@ -528,8 +527,7 @@ impl WitnessConfig {
     pub fn quorum_with_trust(required: u32, witnesses: Vec<Did>, min_trust: f64) -> Self {
         assert!(
             (0.0..=1.0).contains(&min_trust) && !min_trust.is_nan(),
-            "min_trust must be in range [0.0, 1.0], got {}",
-            min_trust
+            "min_trust must be in range [0.0, 1.0], got {min_trust}"
         );
         WitnessConfig {
             default_policy: WitnessPolicy::Quorum {

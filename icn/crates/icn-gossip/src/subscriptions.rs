@@ -89,7 +89,7 @@ impl GossipActor {
                         );
                     }
 
-                    bail!("Subscription denied by policy: {}", reason);
+                    bail!("Subscription denied by policy: {reason}");
                 }
             }
         }

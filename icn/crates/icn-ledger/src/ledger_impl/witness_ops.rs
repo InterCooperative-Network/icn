@@ -188,10 +188,7 @@ async fn validate_witness_trust_score(
     if trust_score < min_trust {
         icn_obs::metrics::ledger::witness_trust_validation_failed_inc();
         anyhow::bail!(
-            "Witness {} has insufficient trust score {:.3} (minimum: {:.3})",
-            witness,
-            trust_score,
-            min_trust
+            "Witness {witness} has insufficient trust score {trust_score:.3} (minimum: {min_trust:.3})"
         );
     }
 

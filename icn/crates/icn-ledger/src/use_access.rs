@@ -705,8 +705,7 @@ impl ResourceAccess {
 
                             if overdue {
                                 return Err(AccessError::DutyUnfulfilled(format!(
-                                    "Maintenance overdue: {}",
-                                    description
+                                    "Maintenance overdue: {description}"
                                 )));
                             }
                         }
@@ -736,8 +735,7 @@ impl ResourceAccess {
 
                             if report_count < *min_reports {
                                 return Err(AccessError::DutyUnfulfilled(format!(
-                                    "Insufficient usage reports: {} < {}",
-                                    report_count, min_reports
+                                    "Insufficient usage reports: {report_count} < {min_reports}"
                                 )));
                             }
                         }
@@ -760,8 +758,7 @@ impl ResourceAccess {
 
                             if !benefit_provided && current_time >= *due_by {
                                 return Err(AccessError::DutyUnfulfilled(format!(
-                                    "Community benefit not provided: {}",
-                                    description
+                                    "Community benefit not provided: {description}"
                                 )));
                             }
                         }
@@ -941,8 +938,7 @@ impl ResourceAccess {
 
             if !step_completed {
                 return Err(AccessError::DutyUnfulfilled(format!(
-                    "Handoff step {} not completed with {} authorized witnesses: {}",
-                    step_index, min_witnesses, step_desc
+                    "Handoff step {step_index} not completed with {min_witnesses} authorized witnesses: {step_desc}"
                 )));
             }
         }
@@ -1018,35 +1014,27 @@ impl SledResourceAccessStore {
 
     /// Primary key for access record: ledger:resource_access:<resource_id>:<holder>
     fn access_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
-        format!("ledger:resource_access:{}:{}", resource_id, holder).into_bytes()
+        format!("ledger:resource_access:{resource_id}:{holder}").into_bytes()
     }
 
     /// Index key for holder lookup: ledger:resource_access:idx:holder:<holder>:<resource_id>
     fn holder_index_key(holder: &EntityId, resource_id: &str) -> Vec<u8> {
-        format!(
-            "ledger:resource_access:idx:holder:{}:{}",
-            holder, resource_id
-        )
-        .into_bytes()
+        format!("ledger:resource_access:idx:holder:{holder}:{resource_id}").into_bytes()
     }
 
     /// Index key for resource lookup: ledger:resource_access:idx:resource:<resource_id>:<holder>
     fn resource_index_key(resource_id: &str, holder: &EntityId) -> Vec<u8> {
-        format!(
-            "ledger:resource_access:idx:resource:{}:{}",
-            resource_id, holder
-        )
-        .into_bytes()
+        format!("ledger:resource_access:idx:resource:{resource_id}:{holder}").into_bytes()
     }
 
     /// Prefix for holder index scan
     fn holder_prefix(holder: &EntityId) -> Vec<u8> {
-        format!("ledger:resource_access:idx:holder:{}:", holder).into_bytes()
+        format!("ledger:resource_access:idx:holder:{holder}:").into_bytes()
     }
 
     /// Prefix for resource index scan
     fn resource_prefix(resource_id: &str) -> Vec<u8> {
-        format!("ledger:resource_access:idx:resource:{}:", resource_id).into_bytes()
+        format!("ledger:resource_access:idx:resource:{resource_id}:").into_bytes()
     }
 
     /// Extract resource_id from a holder index key by stripping the holder prefix.
@@ -1076,8 +1064,7 @@ impl SledResourceAccessStore {
         }
         let holder_bytes = &key[prefix.len()..];
         let holder_str = std::str::from_utf8(holder_bytes)?;
-        EntityId::from_str(holder_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse EntityId: {}", e))
+        EntityId::from_str(holder_str).map_err(|e| anyhow::anyhow!("Failed to parse EntityId: {e}"))
     }
 }
 
@@ -1164,11 +1151,7 @@ impl ResourceAccessStore for SledResourceAccessStore {
 
             Ok(())
         } else {
-            anyhow::bail!(
-                "Access not found for resource {} and holder {}",
-                resource_id,
-                holder
-            );
+            anyhow::bail!("Access not found for resource {resource_id} and holder {holder}");
         }
     }
 

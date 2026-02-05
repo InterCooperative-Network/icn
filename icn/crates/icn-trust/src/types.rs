@@ -674,10 +674,10 @@ impl ScopeId {
 impl fmt::Display for ScopeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Cooperative(id) => write!(f, "coop:{}", id),
-            Self::Federation(id) => write!(f, "federation:{}", id),
-            Self::Domain(id) => write!(f, "domain:{}", id),
-            Self::TopicClass(id) => write!(f, "topic:{}", id),
+            Self::Cooperative(id) => write!(f, "coop:{id}"),
+            Self::Federation(id) => write!(f, "federation:{id}"),
+            Self::Domain(id) => write!(f, "domain:{id}"),
+            Self::TopicClass(id) => write!(f, "topic:{id}"),
             Self::Global => write!(f, "global"),
         }
     }
