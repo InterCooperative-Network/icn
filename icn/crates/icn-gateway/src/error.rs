@@ -1,6 +1,7 @@
 //! Error types for ICN Gateway
 
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use icn_kernel_api::IcnError as KernelError;
 use icn_ledger::fx::FxError;
 use rust_i18n::t;
 
@@ -48,6 +49,9 @@ pub enum GatewayError {
 
     #[error("FX error: {0}")]
     Fx(#[from] FxError),
+
+    #[error("Kernel error: {0}")]
+    Kernel(#[from] KernelError),
 }
 
 impl GatewayError {
@@ -67,6 +71,7 @@ impl GatewayError {
             GatewayError::Conflict(_) => Some("CONFLICT"),
             GatewayError::ServiceUnavailable(_) => Some("SERVICE_UNAVAILABLE"),
             GatewayError::Fx(fx_err) => Some(fx_err.error_code()),
+            GatewayError::Kernel(kernel_err) => Some(kernel_err.code.as_str()),
             // Internal errors don't expose codes
             GatewayError::InternalError(_) => None,
             GatewayError::SubstrateError(_) => None,
@@ -98,6 +103,10 @@ impl ResponseError for GatewayError {
                 } else {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
+            }
+            GatewayError::Kernel(kernel_err) => {
+                StatusCode::from_u16(kernel_err.http_status())
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
             }
         }
     }
@@ -160,6 +169,9 @@ impl ResponseError for GatewayError {
             // FX errors - user-facing with structured codes
             GatewayError::Fx(fx_err) => fx_err.to_string(),
 
+            // Kernel errors - protocol-level errors with stable codes
+            GatewayError::Kernel(kernel_err) => kernel_err.message.clone(),
+
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client
             GatewayError::InternalError(details) => {
@@ -186,5 +198,47 @@ impl ResponseError for GatewayError {
         }
 
         HttpResponse::build(self.status_code()).json(response)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_kernel_api::{ErrCode, IcnError as KernelError};
+
+    #[test]
+    fn gateway_kernel_error_maps_to_http() {
+        let kernel_err = KernelError::new(ErrCode::Unauthorized, "missing DID");
+        let gateway_err = GatewayError::from(kernel_err);
+
+        assert_eq!(gateway_err.status_code(), actix_web::http::StatusCode::UNAUTHORIZED);
+        assert_eq!(gateway_err.error_code(), Some("unauthorized"));
+    }
+
+    #[test]
+    fn gateway_kernel_error_http_mapping() {
+        let test_cases = vec![
+            (ErrCode::Unauthorized, 401),
+            (ErrCode::InvalidSignature, 401),
+            (ErrCode::Forbidden, 403),
+            (ErrCode::NotFound, 404),
+            (ErrCode::Replay, 409),
+            (ErrCode::Expired, 410),
+            (ErrCode::Oversize, 413),
+            (ErrCode::RateLimited, 429),
+            (ErrCode::Busy, 503),
+            (ErrCode::InvalidRequest, 400),
+        ];
+
+        for (code, expected_status) in test_cases {
+            let kernel_err = KernelError::new(code, "test message");
+            let gateway_err = GatewayError::from(kernel_err);
+            assert_eq!(
+                gateway_err.status_code().as_u16(),
+                expected_status,
+                "HTTP status mismatch for {:?}",
+                code
+            );
+        }
     }
 }
