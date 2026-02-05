@@ -62,7 +62,7 @@ impl GossipActor {
                         "Rejecting message from peer denied by policy"
                     );
                     icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                    bail!("Access denied by policy: {}", reason);
+                    bail!("Access denied by policy: {reason}");
                 }
             }
         }

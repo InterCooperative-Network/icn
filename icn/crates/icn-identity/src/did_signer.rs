@@ -161,8 +161,7 @@ impl DidKey {
             Self::Hardware { backend_type, .. } => {
                 anyhow::bail!(
                     "Cannot sign with hardware key using software method. \
-                     Use a DidSigner implementation for backend: {}",
-                    backend_type
+                     Use a DidSigner implementation for backend: {backend_type}"
                 )
             }
         }

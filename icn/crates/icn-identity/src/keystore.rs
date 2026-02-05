@@ -520,9 +520,8 @@ impl AgeKeyStore {
             } => (Zeroizing::new(**secret_bytes), verifying_key.to_bytes()),
             crate::DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
-                    "Cannot save hardware-backed keystore to v4 format (backend: {}). \
-                     Hardware keys should be managed by their backend.",
-                    backend_type
+                    "Cannot save hardware-backed keystore to v4 format (backend: {backend_type}). \
+                     Hardware keys should be managed by their backend."
                 )
             }
         };
@@ -704,9 +703,8 @@ impl AgeKeyStore {
             } => (Zeroizing::new(**secret_bytes), verifying_key.to_bytes()),
             crate::DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
-                    "Cannot save hardware-backed keystore to v3 format (backend: {}). \
-                     Hardware keys should be managed by their backend.",
-                    backend_type
+                    "Cannot save hardware-backed keystore to v3 format (backend: {backend_type}). \
+                     Hardware keys should be managed by their backend."
                 )
             }
         };

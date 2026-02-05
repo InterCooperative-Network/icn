@@ -117,7 +117,7 @@ impl CommunityMembershipManager {
         // Store member type in metadata
         membership
             .metadata
-            .insert("member_type".to_string(), format!("{:?}", member_type));
+            .insert("member_type".to_string(), format!("{member_type:?}"));
 
         Ok(membership)
     }

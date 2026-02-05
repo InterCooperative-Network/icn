@@ -889,7 +889,7 @@ impl TrustGraph {
         scope: &crate::ScopeId,
     ) -> Result<f64> {
         if !scope.is_valid() {
-            anyhow::bail!("Scope identifier is empty or whitespace-only: {:?}", scope);
+            anyhow::bail!("Scope identifier is empty or whitespace-only: {scope:?}");
         }
         let outgoing = self.get_outgoing_edges(&self.own_did)?;
         let now = icn_time::current_timestamp_secs();

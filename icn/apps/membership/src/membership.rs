@@ -522,7 +522,7 @@ mod tests {
 
         let too_many: Vec<crate::entity::Condition> = (0..65)
             .map(|i| crate::entity::Condition {
-                field: format!("f{}", i),
+                field: format!("f{i}"),
                 op: "==".to_string(),
                 value: serde_json::json!(true),
             })

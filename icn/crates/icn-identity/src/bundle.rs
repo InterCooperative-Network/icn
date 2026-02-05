@@ -649,9 +649,8 @@ impl IdentityBundle {
             }
             DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
-                    "Cannot get KeyPair from hardware-backed bundle (backend: {}). \
-                     Use did_key() instead",
-                    backend_type
+                    "Cannot get KeyPair from hardware-backed bundle (backend: {backend_type}). \
+                     Use did_key() instead"
                 )
             }
         }
