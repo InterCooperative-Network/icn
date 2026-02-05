@@ -3,5 +3,95 @@
     "feature-dev@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cargo fmt *)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo test *)",
+      "Bash(cargo build *)",
+      "Bash(cargo check *)",
+      "Bash(cargo build)",
+      "Bash(cargo test)",
+      "Bash(cargo fmt --all --check)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh api *)",
+      "Bash(gh run view *)",
+      "Bash(gh run list *)",
+      "Bash(rustc --version)",
+      "Bash(docker compose *)",
+      "Bash(docker ps *)",
+      "Bash(ss -tlnp *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Read(.env*)",
+      "Read(*.age)",
+      "Read(*keystore*)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git rebase *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(cargo publish *)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose down *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/firewall-guard.sh",
+            "timeout": 10,
+            "statusMessage": "Checking meaning firewall..."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/panic-guard.sh",
+            "timeout": 10,
+            "statusMessage": "Checking for panics..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '📋 ICN Session Started. Key commands: /verify, /firewall-check, /pr-create, /devnet'"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Context compacted. Remember: workspace is icn/, run cargo from there. 5 invariants: adversarial-by-default, determinism, canonical-encodings, no-panics, kernel/app-boundaries.'"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "RUST_BACKTRACE": "1"
   }
 }
