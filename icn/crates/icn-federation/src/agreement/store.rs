@@ -634,7 +634,10 @@ mod tests {
     ///
     /// # Returns
     /// Arc<icn_store::SledStore> on success, panics after max_attempts failures.
-    fn retry_open_sled(store_path: &std::path::Path, max_attempts: usize) -> Arc<icn_store::SledStore> {
+    fn retry_open_sled(
+        store_path: &std::path::Path,
+        max_attempts: usize,
+    ) -> Arc<icn_store::SledStore> {
         let mut attempt = 1;
         loop {
             match icn_store::SledStore::open(store_path) {
