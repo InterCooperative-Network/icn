@@ -16,9 +16,6 @@ use icn_kernel_api::types::{Endpoint, Signature};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Delay to allow gossip callback processing (milliseconds)
-const CALLBACK_PROCESSING_DELAY_MS: u64 = 100;
-
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -124,8 +121,12 @@ async fn test_service_manager_publishes_withdrawal() {
 
     // Check that there's a withdrawal message somewhere
     let has_withdrawal = entries.iter().any(|entry| {
-        if let Ok(msg) = icn_encoding::decode::<icn_gossip::ServiceDiscoveryMessage>(&entry.data) {
-            matches!(msg, icn_gossip::ServiceDiscoveryMessage::Withdraw { .. })
+        if let Ok(data) = entry.get_data() {
+            if let Ok(msg) = icn_encoding::decode::<icn_gossip::ServiceDiscoveryMessage>(&data) {
+                matches!(msg, icn_gossip::ServiceDiscoveryMessage::Withdraw { .. })
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -258,33 +259,61 @@ async fn test_incoming_announcement_stored() {
 #[tokio::test]
 async fn test_malicious_withdrawal_rejected() {
     // Test that a node cannot forge a withdrawal for another node's service
+    //
+    // Scenario:
+    // 1. Node A announces a service
+    // 2. Node B receives the announcement and stores it
+    // 3. Node B tries to forge a withdrawal for Node A's service
+    // 4. The forged withdrawal should be rejected (service should remain in registry)
 
-    // Node A announces a service
+    // Node A creates and announces a service
     let keypair_a = KeyPair::generate().unwrap();
     let did_a = keypair_a.did().clone();
     let signing_key_a = ed25519_dalek::SigningKey::from_bytes(&keypair_a.to_signing_key_bytes());
 
-    let gossip_a = Arc::new(RwLock::new(GossipActor::new(did_a.clone(), None)));
-    let mgr_a = ServiceDiscoveryManager::with_gossip(gossip_a.clone(), did_a.clone())
-        .await
-        .expect("Failed to create manager A");
-
     let endpoint_a = make_endpoint("svc-owned-by-a", did_a.as_str(), &signing_key_a);
-    mgr_a
-        .announce(endpoint_a)
-        .await
-        .expect("Failed to announce");
 
-    // Node B tries to withdraw Node A's service by forging a withdrawal message
+    // Node B's setup - it will receive Node A's announcement
     let keypair_b = KeyPair::generate().unwrap();
     let did_b = keypair_b.did().clone();
 
     let gossip_b = Arc::new(RwLock::new(GossipActor::new(did_b.clone(), None)));
-    let mgr_b = ServiceDiscoveryManager::with_gossip(gossip_b.clone(), did_b.clone())
+    let _mgr_b = ServiceDiscoveryManager::with_gossip(gossip_b.clone(), did_b.clone())
         .await
         .expect("Failed to create manager B");
 
-    // Node B creates a forged withdrawal claiming to be from Node A
+    // Create a shared registry for Node B that we can inspect
+    let registry_b = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+    // Step 1: Propagate Node A's announcement to Node B's registry
+    // Simulate Node A's announcement arriving via gossip
+    let announce_msg = icn_gossip::ServiceDiscoveryMessage::Announce {
+        endpoint: endpoint_a.clone(),
+    };
+    let encoded_announce = icn_encoding::encode(&announce_msg).expect("encode");
+
+    let topic = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
+    let mut g = gossip_b.write().await;
+    let _ = g.publish(topic, encoded_announce).await;
+    let entries = g.get_entries(topic);
+    let announce_entry = entries.last().expect("Should have announce entry");
+    drop(g);
+
+    // Process the announcement in Node B's registry
+    ServiceDiscoveryManager::handle_gossip_entry(registry_b.clone(), announce_entry.clone())
+        .await
+        .expect("Should accept valid announcement");
+
+    // Verify the service is now in Node B's registry
+    {
+        let reg = registry_b.read().await;
+        assert!(
+            reg.get("svc-owned-by-a").is_some(),
+            "Service should be in Node B's registry after announcement"
+        );
+    }
+
+    // Step 2: Node B tries to forge a withdrawal for Node A's service
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -295,25 +324,46 @@ async fn test_malicious_withdrawal_rejected() {
         provider: did_a.clone(), // Claims to be Node A
         timestamp,
     };
-    let encoded = icn_encoding::encode(&forged_msg).expect("encode");
+    let encoded_forged = icn_encoding::encode(&forged_msg).expect("encode");
 
     // Node B publishes the forged withdrawal (entry.author will be did_b, not did_a)
-    let topic = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
     let mut g = gossip_b.write().await;
-    let _ = g.publish(topic, encoded).await;
+    let forged_hash = g
+        .publish(topic, encoded_forged)
+        .await
+        .expect("publish should succeed");
+    
+    // Get the specific entry we just published by its hash
+    let forged_entry = g
+        .get_entry(topic, &forged_hash)
+        .expect("Should be able to retrieve published entry");
+    
+    // Verify this is a withdrawal message
+    let forged_data = forged_entry.get_data().expect("get data");
+    let decoded: icn_gossip::ServiceDiscoveryMessage =
+        icn_encoding::decode(&forged_data).expect("decode");
+    assert!(
+        matches!(decoded, icn_gossip::ServiceDiscoveryMessage::Withdraw { .. }),
+        "Expected Withdraw message"
+    );
+    
     drop(g);
 
-    // Give the callback time to process
-    tokio::time::sleep(tokio::time::Duration::from_millis(
-        CALLBACK_PROCESSING_DELAY_MS,
-    ))
-    .await;
+    // Step 3: Process the forged withdrawal - should fail
+    let result =
+        ServiceDiscoveryManager::handle_gossip_entry(registry_b.clone(), forged_entry.clone())
+            .await;
 
-    // The forged withdrawal should be rejected (service should still exist in Node B's registry)
-    // Note: In a real multi-node scenario, Node A's service wouldn't be in Node B's registry yet,
-    // but this tests that the withdrawal author verification works correctly
+    // The handler should return an error because entry.author (did_b) != provider (did_a)
     assert!(
-        mgr_b.get("svc-owned-by-a").await.is_none(),
-        "Forged withdrawal should be rejected - service should not exist in registry"
+        result.is_err(),
+        "Forged withdrawal should be rejected with author mismatch error"
+    );
+
+    // Step 4: Verify the service is STILL in the registry (withdrawal was rejected)
+    let reg = registry_b.read().await;
+    assert!(
+        reg.get("svc-owned-by-a").is_some(),
+        "Service should still exist after forged withdrawal is rejected"
     );
 }

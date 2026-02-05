@@ -73,7 +73,8 @@ impl ServiceDiscoveryManager {
 
         let mut gossip = gossip_handle.write().await;
 
-        // Create the topic (idempotent operation - safe to call even if exists)
+        // Create the topic if it doesn't exist (idempotent - safe to call multiple times)
+        // Note: create_topic is a void method that handles existing topics gracefully
         let topic_name = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
         let topic = icn_gossip::types::Topic::new(
             topic_name.to_string(),
@@ -95,13 +96,32 @@ impl ServiceDiscoveryManager {
         Ok(manager)
     }
 
-    /// Handle a single gossip entry for service discovery.
+    /// Handle incoming gossip entry for service discovery.
     ///
-    /// This method should be called by the supervisor's central notification callback
-    /// when a service discovery message is received.
+    /// This is the primary method for supervisor integration. The supervisor's
+    /// central notification callback should call this method when a service
+    /// discovery message is received on the `services:announce` topic.
+    ///
+    /// Returns an error if message processing fails (for logging purposes).
+    pub async fn handle_incoming_gossip(&self, entry: icn_gossip::GossipEntry) -> Result<(), String> {
+        Self::handle_gossip_entry_internal(self.registry.clone(), entry).await
+    }
+
+    /// Internal static handler for gossip entries (exposed for testing).
+    ///
+    /// For production use, prefer `handle_incoming_gossip(&self, entry)` which
+    /// uses the manager's internal registry.
     ///
     /// Returns an error if message processing fails (for logging purposes).
     pub async fn handle_gossip_entry(
+        registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
+        entry: icn_gossip::GossipEntry,
+    ) -> Result<(), String> {
+        Self::handle_gossip_entry_internal(registry, entry).await
+    }
+
+    /// Internal implementation for processing gossip entries.
+    async fn handle_gossip_entry_internal(
         registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
         entry: icn_gossip::GossipEntry,
     ) -> Result<(), String> {
