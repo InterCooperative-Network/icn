@@ -2,6 +2,8 @@
 
 This file provides guidance to GitHub Copilot when working with the ICN (Intercooperative Network) codebase.
 
+> **IMPORTANT**: Repo-wide agent operating rules live in `AGENTS.md` (plan-first, invariants, and change-routing). Follow `AGENTS.md` in addition to any path-specific instructions under `.github/instructions/`. Custom agents are available in `.github/agents/`.
+
 > **Note**: This file contains repository-wide instructions. For path-specific instructions (Rust, web, SDK, docs), see `.github/instructions/` directory.
 
 ## Project Overview
