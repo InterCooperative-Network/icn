@@ -35,6 +35,8 @@ fn debug_assert_blocking_context(method: &str) {
 pub struct ServiceDiscoveryManager {
     /// service_id → ServiceEndpoint
     registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
+    /// Optional gossip handle for propagating announcements/withdrawals
+    gossip_handle: Option<icn_gossip::GossipHandle>,
 }
 
 impl ServiceDiscoveryManager {
@@ -42,6 +44,176 @@ impl ServiceDiscoveryManager {
     pub fn new() -> Self {
         Self {
             registry: Arc::new(RwLock::new(HashMap::new())),
+            gossip_handle: None,
+        }
+    }
+
+    /// Create a new manager with gossip propagation enabled.
+    ///
+    /// When a gossip handle is provided:
+    /// - The manager subscribes to `services:announce` topic
+    /// - Successful `announce()` calls propagate via gossip
+    /// - Successful `withdraw()` calls propagate via gossip
+    ///
+    /// **Important**: This method does NOT set up notification callbacks. The supervisor
+    /// must route incoming service discovery messages to `handle_gossip_entry()` via
+    /// its central notification callback. This follows the established pattern where
+    /// the supervisor owns the single global gossip callback and routes messages to
+    /// appropriate handlers based on topic.
+    pub async fn with_gossip(
+        gossip_handle: icn_gossip::GossipHandle,
+        own_did: icn_identity::Did,
+    ) -> Result<Self, NamingError> {
+        let registry = Arc::new(RwLock::new(HashMap::new()));
+
+        let manager = Self {
+            registry: registry.clone(),
+            gossip_handle: Some(gossip_handle.clone()),
+        };
+
+        let mut gossip = gossip_handle.write().await;
+
+        // Create the topic if it doesn't exist (idempotent - safe to call multiple times)
+        // Note: create_topic is a void method that handles existing topics gracefully
+        let topic_name = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
+        let topic = icn_gossip::types::Topic::new(
+            topic_name.to_string(),
+            icn_gossip::AccessControl::Public,
+        );
+
+        gossip.create_topic(topic);
+
+        // Subscribe to the topic
+        gossip.subscribe(topic_name, own_did).await.map_err(|e| {
+            NamingError::Internal(format!("Failed to subscribe to gossip topic: {e}"))
+        })?;
+
+        info!(
+            "ServiceDiscoveryManager subscribed to gossip topic: {}",
+            topic_name
+        );
+
+        Ok(manager)
+    }
+
+    /// Handle incoming gossip entry for service discovery.
+    ///
+    /// This is the primary method for supervisor integration. The supervisor's
+    /// central notification callback should call this method when a service
+    /// discovery message is received on the `services:announce` topic.
+    ///
+    /// Returns an error if message processing fails (for logging purposes).
+    pub async fn handle_incoming_gossip(
+        &self,
+        entry: icn_gossip::GossipEntry,
+    ) -> Result<(), String> {
+        Self::handle_gossip_entry_internal(self.registry.clone(), entry).await
+    }
+
+    /// Internal static handler for gossip entries (exposed for testing).
+    ///
+    /// For production use, prefer `handle_incoming_gossip(&self, entry)` which
+    /// uses the manager's internal registry.
+    ///
+    /// Returns an error if message processing fails (for logging purposes).
+    pub async fn handle_gossip_entry(
+        registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
+        entry: icn_gossip::GossipEntry,
+    ) -> Result<(), String> {
+        Self::handle_gossip_entry_internal(registry, entry).await
+    }
+
+    /// Internal implementation for processing gossip entries.
+    async fn handle_gossip_entry_internal(
+        registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
+        entry: icn_gossip::GossipEntry,
+    ) -> Result<(), String> {
+        // Decode the message (handling possible compression via get_data)
+        let data = entry
+            .get_data()
+            .map_err(|e| format!("Failed to get entry data: {e}"))?;
+        let msg: icn_gossip::ServiceDiscoveryMessage =
+            icn_encoding::decode(&data).map_err(|e| format!("Failed to decode: {e}"))?;
+
+        match msg {
+            icn_gossip::ServiceDiscoveryMessage::Announce { endpoint } => {
+                // Verify signature (supports key rotation)
+                // Note: No rotation cache available here - supervisor integration would provide it
+                if let Err(e) = icn_gossip::verify_service_endpoint_with_rotation(&endpoint, None) {
+                    return Err(format!(
+                        "Invalid signature for {}: {}",
+                        endpoint.service_id, e
+                    ));
+                }
+
+                // Check if expired
+                if endpoint.is_expired() {
+                    debug!(
+                        "Ignoring expired service announcement: {}",
+                        endpoint.service_id
+                    );
+                    return Ok(());
+                }
+
+                // Store in registry (deduplication by service_id)
+                let mut reg = registry.write().await;
+
+                // Allow updates to existing entries even when at capacity
+                // (consistent with announce() method behavior)
+                let is_update = reg.contains_key(&endpoint.service_id);
+                if !is_update && reg.len() >= MAX_REGISTRY_SIZE {
+                    return Err(format!(
+                        "Registry full, ignoring announcement: {}",
+                        endpoint.service_id
+                    ));
+                }
+
+                let service_id = endpoint.service_id.clone();
+                reg.insert(service_id.clone(), endpoint);
+
+                debug!("Received service announcement via gossip: {}", service_id);
+                icn_obs::metrics::service_discovery::gossip_announcements_received_inc();
+                Ok(())
+            }
+            icn_gossip::ServiceDiscoveryMessage::Withdraw {
+                service_id,
+                provider,
+                ..
+            } => {
+                // SECURITY: Verify that the gossip entry author matches the provider DID
+                // This prevents nodes from forging withdrawal messages for services they didn't create
+                if entry.author != provider {
+                    return Err(format!(
+                        "Withdrawal author mismatch: entry.author={}, provider={} (service: {})",
+                        entry.author, provider, service_id
+                    ));
+                }
+
+                let mut reg = registry.write().await;
+                // Only withdraw if the provider matches
+                if let Some(ep) = reg.get(&service_id) {
+                    if ep.provider == provider.as_str() {
+                        reg.remove(&service_id);
+                        debug!("Received service withdrawal via gossip: {}", service_id);
+                        icn_obs::metrics::service_discovery::gossip_withdrawals_received_inc();
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "Ignoring withdrawal from non-owner: {} (owner: {}, requestor: {})",
+                            service_id, ep.provider, provider
+                        ))
+                    }
+                } else {
+                    // Not an error - service might have already been withdrawn
+                    Ok(())
+                }
+            }
+            icn_gossip::ServiceDiscoveryMessage::Query { .. }
+            | icn_gossip::ServiceDiscoveryMessage::Response { .. } => {
+                // Query/Response not handled in this callback
+                // (would need additional wiring for interactive query/response)
+                Ok(())
+            }
         }
     }
 
@@ -50,6 +222,8 @@ impl ServiceDiscoveryManager {
     /// Returns an error if the registry has reached its capacity limit
     /// (`MAX_REGISTRY_SIZE`) and the service_id is not already registered
     /// (updates to existing entries are always allowed).
+    ///
+    /// If gossip is enabled, the announcement is propagated to peers.
     pub async fn announce(&self, endpoint: ServiceEndpoint) -> Result<(), NamingError> {
         let id = endpoint.service_id.clone();
         let mut reg = self.registry.write().await;
@@ -58,20 +232,80 @@ impl ServiceDiscoveryManager {
                 "Service registry is full ({MAX_REGISTRY_SIZE} entries)"
             )));
         }
-        reg.insert(id.clone(), endpoint);
+        reg.insert(id.clone(), endpoint.clone());
+        drop(reg); // Release lock before gossip
+
         debug!("Service announced: {}", id);
         icn_obs::metrics::service_discovery::announcements_inc();
+
+        // Propagate to gossip if enabled
+        if let Some(ref gossip_handle) = self.gossip_handle {
+            let msg = icn_gossip::ServiceDiscoveryMessage::Announce {
+                endpoint: endpoint.clone(),
+            };
+            let encoded = icn_encoding::encode(&msg).map_err(|e| {
+                NamingError::Internal(format!("Failed to encode gossip message: {e}"))
+            })?;
+
+            let topic = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
+            let mut gossip = gossip_handle.write().await;
+            gossip
+                .publish(topic, encoded)
+                .await
+                .map_err(|e| NamingError::Internal(format!("Failed to publish to gossip: {e}")))?;
+
+            debug!("Service announcement propagated via gossip: {}", id);
+        }
+
         Ok(())
     }
 
     /// Withdraw a service endpoint. Only the original provider may withdraw.
+    ///
+    /// If gossip is enabled, the withdrawal is propagated to peers.
     pub async fn withdraw(&self, service_id: &str, provider: &str) -> Result<(), NamingError> {
         let mut reg = self.registry.write().await;
         match reg.get(service_id) {
             Some(ep) if ep.provider == provider => {
                 reg.remove(service_id);
+                drop(reg); // Release lock before gossip
+
                 debug!("Service withdrawn: {}", service_id);
                 icn_obs::metrics::service_discovery::withdrawals_inc();
+
+                // Propagate to gossip if enabled
+                if let Some(ref gossip_handle) = self.gossip_handle {
+                    let timestamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_err(|e| {
+                            NamingError::Internal(format!(
+                                "System time error while computing withdrawal timestamp: {e}"
+                            ))
+                        })?
+                        .as_secs();
+
+                    let provider_did = icn_identity::Did::from_str(provider).map_err(|e| {
+                        NamingError::InvalidName(format!("Failed to parse provider DID: {e}"))
+                    })?;
+
+                    let msg = icn_gossip::ServiceDiscoveryMessage::Withdraw {
+                        service_id: service_id.to_string(),
+                        provider: provider_did,
+                        timestamp,
+                    };
+                    let encoded = icn_encoding::encode(&msg).map_err(|e| {
+                        NamingError::Internal(format!("Failed to encode gossip message: {e}"))
+                    })?;
+
+                    let topic = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
+                    let mut gossip = gossip_handle.write().await;
+                    gossip.publish(topic, encoded).await.map_err(|e| {
+                        NamingError::Internal(format!("Failed to publish to gossip: {e}"))
+                    })?;
+
+                    debug!("Service withdrawal propagated via gossip: {}", service_id);
+                }
+
                 Ok(())
             }
             Some(_) => Err(NamingError::Unauthorized(
