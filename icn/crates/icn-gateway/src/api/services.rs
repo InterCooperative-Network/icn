@@ -114,6 +114,19 @@ pub struct DiscoverQuery {
     pub capabilities: Option<String>,
 }
 
+/// Query parameters for service endpoint query API (Issue #936).
+#[derive(Debug, Deserialize)]
+pub struct QueryServicesParams {
+    /// Optional service ID to filter by
+    pub service_id: Option<String>,
+    /// Maximum scope level to query (defaults to "org")
+    #[serde(default = "default_scope")]
+    pub scope: String,
+    /// Minimum trust threshold (defaults to 0.0)
+    #[serde(default)]
+    pub min_trust: f64,
+}
+
 /// Response for service discovery.
 #[derive(Debug, Serialize)]
 pub struct DiscoverResponse {
@@ -367,6 +380,71 @@ pub async fn discover_services(
     }))
 }
 
+/// GET /services - Query service endpoints with flexible filtering (Issue #936)
+///
+/// Supports filtering by:
+/// - `service_id` (optional): filter to specific service
+/// - `scope`: maximum scope level (default: "org")
+/// - `min_trust`: minimum trust threshold (default: 0.0)
+///
+/// Returns endpoints sorted by:
+/// 1. Scope proximity (narrower scopes preferred)
+/// 2. Trust threshold (higher trust preferred)
+///
+/// Automatically excludes stale/expired endpoints.
+#[get("")]
+pub async fn query_services(
+    mgr: web::Data<Arc<ServiceDiscoveryManager>>,
+    query: web::Query<QueryServicesParams>,
+) -> crate::error::Result<HttpResponse> {
+    let scope = parse_scope(&query.scope);
+    let raw_min_trust = query.min_trust;
+
+    // Validate min_trust to catch obvious client bugs early.
+    // Trust scores are expected to be within [0.0, 1.0] and finite.
+    if !raw_min_trust.is_finite() || !(0.0..=1.0).contains(&raw_min_trust) {
+        return Ok(HttpResponse::BadRequest()
+            .body("invalid min_trust: must be a finite value between 0.0 and 1.0"));
+    }
+
+    let min_trust = raw_min_trust;
+
+    // Get all endpoints at the requested scope (already filters by scope and excludes stale)
+    let mut results = mgr.discover(scope, None, &[]).await;
+
+    // Apply service_id filter if specified
+    if let Some(ref service_id) = query.service_id {
+        results.retain(|ep| ep.service_id == *service_id);
+    }
+
+    // Apply trust threshold filter
+    results.retain(|ep| ep.trust_threshold >= min_trust);
+
+    // Sort by scope proximity (narrower first), then by trust threshold (descending)
+    results.sort_by(|a, b| {
+        // First compare by scope level (narrower is "smaller" and comes first)
+        let scope_cmp = a.scope_visibility.cmp(&b.scope_visibility);
+        if scope_cmp != std::cmp::Ordering::Equal {
+            return scope_cmp;
+        }
+        // Then by trust threshold (higher trust first, so reverse order)
+        // Note: NaN or otherwise invalid trust_threshold values (if present) are treated
+        // as equal here; partial_cmp may return None, and unwrap_or provides a safe fallback.
+        b.trust_threshold
+            .partial_cmp(&a.trust_threshold)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let response_endpoints: Vec<ServiceEndpointResponse> =
+        results.iter().map(to_response).collect();
+    let count = response_endpoints.len();
+
+    Ok(HttpResponse::Ok().json(DiscoverResponse {
+        endpoints: response_endpoints,
+        count,
+    }))
+}
+
 /// GET /services/{service_id} - Get a specific service
 #[get("/{service_id}")]
 pub async fn get_service(
@@ -387,12 +465,23 @@ pub async fn get_service(
 ///
 /// Routes:
 /// - `POST /announce` - Register a service
-/// - `GET /discover` - Discover services (must be registered before `{service_id}`)
+/// - `GET /discover` - Discover services (type-based: filters by service type name)
+/// - `GET /` - Query services with flexible filtering (preferred: filters by scope, trust, service_id)
 /// - `GET /{service_id}` - Get specific service
 /// - `DELETE /{service_id}` - Withdraw a service
+///
+/// **Usage Guidelines**:
+/// - Use `/discover` for type-based discovery by service type name (e.g., "ledger", "governance")
+/// - Use `/` (query API) when filtering by scope level, trust threshold, or service ID
 pub fn configure(cfg: &mut web::ServiceConfig) {
+    // Route registration order matters for actix-web:
+    // 1. `discover_services` ("/discover") - specific path, must come before root
+    // 2. `query_services` ("/") - root path
+    // 3. `get_service` ("/{service_id}") - path parameter, matches after specific paths
+    // 4. `withdraw_service` ("/{service_id}") - DELETE method, same pattern as get_service
     cfg.service(announce_service)
         .service(discover_services)
+        .service(query_services)
         .service(get_service)
         .service(withdraw_service);
 }
@@ -416,5 +505,33 @@ mod tests {
     fn test_default_scope_and_ttl() {
         assert_eq!(default_scope(), "org");
         assert_eq!(default_ttl(), 3600);
+    }
+
+    #[test]
+    fn test_query_services_params_defaults() {
+        // Test that default values work correctly for QueryServicesParams
+        let json = r#"{"service_id": "test-svc"}"#;
+        let params: QueryServicesParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.service_id, Some("test-svc".to_string()));
+        assert_eq!(params.scope, "org");
+        assert_eq!(params.min_trust, 0.0);
+    }
+
+    #[test]
+    fn test_query_services_params_custom() {
+        let json = r#"{"service_id": "test-svc", "scope": "federation", "min_trust": 0.5}"#;
+        let params: QueryServicesParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.service_id, Some("test-svc".to_string()));
+        assert_eq!(params.scope, "federation");
+        assert_eq!(params.min_trust, 0.5);
+    }
+
+    #[test]
+    fn test_query_services_params_no_service_id() {
+        let json = r#"{"scope": "cell", "min_trust": 0.3}"#;
+        let params: QueryServicesParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.service_id, None);
+        assert_eq!(params.scope, "cell");
+        assert_eq!(params.min_trust, 0.3);
     }
 }
