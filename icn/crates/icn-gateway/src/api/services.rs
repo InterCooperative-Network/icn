@@ -402,7 +402,7 @@ pub async fn query_services(
 
     // Validate min_trust to catch obvious client bugs early.
     // Trust scores are expected to be within [0.0, 1.0] and finite.
-    if !raw_min_trust.is_finite() || raw_min_trust < 0.0 || raw_min_trust > 1.0 {
+    if !raw_min_trust.is_finite() || !(0.0..=1.0).contains(&raw_min_trust) {
         return Ok(HttpResponse::BadRequest()
             .body("invalid min_trust: must be a finite value between 0.0 and 1.0"));
     }
@@ -476,7 +476,7 @@ pub async fn get_service(
 pub fn configure(cfg: &mut web::ServiceConfig) {
     // Route registration order matters for actix-web:
     // 1. `discover_services` ("/discover") - specific path, must come before root
-    // 2. `query_services` ("/") - root path 
+    // 2. `query_services` ("/") - root path
     // 3. `get_service` ("/{service_id}") - path parameter, matches after specific paths
     // 4. `withdraw_service` ("/{service_id}") - DELETE method, same pattern as get_service
     cfg.service(announce_service)
