@@ -2,6 +2,7 @@
 //!
 //! These tests assume a 3-node devnet is running via `make devnet-up`.
 //! Run with: `cargo test --test devnet_smoke -- --test-threads=1 --nocapture`
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use reqwest::Client;
 use std::time::Duration;
