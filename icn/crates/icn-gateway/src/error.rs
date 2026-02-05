@@ -104,10 +104,8 @@ impl ResponseError for GatewayError {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
             }
-            GatewayError::Kernel(kernel_err) => {
-                StatusCode::from_u16(kernel_err.http_status())
-                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
-            }
+            GatewayError::Kernel(kernel_err) => StatusCode::from_u16(kernel_err.http_status())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 
@@ -211,7 +209,10 @@ mod tests {
         let kernel_err = KernelError::new(ErrCode::Unauthorized, "missing DID");
         let gateway_err = GatewayError::from(kernel_err);
 
-        assert_eq!(gateway_err.status_code(), actix_web::http::StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            gateway_err.status_code(),
+            actix_web::http::StatusCode::UNAUTHORIZED
+        );
         assert_eq!(gateway_err.error_code(), Some("unauthorized"));
     }
 

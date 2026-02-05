@@ -169,7 +169,11 @@ mod tests {
 
         for (code, expected_json) in &codes {
             let json = serde_json::to_string(code).expect("serialize");
-            assert_eq!(&json, expected_json, "serialization mismatch for {:?}", code);
+            assert_eq!(
+                &json, expected_json,
+                "serialization mismatch for {:?}",
+                code
+            );
 
             let roundtrip: ErrCode = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(&roundtrip, code, "roundtrip mismatch for {:?}", code);
@@ -240,7 +244,11 @@ mod tests {
                 .expect("serialize")
                 .trim_matches('"')
                 .to_string();
-            assert_eq!(display, serde_str, "Display and serde mismatch for {:?}", code);
+            assert_eq!(
+                display, serde_str,
+                "Display and serde mismatch for {:?}",
+                code
+            );
         }
     }
 

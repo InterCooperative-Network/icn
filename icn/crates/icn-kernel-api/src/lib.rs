@@ -55,7 +55,6 @@ pub use authz::{
     Domain, PolicyContext, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
     PolicyRequestCore, RateLimit,
 };
-pub use error::{ErrCode, IcnError};
 pub use bootstrap::{
     BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,
     GenesisCapabilities, OracleRegistry,
@@ -63,6 +62,7 @@ pub use bootstrap::{
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, Job, Trigger};
 pub use coord::Coordination;
+pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{
