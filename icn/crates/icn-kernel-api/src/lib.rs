@@ -37,6 +37,7 @@ pub mod bootstrap;
 pub mod comms;
 pub mod compute;
 pub mod coord;
+pub mod error;
 pub mod events;
 pub mod identity;
 pub mod naming;
@@ -54,6 +55,7 @@ pub use authz::{
     Domain, PolicyContext, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
     PolicyRequestCore, RateLimit,
 };
+pub use error::{ErrCode, IcnError};
 pub use bootstrap::{
     BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,
     GenesisCapabilities, OracleRegistry,
