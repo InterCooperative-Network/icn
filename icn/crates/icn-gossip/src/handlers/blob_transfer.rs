@@ -1115,8 +1115,7 @@ mod tests {
         let sender = make_test_did();
         let blob_hash = [0xAA; 32];
 
-        let result =
-            actor.handle_blob_announce(&sender, blob_hash, sender.clone(), 4096);
+        let result = actor.handle_blob_announce(&sender, blob_hash, sender.clone(), 4096);
         assert!(result.is_ok());
 
         // Verify provider was recorded
@@ -1140,8 +1139,7 @@ mod tests {
         let blob_hash = [0xBB; 32];
 
         // peer_did doesn't match sender — should be rejected
-        let result =
-            actor.handle_blob_announce(&sender, blob_hash, impersonated, 4096);
+        let result = actor.handle_blob_announce(&sender, blob_hash, impersonated, 4096);
         assert!(result.is_ok());
 
         // Provider should NOT be recorded

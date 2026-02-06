@@ -286,10 +286,12 @@ pub fn verify_service_response(response: &ServiceDiscoveryMessage) -> Result<(),
                 .map_err(|e| format!("Cannot extract public key from responder DID: {e}"))?;
 
             // Check signature length
-            let sig_bytes: [u8; 64] = signature
-                .as_slice()
-                .try_into()
-                .map_err(|_| format!("Invalid signature length: expected 64, got {}", signature.len()))?;
+            let sig_bytes: [u8; 64] = signature.as_slice().try_into().map_err(|_| {
+                format!(
+                    "Invalid signature length: expected 64, got {}",
+                    signature.len()
+                )
+            })?;
             let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
 
             // Recompute canonical payload and verify
@@ -598,13 +600,18 @@ mod tests {
         let (signing_key, did) = make_keypair();
         let ep = make_endpoint(&did);
 
-        let mut response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
         sign_service_response(&mut response, &signing_key).expect("signing should succeed");
 
         // Signature should now be non-zero
         if let ServiceDiscoveryMessage::Response { ref signature, .. } = response {
             assert_eq!(signature.len(), 64);
-            assert_ne!(signature, &vec![0u8; 64], "signature should be non-trivial after signing");
+            assert_ne!(
+                signature,
+                &vec![0u8; 64],
+                "signature should be non-trivial after signing"
+            );
         }
 
         verify_service_response(&response).expect("verification should succeed");
@@ -619,7 +626,10 @@ mod tests {
         let response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
 
         let result = verify_service_response(&response);
-        assert!(result.is_err(), "unsigned response should fail verification");
+        assert!(
+            result.is_err(),
+            "unsigned response should fail verification"
+        );
     }
 
     #[test]
@@ -627,16 +637,23 @@ mod tests {
         let (signing_key, did) = make_keypair();
         let ep = make_endpoint(&did);
 
-        let mut response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
         sign_service_response(&mut response, &signing_key).expect("signing should succeed");
 
         // Tamper: change the query_id after signing
-        if let ServiceDiscoveryMessage::Response { ref mut query_id, .. } = response {
+        if let ServiceDiscoveryMessage::Response {
+            ref mut query_id, ..
+        } = response
+        {
             *query_id = "q-TAMPERED".to_string();
         }
 
         let result = verify_service_response(&response);
-        assert!(result.is_err(), "tampered response should fail verification");
+        assert!(
+            result.is_err(),
+            "tampered response should fail verification"
+        );
     }
 
     #[test]
@@ -646,11 +663,15 @@ mod tests {
         let ep = make_endpoint(&did_b);
 
         // Sign with key_a but set responder to did_b
-        let mut response = make_response("q-1", &did_b, vec![ep], ScopeLevel::Org, future_timestamp());
+        let mut response =
+            make_response("q-1", &did_b, vec![ep], ScopeLevel::Org, future_timestamp());
         sign_service_response(&mut response, &key_a).expect("signing should succeed");
 
         let result = verify_service_response(&response);
-        assert!(result.is_err(), "response signed with wrong key should fail verification");
+        assert!(
+            result.is_err(),
+            "response signed with wrong key should fail verification"
+        );
     }
 
     #[test]
@@ -673,11 +694,20 @@ mod tests {
         let ep = make_endpoint(&did);
 
         // Response scope (Federation) exceeds query scope (Org)
-        let mut response = make_response("q-1", &did, vec![ep], ScopeLevel::Federation, future_timestamp());
+        let mut response = make_response(
+            "q-1",
+            &did,
+            vec![ep],
+            ScopeLevel::Federation,
+            future_timestamp(),
+        );
         sign_service_response(&mut response, &signing_key).expect("signing should succeed");
 
         let valid = validate_service_response(&response, &ScopeLevel::Org);
-        assert!(!valid, "response with scope exceeding query scope should be rejected");
+        assert!(
+            !valid,
+            "response with scope exceeding query scope should be rejected"
+        );
     }
 
     #[test]
@@ -685,15 +715,22 @@ mod tests {
         let (signing_key, did) = make_keypair();
         let ep = make_endpoint(&did);
 
-        let mut response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
         sign_service_response(&mut response, &signing_key).expect("signing should succeed");
 
         // Query scope (Federation) includes response scope (Org) -- should pass
         let valid = validate_service_response(&response, &ScopeLevel::Federation);
-        assert!(valid, "valid signed response within scope should pass validation");
+        assert!(
+            valid,
+            "valid signed response within scope should pass validation"
+        );
 
         // Query scope (Org) equals response scope (Org) -- should also pass
         let valid = validate_service_response(&response, &ScopeLevel::Org);
-        assert!(valid, "valid signed response at exact scope should pass validation");
+        assert!(
+            valid,
+            "valid signed response at exact scope should pass validation"
+        );
     }
 }

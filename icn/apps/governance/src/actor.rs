@@ -470,9 +470,7 @@ impl GovernanceHandle {
                     | TreasuryProposalOperation::ReclaimBudget { .. } => Some("treasury_budget"),
                     TreasuryProposalOperation::Withdraw { .. }
                     | TreasuryProposalOperation::TransferBetweenBudgets { .. }
-                    | TreasuryProposalOperation::Spend { .. } => {
-                        Some("treasury_withdrawal")
-                    }
+                    | TreasuryProposalOperation::Spend { .. } => Some("treasury_withdrawal"),
                     TreasuryProposalOperation::ModifySpendingRule { .. } => Some("treasury_rule"),
                 }
             }
@@ -1069,9 +1067,7 @@ impl GovernanceActor {
                     | TreasuryProposalOperation::ReclaimBudget { .. } => Some("treasury_budget"),
                     TreasuryProposalOperation::Withdraw { .. }
                     | TreasuryProposalOperation::TransferBetweenBudgets { .. }
-                    | TreasuryProposalOperation::Spend { .. } => {
-                        Some("treasury_withdrawal")
-                    }
+                    | TreasuryProposalOperation::Spend { .. } => Some("treasury_withdrawal"),
                     TreasuryProposalOperation::ModifySpendingRule { .. } => Some("treasury_rule"),
                 }
             }

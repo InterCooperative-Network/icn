@@ -432,14 +432,20 @@ pub async fn discover_services(
     // If remote was requested and timed out with no results at all → Busy
     if query.remote && remote_timed_out && results.is_empty() {
         return Err(crate::error::GatewayError::Kernel(
-            icn_kernel_api::IcnError::new(icn_kernel_api::ErrCode::Busy, "Remote discovery timed out"),
+            icn_kernel_api::IcnError::new(
+                icn_kernel_api::ErrCode::Busy,
+                "Remote discovery timed out",
+            ),
         ));
     }
 
     // If no results at all → NotFound
     if results.is_empty() {
         return Err(crate::error::GatewayError::Kernel(
-            icn_kernel_api::IcnError::new(icn_kernel_api::ErrCode::NotFound, "No matching services found"),
+            icn_kernel_api::IcnError::new(
+                icn_kernel_api::ErrCode::NotFound,
+                "No matching services found",
+            ),
         ));
     }
 
@@ -450,16 +456,8 @@ pub async fn discover_services(
     Ok(HttpResponse::Ok().json(DiscoverResponse {
         endpoints: response_endpoints,
         count,
-        remote: if remote_included {
-            Some(true)
-        } else {
-            None
-        },
-        remote_timeout: if remote_timed_out {
-            Some(true)
-        } else {
-            None
-        },
+        remote: if remote_included { Some(true) } else { None },
+        remote_timeout: if remote_timed_out { Some(true) } else { None },
     }))
 }
 

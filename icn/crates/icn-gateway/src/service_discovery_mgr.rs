@@ -125,14 +125,9 @@ impl ServiceDiscoveryManager {
             icn_gossip::AccessControl::Public,
         );
         gossip.create_topic(topic);
-        gossip
-            .subscribe(query_topic, own_did)
-            .await
-            .map_err(|e| {
-                NamingError::Internal(format!(
-                    "Failed to subscribe to gossip query topic: {e}"
-                ))
-            })?;
+        gossip.subscribe(query_topic, own_did).await.map_err(|e| {
+            NamingError::Internal(format!("Failed to subscribe to gossip query topic: {e}"))
+        })?;
 
         info!(
             "ServiceDiscoveryManager subscribed to gossip topics: {}, {}",
@@ -237,12 +232,10 @@ impl ServiceDiscoveryManager {
         // Build and publish query
         let query_msg = icn_gossip::ServiceDiscoveryMessage::Query {
             requester: own_did.clone(),
-            service_type: service_type
-                .cloned()
-                .unwrap_or_else(|| ServiceType {
-                    name: "*".to_string(),
-                    version: String::new(),
-                }),
+            service_type: service_type.cloned().unwrap_or_else(|| ServiceType {
+                name: "*".to_string(),
+                version: String::new(),
+            }),
             max_scope: scope,
             required_capabilities: required_capabilities.to_vec(),
             query_id: query_id.clone(),
@@ -255,9 +248,10 @@ impl ServiceDiscoveryManager {
         {
             let topic = icn_gossip::service_discovery_topics::SERVICES_QUERY;
             let mut gossip = gossip_handle.write().await;
-            gossip.publish(topic, encoded).await.map_err(|e| {
-                NamingError::Internal(format!("Failed to publish query: {e}"))
-            })?;
+            gossip
+                .publish(topic, encoded)
+                .await
+                .map_err(|e| NamingError::Internal(format!("Failed to publish query: {e}")))?;
         }
 
         debug!(query_id = %query_id, "Published remote discovery query");
@@ -464,9 +458,7 @@ impl ServiceDiscoveryManager {
                     scope: max_scope,
                 };
 
-                if let Err(e) =
-                    icn_gossip::sign_service_response(&mut response, &signing_key)
-                {
+                if let Err(e) = icn_gossip::sign_service_response(&mut response, &signing_key) {
                     warn!(query_id = %query_id, error = %e, "Failed to sign response");
                     return Err(format!("Failed to sign response: {e}"));
                 }
@@ -1111,9 +1103,7 @@ mod tests {
     async fn test_discover_remote_without_gossip_returns_error() {
         let mgr = ServiceDiscoveryManager::new();
 
-        let result = mgr
-            .discover_remote(ScopeLevel::Org, None, &[], None)
-            .await;
+        let result = mgr.discover_remote(ScopeLevel::Org, None, &[], None).await;
 
         assert!(result.is_err());
         match result {
@@ -1188,12 +1178,7 @@ mod tests {
 
         // Without a signing key, should succeed but not generate a response
         let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
-            registry,
-            None,
-            None,
-            None,
-            None,
-            entry,
+            registry, None, None, None, None, entry,
         )
         .await;
 
@@ -1231,12 +1216,7 @@ mod tests {
         let entry = make_gossip_entry(kp.did().clone(), encoded, "services:query");
 
         let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
-            registry,
-            None,
-            None,
-            None,
-            None,
-            entry,
+            registry, None, None, None, None, entry,
         )
         .await;
 
