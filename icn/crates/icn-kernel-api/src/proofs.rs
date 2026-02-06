@@ -77,11 +77,19 @@ impl ArtifactReceipt {
         }
     }
 
+    /// Domain separation tag for receipt hashes.
+    ///
+    /// Prevents cross-protocol hash collisions if the same field layout is
+    /// reused in another proof type.
+    pub const DOMAIN_TAG: &[u8] = b"icn:artifact-receipt:v1";
+
     /// Compute the binding hash from the significant fields.
     ///
     /// This is a pure function used by `new()` and `verify_binding()`.
     /// Variable-length fields are length-prefixed (u64 LE) to prevent
     /// collision attacks from redistributing bytes between adjacent fields.
+    /// The domain separation tag is hashed first to prevent cross-protocol
+    /// collisions.
     pub fn compute_receipt_hash(
         request_id: &[u8; 32],
         blob_hash: &Hash,
@@ -90,6 +98,8 @@ impl ArtifactReceipt {
         scope_id: &str,
     ) -> Hash {
         let mut hasher = blake3::Hasher::new();
+        // Domain separation: prevents hash collisions with other proof types
+        hasher.update(Self::DOMAIN_TAG);
         // Fixed-length fields: no prefix needed
         hasher.update(request_id);
         hasher.update(blob_hash);
@@ -186,6 +196,28 @@ mod tests {
     fn signature_starts_empty() {
         let receipt = make_receipt();
         assert!(receipt.signature.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn domain_tag_is_part_of_hash() {
+        // Compute the receipt hash the normal way (with domain tag)
+        let receipt = make_receipt();
+        let with_tag = receipt.receipt_hash;
+
+        // Compute manually without domain tag — must differ
+        let mut hasher = blake3::Hasher::new();
+        // Deliberately omit: hasher.update(ArtifactReceipt::DOMAIN_TAG);
+        hasher.update(&receipt.request_id);
+        hasher.update(&receipt.blob_hash);
+        hasher.update(&(receipt.requester_did.len() as u64).to_le_bytes());
+        hasher.update(receipt.requester_did.as_bytes());
+        hasher.update(&(receipt.provider_did.len() as u64).to_le_bytes());
+        hasher.update(receipt.provider_did.as_bytes());
+        hasher.update(&(receipt.scope_id.len() as u64).to_le_bytes());
+        hasher.update(receipt.scope_id.as_bytes());
+        let without_tag: Hash = *hasher.finalize().as_bytes();
+
+        assert_ne!(with_tag, without_tag, "domain tag must affect hash output");
     }
 
     #[test]
