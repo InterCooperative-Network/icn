@@ -554,6 +554,24 @@ impl Cooperative {
         Ok((did, kp))
     }
 
+    /// Sign data with a treasury keypair.
+    ///
+    /// This is a **static** method that requires the caller to provide the
+    /// keypair explicitly.  The `Cooperative` struct never stores key material
+    /// -- only the DID string.  In production the keypair lives in the
+    /// Age-encrypted keystore and is loaded by the governance executor at the
+    /// time of signing.
+    ///
+    /// # Arguments
+    /// * `keypair` - Treasury keypair (loaded from keystore by governance executor)
+    /// * `data`    - Bytes to sign
+    ///
+    /// # Returns
+    /// Ed25519 signature bytes.
+    pub fn treasury_sign(keypair: &icn_identity::KeyPair, data: &[u8]) -> Vec<u8> {
+        keypair.sign(data).to_bytes().to_vec()
+    }
+
     /// Assign a treasury DID to this cooperative.
     ///
     /// Returns `Err` if the cooperative already has a treasury DID assigned,
@@ -893,5 +911,91 @@ mod tests {
 
         assert_eq!(did1, did2, "Same seed bytes must produce same DID");
         assert!(did1.starts_with("did:icn:"));
+    }
+
+    // === Treasury Key Custody Enforcement (Issue #1087) ===
+
+    #[test]
+    fn test_cooperative_struct_never_holds_keypair() {
+        // The Cooperative struct stores only the DID string, never the keypair.
+        // This test confirms the treasury_did field is a plain String option.
+        let mut coop = Cooperative::new("Custody Test".to_string(), CoopType::Worker);
+        let (did, _kp) = Cooperative::generate_treasury_did().expect("keygen");
+
+        coop.assign_treasury(did.clone()).expect("assign");
+        assert_eq!(coop.treasury_did, Some(did));
+
+        // Serialize and verify no key material leaks into JSON
+        let json = serde_json::to_string(&coop).expect("serialize");
+        // treasury_did should appear, but no private/secret key fields
+        assert!(json.contains("treasury_did"));
+        assert!(
+            !json.contains("secret"),
+            "Serialized Cooperative must not contain secret key material"
+        );
+        assert!(
+            !json.contains("signing_key"),
+            "Serialized Cooperative must not contain signing key"
+        );
+        assert!(
+            !json.contains("private_key"),
+            "Serialized Cooperative must not contain private key"
+        );
+    }
+
+    #[test]
+    fn test_treasury_sign_requires_explicit_keypair() {
+        // treasury_sign is static -- it takes a keypair reference, not &self.
+        // This enforces that the keypair must be provided by the governance executor.
+        let (_did, kp) = Cooperative::generate_treasury_did().expect("keygen");
+        let data = b"treasury disbursement approved by governance vote";
+
+        let sig = Cooperative::treasury_sign(&kp, data);
+        assert_eq!(sig.len(), 64, "Ed25519 signatures are 64 bytes");
+
+        // Verify the signature is valid
+        let signature =
+            ed25519_dalek::Signature::from_bytes(sig.as_slice().try_into().expect("64 bytes"));
+        use ed25519_dalek::Verifier;
+        kp.verifying_key()
+            .verify(data, &signature)
+            .expect("Signature must verify against the keypair that produced it");
+    }
+
+    #[test]
+    fn test_treasury_sign_different_keypair_fails_verify() {
+        // Signing with one keypair must not verify under a different keypair.
+        let (_did1, kp1) = Cooperative::generate_treasury_did().expect("keygen 1");
+        let (_did2, kp2) = Cooperative::generate_treasury_did().expect("keygen 2");
+
+        let data = b"payment of 500 hours";
+        let sig = Cooperative::treasury_sign(&kp1, data);
+
+        let signature =
+            ed25519_dalek::Signature::from_bytes(sig.as_slice().try_into().expect("64 bytes"));
+        use ed25519_dalek::Verifier;
+        let result = kp2.verifying_key().verify(data, &signature);
+        assert!(
+            result.is_err(),
+            "Signature from kp1 must not verify under kp2"
+        );
+    }
+
+    #[test]
+    fn test_generate_treasury_did_returns_keypair_to_caller() {
+        // generate_treasury_did returns (did_string, KeyPair) so the caller
+        // can persist the keypair.  The Cooperative struct only stores the DID.
+        let (did, kp) = Cooperative::generate_treasury_did().expect("keygen");
+
+        // DID matches keypair
+        assert_eq!(kp.did().to_string(), did);
+
+        // A new Cooperative does NOT have the keypair
+        let mut coop = Cooperative::new("Return Test".to_string(), CoopType::Consumer);
+        coop.assign_treasury(did.clone()).expect("assign");
+
+        // The cooperative only has the string, not the keypair
+        assert_eq!(coop.treasury_did, Some(did));
+        // There is no method on Cooperative to retrieve a keypair
     }
 }
