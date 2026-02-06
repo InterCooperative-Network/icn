@@ -148,3 +148,5 @@ unwrap_used = "warn"
 expect_used = "warn"
 # Allow in tests
 unwrap_in_result = "allow"
+# Allow non-inlined format args (many pre-existing instances across workspace)
+uninlined_format_args = "allow"

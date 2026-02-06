@@ -827,10 +827,8 @@ impl DidKeySnapshot {
             } => {
                 anyhow::bail!(
                     "Cannot restore hardware key automatically. Hardware key requires \
-                     backend reconnection. Backend type: {}, Hardware ID: {}. \
-                     Use restore_hardware_key() with an appropriate hardware backend.",
-                    backend_type,
-                    hardware_id
+                     backend reconnection. Backend type: {backend_type}, Hardware ID: {hardware_id}. \
+                     Use restore_hardware_key() with an appropriate hardware backend."
                 )
             }
         }
