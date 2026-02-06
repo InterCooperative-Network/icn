@@ -15,6 +15,7 @@
 
 pub mod blob_nonce_guard;
 pub mod blob_transfer;
+pub mod blob_transfer_state;
 mod bloom;
 mod dispatch;
 mod partition;
