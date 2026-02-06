@@ -113,7 +113,8 @@ impl GovernanceConfig {
                 ),
 
                 TreasuryProposalOperation::Withdraw { .. }
-                | TreasuryProposalOperation::TransferBetweenBudgets { .. } => {
+                | TreasuryProposalOperation::TransferBetweenBudgets { .. }
+                | TreasuryProposalOperation::Spend { .. } => {
                     ProposalThresholds::new(
                         self.emergency.treasury_withdrawal_quorum_percentage,
                         self.emergency.treasury_withdrawal_approval_percentage,
