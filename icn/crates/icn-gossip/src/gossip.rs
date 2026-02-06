@@ -154,6 +154,10 @@ pub struct GossipActor {
     /// Blob transfer session manager (PR2c #1070)
     pub(crate) transfer_manager:
         Option<std::sync::Mutex<crate::handlers::blob_transfer_state::TransferSessionManager>>,
+
+    /// Provider registry for blob transfer protocol (PR2d #1071)
+    /// Tracks which peers announced availability for which blob hashes
+    pub(crate) provider_registry: crate::handlers::provider_registry::ProviderRegistry,
 }
 
 impl GossipActor {
@@ -187,6 +191,7 @@ impl GossipActor {
             blob_nonce_guard: crate::handlers::blob_nonce_guard::BlobNonceGuard::default_config(), // PR2b: Blob replay protection
             blob_store: None,       // PR2c: Set via set_blob_store()
             transfer_manager: None, // PR2c: Set via set_transfer_manager()
+            provider_registry: crate::handlers::provider_registry::ProviderRegistry::new(), // PR2d: Provider selection
         };
 
         // Create default topics with appropriate scopes

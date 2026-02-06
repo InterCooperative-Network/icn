@@ -10,29 +10,6 @@ use icn_identity::Did;
 use tracing::{debug, info, warn};
 
 impl GossipActor {
-    /// Handle a BlobAnnounce message - announcement of a binary blob
-    ///
-    /// BlobAnnounce is forwarded through gossip but handled by NetworkActor/BlobLocationRegistry.
-    pub(crate) fn handle_blob_announce(
-        &mut self,
-        _sender: &Did,
-        blob_hash: ContentHash,
-        peer_did: Did,
-        size_bytes: u64,
-    ) -> Result<()> {
-        debug!(
-            peer_did = %peer_did,
-            blob_hash = %hex::encode(blob_hash),
-            size_bytes = size_bytes,
-            message_type = "BlobAnnounce",
-            "Received blob announcement"
-        );
-
-        // BlobAnnounce is handled by the NetworkActor/BlobLocationRegistry
-        // This message type is just forwarded through gossip, not stored
-        Ok(())
-    }
-
     /// Handle a ReplicaRequest message - request to find replicas for content
     ///
     /// Checks if we have the requested content. If so, responds with a

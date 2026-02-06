@@ -85,6 +85,58 @@ impl Drop for AssemblyGuard<'_> {
 }
 
 impl GossipActor {
+    /// Handle a BlobAnnounce message — records the announcing peer in the provider registry.
+    ///
+    /// # Validation
+    /// - Sender must match the announced peer_did (envelope authenticity)
+    /// - Size must not exceed MAX_BLOB_SIZE
+    ///
+    /// Announcements are hints, not authoritative. The requester always validates
+    /// the actual blob after transfer.
+    pub(crate) fn handle_blob_announce(
+        &mut self,
+        sender: &Did,
+        blob_hash: ContentHash,
+        peer_did: Did,
+        size_bytes: u64,
+    ) -> Result<()> {
+        debug!(
+            sender = %sender,
+            peer_did = %peer_did,
+            blob_hash = %hex::encode(blob_hash),
+            size_bytes = size_bytes,
+            message_type = "BlobAnnounce",
+            "Received blob announcement"
+        );
+
+        // Validate: peer_did must match sender (envelope.from)
+        if *sender != peer_did {
+            warn!(
+                sender = %sender,
+                claimed_peer = %peer_did,
+                "BlobAnnounce peer_did does not match envelope sender, rejecting"
+            );
+            return Ok(());
+        }
+
+        // Validate: announced size within limit
+        if size_bytes > MAX_BLOB_SIZE {
+            warn!(
+                sender = %sender,
+                size_bytes = size_bytes,
+                max = MAX_BLOB_SIZE,
+                "BlobAnnounce size exceeds max blob size, rejecting"
+            );
+            return Ok(());
+        }
+
+        // Record in provider registry for later selection
+        self.provider_registry
+            .record_announcement(blob_hash, peer_did, size_bytes);
+
+        Ok(())
+    }
+
     /// Handle an incoming BlobRequest message (provider side).
     ///
     /// After validation (replay, expiry, sender match), looks up the blob
@@ -1047,5 +1099,75 @@ mod tests {
 
         // Handler returns Ok but the chunk is dropped internally
         assert!(result.is_ok());
+    }
+
+    // --- BlobAnnounce handler tests (PR2d #1071) ---
+
+    #[test]
+    fn blob_announce_records_in_provider_registry() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let blob_hash = [0xAA; 32];
+
+        let result =
+            actor.handle_blob_announce(&sender, blob_hash, sender.clone(), 4096);
+        assert!(result.is_ok());
+
+        // Verify provider was recorded
+        let providers = actor.provider_registry.list_providers(&blob_hash);
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].did, sender);
+        assert_eq!(providers[0].size_bytes, 4096);
+    }
+
+    #[test]
+    fn blob_announce_rejects_mismatched_sender() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let impersonated = make_test_did();
+        let blob_hash = [0xBB; 32];
+
+        // peer_did doesn't match sender — should be rejected
+        let result =
+            actor.handle_blob_announce(&sender, blob_hash, impersonated, 4096);
+        assert!(result.is_ok());
+
+        // Provider should NOT be recorded
+        let providers = actor.provider_registry.list_providers(&blob_hash);
+        assert_eq!(providers.len(), 0, "mismatched sender must not be recorded");
+    }
+
+    #[test]
+    fn blob_announce_rejects_oversize() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let blob_hash = [0xCC; 32];
+
+        // Size exceeds MAX_BLOB_SIZE
+        let result =
+            actor.handle_blob_announce(&sender, blob_hash, sender.clone(), MAX_BLOB_SIZE + 1);
+        assert!(result.is_ok());
+
+        // Provider should NOT be recorded
+        let providers = actor.provider_registry.list_providers(&blob_hash);
+        assert_eq!(providers.len(), 0, "oversize announce must not be recorded");
     }
 }
