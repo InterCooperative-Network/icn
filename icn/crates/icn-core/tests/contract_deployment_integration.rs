@@ -176,6 +176,10 @@ impl TestNode {
                             icn_gossip::GossipMessage::StorageContentNotFoundMsg { .. } => {
                                 "StorageContentNotFoundMsg"
                             }
+                            icn_gossip::GossipMessage::BlobRequest { .. } => "BlobRequest",
+                            icn_gossip::GossipMessage::BlobTransferChunk { .. } => {
+                                "BlobTransferChunk"
+                            }
                         };
 
                         let result = if let Some(target_did) = recipient {
