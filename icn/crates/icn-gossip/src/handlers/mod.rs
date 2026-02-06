@@ -10,7 +10,9 @@
 //! - `replica`: ReplicaRequest, ReplicaOffer, ReplicaStatus (Phase 17)
 //! - `partition`: PartitionHealRequest, PartitionHealResponse (Phase 18)
 //! - `storage_challenge`: StorageChallengeMsg, StorageProofMsg (proof-of-storage)
+//! - `blob_transfer`: BlobRequest, BlobTransferChunk (Pilot blob protocol)
 
+pub mod blob_transfer;
 mod bloom;
 mod dispatch;
 mod partition;
