@@ -143,6 +143,10 @@ pub struct GossipActor {
     /// Key rotation cache for tracking rotated DIDs during grace period (Issue #469)
     /// Used to accept messages signed with old keys during the transition period
     key_rotation_cache: crate::key_rotation::KeyRotationCache,
+
+    /// Blob transfer nonce guard for replay protection (PR2b #1069)
+    /// Prevents duplicate processing of BlobRequest and BlobTransferChunk messages
+    pub(crate) blob_nonce_guard: crate::handlers::blob_nonce_guard::BlobNonceGuard,
 }
 
 impl GossipActor {
@@ -173,6 +177,7 @@ impl GossipActor {
             adaptive_fanout_config: crate::types::AdaptiveFanoutConfig::default(), // M2 #484: Adaptive fanout
             topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy::default(), // Issue #473: Strict defaults
             key_rotation_cache: crate::key_rotation::KeyRotationCache::new(), // Issue #469: Key rotation tracking
+            blob_nonce_guard: crate::handlers::blob_nonce_guard::BlobNonceGuard::default_config(), // PR2b: Blob replay protection
         };
 
         // Create default topics with appropriate scopes

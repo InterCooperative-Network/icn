@@ -11,7 +11,9 @@
 //! - `partition`: PartitionHealRequest, PartitionHealResponse (Phase 18)
 //! - `storage_challenge`: StorageChallengeMsg, StorageProofMsg (proof-of-storage)
 //! - `blob_transfer`: BlobRequest, BlobTransferChunk (Pilot blob protocol)
+//! - `blob_nonce_guard`: Per-peer nonce deduplication for blob messages
 
+pub mod blob_nonce_guard;
 pub mod blob_transfer;
 mod bloom;
 mod dispatch;

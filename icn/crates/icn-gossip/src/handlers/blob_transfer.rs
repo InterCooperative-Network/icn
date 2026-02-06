@@ -8,9 +8,10 @@
 //!
 //! All blob transfer messages MUST be wrapped in SignedEnvelope.
 //! The dispatch layer verifies signatures before reaching these handlers.
-//! Replay protection is handled by ReplayGuard (PR2b).
+//! Replay protection is handled by BlobNonceGuard (PR2b #1069).
 
 use crate::gossip::GossipActor;
+use crate::handlers::blob_nonce_guard::composite_chunk_nonce;
 use crate::types::ContentHash;
 use anyhow::Result;
 use icn_identity::Did;
@@ -62,6 +63,16 @@ impl GossipActor {
             message_type = "BlobRequest",
             "Received blob request"
         );
+
+        // Replay check: reject duplicate request_id from same sender
+        if let Err(e) = self.blob_nonce_guard.check_and_record(sender, request_id) {
+            warn!(
+                sender = %sender,
+                request_id = %hex::encode(request_id),
+                "BlobRequest replay rejected: {e}"
+            );
+            return Ok(());
+        }
 
         // Validate: requester_did must match sender (envelope.from)
         if *sender != requester_did {
@@ -121,6 +132,18 @@ impl GossipActor {
             message_type = "BlobTransferChunk",
             "Received blob transfer chunk"
         );
+
+        // Replay check: reject duplicate (request_id, chunk_index) from same sender
+        let chunk_nonce = composite_chunk_nonce(&request_id, chunk_index);
+        if let Err(e) = self.blob_nonce_guard.check_and_record(sender, chunk_nonce) {
+            warn!(
+                sender = %sender,
+                request_id = %hex::encode(request_id),
+                chunk_index = chunk_index,
+                "BlobTransferChunk replay rejected: {e}"
+            );
+            return Ok(());
+        }
 
         // Validate: chunk data size
         if data.len() > MAX_CHUNK_SIZE {
@@ -454,5 +477,121 @@ mod tests {
             .handle_blob_transfer_chunk(&sender, [1u8; 32], [2u8; 32], 0, 1, wrong_hash, 100, data);
 
         assert!(result.is_ok());
+    }
+
+    // --- Replay protection tests (PR2b) ---
+
+    #[test]
+    fn blob_request_handler_rejects_duplicate_request() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let request_id = [0x11; 32];
+
+        // First request: accepted
+        let r1 =
+            actor.handle_blob_request(&sender, request_id, [0xAA; 32], sender.clone(), u64::MAX);
+        assert!(r1.is_ok());
+
+        // Same request_id from same sender: silently rejected (replay)
+        let r2 =
+            actor.handle_blob_request(&sender, request_id, [0xAA; 32], sender.clone(), u64::MAX);
+        assert!(r2.is_ok()); // Returns Ok but logs warning and short-circuits
+
+        // Verify nonce was tracked
+        assert_eq!(actor.blob_nonce_guard.nonce_count(&sender), 1);
+    }
+
+    #[test]
+    fn blob_request_handler_allows_different_requests() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+
+        // Two different request_ids: both accepted
+        let r1 =
+            actor.handle_blob_request(&sender, [0x11; 32], [0xAA; 32], sender.clone(), u64::MAX);
+        assert!(r1.is_ok());
+
+        let r2 =
+            actor.handle_blob_request(&sender, [0x22; 32], [0xBB; 32], sender.clone(), u64::MAX);
+        assert!(r2.is_ok());
+
+        assert_eq!(actor.blob_nonce_guard.nonce_count(&sender), 2);
+    }
+
+    #[test]
+    fn blob_chunk_handler_rejects_duplicate_chunk() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let data = vec![0x42u8; 100];
+        let hash = *blake3::hash(&data).as_bytes();
+
+        // First chunk: accepted
+        let r1 = actor.handle_blob_transfer_chunk(
+            &sender,
+            [0x11; 32],
+            [0xAA; 32],
+            0,
+            5,
+            hash,
+            500,
+            data.clone(),
+        );
+        assert!(r1.is_ok());
+
+        // Same (request_id, chunk_index) from same sender: silently rejected
+        let r2 = actor
+            .handle_blob_transfer_chunk(&sender, [0x11; 32], [0xAA; 32], 0, 5, hash, 500, data);
+        assert!(r2.is_ok()); // Returns Ok but logs warning
+        assert_eq!(actor.blob_nonce_guard.nonce_count(&sender), 1);
+    }
+
+    #[test]
+    fn blob_chunk_handler_allows_different_chunks_same_request() {
+        use crate::GossipActor;
+
+        let mut actor = {
+            let kp = KeyPair::generate().unwrap();
+            GossipActor::new(kp.did().clone(), None)
+        };
+
+        let sender = make_test_did();
+        let data = vec![0x42u8; 100];
+        let hash = *blake3::hash(&data).as_bytes();
+
+        // Chunk 0 and chunk 1 of same request: both accepted
+        let r1 = actor.handle_blob_transfer_chunk(
+            &sender,
+            [0x11; 32],
+            [0xAA; 32],
+            0,
+            5,
+            hash,
+            500,
+            data.clone(),
+        );
+        assert!(r1.is_ok());
+
+        let r2 = actor
+            .handle_blob_transfer_chunk(&sender, [0x11; 32], [0xAA; 32], 1, 5, hash, 500, data);
+        assert!(r2.is_ok());
+        assert_eq!(actor.blob_nonce_guard.nonce_count(&sender), 2);
     }
 }
