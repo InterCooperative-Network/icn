@@ -811,6 +811,14 @@ pub enum TreasuryProposalOperation {
         recipient: Did,
         /// Human-readable description of the spend (must be non-empty)
         memo: String,
+        /// Expected treasury nonce at execution time.
+        ///
+        /// The nonce is checked atomically before the ledger transfer.
+        /// If the stored nonce does not match, the spend is rejected as
+        /// a replay / double-spend attempt. Defaults to 0 for backward
+        /// compatibility with proposals created before nonce support.
+        #[serde(default)]
+        nonce: u64,
     },
 }
 
@@ -2325,6 +2333,7 @@ mod tests {
             amount: 5000,
             recipient: recipient.clone(),
             memo: "Office supplies reimbursement".to_string(),
+            nonce: 0,
         };
 
         let json = serde_json::to_string(&operation).unwrap();
@@ -2335,10 +2344,12 @@ mod tests {
                 amount,
                 recipient: r,
                 memo,
+                nonce,
             } => {
                 assert_eq!(amount, 5000);
                 assert_eq!(r, recipient);
                 assert_eq!(memo, "Office supplies reimbursement");
+                assert_eq!(nonce, 0);
             }
             other => panic!("Expected Spend, got {:?}", other),
         }
@@ -2361,6 +2372,7 @@ mod tests {
                     amount: 2500,
                     recipient: recipient.clone(),
                     memo: "Garden tools and seeds".to_string(),
+                    nonce: 0,
                 },
             },
         );
@@ -2385,6 +2397,7 @@ mod tests {
             amount: 0,
             recipient,
             memo: "Should be rejected by handler".to_string(),
+            nonce: 0,
         };
 
         // Serialization still works -- the handler is responsible for rejection.
@@ -2401,6 +2414,7 @@ mod tests {
             amount: 100,
             recipient,
             memo: String::new(),
+            nonce: 0,
         };
 
         let json = serde_json::to_string(&operation).unwrap();
@@ -2424,6 +2438,7 @@ mod tests {
                     amount: 15000,
                     recipient,
                     memo: "Roof repair after storm damage".to_string(),
+                    nonce: 0,
                 },
             },
         );

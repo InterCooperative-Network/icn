@@ -230,8 +230,9 @@ impl super::GovernanceEventHandler {
                 amount,
                 recipient,
                 memo,
+                nonce,
             } => {
-                self.handle_treasury_spend(proposal_id, amount, recipient, memo, decided_at);
+                self.handle_treasury_spend(proposal_id, amount, recipient, memo, nonce, decided_at);
             }
         }
     }
@@ -1551,15 +1552,19 @@ impl super::GovernanceEventHandler {
 
     /// Handle a direct treasury spend
     ///
-    /// Validates amount, recipient, and memo before resolving the treasury
-    /// currency and delegating to the budget proposal handler for the actual
-    /// ledger transfer.
+    /// Validates amount, recipient, memo, and treasury nonce before resolving
+    /// the treasury currency and performing the actual ledger transfer.
+    ///
+    /// The nonce is checked atomically via `CoopStore::check_and_increment_treasury_nonce`
+    /// before the ledger transfer to prevent double-spend from concurrent
+    /// proposal execution.
     fn handle_treasury_spend(
         &self,
         proposal_id: ProposalId,
         amount: i64,
         recipient: Did,
         memo: String,
+        nonce: u64,
         decided_at: u64,
     ) {
         info!(
@@ -1637,9 +1642,50 @@ impl super::GovernanceEventHandler {
         let proposal_id_clone = proposal_id.clone();
         let recipient_clone = recipient.clone();
         let memo_clone = memo.clone();
+        let coop_store = self.coop_store.clone();
 
         tokio::spawn(async move {
             use icn_ledger::treasury::TreasuryOperation;
+
+            // --- Treasury nonce check (double-spend guard) ---
+            //
+            // The nonce is checked and incremented atomically in a sled
+            // transaction BEFORE the ledger transfer.  If the nonce does not
+            // match the expected value, the spend is rejected.
+            if let Some(ref cs) = coop_store {
+                let treasury_id = treasury_did.to_string();
+                if let Err(e) = cs.check_and_increment_treasury_nonce(&treasury_id, nonce) {
+                    error!(
+                        "❌ Treasury nonce check failed for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:spend:nonce:{}", proposal_id_clone.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id_clone.0,
+                            "error": "nonce_mismatch",
+                            "expected_nonce": nonce,
+                            "treasury_did": treasury_id,
+                        }),
+                        e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    return;
+                }
+                debug!(
+                    "Treasury nonce {} accepted for spend proposal {}",
+                    nonce, proposal_id_clone.0
+                );
+            } else {
+                warn!(
+                    "⚠️ No CoopStore configured; skipping nonce check for spend proposal {}",
+                    proposal_id_clone.0
+                );
+            }
 
             // Resolve currency from the treasury configuration
             let currency = {

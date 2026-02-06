@@ -306,6 +306,17 @@ pub struct Cooperative {
     /// `None` only for cooperatives created before treasury support was added.
     #[serde(default)]
     pub treasury_did: Option<String>,
+
+    /// Monotonically increasing nonce for treasury spend operations.
+    ///
+    /// Every treasury spend proposal carries an expected nonce value. Before
+    /// executing the ledger transfer the system atomically checks that the
+    /// stored nonce matches the proposal's nonce and increments it. This
+    /// prevents double-spend from concurrent proposal execution.
+    ///
+    /// Initialized to 0 on cooperative creation. Never resets.
+    #[serde(default)]
+    pub treasury_nonce: u64,
 }
 
 fn default_min_founders() -> usize {
@@ -453,6 +464,7 @@ impl Cooperative {
             dissolution_plan: None,
             dissolution_proposal_id: None,
             treasury_did: None,
+            treasury_nonce: 0,
         }
     }
 
@@ -498,6 +510,7 @@ impl Cooperative {
             dissolution_plan: None,
             dissolution_proposal_id: None,
             treasury_did: None,
+            treasury_nonce: 0,
         }
     }
 
@@ -979,6 +992,59 @@ mod tests {
             result.is_err(),
             "Signature from kp1 must not verify under kp2"
         );
+    }
+
+    // === Treasury nonce field tests (Issue #1089) ===
+
+    #[test]
+    fn test_treasury_nonce_default_zero() {
+        let coop = Cooperative::new("Nonce Test".to_string(), CoopType::Worker);
+        assert_eq!(coop.treasury_nonce, 0, "New cooperative nonce must be 0");
+    }
+
+    #[test]
+    fn test_treasury_nonce_serialization_roundtrip() {
+        let mut coop = Cooperative::new("Nonce Serde".to_string(), CoopType::Consumer);
+        coop.treasury_nonce = 42;
+
+        let json = serde_json::to_string(&coop).expect("serialize");
+        let deser: Cooperative = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deser.treasury_nonce, 42);
+    }
+
+    #[test]
+    fn test_treasury_nonce_backward_compat_missing_field() {
+        // Simulate old cooperative without treasury_nonce field
+        let coop = Cooperative::new("Old Coop".to_string(), CoopType::Producer);
+        let json = serde_json::to_string(&coop).expect("serialize");
+        let json_value: serde_json::Value = serde_json::from_str(&json).expect("parse");
+        let mut obj = json_value.as_object().expect("object").clone();
+        obj.remove("treasury_nonce");
+        let old_json = serde_json::to_string(&obj).expect("reserialize");
+
+        let deser: Cooperative = serde_json::from_str(&old_json).expect("deserialize old format");
+        assert_eq!(
+            deser.treasury_nonce, 0,
+            "Missing treasury_nonce must default to 0"
+        );
+    }
+
+    #[test]
+    fn test_treasury_nonce_all_constructors_zero() {
+        let c1 = Cooperative::new("A".to_string(), CoopType::Worker);
+        assert_eq!(c1.treasury_nonce, 0);
+
+        let c2 = Cooperative::new_with_id("id1".to_string(), "B".to_string(), CoopType::Consumer);
+        assert_eq!(c2.treasury_nonce, 0);
+
+        let c3 = Cooperative::new_with_domain(
+            "id2".to_string(),
+            "C".to_string(),
+            CoopType::Platform,
+            "d1".to_string(),
+            5,
+        );
+        assert_eq!(c3.treasury_nonce, 0);
     }
 
     #[test]

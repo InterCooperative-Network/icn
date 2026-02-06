@@ -50,6 +50,9 @@ pub type ClearingManagerHandle = Arc<ClearingManager>;
 /// Type alias for the attestation store handle
 pub type AttestationStoreHandle = Arc<AttestationStore>;
 
+/// Type alias for the cooperative store handle
+pub type CoopStoreHandle = Arc<icn_coop::CoopStore>;
+
 // =============================================================================
 // Validation helpers - shared logic for treasury operation validation
 // =============================================================================
@@ -76,6 +79,8 @@ pub struct GovernanceEventHandler {
     treasury_did: Did,
     /// Event bus for emitting system events
     event_bus: Option<EventBus>,
+    /// Cooperative store for treasury nonce atomicity
+    coop_store: Option<CoopStoreHandle>,
 
     // Federation components (optional - only set if federation is enabled)
     /// Cooperative registry for federation membership
@@ -106,6 +111,7 @@ impl GovernanceEventHandler {
             treasury_manager,
             treasury_did,
             event_bus: None,
+            coop_store: None,
             federation_registry: None,
             clearing_manager: None,
             attestation_store: None,
@@ -115,6 +121,12 @@ impl GovernanceEventHandler {
     /// Set the event bus for error reporting
     pub fn with_event_bus(mut self, event_bus: EventBus) -> Self {
         self.event_bus = Some(event_bus);
+        self
+    }
+
+    /// Set the cooperative store for treasury nonce atomicity
+    pub fn with_coop_store(mut self, coop_store: CoopStoreHandle) -> Self {
+        self.coop_store = Some(coop_store);
         self
     }
 
