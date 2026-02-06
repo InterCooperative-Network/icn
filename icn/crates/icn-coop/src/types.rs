@@ -300,6 +300,12 @@ pub struct Cooperative {
     /// Governance proposal ID that approved dissolution (if applicable)
     #[serde(default)]
     pub dissolution_proposal_id: Option<String>,
+
+    /// Treasury DID for this cooperative's funds.
+    /// Generated from a fresh Ed25519 keypair on cooperative creation.
+    /// `None` only for cooperatives created before treasury support was added.
+    #[serde(default)]
+    pub treasury_did: Option<String>,
 }
 
 fn default_min_founders() -> usize {
@@ -446,6 +452,7 @@ impl Cooperative {
             governance_domain: None,
             dissolution_plan: None,
             dissolution_proposal_id: None,
+            treasury_did: None,
         }
     }
 
@@ -490,6 +497,7 @@ impl Cooperative {
             governance_domain,
             dissolution_plan: None,
             dissolution_proposal_id: None,
+            treasury_did: None,
         }
     }
 
@@ -514,6 +522,49 @@ impl Cooperative {
             coop.charter_hash = Some(hex::encode(hash));
         }
         coop
+    }
+
+    /// Generate a fresh Ed25519 keypair for the cooperative treasury.
+    ///
+    /// Returns the DID string and the keypair. The caller is responsible for
+    /// persisting the keypair securely (e.g., in an Age-encrypted keystore).
+    /// Only the DID string is stored on the `Cooperative` struct.
+    ///
+    /// # Production safety
+    /// Uses `OsRng` for key generation -- never derives from public seeds.
+    pub fn generate_treasury_did() -> Result<(String, icn_identity::KeyPair), String> {
+        let kp = icn_identity::KeyPair::generate()
+            .map_err(|e| format!("Treasury keypair generation failed: {e}"))?;
+        let did = kp.did().to_string();
+        Ok((did, kp))
+    }
+
+    /// Generate a treasury keypair from known bytes (test-only).
+    ///
+    /// This function exists exclusively behind the `test_deterministic_keys`
+    /// feature flag and MUST NOT be used in production builds.
+    #[cfg(feature = "test_deterministic_keys")]
+    pub fn generate_treasury_did_deterministic(
+        secret_bytes: &[u8; 32],
+        public_bytes: &[u8; 32],
+    ) -> Result<(String, icn_identity::KeyPair), String> {
+        let kp = icn_identity::KeyPair::from_bytes(secret_bytes, public_bytes)
+            .map_err(|e| format!("Deterministic keypair creation failed: {e}"))?;
+        let did = kp.did().to_string();
+        Ok((did, kp))
+    }
+
+    /// Assign a treasury DID to this cooperative.
+    ///
+    /// Returns `Err` if the cooperative already has a treasury DID assigned,
+    /// to prevent accidental key rotation (which should be a deliberate operation).
+    pub fn assign_treasury(&mut self, treasury_did: String) -> Result<(), String> {
+        if self.treasury_did.is_some() {
+            return Err("Cooperative already has a treasury DID assigned".to_string());
+        }
+        self.treasury_did = Some(treasury_did);
+        self.updated_at = Utc::now();
+        Ok(())
     }
 
     /// Add a founder signature from governance type
@@ -730,5 +781,117 @@ mod tests {
         assert!(member.has_governance_right("vote"));
         assert!(member.has_governance_right("propose"));
         assert!(!member.has_governance_right("elect_board"));
+    }
+
+    // === Treasury DID tests (Issue #1086) ===
+
+    #[test]
+    fn test_treasury_did_generated() {
+        let (did, kp) = Cooperative::generate_treasury_did().expect("treasury keygen");
+        assert!(did.starts_with("did:icn:"));
+        assert_eq!(kp.did().to_string(), did);
+    }
+
+    #[test]
+    fn test_treasury_did_unique() {
+        let (did1, _kp1) = Cooperative::generate_treasury_did().expect("treasury keygen 1");
+        let (did2, _kp2) = Cooperative::generate_treasury_did().expect("treasury keygen 2");
+        assert_ne!(did1, did2, "Two treasury DIDs must be unique");
+    }
+
+    #[test]
+    fn test_treasury_did_assign() {
+        let mut coop = Cooperative::new("Treasury Test".to_string(), CoopType::Worker);
+        assert!(coop.treasury_did.is_none());
+
+        let (did, _kp) = Cooperative::generate_treasury_did().expect("treasury keygen");
+        coop.assign_treasury(did.clone()).expect("assign treasury");
+        assert_eq!(coop.treasury_did.as_deref(), Some(did.as_str()));
+    }
+
+    #[test]
+    fn test_treasury_did_assign_rejects_double() {
+        let mut coop = Cooperative::new("Treasury Test".to_string(), CoopType::Worker);
+        let (did1, _) = Cooperative::generate_treasury_did().expect("keygen 1");
+        let (did2, _) = Cooperative::generate_treasury_did().expect("keygen 2");
+
+        coop.assign_treasury(did1).expect("first assign");
+        let err = coop.assign_treasury(did2).unwrap_err();
+        assert!(err.contains("already has a treasury DID"));
+    }
+
+    #[test]
+    fn test_treasury_did_serialization_roundtrip() {
+        let mut coop = Cooperative::new("Serde Test".to_string(), CoopType::Consumer);
+        let (did, _kp) = Cooperative::generate_treasury_did().expect("treasury keygen");
+        coop.assign_treasury(did.clone()).expect("assign treasury");
+
+        let json = serde_json::to_string(&coop).expect("serialize");
+        let deser: Cooperative = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deser.treasury_did.as_deref(), Some(did.as_str()));
+    }
+
+    #[test]
+    fn test_treasury_did_default_none_backward_compat() {
+        // Simulate an old cooperative serialized without treasury_did field.
+        // serde(default) should produce None.
+        let mut coop = Cooperative::new("Old Coop".to_string(), CoopType::Producer);
+        coop.treasury_did = None; // Explicitly None, like old data
+        let json = serde_json::to_string(&coop).expect("serialize");
+
+        // Remove the treasury_did field from the JSON to simulate old format
+        let json_value: serde_json::Value = serde_json::from_str(&json).expect("parse json");
+        let mut obj = json_value.as_object().expect("object").clone();
+        obj.remove("treasury_did");
+        let old_json = serde_json::to_string(&obj).expect("reserialize");
+
+        let deser: Cooperative = serde_json::from_str(&old_json).expect("deserialize old format");
+        assert!(
+            deser.treasury_did.is_none(),
+            "Missing treasury_did field should deserialize as None"
+        );
+    }
+
+    #[test]
+    fn test_new_cooperative_treasury_did_is_none() {
+        // All constructors should produce treasury_did = None by default.
+        // The treasury keypair is generated separately and assigned explicitly.
+        let coop1 = Cooperative::new("Test 1".to_string(), CoopType::Worker);
+        assert!(coop1.treasury_did.is_none());
+
+        let coop2 =
+            Cooperative::new_with_id("id1".to_string(), "Test 2".to_string(), CoopType::Consumer);
+        assert!(coop2.treasury_did.is_none());
+
+        let coop3 = Cooperative::new_with_domain(
+            "id2".to_string(),
+            "Test 3".to_string(),
+            CoopType::Platform,
+            "domain1".to_string(),
+            5,
+        );
+        assert!(coop3.treasury_did.is_none());
+    }
+
+    #[cfg(feature = "test_deterministic_keys")]
+    #[test]
+    fn test_deterministic_treasury_keys() {
+        use ed25519_dalek::SigningKey;
+
+        // Use known seed bytes to generate a deterministic keypair
+        let secret_bytes: [u8; 32] = [42u8; 32];
+        let signing_key = SigningKey::from_bytes(&secret_bytes);
+        let public_bytes = signing_key.verifying_key().to_bytes();
+
+        let (did1, _kp1) =
+            Cooperative::generate_treasury_did_deterministic(&secret_bytes, &public_bytes)
+                .expect("deterministic keygen 1");
+
+        let (did2, _kp2) =
+            Cooperative::generate_treasury_did_deterministic(&secret_bytes, &public_bytes)
+                .expect("deterministic keygen 2");
+
+        assert_eq!(did1, did2, "Same seed bytes must produce same DID");
+        assert!(did1.starts_with("did:icn:"));
     }
 }

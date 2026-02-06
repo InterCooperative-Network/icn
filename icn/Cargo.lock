@@ -2896,6 +2896,7 @@ dependencies = [
  "icn-store",
  "icn-trust",
  "serde",
+ "serde_json",
  "sled",
  "tempfile",
  "thiserror 2.0.18",
