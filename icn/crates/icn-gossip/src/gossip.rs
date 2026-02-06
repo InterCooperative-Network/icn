@@ -95,7 +95,7 @@ pub struct GossipActor {
     pub(crate) oracle: Option<Arc<dyn PolicyOracle>>,
 
     /// Send message callback (optional, for sending responses)
-    send_callback: Option<SendMessageCallback>,
+    pub(crate) send_callback: Option<SendMessageCallback>,
 
     /// Entry notification callback (optional, for notifying subscribers)
     notification_callback: Option<EntryNotificationCallback>,
@@ -147,6 +147,13 @@ pub struct GossipActor {
     /// Blob transfer nonce guard for replay protection (PR2b #1069)
     /// Prevents duplicate processing of BlobRequest and BlobTransferChunk messages
     pub(crate) blob_nonce_guard: crate::handlers::blob_nonce_guard::BlobNonceGuard,
+
+    /// Blob storage backend for serving/storing blobs (PR2c #1070)
+    pub(crate) blob_store: Option<Arc<dyn icn_kernel_api::state::BlobService>>,
+
+    /// Blob transfer session manager (PR2c #1070)
+    pub(crate) transfer_manager:
+        Option<std::sync::Mutex<crate::handlers::blob_transfer_state::TransferSessionManager>>,
 }
 
 impl GossipActor {
@@ -178,6 +185,8 @@ impl GossipActor {
             topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy::default(), // Issue #473: Strict defaults
             key_rotation_cache: crate::key_rotation::KeyRotationCache::new(), // Issue #469: Key rotation tracking
             blob_nonce_guard: crate::handlers::blob_nonce_guard::BlobNonceGuard::default_config(), // PR2b: Blob replay protection
+            blob_store: None,       // PR2c: Set via set_blob_store()
+            transfer_manager: None, // PR2c: Set via set_transfer_manager()
         };
 
         // Create default topics with appropriate scopes
@@ -322,6 +331,19 @@ impl GossipActor {
     /// Get the current topic auto-creation policy
     pub fn topic_auto_creation_policy(&self) -> crate::types::TopicAutoCreationPolicy {
         self.topic_auto_creation_policy
+    }
+
+    /// Set the blob storage backend for serving and storing blobs (PR2c #1070)
+    pub fn set_blob_store(&mut self, store: Arc<dyn icn_kernel_api::state::BlobService>) {
+        self.blob_store = Some(store);
+    }
+
+    /// Set the transfer session manager for blob transfers (PR2c #1070)
+    pub fn set_transfer_manager(
+        &mut self,
+        manager: crate::handlers::blob_transfer_state::TransferSessionManager,
+    ) {
+        self.transfer_manager = Some(std::sync::Mutex::new(manager));
     }
 
     // ==================== Key Rotation Methods (Issue #469) ====================

@@ -204,7 +204,11 @@ impl TransferSessionManager {
         }
 
         // Check per-peer limit for the requester
-        let count = self.per_peer_counts.get(&requester_did).copied().unwrap_or(0);
+        let count = self
+            .per_peer_counts
+            .get(&requester_did)
+            .copied()
+            .unwrap_or(0);
         if count >= MAX_REQUESTS_PER_PEER {
             return Err(ErrCode::Busy);
         }
@@ -221,7 +225,10 @@ impl TransferSessionManager {
         let request_id: RequestId = *hasher.finalize().as_bytes();
 
         // Pick first provider (PR2d will add ranking)
-        let provider_did = providers.into_iter().next().ok_or(ErrCode::InvalidRequest)?;
+        let provider_did = providers
+            .into_iter()
+            .next()
+            .ok_or(ErrCode::InvalidRequest)?;
 
         let session = TransferSession {
             request_id,
@@ -230,8 +237,8 @@ impl TransferSessionManager {
             requester_did: requester_did.clone(),
             scope_id,
             expires_at,
-            total_chunks: 0,  // Set on first chunk
-            total_size: 0,    // Set on first chunk
+            total_chunks: 0, // Set on first chunk
+            total_size: 0,   // Set on first chunk
             state: TransferState::Requested,
             created_at: now / 1_000_000_000, // Convert nanos to secs
         };
@@ -270,7 +277,9 @@ impl TransferSessionManager {
         // Compute session dir before borrowing sessions mutably
         let session_dir = self.session_dir(&request_id);
 
-        let session = self.sessions.get_mut(&request_id)
+        let session = self
+            .sessions
+            .get_mut(&request_id)
             .ok_or(ErrCode::InvalidRequest)?;
 
         // Check expiry
@@ -322,7 +331,10 @@ impl TransferSessionManager {
                     Ok(ChunkResult::Accepted)
                 }
             }
-            TransferState::Receiving { chunks_received, received_bytes } => {
+            TransferState::Receiving {
+                chunks_received,
+                received_bytes,
+            } => {
                 // Subsequent chunks: validate consistency
                 if total_chunks != session.total_chunks {
                     session.state = TransferState::Failed(ErrCode::InvalidRequest);
@@ -358,9 +370,7 @@ impl TransferSessionManager {
                 // Session already past receiving phase
                 Err(ErrCode::InvalidRequest)
             }
-            TransferState::Failed(_) => {
-                Err(ErrCode::InvalidRequest)
-            }
+            TransferState::Failed(_) => Err(ErrCode::InvalidRequest),
         }
     }
 
@@ -376,12 +386,16 @@ impl TransferSessionManager {
         // Compute dir before mutable borrow
         let partial_dir = self.session_dir(&request_id);
 
-        let session = self.sessions.get_mut(&request_id)
+        let session = self
+            .sessions
+            .get_mut(&request_id)
             .ok_or(ErrCode::InvalidRequest)?;
 
         // Only transition from Receiving with all chunks
         match &session.state {
-            TransferState::Receiving { chunks_received, .. } => {
+            TransferState::Receiving {
+                chunks_received, ..
+            } => {
                 if !chunks_received.iter().all(|&b| b) {
                     return Err(ErrCode::InvalidRequest);
                 }
@@ -409,7 +423,9 @@ impl TransferSessionManager {
         request_id: RequestId,
         success: bool,
     ) -> Result<(), ErrCode> {
-        let session = self.sessions.get_mut(&request_id)
+        let session = self
+            .sessions
+            .get_mut(&request_id)
             .ok_or(ErrCode::InvalidRequest)?;
 
         match session.state {
@@ -462,7 +478,9 @@ impl TransferSessionManager {
 
     /// Clean up all expired sessions. Returns count of cleaned sessions.
     pub fn cleanup_expired(&mut self, now: u64) -> usize {
-        let expired: Vec<RequestId> = self.sessions.iter()
+        let expired: Vec<RequestId> = self
+            .sessions
+            .iter()
             .filter(|(_, s)| s.expires_at > 0 && now > s.expires_at)
             .map(|(id, _)| *id)
             .collect();
@@ -529,13 +547,15 @@ mod tests {
         provider: &Did,
         requester: &Did,
     ) -> RequestId {
-        manager.start_request(
-            blob_hash,
-            vec![provider.clone()],
-            requester.clone(),
-            "test-scope".to_string(),
-            u64::MAX, // far future
-        ).expect("start_request should succeed")
+        manager
+            .start_request(
+                blob_hash,
+                vec![provider.clone()],
+                requester.clone(),
+                "test-scope".to_string(),
+                u64::MAX, // far future
+            )
+            .expect("start_request should succeed")
     }
 
     fn make_chunk_data(index: u32) -> Vec<u8> {
@@ -564,27 +584,57 @@ mod tests {
         let rid = start_session(&mut mgr, blob_hash, &provider, &requester);
 
         // Initially Requested
-        assert!(matches!(mgr.get_session(&rid).unwrap().state, TransferState::Requested));
+        assert!(matches!(
+            mgr.get_session(&rid).unwrap().state,
+            TransferState::Requested
+        ));
 
         // First chunk → Receiving
         let data0 = make_chunk_data(0);
-        let r = mgr.receive_chunk(rid, &provider, 0, total_chunks, total_chunks as u64 * 1024, &data0);
+        let r = mgr.receive_chunk(
+            rid,
+            &provider,
+            0,
+            total_chunks,
+            total_chunks as u64 * 1024,
+            &data0,
+        );
         assert_eq!(r.unwrap(), ChunkResult::Accepted);
-        assert!(matches!(mgr.get_session(&rid).unwrap().state, TransferState::Receiving { .. }));
+        assert!(matches!(
+            mgr.get_session(&rid).unwrap().state,
+            TransferState::Receiving { .. }
+        ));
 
         // Second chunk → still Receiving
         let data1 = make_chunk_data(1);
-        let r = mgr.receive_chunk(rid, &provider, 1, total_chunks, total_chunks as u64 * 1024, &data1);
+        let r = mgr.receive_chunk(
+            rid,
+            &provider,
+            1,
+            total_chunks,
+            total_chunks as u64 * 1024,
+            &data1,
+        );
         assert_eq!(r.unwrap(), ChunkResult::Accepted);
 
         // Third chunk → AllChunksReceived
         let data2 = make_chunk_data(2);
-        let r = mgr.receive_chunk(rid, &provider, 2, total_chunks, total_chunks as u64 * 1024, &data2);
+        let r = mgr.receive_chunk(
+            rid,
+            &provider,
+            2,
+            total_chunks,
+            total_chunks as u64 * 1024,
+            &data2,
+        );
         assert_eq!(r.unwrap(), ChunkResult::AllChunksReceived);
 
         // Begin assembly → Assembling
         let job = mgr.begin_assembly(rid).unwrap();
-        assert!(matches!(mgr.get_session(&rid).unwrap().state, TransferState::Assembling));
+        assert!(matches!(
+            mgr.get_session(&rid).unwrap().state,
+            TransferState::Assembling
+        ));
         assert_eq!(mgr.active_reassemblies(), 1);
 
         // Execute assembly (reads files, verifies hash)
@@ -593,12 +643,18 @@ mod tests {
 
         // Complete assembly → Verified
         mgr.complete_assembly(rid, true).unwrap();
-        assert!(matches!(mgr.get_session(&rid).unwrap().state, TransferState::Verified));
+        assert!(matches!(
+            mgr.get_session(&rid).unwrap().state,
+            TransferState::Verified
+        ));
         assert_eq!(mgr.active_reassemblies(), 0);
 
         // Mark stored → Stored
         mgr.mark_stored(rid);
-        assert!(matches!(mgr.get_session(&rid).unwrap().state, TransferState::Stored));
+        assert!(matches!(
+            mgr.get_session(&rid).unwrap().state,
+            TransferState::Stored
+        ));
 
         // Cleanup
         mgr.cleanup_session(rid);
@@ -637,13 +693,15 @@ mod tests {
         let requester = make_did();
 
         // Start with expires_at in the past
-        let rid = mgr.start_request(
-            [0xAA; 32],
-            vec![provider.clone()],
-            requester.clone(),
-            "test".to_string(),
-            1, // 1 second after epoch = expired
-        ).unwrap();
+        let rid = mgr
+            .start_request(
+                [0xAA; 32],
+                vec![provider.clone()],
+                requester.clone(),
+                "test".to_string(),
+                1, // 1 second after epoch = expired
+            )
+            .unwrap();
 
         let result = mgr.receive_chunk(rid, &provider, 0, 1, 1024, &[0u8; 100]);
         assert_eq!(result.unwrap_err(), ErrCode::Expired);
@@ -659,7 +717,10 @@ mod tests {
         let rid = start_session(&mut mgr, [0xAA; 32], &provider, &requester);
 
         let result = mgr.receive_chunk(
-            rid, &provider, 0, 200,
+            rid,
+            &provider,
+            0,
+            200,
             MAX_BLOB_SIZE + 1, // Over 10 MB
             &[0u8; 100],
         );
@@ -681,7 +742,8 @@ mod tests {
             let expected_hash = *blake3::hash(&data).as_bytes();
             let rid = start_session(&mut mgr, expected_hash, &provider, &requester);
 
-            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data).unwrap();
+            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data)
+                .unwrap();
             mgr.begin_assembly(rid).unwrap();
         }
 
@@ -693,7 +755,8 @@ mod tests {
         let data = make_chunk_data(99);
         let expected_hash = *blake3::hash(&data).as_bytes();
         let rid = start_session(&mut mgr, expected_hash, &provider, &requester);
-        mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data).unwrap();
+        mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data)
+            .unwrap();
 
         let result = mgr.begin_assembly(rid);
         assert_eq!(result.unwrap_err(), ErrCode::Busy);
@@ -707,13 +770,15 @@ mod tests {
         let requester = make_did();
 
         // Start with near-future expiry
-        let rid = mgr.start_request(
-            [0xAA; 32],
-            vec![provider.clone()],
-            requester.clone(),
-            "test".to_string(),
-            100, // expires at 100 seconds
-        ).unwrap();
+        let rid = mgr
+            .start_request(
+                [0xAA; 32],
+                vec![provider.clone()],
+                requester.clone(),
+                "test".to_string(),
+                100, // expires at 100 seconds
+            )
+            .unwrap();
 
         let session_dir = tmp.path().join(hex::encode(rid));
         assert!(session_dir.exists());
@@ -768,7 +833,8 @@ mod tests {
                 requester.clone(),
                 "test".to_string(),
                 u64::MAX,
-            ).unwrap();
+            )
+            .unwrap();
         }
 
         assert_eq!(mgr.peer_request_count(&requester), MAX_REQUESTS_PER_PEER);
@@ -797,7 +863,8 @@ mod tests {
             let data = make_chunk_data(0);
             let correct_hash = *blake3::hash(&data).as_bytes();
             let rid = start_session(&mut mgr, correct_hash, &provider, &requester);
-            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data).unwrap();
+            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data)
+                .unwrap();
 
             let job = mgr.begin_assembly(rid).unwrap();
             let result = job.execute();
@@ -814,7 +881,8 @@ mod tests {
             let data = make_chunk_data(0);
             let wrong_hash = [0xFF; 32]; // doesn't match data
             let rid = start_session(&mut mgr, wrong_hash, &provider, &requester);
-            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data).unwrap();
+            mgr.receive_chunk(rid, &provider, 0, 1, data.len() as u64, &data)
+                .unwrap();
 
             let job = mgr.begin_assembly(rid).unwrap();
             let result = job.execute();

@@ -3143,6 +3143,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "sha2",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
