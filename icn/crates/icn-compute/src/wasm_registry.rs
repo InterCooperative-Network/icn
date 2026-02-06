@@ -125,6 +125,28 @@ fn validate_wasm(wasm_bytes: &[u8]) -> Result<()> {
 /// Default namespace for WASM blobs in BlobService.
 const WASM_BLOB_NAMESPACE: &str = "wasm";
 
+/// Callback invoked after a WASM module is deployed, to announce availability via gossip.
+/// Parameters: (blob_hash, size_bytes)
+pub type BlobAnnounceCallback = Arc<dyn Fn([u8; 32], u64) + Send + Sync>;
+
+/// Callback invoked to fetch a WASM module from a remote peer via blob transfer.
+/// Parameters: (blob_hash) -> Result<Vec<u8>>
+pub type BlobFetchCallback = Arc<
+    dyn Fn(
+            [u8; 32],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::result::Result<
+                            Vec<u8>,
+                            Box<dyn std::error::Error + Send + Sync>,
+                        >,
+                    > + Send,
+            >,
+        > + Send
+        + Sync,
+>;
+
 /// WASM Registry - stores WASM modules with metadata
 ///
 /// Thread-safe with in-memory caching and optional persistent storage.
@@ -141,6 +163,10 @@ pub struct WasmRegistry {
     store: Option<sled::Db>,
     /// Optional content-addressed blob storage (bytecode source of truth when present)
     blob_service: Option<Arc<dyn BlobService>>,
+    /// Callback to announce blob availability via gossip after deploy (#1073)
+    announce_callback: Option<BlobAnnounceCallback>,
+    /// Callback to fetch a blob from a remote peer (#1073)
+    fetch_callback: Option<BlobFetchCallback>,
 }
 
 impl WasmRegistry {
@@ -152,6 +178,8 @@ impl WasmRegistry {
             owner_index: Arc::new(RwLock::new(HashMap::new())),
             store: None,
             blob_service: None,
+            announce_callback: None,
+            fetch_callback: None,
         }
     }
 
@@ -163,6 +191,8 @@ impl WasmRegistry {
             owner_index: Arc::new(RwLock::new(HashMap::new())),
             store: Some(db),
             blob_service: None,
+            announce_callback: None,
+            fetch_callback: None,
         }
     }
 
@@ -177,7 +207,19 @@ impl WasmRegistry {
             owner_index: Arc::new(RwLock::new(HashMap::new())),
             store: Some(db),
             blob_service: Some(blob_service),
+            announce_callback: None,
+            fetch_callback: None,
         }
+    }
+
+    /// Set the gossip announce callback for notifying peers about new deployments.
+    pub fn set_announce_callback(&mut self, cb: BlobAnnounceCallback) {
+        self.announce_callback = Some(cb);
+    }
+
+    /// Set the remote fetch callback for fetching modules from peers.
+    pub fn set_fetch_callback(&mut self, cb: BlobFetchCallback) {
+        self.fetch_callback = Some(cb);
     }
 
     /// Open a registry with persistent storage at the given path
@@ -253,6 +295,9 @@ impl WasmRegistry {
             }
         }
 
+        // Capture size before wasm_bytes is moved
+        let wasm_size = wasm_bytes.len() as u64;
+
         // Build metadata
         let metadata = metadata_builder(WasmMetadata::new(&wasm_bytes, owner));
 
@@ -315,7 +360,48 @@ impl WasmRegistry {
             "WASM module deployed to registry"
         );
 
+        // Announce availability via gossip (fire and forget)
+        if let Some(ref cb) = self.announce_callback {
+            tracing::debug!(
+                hash = %hash_hex,
+                size = wasm_size,
+                "Announcing WASM module via gossip"
+            );
+            cb(hash, wasm_size);
+        }
+
         Ok(hash)
+    }
+
+    /// Fetch a WASM module from a remote peer via the blob transfer protocol.
+    ///
+    /// Calls the configured `fetch_callback` to request the blob from peers,
+    /// then verifies the content hash matches before returning.
+    ///
+    /// Returns an error if no fetch callback is configured or the fetch fails.
+    pub async fn fetch_remote(&self, hash: &WasmHash) -> Result<Vec<u8>> {
+        let cb = self.fetch_callback.as_ref().ok_or_else(|| {
+            WasmRegistryError::StorageError("No remote fetch callback configured".into())
+        })?;
+
+        let bytes = (cb)(*hash).await.map_err(|e| {
+            WasmRegistryError::StorageError(format!("Remote fetch failed: {e}"))
+        })?;
+
+        // Verify hash matches
+        let actual = compute_hash(&bytes);
+        if actual != *hash {
+            return Err(WasmRegistryError::StorageError(format!(
+                "Remote fetch hash mismatch: expected {}, got {}",
+                hex::encode(hash),
+                hex::encode(actual),
+            )));
+        }
+
+        // Validate WASM format
+        validate_wasm(&bytes)?;
+
+        Ok(bytes)
     }
 
     /// Get WASM bytecode by hash (async wrapper)
@@ -1007,5 +1093,90 @@ mod tests {
         // Bytecode should be fetchable from BlobService
         let retrieved = registry2.get(&hash).await.unwrap().unwrap();
         assert_eq!(retrieved, wasm);
+    }
+
+    // --- Gossip announce tests (#1073) ---
+
+    #[tokio::test]
+    async fn test_deploy_emits_announce() {
+        let announced: Arc<Mutex<Vec<([u8; 32], u64)>>> = Arc::new(Mutex::new(Vec::new()));
+        let announced_clone = announced.clone();
+
+        let mut registry = blob_registry();
+        registry.set_announce_callback(Arc::new(move |hash, size| {
+            announced_clone.lock().unwrap().push((hash, size));
+        }));
+
+        let wasm = sample_wasm();
+        let wasm_size = wasm.len() as u64;
+        let hash = registry
+            .deploy(wasm, "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        let announces = announced.lock().unwrap();
+        assert_eq!(announces.len(), 1, "exactly one announce after deploy");
+        assert_eq!(announces[0].0, hash, "announced hash must match deployed hash");
+        assert_eq!(announces[0].1, wasm_size, "announced size must match");
+    }
+
+    #[tokio::test]
+    async fn test_no_announce_without_callback() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        // Should succeed without announce callback
+        let result = registry.deploy(wasm, "did:icn:owner", |m| m).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_success() {
+        let wasm = sample_wasm();
+        let expected_hash = compute_hash(&wasm);
+        let wasm_clone = wasm.clone();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |hash| {
+            let data = wasm_clone.clone();
+            let h = hash;
+            Box::pin(async move {
+                // Simulate remote fetch: return data if hash matches
+                if h == compute_hash(&data) {
+                    Ok(data)
+                } else {
+                    Err("not found".into())
+                }
+            })
+        }));
+
+        let fetched = registry.fetch_remote(&expected_hash).await.unwrap();
+        assert_eq!(fetched, wasm);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_hash_mismatch() {
+        let wasm = sample_wasm();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            // Return wrong data (doesn't match requested hash)
+            Box::pin(async move { Ok(vec![0xFF; 100]) })
+        }));
+
+        let fake_hash = [0xAA; 32];
+        let result = registry.fetch_remote(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("mismatch") || err_msg.contains("Invalid"));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_no_callback() {
+        let registry = blob_registry();
+        let result = registry.fetch_remote(&[0xBB; 32]).await;
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("No remote fetch callback"));
     }
 }
