@@ -40,3 +40,4 @@ pub mod resource_enforcer;
 pub mod rpc;
 pub mod service_discovery;
 pub mod storage;
+pub mod trust;

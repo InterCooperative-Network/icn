@@ -124,8 +124,9 @@ impl TrustService for TrustServiceImplTokio {
     }
 
     fn trust_score(&self, actor: &icn_kernel_api::types::Did) -> f64 {
+        let start = std::time::Instant::now();
         // Use block_in_place to safely access tokio lock from sync context.
-        tokio::task::block_in_place(|| {
+        let result = tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
@@ -135,7 +136,9 @@ impl TrustService for TrustServiceImplTokio {
                     0.0
                 }
             })
-        })
+        });
+        icn_obs::metrics::trust::trust_score_duration_record(start.elapsed());
+        result
     }
 
     /// Get an enriched trust score with provenance metadata.
@@ -171,7 +174,8 @@ impl TrustService for TrustServiceImplTokio {
     /// - `computed_at`: Unix timestamp
     /// - `reducer_version`: Algorithm version string
     fn trust_score_detailed(&self, actor: &icn_kernel_api::types::Did) -> TrustScoreResult {
-        tokio::task::block_in_place(|| {
+        let start = std::time::Instant::now();
+        let result = tokio::task::block_in_place(|| {
             let rt = tokio::runtime::Handle::current();
             rt.block_on(async {
                 let graph = self.graph.read().await;
@@ -219,7 +223,9 @@ impl TrustService for TrustServiceImplTokio {
                 result.score = score;
                 result
             })
-        })
+        });
+        icn_obs::metrics::trust::trust_score_detailed_duration_record(start.elapsed());
+        result
     }
 
     fn record_event(&self, actor: &icn_kernel_api::types::Did, event: TrustEvent) {
@@ -1323,5 +1329,28 @@ mod tests {
             "Should accept attestation at size limits: {:?}",
             result
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_trust_score_metrics_recorded() {
+        // Test that metrics are recorded when calling trust_score and trust_score_detailed
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph, keypair, store);
+
+        // Create a test actor
+        let test_keypair = icn_identity::KeyPair::generate().unwrap();
+        let test_did = icn_kernel_api::types::Did::from(test_keypair.did().to_string());
+
+        // Call trust_score - should record metric
+        let score = service.trust_score(&test_did);
+        assert_eq!(score, 0.0); // Unknown actor should have 0.0 trust
+
+        // Call trust_score_detailed - should record metric
+        let result = service.trust_score_detailed(&test_did);
+        assert_eq!(result.score, 0.0);
+
+        // Note: We can't easily verify histogram recordings in tests without
+        // instrumenting the metrics backend, but we can verify the methods
+        // execute without panicking and return correct values.
     }
 }
