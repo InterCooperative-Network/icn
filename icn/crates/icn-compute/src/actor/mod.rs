@@ -33,6 +33,7 @@ use crate::migration_manager::ActorMigrationManager;
 use crate::result_quorum::{ResultQuorumManager, VerificationConfig};
 use crate::task::TaskManager;
 use crate::types::{ComputeMessage, TaskHash};
+use crate::wasm_registry::WasmRegistry;
 
 /// Actor managing distributed compute tasks
 pub struct ComputeActor {
@@ -106,6 +107,8 @@ pub struct ComputeActor {
     /// Commons resource pool for tracking nodes contributing to the commons (Epic 6 #946).
     /// Advisory scheduling state only — ledger is authoritative economic state.
     commons_pool: Arc<RwLock<crate::commons_pool::CommonsPool>>,
+    /// WASM registry for execute-by-hash (Issue #1074)
+    wasm_registry: Option<Arc<WasmRegistry>>,
     /// Resource refresh configuration
     resource_refresh_config: crate::scheduler::ResourceRefreshConfig,
     /// Current cached resource profile
@@ -150,6 +153,7 @@ impl ComputeActor {
             capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
+            wasm_registry: None,
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
             shutdown_tx: tokio::sync::broadcast::channel(1).0,
@@ -281,6 +285,14 @@ impl ComputeActor {
     /// Get this node's cooperative ID
     pub fn cooperative_id(&self) -> Option<&str> {
         self.own_cooperative_id.as_deref()
+    }
+
+    /// Set the WASM registry for execute-by-hash (Issue #1074).
+    ///
+    /// When set, tasks using `TaskCode::WasmRef(hash)` will resolve the module
+    /// from this registry (local or remote) before execution.
+    pub fn set_wasm_registry(&mut self, registry: Arc<WasmRegistry>) {
+        self.wasm_registry = Some(registry);
     }
 
     /// Set the demand adjustment configuration (Epic 2 #933).

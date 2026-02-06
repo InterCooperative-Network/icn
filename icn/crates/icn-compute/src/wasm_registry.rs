@@ -384,9 +384,9 @@ impl WasmRegistry {
             WasmRegistryError::StorageError("No remote fetch callback configured".into())
         })?;
 
-        let bytes = (cb)(*hash).await.map_err(|e| {
-            WasmRegistryError::StorageError(format!("Remote fetch failed: {e}"))
-        })?;
+        let bytes = (cb)(*hash)
+            .await
+            .map_err(|e| WasmRegistryError::StorageError(format!("Remote fetch failed: {e}")))?;
 
         // Verify hash matches
         let actual = compute_hash(&bytes);
@@ -400,6 +400,66 @@ impl WasmRegistry {
 
         // Validate WASM format
         validate_wasm(&bytes)?;
+
+        Ok(bytes)
+    }
+
+    /// Resolve a WASM module by hash, fetching from remote peers if not found locally.
+    ///
+    /// This is the primary entry point for execute-by-hash (#1074):
+    /// 1. Check local cache / BlobService / sled store
+    /// 2. If not found locally, attempt remote fetch via gossip
+    /// 3. Verify content hash matches after fetch
+    /// 4. Store fetched module locally for future use
+    ///
+    /// Returns `Ok(bytes)` on success, or `Err` if the module cannot be obtained.
+    pub async fn resolve_or_fetch(&self, hash: &WasmHash) -> Result<Vec<u8>> {
+        // Try local first
+        if let Some(bytes) = self.get(hash).await? {
+            tracing::debug!(
+                hash = %hex::encode(hash),
+                "WASM module found locally"
+            );
+            return Ok(bytes);
+        }
+
+        // Not found locally -- attempt remote fetch
+        tracing::info!(
+            hash = %hex::encode(hash),
+            "WASM module not found locally, attempting remote fetch"
+        );
+
+        let bytes = self.fetch_remote(hash).await?;
+
+        // fetch_remote already verifies hash and validates WASM magic bytes.
+        // Store the fetched module locally for future use.
+        // Use deploy_sync which handles dedup (AlreadyExists is not an error here).
+        let store_result = self.deploy_sync(bytes.clone(), "remote", |m| m);
+        match store_result {
+            Ok(_) => {
+                tracing::info!(
+                    hash = %hex::encode(hash),
+                    size = bytes.len(),
+                    "Remote WASM module fetched and stored locally"
+                );
+            }
+            Err(WasmRegistryError::AlreadyExists(_)) => {
+                // Race condition: another task stored it between our get() and deploy_sync().
+                // This is fine.
+                tracing::debug!(
+                    hash = %hex::encode(hash),
+                    "Remote WASM module already stored (race)"
+                );
+            }
+            Err(e) => {
+                // Log but don't fail -- we already have the bytes
+                tracing::warn!(
+                    hash = %hex::encode(hash),
+                    error = %e,
+                    "Failed to store fetched WASM module locally"
+                );
+            }
+        }
 
         Ok(bytes)
     }
@@ -743,6 +803,7 @@ mod tests {
     use std::sync::Mutex;
 
     /// In-memory BlobService implementation for testing.
+    #[allow(clippy::type_complexity)]
     struct MockBlobService {
         blobs: Mutex<StdHashMap<[u8; 32], (Vec<u8>, Namespace)>>,
     }
@@ -1099,6 +1160,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_deploy_emits_announce() {
+        #[allow(clippy::type_complexity)]
         let announced: Arc<Mutex<Vec<([u8; 32], u64)>>> = Arc::new(Mutex::new(Vec::new()));
         let announced_clone = announced.clone();
 
@@ -1109,14 +1171,14 @@ mod tests {
 
         let wasm = sample_wasm();
         let wasm_size = wasm.len() as u64;
-        let hash = registry
-            .deploy(wasm, "did:icn:owner", |m| m)
-            .await
-            .unwrap();
+        let hash = registry.deploy(wasm, "did:icn:owner", |m| m).await.unwrap();
 
         let announces = announced.lock().unwrap();
         assert_eq!(announces.len(), 1, "exactly one announce after deploy");
-        assert_eq!(announces[0].0, hash, "announced hash must match deployed hash");
+        assert_eq!(
+            announces[0].0, hash,
+            "announced hash must match deployed hash"
+        );
         assert_eq!(announces[0].1, wasm_size, "announced size must match");
     }
 
@@ -1178,5 +1240,102 @@ mod tests {
         assert!(result.is_err());
         let err_msg = format!("{:?}", result.unwrap_err());
         assert!(err_msg.contains("No remote fetch callback"));
+    }
+
+    // --- resolve_or_fetch tests (#1074) ---
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_local_hit() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        // Deploy locally first
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        // resolve_or_fetch should return local bytes without needing fetch callback
+        let resolved = registry.resolve_or_fetch(&hash).await.unwrap();
+        assert_eq!(resolved, wasm);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_remote_success() {
+        let wasm = sample_wasm();
+        let expected_hash = compute_hash(&wasm);
+        let wasm_clone = wasm.clone();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |hash| {
+            let data = wasm_clone.clone();
+            let h = hash;
+            Box::pin(async move {
+                if h == compute_hash(&data) {
+                    Ok(data)
+                } else {
+                    Err("not found".into())
+                }
+            })
+        }));
+
+        // Module is NOT deployed locally -- resolve_or_fetch should fetch remotely
+        let resolved = registry.resolve_or_fetch(&expected_hash).await.unwrap();
+        assert_eq!(resolved, wasm);
+
+        // After fetch, module should be stored locally
+        assert!(registry.exists(&expected_hash).await);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_remote_failure() {
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            Box::pin(async move { Err("peer unreachable".into()) })
+        }));
+
+        let fake_hash = [0xCC; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("Remote fetch failed"),
+            "Expected 'Remote fetch failed', got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_no_callback_no_local() {
+        let registry = blob_registry();
+        // No fetch callback, module not deployed locally
+        let fake_hash = [0xDD; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("No remote fetch callback"),
+            "Expected 'No remote fetch callback', got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_hash_mismatch() {
+        let mut registry = blob_registry();
+        // Return wrong data that doesn't match the requested hash
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            Box::pin(async move {
+                // Return valid WASM but with wrong content
+                Ok(vec![0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, 0xFF])
+            })
+        }));
+
+        let fake_hash = [0xEE; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("mismatch"),
+            "Expected hash mismatch error, got: {err_msg}"
+        );
     }
 }
