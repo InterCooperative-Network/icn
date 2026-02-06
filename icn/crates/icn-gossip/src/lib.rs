@@ -81,8 +81,9 @@ pub use labor_shares::{
 
 // Service discovery gossip messages (Epic 3, Issue #935)
 pub use service_discovery::{
-    sign_service_endpoint, topics as service_discovery_topics, verify_service_endpoint,
-    verify_service_endpoint_with_rotation, ServiceDiscoveryMessage,
+    response_signing_payload, sign_service_endpoint, sign_service_response,
+    topics as service_discovery_topics, validate_service_response, verify_service_endpoint,
+    verify_service_endpoint_with_rotation, verify_service_response, ServiceDiscoveryMessage,
 };
 
 // Key rotation gossip messages (Issue #469)

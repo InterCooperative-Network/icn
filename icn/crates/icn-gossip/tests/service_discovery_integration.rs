@@ -136,6 +136,7 @@ fn test_query_response_roundtrip() {
         max_scope: ScopeLevel::Federation,
         required_capabilities: vec!["read".to_string()],
         query_id: "q-001".to_string(),
+        expires_at: 1700003600,
     };
 
     let encoded = icn_encoding::encode(&query).expect("encode query");
@@ -146,6 +147,9 @@ fn test_query_response_roundtrip() {
         query_id: "q-001".to_string(),
         endpoints: vec![ep.clone()],
         responder: did.clone(),
+        signature: vec![0; 64],
+        expires_at: 1700003600,
+        scope: ScopeLevel::Org,
     };
 
     let encoded = icn_encoding::encode(&response).expect("encode response");
@@ -156,10 +160,16 @@ fn test_query_response_roundtrip() {
             query_id,
             endpoints,
             responder,
+            signature,
+            expires_at,
+            scope,
         } => {
             assert_eq!(query_id, "q-001");
             assert_eq!(endpoints.len(), 1);
             assert_eq!(responder.to_string(), did.to_string());
+            assert_eq!(signature.len(), 64);
+            assert_eq!(expires_at, 1700003600);
+            assert_eq!(scope, ScopeLevel::Org);
             verify_service_endpoint(&endpoints[0]).expect("signature valid in response");
         }
         _ => panic!("Expected Response message"),
