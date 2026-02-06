@@ -80,7 +80,8 @@ impl ArtifactReceipt {
     /// Compute the binding hash from the significant fields.
     ///
     /// This is a pure function used by `new()` and `verify_binding()`.
-    /// The hash commits to: request_id || blob_hash || requester_did || provider_did || scope_id
+    /// Variable-length fields are length-prefixed (u64 LE) to prevent
+    /// collision attacks from redistributing bytes between adjacent fields.
     pub fn compute_receipt_hash(
         request_id: &[u8; 32],
         blob_hash: &Hash,
@@ -89,10 +90,15 @@ impl ArtifactReceipt {
         scope_id: &str,
     ) -> Hash {
         let mut hasher = blake3::Hasher::new();
+        // Fixed-length fields: no prefix needed
         hasher.update(request_id);
         hasher.update(blob_hash);
+        // Variable-length fields: length-prefix each one
+        hasher.update(&(requester_did.len() as u64).to_le_bytes());
         hasher.update(requester_did.as_bytes());
+        hasher.update(&(provider_did.len() as u64).to_le_bytes());
         hasher.update(provider_did.as_bytes());
+        hasher.update(&(scope_id.len() as u64).to_le_bytes());
         hasher.update(scope_id.as_bytes());
         *hasher.finalize().as_bytes()
     }
@@ -180,5 +186,30 @@ mod tests {
     fn signature_starts_empty() {
         let receipt = make_receipt();
         assert!(receipt.signature.as_bytes().is_empty());
+    }
+
+    #[test]
+    fn length_prefix_prevents_field_collision() {
+        // Without length prefixes, these two would hash identically because
+        // the concatenation of provider_did || scope_id is the same bytes.
+        let r1 = ArtifactReceipt::new(
+            [0xAA; 32],
+            "did:icn:ABC".to_string(),
+            "did:icn:requester".to_string(),
+            [0xBB; 32],
+            "XYZ".to_string(),
+            1700000000,
+        );
+        let r2 = ArtifactReceipt::new(
+            [0xAA; 32],
+            "did:icn:ABCXYZ".to_string(),
+            "did:icn:requester".to_string(),
+            [0xBB; 32],
+            "".to_string(),
+            1700000000,
+        );
+        assert_ne!(r1.receipt_hash, r2.receipt_hash);
+        assert!(r1.verify_binding());
+        assert!(r2.verify_binding());
     }
 }

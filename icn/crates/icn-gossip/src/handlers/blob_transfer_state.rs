@@ -254,8 +254,9 @@ impl TransferSessionManager {
                 error = %e,
                 "Failed to create partial dir for transfer session"
             );
-            // Clean up session on failure
-            self.sessions.remove(&request_id);
+            // Clean up session AND per-peer counter on failure.
+            // cleanup_session handles both removal and counter decrement.
+            self.cleanup_session(request_id);
             return Err(ErrCode::Busy);
         }
 
@@ -308,6 +309,10 @@ impl TransferSessionManager {
                 // First chunk: initialize receiving state
                 if total_chunks == 0 {
                     session.state = TransferState::Failed(ErrCode::InvalidRequest);
+                    return Err(ErrCode::InvalidRequest);
+                }
+
+                if chunk_index >= total_chunks {
                     return Err(ErrCode::InvalidRequest);
                 }
 
