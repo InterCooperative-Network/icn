@@ -1156,7 +1156,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_remote_hash_mismatch() {
-        let wasm = sample_wasm();
+        let _wasm = sample_wasm();
 
         let mut registry = blob_registry();
         registry.set_fetch_callback(Arc::new(move |_hash| {
