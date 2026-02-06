@@ -21,7 +21,7 @@
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
 };
-use icn_trust::TrustGraph;
+use icn_trust::{ScopeId, TrustGraph};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
@@ -117,6 +117,50 @@ impl TrustPolicyOracle {
         }
         threshold
     }
+
+    /// Parse org_id from metadata and convert to ScopeId.
+    ///
+    /// Supports federation and cooperative scope identifiers:
+    /// - `did:icn:fed:<id>` -> `ScopeId::Federation(id)`
+    /// - `did:icn:coop:<id>` -> `ScopeId::Cooperative(id)`
+    /// - Other formats (e.g., plain names) -> `ScopeId::Cooperative(org_id)`
+    ///
+    /// Returns None if org_id is not present or invalid (empty, whitespace-only, or invalid ScopeId).
+    fn parse_scope_from_org_id(request: &PolicyRequest) -> Option<ScopeId> {
+        let org_id = request.context.metadata.get("org_id")?.trim();
+
+        // Empty or whitespace-only string is invalid
+        if org_id.is_empty() {
+            return None;
+        }
+
+        // Check for DID-style org_id patterns
+        if let Some(stripped) = org_id.strip_prefix("did:icn:fed:") {
+            let stripped = stripped.trim();
+            if stripped.is_empty() {
+                return None;
+            }
+            let scope = ScopeId::federation(stripped);
+            return if scope.is_valid() { Some(scope) } else { None };
+        }
+        if let Some(stripped) = org_id.strip_prefix("did:icn:coop:") {
+            let stripped = stripped.trim();
+            if stripped.is_empty() {
+                return None;
+            }
+            let scope = ScopeId::cooperative(stripped);
+            return if scope.is_valid() { Some(scope) } else { None };
+        }
+
+        // Fallback: treat as cooperative scope for plain names
+        // This supports legacy org_id formats like "regional-food-network"
+        let scope = ScopeId::cooperative(org_id);
+        if scope.is_valid() {
+            Some(scope)
+        } else {
+            None
+        }
+    }
 }
 
 impl PolicyOracle for TrustPolicyOracle {
@@ -140,17 +184,40 @@ impl PolicyOracle for TrustPolicyOracle {
             }
         };
 
-        // Compute trust score internally (trust semantics stay here)
-        // Log errors (storage corruption, lock issues) before falling back to minimal trust
-        let score = match graph.compute_trust_score(&actor_did) {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::warn!(
-                    actor = %request.core.actor,
-                    error = %e,
-                    "Failed to compute trust score, returning minimal trust"
-                );
-                0.0
+        // Check for scope-bounded evaluation via org_id metadata
+        // If org_id is present, compute trust within that scope
+        // Otherwise, use global scope trust computation (backward compatible)
+        let score = if let Some(scope) = Self::parse_scope_from_org_id(request) {
+            // Scope-bounded trust computation
+            tracing::debug!(
+                actor = %request.core.actor,
+                scope = %scope,
+                "Computing trust score in scope"
+            );
+            match graph.compute_trust_score_in_scope(&actor_did, &scope) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(
+                        actor = %request.core.actor,
+                        scope = %scope,
+                        error = %e,
+                        "Failed to compute scope-bounded trust score, returning minimal trust"
+                    );
+                    0.0
+                }
+            }
+        } else {
+            // Global scope trust computation (default)
+            match graph.compute_trust_score(&actor_did) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(
+                        actor = %request.core.actor,
+                        error = %e,
+                        "Failed to compute trust score, returning minimal trust"
+                    );
+                    0.0
+                }
             }
         };
 
@@ -208,6 +275,7 @@ impl PolicyOracle for TrustPolicyOracle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_kernel_api::authz::PolicyRequestCore;
     use icn_store::SledStore;
     use tempfile::tempdir;
 
@@ -338,6 +406,154 @@ mod tests {
     fn test_cache_ttl_is_30_seconds() {
         let oracle = create_test_oracle();
         assert_eq!(oracle.cache_ttl(), Duration::from_secs(30));
+    }
+
+    // ================================================================
+    // Scope parsing tests
+    // ================================================================
+
+    #[test]
+    fn test_parse_scope_from_org_id_cooperative_plain() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "coop-a");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_some());
+        assert_eq!(scope.unwrap(), icn_trust::ScopeId::cooperative("coop-a"));
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_federation_did_style() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new()
+            .with_metadata("org_id", "did:icn:fed:regional-alliance");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_some());
+        assert_eq!(
+            scope.unwrap(),
+            icn_trust::ScopeId::federation("regional-alliance")
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_cooperative_did_style() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new()
+            .with_metadata("org_id", "did:icn:coop:food-coop");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_some());
+        assert_eq!(scope.unwrap(), icn_trust::ScopeId::cooperative("food-coop"));
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_no_metadata() {
+        let request = PolicyRequest::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_none());
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_empty_string() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_none(), "Empty org_id should return None");
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_whitespace_only() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context = icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "   ");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(scope.is_none(), "Whitespace-only org_id should return None");
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_empty_suffix_fed() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:fed:");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with empty suffix should return None (fed)"
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_empty_suffix_coop() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:coop:");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with empty suffix should return None (coop)"
+        );
+    }
+
+    #[test]
+    fn test_parse_scope_from_org_id_did_whitespace_suffix() {
+        let core = PolicyRequestCore::new(
+            "did:icn:test".to_string(),
+            ActionKind::Read,
+            Domain::trust(),
+        );
+        let context =
+            icn_kernel_api::authz::PolicyContext::new().with_metadata("org_id", "did:icn:fed:   ");
+        let request = PolicyRequest::with_context(core, context);
+
+        let scope = TrustPolicyOracle::parse_scope_from_org_id(&request);
+        assert!(
+            scope.is_none(),
+            "DID with whitespace-only suffix should return None"
+        );
     }
 
     // ================================================================
