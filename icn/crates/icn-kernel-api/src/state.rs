@@ -344,6 +344,24 @@ pub enum StateError {
     #[error("Log already exists: {0}")]
     LogAlreadyExists(String),
 
+    /// Blob exceeds maximum allowed size
+    #[error("Blob exceeds size limit: {size} bytes (max {max})")]
+    BlobOversize {
+        /// Actual blob size
+        size: u64,
+        /// Maximum allowed size
+        max: u64,
+    },
+
+    /// Blob integrity check failed (hash mismatch)
+    #[error("Blob integrity error: expected {expected}, got {actual}")]
+    BlobIntegrity {
+        /// Expected hash (hex)
+        expected: String,
+        /// Actual hash (hex)
+        actual: String,
+    },
+
     /// Storage backend error
     #[error("Storage error: {0}")]
     StorageError(String),

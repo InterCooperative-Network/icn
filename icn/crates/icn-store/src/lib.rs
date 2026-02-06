@@ -6,6 +6,8 @@
 // Allow unwrap/expect in test code - panics are acceptable for tests
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+/// Hybrid blob store: sled metadata + filesystem blobs
+pub mod blob_store;
 /// Storage maintenance tasks
 pub mod maintenance;
 /// Notification storage and management

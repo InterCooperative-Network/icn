@@ -3547,8 +3547,10 @@ name = "icn-store"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "bytes",
  "ed25519-dalek",
+ "hex",
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
@@ -3558,6 +3560,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sled",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
