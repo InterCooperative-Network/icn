@@ -3,7 +3,10 @@
 jobs = 5
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "debuginfo=1"]
+# Use mold linker if available - much faster and uses less memory than ld
+# Falls back to default linker if mold is not installed
+linker = "clang"
+rustflags = ["-C", "debuginfo=1", "-C", "link-arg=-fuse-ld=mold"]
 
 [profile.dev]
 opt-level = 0
