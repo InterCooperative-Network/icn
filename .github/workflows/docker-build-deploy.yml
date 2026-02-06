@@ -25,7 +25,12 @@ env:
   IMAGE_NAME: icn
   IMAGE_TAG: ${{ github.sha }}
   # Increase rustc stack size to prevent compiler crashes (SIGSEGV) on large crates
-  RUST_MIN_STACK: 268435456
+  # Error suggested 536870912 (512MB) when 256MB was insufficient
+  RUST_MIN_STACK: 536870912
+  # Use clang instead of gcc to avoid GCC 13 ICE (internal compiler error)
+  # when compiling aws-lc-sys crypto library
+  CC: clang
+  CXX: clang++
 
 jobs:
   # Standard CI jobs run on GitHub-hosted runners
@@ -42,6 +47,14 @@ jobs:
         with:
           verbose: 'true'
           aggressive: 'true'
+
+      - name: Install clang (workaround for GCC 13 ICE in aws-lc-sys)
+        run: |
+          if ! command -v clang &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y clang
+          fi
+          clang --version
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
