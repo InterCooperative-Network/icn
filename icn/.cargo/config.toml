@@ -1,6 +1,7 @@
 [build]
-# On icn-dev (6 vCPU): build fast but don't bully the scheduler
-jobs = 5
+# Limit parallel jobs to avoid OOM on CI runner (11GB RAM)
+# CI will override with CARGO_BUILD_JOBS if needed
+jobs = 4
 
 [target.x86_64-unknown-linux-gnu]
 # Use mold linker if available - much faster and uses less memory than ld
@@ -12,7 +13,8 @@ rustflags = ["-C", "debuginfo=1", "-C", "link-arg=-fuse-ld=mold"]
 opt-level = 0
 debug = 1
 incremental = true
-codegen-units = 256
+# Reduced from 256 to prevent rustc OOM/SIGSEGV on memory-constrained CI
+codegen-units = 64
 
 [profile.dev.package."*"]
 opt-level = 2
