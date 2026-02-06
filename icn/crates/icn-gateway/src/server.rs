@@ -104,6 +104,9 @@ pub struct GatewayServer {
     steward_handle: Option<icn_steward::StewardHandle>,
     /// Optional handle to daemon's AgreementManager (for inter-cooperative agreements)
     agreement_manager_handle: Option<icn_federation::agreement::AgreementManagerHandle>,
+    /// Optional supervisor-initialized ServiceDiscoveryManager with gossip wiring.
+    /// When provided, the gateway uses this instead of creating its own (gossip-less) instance.
+    service_discovery_manager: Option<Arc<crate::service_discovery_mgr::ServiceDiscoveryManager>>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
     /// Default trust score for unknown peers (overrides DEFAULT_TRUST_SCORE)
@@ -133,6 +136,7 @@ impl GatewayServer {
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
+            service_discovery_manager: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -164,6 +168,7 @@ impl GatewayServer {
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
+            service_discovery_manager: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -196,6 +201,7 @@ impl GatewayServer {
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
+            service_discovery_manager: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -330,6 +336,19 @@ impl GatewayServer {
         handle: icn_federation::agreement::AgreementManagerHandle,
     ) -> Self {
         self.agreement_manager_handle = Some(handle);
+        self
+    }
+
+    /// Set the supervisor-initialized ServiceDiscoveryManager.
+    ///
+    /// When provided, the gateway uses this manager (which has gossip wiring)
+    /// instead of creating its own isolated instance. This enables gossip-backed
+    /// service discovery across the network.
+    pub fn with_service_discovery_manager(
+        mut self,
+        manager: Arc<crate::service_discovery_mgr::ServiceDiscoveryManager>,
+    ) -> Self {
+        self.service_discovery_manager = Some(manager);
         self
     }
 
@@ -486,10 +505,14 @@ impl GatewayServer {
                 None
             };
 
-        // Create service discovery manager
-        let service_discovery_manager =
-            Arc::new(crate::service_discovery_mgr::ServiceDiscoveryManager::new());
-        info!("Service discovery manager initialized");
+        // Use supervisor-provided service discovery manager (gossip-wired) or create a local one
+        let service_discovery_manager = if let Some(mgr) = self.service_discovery_manager {
+            info!("Service discovery manager initialized (gossip-wired from supervisor)");
+            mgr
+        } else {
+            info!("Service discovery manager initialized (local, no gossip)");
+            Arc::new(crate::service_discovery_mgr::ServiceDiscoveryManager::new())
+        };
 
         // Start background expiry task for service endpoints (every 5 minutes)
         let _service_expiry_handle =

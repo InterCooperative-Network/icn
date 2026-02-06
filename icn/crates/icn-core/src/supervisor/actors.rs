@@ -20,6 +20,8 @@ pub struct GatewayActorHandles {
     pub entity: Option<icn_entity::EntityHandle>,
     pub steward: Option<icn_steward::StewardHandle>,
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
+    pub service_discovery_manager:
+        Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
 }
 
 /// Core actor handles returned from initialization
