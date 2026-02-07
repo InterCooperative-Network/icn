@@ -85,6 +85,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Check kernel crates for forbidden deps (bash version)
@@ -138,6 +141,9 @@ jobs:
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
 
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -160,6 +166,9 @@ jobs:
         uses: ./.github/actions/free-disk-space
         with:
           verbose: 'true'
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -187,6 +196,9 @@ jobs:
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -229,6 +241,9 @@ jobs:
           verbose: 'true'
           aggressive: 'true'
 
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
       - uses: dtolnay/rust-toolchain@stable
 
       # NOTE: No rust-cache for coverage job - tarpaulin needs fresh instrumented
@@ -267,6 +282,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
@@ -298,6 +316,9 @@ jobs:
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
 

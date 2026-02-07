@@ -41,6 +41,7 @@ pub mod error;
 pub mod events;
 pub mod identity;
 pub mod naming;
+pub mod proofs;
 pub mod protocol_params;
 pub mod scope;
 pub mod services;
@@ -68,6 +69,7 @@ pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{
     Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
 };
+pub use proofs::ArtifactReceipt;
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,

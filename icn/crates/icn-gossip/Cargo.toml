@@ -30,6 +30,7 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 [dev-dependencies]
 icn-store.workspace = true
 criterion = "0.5"
+tempfile = "3"
 
 [[bench]]
 name = "gossip_bench"
