@@ -4,10 +4,7 @@
 jobs = 4
 
 [target.x86_64-unknown-linux-gnu]
-# Requires clang + mold: `sudo apt-get install clang mold`
-# CI installs via .github/actions/install-build-tools
-linker = "clang"
-rustflags = ["-C", "debuginfo=1", "-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "debuginfo=1"]
 
 [profile.dev]
 opt-level = 0
