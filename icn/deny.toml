@@ -36,6 +36,11 @@ ignore = [
     # Recommended replacement is portable-atomic. Tracking in #535 (postcard migration).
     # Will be resolved when heapless updates or we use postcard without heapless feature.
     "RUSTSEC-2023-0089",  # atomic-polyfill deprecated
+
+    # time 0.3.x has a DoS via stack exhaustion (fixed in 0.3.47).
+    # Transitive dep via cookie, x509-parser/yasna, pqcrypto-mldsa.
+    # No direct upgrade path until upstream crates update.
+    "RUSTSEC-2026-0009",  # time 0.3.x DoS
 ]
 
 [licenses]
