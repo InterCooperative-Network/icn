@@ -41,6 +41,7 @@ struct ProviderEntry {
 }
 
 impl ProviderEntry {
+    #[allow(dead_code)] // Used by select_provider/list_providers (PR2d #1071)
     fn is_expired(&self, ttl: Duration) -> bool {
         self.received_at.elapsed() > ttl
     }
@@ -53,6 +54,7 @@ pub struct ProviderRegistry {
     /// blob_hash → set of providers (sorted by DID for deterministic iteration)
     providers: HashMap<ContentHash, Vec<ProviderEntry>>,
     /// Announcement TTL
+    #[allow(dead_code)] // Used by select_provider/list_providers (PR2d #1071)
     ttl: Duration,
 }
 
@@ -147,6 +149,7 @@ impl ProviderRegistry {
     /// DIDs are skipped (e.g., already-failed providers).
     ///
     /// Returns `None` if no valid providers are available.
+    #[allow(dead_code)] // API surface for PR2d #1071
     pub fn select_provider(
         &mut self,
         blob_hash: &ContentHash,
@@ -182,6 +185,7 @@ impl ProviderRegistry {
     }
 
     /// List all known providers for a blob hash (non-expired).
+    #[allow(dead_code)] // API surface for PR2d #1071
     pub fn list_providers(&mut self, blob_hash: &ContentHash) -> Vec<ProviderInfo> {
         let Some(entries) = self.providers.get_mut(blob_hash) else {
             return Vec::new();
@@ -204,6 +208,7 @@ impl ProviderRegistry {
     }
 
     /// Remove a specific provider for a blob (e.g., after transfer failure).
+    #[allow(dead_code)] // API surface for PR2d #1071
     pub fn remove_provider(&mut self, blob_hash: &ContentHash, provider_did: &Did) {
         if let Some(entries) = self.providers.get_mut(blob_hash) {
             entries.retain(|e| e.did != *provider_did);
@@ -214,11 +219,13 @@ impl ProviderRegistry {
     }
 
     /// Number of blobs with at least one provider.
+    #[allow(dead_code)] // API surface for PR2d #1071
     pub fn blob_count(&self) -> usize {
         self.providers.len()
     }
 
     /// Total number of provider entries across all blobs.
+    #[allow(dead_code)] // API surface for PR2d #1071
     pub fn total_entries(&self) -> usize {
         self.providers.values().map(|v| v.len()).sum()
     }

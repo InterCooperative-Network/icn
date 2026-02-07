@@ -297,11 +297,7 @@ impl ServiceDiscoveryManager {
         );
 
         if all_endpoints.is_empty() {
-            if timed_out {
-                Ok(RemoteDiscoverOutcome::NoResults)
-            } else {
-                Ok(RemoteDiscoverOutcome::NoResults)
-            }
+            Ok(RemoteDiscoverOutcome::NoResults)
         } else if timed_out {
             Ok(RemoteDiscoverOutcome::Timeout(all_endpoints))
         } else {
@@ -310,6 +306,7 @@ impl ServiceDiscoveryManager {
     }
 
     /// Internal implementation for processing gossip entries.
+    #[allow(clippy::type_complexity)]
     async fn handle_gossip_entry_internal(
         registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
         pending_queries: Option<Arc<RwLock<HashMap<String, mpsc::Sender<Vec<ServiceEndpoint>>>>>>,
@@ -507,9 +504,9 @@ impl ServiceDiscoveryManager {
                     let pq_read = pq.read().await;
                     if let Some(sender) = pq_read.get(&qid) {
                         if sender.try_send(eps).is_err() {
-                            debug!(
+                            warn!(
                                 query_id = %qid,
-                                "Pending query channel full or closed"
+                                "Pending query response dropped: channel full or closed"
                             );
                         }
                     }

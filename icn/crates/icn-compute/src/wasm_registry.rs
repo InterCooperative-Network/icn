@@ -452,12 +452,12 @@ impl WasmRegistry {
                 );
             }
             Err(e) => {
-                // Log but don't fail -- we already have the bytes
                 tracing::warn!(
                     hash = %hex::encode(hash),
                     error = %e,
                     "Failed to store fetched WASM module locally"
                 );
+                return Err(e);
             }
         }
 
