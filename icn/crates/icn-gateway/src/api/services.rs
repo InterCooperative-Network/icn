@@ -112,6 +112,11 @@ pub struct DiscoverQuery {
     pub scope: String,
     /// Comma-separated required capabilities
     pub capabilities: Option<String>,
+    /// Include remote gossip-based discovery (default: false)
+    #[serde(default)]
+    pub remote: bool,
+    /// Remote query timeout in seconds (default: 5)
+    pub timeout_secs: Option<u64>,
 }
 
 /// Query parameters for service endpoint query API (Issue #936).
@@ -132,6 +137,12 @@ pub struct QueryServicesParams {
 pub struct DiscoverResponse {
     pub endpoints: Vec<ServiceEndpointResponse>,
     pub count: usize,
+    /// Whether remote discovery was included
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote: Option<bool>,
+    /// Whether the remote query timed out (partial results may be present)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote_timeout: Option<bool>,
 }
 
 /// Service endpoint in API response format.
@@ -348,6 +359,14 @@ pub struct WithdrawQuery {
 }
 
 /// GET /services/discover - Discover services with filters
+///
+/// By default, searches only the local registry. Add `?remote=true` to also
+/// query peers via gossip fanout. Remote responses are validated (signature,
+/// TTL, scope) before aggregation.
+///
+/// Error mapping:
+/// - timeout with no results → 503 (`ErrCode::Busy`)
+/// - no results (local + remote) → 404 (`ErrCode::NotFound`)
 #[get("/discover")]
 pub async fn discover_services(
     mgr: web::Data<Arc<ServiceDiscoveryManager>>,
@@ -366,9 +385,69 @@ pub async fn discover_services(
         .map(|c| c.split(',').map(|s| s.trim().to_string()).collect())
         .unwrap_or_default();
 
-    let results = mgr
+    // Local discovery
+    let mut results = mgr
         .discover(scope, service_type.as_ref(), &capabilities)
         .await;
+
+    let mut remote_included = false;
+    let mut remote_timed_out = false;
+
+    // Remote discovery via gossip (if requested)
+    if query.remote {
+        let timeout = query
+            .timeout_secs
+            .map(|s| std::time::Duration::from_secs(s.min(30))); // cap at 30s
+
+        match mgr
+            .discover_remote(scope, service_type.as_ref(), &capabilities, timeout)
+            .await
+        {
+            Ok(outcome) => {
+                remote_included = true;
+                match outcome {
+                    crate::service_discovery_mgr::RemoteDiscoverOutcome::Results(eps) => {
+                        results.extend(eps);
+                    }
+                    crate::service_discovery_mgr::RemoteDiscoverOutcome::Timeout(eps) => {
+                        remote_timed_out = true;
+                        results.extend(eps);
+                    }
+                    crate::service_discovery_mgr::RemoteDiscoverOutcome::NoResults => {
+                        // No remote results
+                    }
+                }
+            }
+            Err(_e) => {
+                // Remote discovery failed (no gossip configured, etc.)
+                // Fall back to local results only
+            }
+        }
+    }
+
+    // Deduplicate by service_id
+    let mut seen = std::collections::HashSet::new();
+    results.retain(|ep| seen.insert(ep.service_id.clone()));
+
+    // If remote was requested and timed out with no results at all → Busy
+    if query.remote && remote_timed_out && results.is_empty() {
+        return Err(crate::error::GatewayError::Kernel(
+            icn_kernel_api::IcnError::new(
+                icn_kernel_api::ErrCode::Busy,
+                "Remote discovery timed out",
+            ),
+        ));
+    }
+
+    // If no results at all → NotFound
+    if results.is_empty() {
+        return Err(crate::error::GatewayError::Kernel(
+            icn_kernel_api::IcnError::new(
+                icn_kernel_api::ErrCode::NotFound,
+                "No matching services found",
+            ),
+        ));
+    }
 
     let response_endpoints: Vec<ServiceEndpointResponse> =
         results.iter().map(to_response).collect();
@@ -377,6 +456,8 @@ pub async fn discover_services(
     Ok(HttpResponse::Ok().json(DiscoverResponse {
         endpoints: response_endpoints,
         count,
+        remote: if remote_included { Some(true) } else { None },
+        remote_timeout: if remote_timed_out { Some(true) } else { None },
     }))
 }
 
@@ -442,6 +523,8 @@ pub async fn query_services(
     Ok(HttpResponse::Ok().json(DiscoverResponse {
         endpoints: response_endpoints,
         count,
+        remote: None,
+        remote_timeout: None,
     }))
 }
 

@@ -738,9 +738,19 @@ mod tests {
         assert_eq!(result.revocations, 1000);
         assert_eq!(LARGE_REVOKE_COUNT.load(Ordering::SeqCst), 1000);
 
+        // Stats may include an extra periodic check if the tokio interval's
+        // first tick fires before force_check (race when startup jitter is 0).
         let stats = handle.get_stats().await.unwrap();
-        assert_eq!(stats.resources_checked, 1500);
-        assert_eq!(stats.total_revocations, 1000);
+        assert!(
+            stats.resources_checked >= 1500,
+            "expected at least 1500 resources_checked, got {}",
+            stats.resources_checked
+        );
+        assert!(
+            stats.total_revocations >= 1000,
+            "expected at least 1000 total_revocations, got {}",
+            stats.total_revocations
+        );
 
         let _ = shutdown_tx.send(());
         tokio::time::sleep(Duration::from_millis(100)).await;

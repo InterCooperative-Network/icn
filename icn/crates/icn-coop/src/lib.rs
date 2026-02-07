@@ -61,6 +61,13 @@ pub enum CoopError {
 
     #[error("Ledger error: {0}")]
     Ledger(String),
+
+    #[error("Treasury nonce mismatch for coop {coop_id}: expected {expected}, stored {stored}")]
+    NonceMismatch {
+        coop_id: String,
+        expected: u64,
+        stored: u64,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, CoopError>;

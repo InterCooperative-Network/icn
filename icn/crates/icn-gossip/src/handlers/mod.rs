@@ -19,6 +19,7 @@ pub mod blob_transfer_state;
 mod bloom;
 mod dispatch;
 mod partition;
+pub mod provider_registry;
 mod pull;
 mod push;
 mod replica;

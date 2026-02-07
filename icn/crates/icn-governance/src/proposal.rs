@@ -795,6 +795,31 @@ pub enum TreasuryProposalOperation {
         /// Reason for reclamation
         reason: String,
     },
+
+    /// Direct treasury spend approved through governance
+    ///
+    /// A simplified treasury disbursement that transfers funds directly from
+    /// the cooperative treasury to a recipient. Unlike `Withdraw`, this does
+    /// not require specifying a budget -- the spend is charged against the
+    /// treasury's unallocated balance.
+    ///
+    /// Requires governance approval (same thresholds as `Withdraw`).
+    Spend {
+        /// Amount to spend (must be positive)
+        amount: i64,
+        /// Recipient DID (must be a valid `did:icn:` identifier)
+        recipient: Did,
+        /// Human-readable description of the spend (must be non-empty)
+        memo: String,
+        /// Expected treasury nonce at execution time.
+        ///
+        /// The nonce is checked atomically before the ledger transfer.
+        /// If the stored nonce does not match, the spend is rejected as
+        /// a replay / double-spend attempt. Defaults to 0 for backward
+        /// compatibility with proposals created before nonce support.
+        #[serde(default)]
+        nonce: u64,
+    },
 }
 
 /// Type of approval required for treasury spending
@@ -2296,5 +2321,139 @@ mod tests {
             let deserialized: DisputeResolutionMethod = serde_json::from_str(&json).unwrap();
             assert_eq!(method, deserialized);
         }
+    }
+
+    // ========== TreasurySpend Tests (Issue #1088) ==========
+
+    #[test]
+    fn test_treasury_spend_serialization_roundtrip() {
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let operation = TreasuryProposalOperation::Spend {
+            amount: 5000,
+            recipient: recipient.clone(),
+            memo: "Office supplies reimbursement".to_string(),
+            nonce: 0,
+        };
+
+        let json = serde_json::to_string(&operation).unwrap();
+        let deserialized: TreasuryProposalOperation = serde_json::from_str(&json).unwrap();
+
+        match deserialized {
+            TreasuryProposalOperation::Spend {
+                amount,
+                recipient: r,
+                memo,
+                nonce,
+            } => {
+                assert_eq!(amount, 5000);
+                assert_eq!(r, recipient);
+                assert_eq!(memo, "Office supplies reimbursement");
+                assert_eq!(nonce, 0);
+            }
+            other => panic!("Expected Spend, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_treasury_spend_proposal_creation() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Community garden supplies".to_string(),
+            "Purchase supplies for the community garden project".to_string(),
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::Spend {
+                    amount: 2500,
+                    recipient: recipient.clone(),
+                    memo: "Garden tools and seeds".to_string(),
+                    nonce: 0,
+                },
+            },
+        );
+
+        assert_eq!(proposal.title, "Community garden supplies");
+        assert_eq!(proposal.payload.type_name(), "treasury");
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::Spend { amount: 2500, .. }
+            }
+        ));
+    }
+
+    #[test]
+    fn test_treasury_spend_zero_amount_is_representable() {
+        // Zero amount is structurally valid at the type level; validation
+        // happens at the handler level (handler rejects amount <= 0).
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let operation = TreasuryProposalOperation::Spend {
+            amount: 0,
+            recipient,
+            memo: "Should be rejected by handler".to_string(),
+            nonce: 0,
+        };
+
+        // Serialization still works -- the handler is responsible for rejection.
+        let json = serde_json::to_string(&operation).unwrap();
+        assert!(json.contains("\"amount\":0"));
+    }
+
+    #[test]
+    fn test_treasury_spend_empty_memo_is_representable() {
+        // Empty memo is structurally valid; handler-level validation rejects it.
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let operation = TreasuryProposalOperation::Spend {
+            amount: 100,
+            recipient,
+            memo: String::new(),
+            nonce: 0,
+        };
+
+        let json = serde_json::to_string(&operation).unwrap();
+        assert!(json.contains("\"memo\":\"\""));
+    }
+
+    #[test]
+    fn test_treasury_spend_payload_in_full_lifecycle() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let mut proposal = Proposal::new(
+            domain_id,
+            did,
+            "Emergency repair fund".to_string(),
+            "Approve spend for emergency roof repair".to_string(),
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::Spend {
+                    amount: 15000,
+                    recipient,
+                    memo: "Roof repair after storm damage".to_string(),
+                    nonce: 0,
+                },
+            },
+        );
+
+        assert!(proposal.state.is_draft());
+
+        // Open directly (emergency-style)
+        proposal.open(3600).unwrap();
+        assert!(proposal.state.is_open());
+
+        // Close as accepted
+        let now = icn_time::current_timestamp_secs();
+        proposal
+            .close(ProposalState::Accepted { closed_at: now })
+            .unwrap();
+        assert!(proposal.state.is_closed());
     }
 }

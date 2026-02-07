@@ -37,6 +37,9 @@ pub struct GatewayHandles {
     pub steward: Option<icn_steward::StewardHandle>,
     /// Agreement manager for inter-cooperative agreements
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
+    /// Service discovery manager with gossip wiring
+    pub service_discovery_manager:
+        Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -96,6 +99,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let entity_handle = handles.entity;
     let steward_handle = handles.steward;
     let agreement_manager_handle = handles.agreement_manager;
+    let service_discovery_manager = handles.service_discovery_manager;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -154,6 +158,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(handle) = agreement_manager_handle {
                 gateway_server = gateway_server.with_agreement_manager_handle(handle);
+            }
+
+            if let Some(mgr) = service_discovery_manager {
+                gateway_server = gateway_server.with_service_discovery_manager(mgr);
             }
 
             if let Some(score) = default_trust_score {

@@ -713,13 +713,103 @@ impl ComputeActor {
             });
         }
 
+        // Resolve WasmRef to WasmInline before execution (Issue #1074).
+        // Authz has already happened above (trust check, capacity check, policy check).
+        // This fetch is async and must happen BEFORE the sync Executor::execute() call.
+        let mut resolved_task = claimed_task.clone();
+        if let crate::types::TaskCode::WasmRef(ref wasm_hash) = claimed_task.code {
+            let wasm_hash_hex = hex::encode(wasm_hash);
+            match &self.wasm_registry {
+                Some(registry) => {
+                    tracing::debug!(
+                        task_id = %claimed_task.id,
+                        wasm_hash = %wasm_hash_hex,
+                        "Resolving WasmRef module (local or remote)"
+                    );
+                    match registry.resolve_or_fetch(wasm_hash).await {
+                        Ok(wasm_bytes) => {
+                            tracing::info!(
+                                task_id = %claimed_task.id,
+                                wasm_hash = %wasm_hash_hex,
+                                size = wasm_bytes.len(),
+                                "WasmRef resolved successfully"
+                            );
+                            resolved_task.code = crate::types::TaskCode::WasmInline(wasm_bytes);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                task_id = %claimed_task.id,
+                                wasm_hash = %wasm_hash_hex,
+                                error = %e,
+                                "WasmRef resolution failed"
+                            );
+                            // Mark task as failed and clean up
+                            self.task_manager
+                                .lock()
+                                .await
+                                .fail(&hash, format!("Module fetch failed: {e}"))?;
+                            let mut registry = self.executor_registry.lock().await;
+                            if let Some(info) = registry.get_mut(&self.own_did) {
+                                if info.tasks_executing > 0 {
+                                    info.tasks_executing -= 1;
+                                }
+                            }
+                            drop(registry);
+                            self.decrement_scope_queue(&hash).await;
+                            return Err(ComputeError::ModuleFetchFailed {
+                                hash: wasm_hash_hex,
+                                reason: e.to_string(),
+                            });
+                        }
+                    }
+                }
+                None => {
+                    tracing::warn!(
+                        task_id = %claimed_task.id,
+                        wasm_hash = %wasm_hash_hex,
+                        "WasmRef requires WASM registry (not configured)"
+                    );
+                    self.task_manager
+                        .lock()
+                        .await
+                        .fail(&hash, "WASM registry not configured".to_string())?;
+                    let mut registry = self.executor_registry.lock().await;
+                    if let Some(info) = registry.get_mut(&self.own_did) {
+                        if info.tasks_executing > 0 {
+                            info.tasks_executing -= 1;
+                        }
+                    }
+                    drop(registry);
+                    self.decrement_scope_queue(&hash).await;
+                    return Err(ComputeError::ModuleFetchFailed {
+                        hash: wasm_hash_hex,
+                        reason: "WASM registry not configured".to_string(),
+                    });
+                }
+            }
+        }
+
         // Execute
         let start = std::time::Instant::now();
-        let result = {
+        let mut result = {
             let executor = self.executor.read().await;
-            executor.execute_task(&claimed_task, &self.own_did, &self.signing_key)?
+            executor.execute_task(&resolved_task, &self.own_did, &self.signing_key)?
         };
         let duration = start.elapsed().as_secs_f64();
+
+        // When a WasmRef was resolved to WasmInline, the resolved_task has a
+        // different hash than the original claimed_task. The result must carry
+        // the *original* task hash so it matches the TaskManager entry.
+        // Re-sign because signing_payload includes task_hash.
+        if matches!(claimed_task.code, crate::types::TaskCode::WasmRef(_)) {
+            result.task_hash = hash;
+            let signing_key_bytes: [u8; 32] =
+                self.signing_key.as_slice().try_into().map_err(|_| {
+                    ComputeError::InvalidSignature("Invalid signing key length".into())
+                })?;
+            let ed25519_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
+            result.sign(&ed25519_key);
+        }
 
         // Record metrics
         icn_obs::metrics::compute::task_duration_record(duration);

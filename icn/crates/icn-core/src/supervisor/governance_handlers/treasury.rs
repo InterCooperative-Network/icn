@@ -226,6 +226,14 @@ impl super::GovernanceEventHandler {
                     reason,
                 );
             }
+            TreasuryProposalOperation::Spend {
+                amount,
+                recipient,
+                memo,
+                nonce,
+            } => {
+                self.handle_treasury_spend(proposal_id, amount, recipient, memo, nonce, decided_at);
+            }
         }
     }
 
@@ -1539,6 +1547,309 @@ impl super::GovernanceEventHandler {
             let duration = start.elapsed().as_secs_f64();
             icn_obs::metrics::governance::proposals_executed_inc("treasury_reclaim");
             icn_obs::metrics::governance::execution_duration_record("treasury_reclaim", duration);
+        });
+    }
+
+    /// Handle a direct treasury spend
+    ///
+    /// Validates amount, recipient, memo, and treasury nonce before resolving
+    /// the treasury currency and performing the actual ledger transfer.
+    ///
+    /// The nonce is checked atomically via `CoopStore::check_and_increment_treasury_nonce`
+    /// before the ledger transfer to prevent double-spend from concurrent
+    /// proposal execution.
+    fn handle_treasury_spend(
+        &self,
+        proposal_id: ProposalId,
+        amount: i64,
+        recipient: Did,
+        memo: String,
+        nonce: u64,
+        decided_at: u64,
+    ) {
+        info!(
+            "🏦 Executing treasury spend for proposal {}: {} to {} ({})",
+            proposal_id.0, amount, recipient, memo
+        );
+
+        let dlq = self.dlq.clone();
+
+        // --- Field validation (before any IO) ---
+
+        // Validate amount is positive
+        if !validate_positive_amount(
+            amount,
+            &proposal_id,
+            "spend",
+            "treasury_spend",
+            "Amount",
+            &dlq,
+        ) {
+            return;
+        }
+
+        // Validate recipient is non-empty
+        if recipient.to_string().is_empty() {
+            error!(
+                "❌ Empty recipient for treasury spend proposal {}",
+                proposal_id.0
+            );
+            let failed_op = FailedOperation::new(
+                format!("treasury:spend:{}", proposal_id.0),
+                FailureType::TreasuryOperationFailed,
+                serde_json::json!({
+                    "proposal_id": proposal_id.0,
+                    "error": "empty_recipient",
+                }),
+                "Recipient DID must not be empty".to_string(),
+            );
+            if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                error!("   Failed to write to dead-letter queue: {}", dlq_err);
+            }
+            icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+            return;
+        }
+
+        // Validate memo is non-empty
+        if memo.is_empty() {
+            error!(
+                "❌ Empty memo for treasury spend proposal {}",
+                proposal_id.0
+            );
+            let failed_op = FailedOperation::new(
+                format!("treasury:spend:{}", proposal_id.0),
+                FailureType::TreasuryOperationFailed,
+                serde_json::json!({
+                    "proposal_id": proposal_id.0,
+                    "error": "empty_memo",
+                }),
+                "Memo must not be empty".to_string(),
+            );
+            if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                error!("   Failed to write to dead-letter queue: {}", dlq_err);
+            }
+            icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+            return;
+        }
+
+        // Resolve the treasury currency and record audit trail, then delegate
+        // the actual ledger transfer to handle_budget_proposal.
+        let treasury_manager = self.treasury_manager.clone();
+        let treasury_did = self.treasury_did.clone();
+        let ledger = self.ledger.clone();
+        let store = self.audit_store.clone();
+        let dlq_clone = dlq.clone();
+        let proposal_id_clone = proposal_id.clone();
+        let recipient_clone = recipient.clone();
+        let memo_clone = memo.clone();
+        let coop_store = self.coop_store.clone();
+
+        tokio::spawn(async move {
+            use icn_ledger::treasury::TreasuryOperation;
+
+            // --- Treasury nonce check (double-spend guard) ---
+            //
+            // The nonce is checked and incremented atomically in a sled
+            // transaction BEFORE the ledger transfer.  If the nonce does not
+            // match the expected value, the spend is rejected.
+            if let Some(ref cs) = coop_store {
+                let treasury_id = treasury_did.to_string();
+                if let Err(e) = cs.check_and_increment_treasury_nonce(&treasury_id, nonce) {
+                    error!(
+                        "❌ Treasury nonce check failed for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:spend:nonce:{}", proposal_id_clone.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id_clone.0,
+                            "error": "nonce_mismatch",
+                            "expected_nonce": nonce,
+                            "treasury_did": treasury_id,
+                        }),
+                        e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    return;
+                }
+                debug!(
+                    "Treasury nonce {} accepted for spend proposal {}",
+                    nonce, proposal_id_clone.0
+                );
+            } else {
+                warn!(
+                    "⚠️ No CoopStore configured; skipping nonce check for spend proposal {}",
+                    proposal_id_clone.0
+                );
+            }
+
+            // Resolve currency from the treasury configuration
+            let currency = {
+                let treasury_guard = treasury_manager.read().await;
+                match treasury_guard.get_treasury(&treasury_did) {
+                    Some(treasury) => treasury.currency.clone(),
+                    None => {
+                        error!(
+                            "❌ Treasury {} not found for spend proposal {}",
+                            treasury_did, proposal_id_clone.0
+                        );
+                        let failed_op = FailedOperation::new(
+                            format!("treasury:spend:{}", proposal_id_clone.0),
+                            FailureType::TreasuryOperationFailed,
+                            serde_json::json!({
+                                "proposal_id": proposal_id_clone.0,
+                                "error": "treasury_not_found",
+                                "treasury_did": treasury_did.to_string(),
+                            }),
+                            format!("Treasury {treasury_did} not found"),
+                        );
+                        if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                        }
+                        icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                        return;
+                    }
+                }
+            };
+
+            // Record treasury audit trail
+            {
+                let mut treasury_guard = treasury_manager.write().await;
+                let operation = TreasuryOperation::Withdraw {
+                    to: recipient_clone.clone(),
+                    amount,
+                    currency: currency.clone(),
+                    purpose: memo_clone,
+                    budget_id: None,
+                };
+
+                if let Err(e) = treasury_guard.record_audit(
+                    &treasury_did,
+                    operation,
+                    treasury_did.clone(),
+                    0,
+                    Some(proposal_id_clone.0.clone()),
+                    None,
+                ) {
+                    warn!(
+                        "⚠️ Failed to record treasury audit for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    // Audit failure is non-fatal; the spend proceeds
+                }
+            }
+
+            // Perform the actual ledger transfer (inline from handle_budget_proposal logic)
+            use icn_ledger::entry::JournalEntryBuilder;
+
+            let start = std::time::Instant::now();
+
+            // Idempotency check
+            let audit_key = format!("gov:audit:treasury:spend:{}", proposal_id_clone.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury spend proposal {} already executed, skipping",
+                        proposal_id_clone.0
+                    );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    let failed_op = FailedOperation::idempotency_check_failure(
+                        &proposal_id_clone.0,
+                        &e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    return;
+                }
+            }
+
+            let mut ledger_guard = ledger.write().await;
+
+            let entry_result = JournalEntryBuilder::new(treasury_did.clone())
+                .credit(treasury_did.clone(), currency.clone(), amount)
+                .debit(recipient_clone.clone(), currency.clone(), amount)
+                .build();
+
+            match entry_result {
+                Ok(entry) => match ledger_guard.append_entry(entry).await {
+                    Ok(entry_hash) => {
+                        info!(
+                            "✅ Treasury spend {} executed: {} {} transferred to {}",
+                            proposal_id_clone.0, amount, currency, recipient_clone
+                        );
+
+                        let audit_record = serde_json::json!({
+                            "proposal_id": proposal_id_clone.0,
+                            "action": "treasury_spend",
+                            "ledger_entry_hash": hex::encode(entry_hash.0),
+                            "amount": amount,
+                            "currency": currency,
+                            "recipient": recipient_clone.to_string(),
+                            "decided_at": decided_at,
+                            "executed_at": icn_time::current_timestamp_secs(),
+                        });
+
+                        if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                            if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                error!(
+                                    "🚨 Failed to store audit trail for spend proposal {}: {}",
+                                    proposal_id_clone.0, e
+                                );
+                                icn_obs::metrics::governance::audit_failures_inc();
+                            }
+                        }
+
+                        let duration = start.elapsed().as_secs_f64();
+                        icn_obs::metrics::governance::proposals_executed_inc("treasury_spend");
+                        icn_obs::metrics::governance::execution_duration_record(
+                            "treasury_spend",
+                            duration,
+                        );
+                    }
+                    Err(e) => {
+                        error!(
+                            "🚨 Failed to append ledger entry for spend proposal {}: {}",
+                            proposal_id_clone.0, e
+                        );
+                        let failed_op = FailedOperation::new(
+                            format!("treasury:spend:ledger:{}", proposal_id_clone.0),
+                            FailureType::LedgerAppendFailed,
+                            serde_json::json!({
+                                "proposal_id": proposal_id_clone.0,
+                                "amount": amount,
+                                "currency": currency,
+                                "recipient": recipient_clone.to_string(),
+                            }),
+                            e.to_string(),
+                        );
+                        if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                        }
+                        icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    }
+                },
+                Err(e) => {
+                    warn!(
+                        "❌ Failed to build ledger entry for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                }
+            }
         });
     }
 

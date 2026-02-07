@@ -30,6 +30,8 @@ pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::Attestatio
 pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
 pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
 pub type EntityHandleType = icn_entity::EntityHandle;
+pub type ServiceDiscoveryManagerHandle =
+    Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -74,6 +76,8 @@ pub struct NotificationDeps {
     pub nat_dial_config: NatDialConfig,
     /// Entity handle for entity registry operations
     pub entity_handle: Option<EntityHandleType>,
+    /// Service discovery manager for gossip-backed service endpoint registration
+    pub service_discovery_manager: Option<ServiceDiscoveryManagerHandle>,
 }
 
 /// Handle trust attestation entries via TrustService
@@ -809,6 +813,13 @@ pub async fn handle_entity_update(entry_data: Vec<u8>, entity_handle: EntityHand
     }
 }
 
+/// Handle service discovery gossip entries (announce/withdraw/query/response)
+pub async fn handle_service_discovery(entry: GossipEntry, manager: ServiceDiscoveryManagerHandle) {
+    if let Err(e) = manager.handle_incoming_gossip(entry).await {
+        warn!("Service discovery gossip error: {}", e);
+    }
+}
+
 /// Handle resource revocation events from cluster
 pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
     match serde_json::from_slice::<crate::resource_enforcer_actor::RevocationEvent>(&entry_data) {
@@ -979,6 +990,16 @@ pub fn create_notification_callback(
             if let Some(data) = entry_data {
                 tokio::spawn(async move {
                     handle_resource_revocation(data).await;
+                });
+            }
+        } else if topic == icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE
+            || topic == icn_gossip::service_discovery_topics::SERVICES_QUERY
+        {
+            if let Some(ref mgr) = deps.service_discovery_manager {
+                let mgr = mgr.clone();
+                let entry = entry.clone();
+                tokio::spawn(async move {
+                    handle_service_discovery(entry, mgr).await;
                 });
             }
         } else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY

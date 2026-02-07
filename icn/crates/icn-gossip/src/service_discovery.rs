@@ -59,9 +59,16 @@ pub enum ServiceDiscoveryMessage {
         required_capabilities: Vec<String>,
         /// Unique query identifier for correlating responses
         query_id: String,
+        /// Unix timestamp when this query expires (prevents stale replay)
+        expires_at: u64,
     },
 
     /// Response to a service query.
+    ///
+    /// Responses carry an Ed25519 signature from the responder over a canonical
+    /// payload (domain-separated with `icn:svc-response:v1`), an expiry
+    /// timestamp, and the scope level the responder is answering within.
+    /// Receivers MUST call [`validate_service_response`] before trusting.
     Response {
         /// Query ID this responds to
         query_id: String,
@@ -69,6 +76,12 @@ pub enum ServiceDiscoveryMessage {
         endpoints: Vec<ServiceEndpoint>,
         /// DID of the responding peer
         responder: Did,
+        /// Ed25519 signature over the canonical response payload
+        signature: Vec<u8>,
+        /// Unix timestamp when this response expires (prevents stale replay)
+        expires_at: u64,
+        /// Scope level the responder is answering within
+        scope: ScopeLevel,
     },
 }
 
@@ -163,6 +176,187 @@ pub fn verify_service_endpoint_with_rotation(
     }
 }
 
+// ============================================================================
+// Service Response signing / verification
+// ============================================================================
+
+/// Domain separation tag for service response signing (version 1).
+const RESPONSE_DOMAIN_TAG: &[u8] = b"icn:svc-response:v1";
+
+/// Compute the canonical signing payload for a service discovery response.
+///
+/// The payload is constructed as:
+/// ```text
+/// domain_tag || query_id || responder_did || scope_u8 || expires_at_le || endpoints_hash
+/// ```
+///
+/// All variable-length fields are length-prefixed (u32 LE) to prevent
+/// concatenation ambiguity. The endpoints are hashed with blake3 to keep the
+/// payload compact regardless of response size.
+pub fn response_signing_payload(
+    query_id: &str,
+    responder: &str,
+    scope: &ScopeLevel,
+    expires_at: u64,
+    endpoints: &[ServiceEndpoint],
+) -> Vec<u8> {
+    let mut payload = Vec::new();
+
+    // Domain separation tag (length-prefixed)
+    payload.extend_from_slice(&(RESPONSE_DOMAIN_TAG.len() as u32).to_le_bytes());
+    payload.extend_from_slice(RESPONSE_DOMAIN_TAG);
+
+    // query_id (length-prefixed)
+    payload.extend_from_slice(&(query_id.len() as u32).to_le_bytes());
+    payload.extend_from_slice(query_id.as_bytes());
+
+    // responder DID (length-prefixed)
+    payload.extend_from_slice(&(responder.len() as u32).to_le_bytes());
+    payload.extend_from_slice(responder.as_bytes());
+
+    // scope (fixed 1 byte)
+    payload.push(scope.as_u8());
+
+    // expires_at (fixed 8 bytes, little-endian)
+    payload.extend_from_slice(&expires_at.to_le_bytes());
+
+    // endpoints hash (fixed 32 bytes) — hash each endpoint's signing payload
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&(endpoints.len() as u32).to_le_bytes());
+    for ep in endpoints {
+        let ep_payload = ep.signing_payload();
+        hasher.update(&(ep_payload.len() as u32).to_le_bytes());
+        hasher.update(&ep_payload);
+    }
+    payload.extend_from_slice(hasher.finalize().as_bytes());
+
+    payload
+}
+
+/// Sign a service discovery response in place.
+///
+/// Computes the canonical payload from the response fields and sets the
+/// `signature` field. Returns an error if `response` is not a `Response` variant.
+pub fn sign_service_response(
+    response: &mut ServiceDiscoveryMessage,
+    signing_key: &ed25519_dalek::SigningKey,
+) -> Result<(), String> {
+    match response {
+        ServiceDiscoveryMessage::Response {
+            query_id,
+            endpoints,
+            responder,
+            signature,
+            expires_at,
+            scope,
+        } => {
+            let payload = response_signing_payload(
+                query_id,
+                responder.as_str(),
+                scope,
+                *expires_at,
+                endpoints,
+            );
+            let sig = signing_key.sign(&payload);
+            *signature = sig.to_bytes().to_vec();
+            Ok(())
+        }
+        _ => Err("sign_service_response called on non-Response variant".to_string()),
+    }
+}
+
+/// Verify the Ed25519 signature of a service discovery response.
+///
+/// Extracts the public key from the responder DID and verifies the signature
+/// over the canonical payload. Returns `Ok(())` if valid, `Err` with reason
+/// if not.
+pub fn verify_service_response(response: &ServiceDiscoveryMessage) -> Result<(), String> {
+    match response {
+        ServiceDiscoveryMessage::Response {
+            query_id,
+            endpoints,
+            responder,
+            signature,
+            expires_at,
+            scope,
+        } => {
+            // Extract verifying key from responder DID
+            let verifying_key = responder
+                .to_verifying_key()
+                .map_err(|e| format!("Cannot extract public key from responder DID: {e}"))?;
+
+            // Check signature length
+            let sig_bytes: [u8; 64] = signature.as_slice().try_into().map_err(|_| {
+                format!(
+                    "Invalid signature length: expected 64, got {}",
+                    signature.len()
+                )
+            })?;
+            let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+
+            // Recompute canonical payload and verify
+            let payload = response_signing_payload(
+                query_id,
+                responder.as_str(),
+                scope,
+                *expires_at,
+                endpoints,
+            );
+            verifying_key
+                .verify(&payload, &sig)
+                .map_err(|e| format!("Response signature verification failed: {e}"))
+        }
+        _ => Err("verify_service_response called on non-Response variant".to_string()),
+    }
+}
+
+/// Validate a service discovery response: signature, TTL, scope.
+///
+/// Returns `true` if the response passes all checks, `false` otherwise.
+/// Invalid responses are silently dropped -- attackers do not deserve error
+/// messages.
+pub fn validate_service_response(
+    response: &ServiceDiscoveryMessage,
+    query_scope: &ScopeLevel,
+) -> bool {
+    match response {
+        ServiceDiscoveryMessage::Response {
+            endpoints,
+            expires_at,
+            scope,
+            ..
+        } => {
+            // 1. Signature must be valid
+            if verify_service_response(response).is_err() {
+                return false;
+            }
+
+            // 2. Must not be expired (current time < expires_at)
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            if now >= *expires_at {
+                return false;
+            }
+
+            // 3. Response scope must be within query scope bounds
+            //    (response scope must not exceed the query scope)
+            if scope > query_scope {
+                return false;
+            }
+
+            // 4. Endpoints must not be empty
+            if endpoints.is_empty() {
+                return false;
+            }
+
+            true
+        }
+        _ => false,
+    }
+}
+
 /// Topic constants for service discovery gossip.
 pub mod topics {
     /// Service announcements and withdrawals (`MinTrustScore(0.1)` - Known+)
@@ -238,6 +432,7 @@ mod tests {
             max_scope: ScopeLevel::Federation,
             required_capabilities: vec!["read".to_string()],
             query_id: "q-123".to_string(),
+            expires_at: 1700003600,
         };
         let serialized = icn_encoding::encode(&query).expect("serialize");
         let deserialized: ServiceDiscoveryMessage =
@@ -248,6 +443,9 @@ mod tests {
             query_id: "q-123".to_string(),
             endpoints: vec![ep],
             responder: did.clone(),
+            signature: vec![0; 64],
+            expires_at: 1700003600,
+            scope: ScopeLevel::Org,
         };
         let serialized = icn_encoding::encode(&response).expect("serialize");
         let deserialized: ServiceDiscoveryMessage =
@@ -364,5 +562,175 @@ mod tests {
     fn test_topic_names() {
         assert_eq!(topics::SERVICES_ANNOUNCE, "services:announce");
         assert_eq!(topics::SERVICES_QUERY, "services:query");
+    }
+
+    // ========================================================================
+    // Service response signing / verification tests
+    // ========================================================================
+
+    /// Helper: build a Response variant ready for signing.
+    fn make_response(
+        query_id: &str,
+        responder: &icn_identity::Did,
+        endpoints: Vec<ServiceEndpoint>,
+        scope: ScopeLevel,
+        expires_at: u64,
+    ) -> ServiceDiscoveryMessage {
+        ServiceDiscoveryMessage::Response {
+            query_id: query_id.to_string(),
+            endpoints,
+            responder: responder.clone(),
+            signature: vec![0; 64],
+            expires_at,
+            scope,
+        }
+    }
+
+    /// Returns a future Unix timestamp ~1 hour from now.
+    fn future_timestamp() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600
+    }
+
+    #[test]
+    fn test_sign_and_verify_response() {
+        let (signing_key, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        sign_service_response(&mut response, &signing_key).expect("signing should succeed");
+
+        // Signature should now be non-zero
+        if let ServiceDiscoveryMessage::Response { ref signature, .. } = response {
+            assert_eq!(signature.len(), 64);
+            assert_ne!(
+                signature,
+                &vec![0u8; 64],
+                "signature should be non-trivial after signing"
+            );
+        }
+
+        verify_service_response(&response).expect("verification should succeed");
+    }
+
+    #[test]
+    fn test_unsigned_response_rejected() {
+        let (_, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        // Response with zeroed-out signature (never signed)
+        let response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+
+        let result = verify_service_response(&response);
+        assert!(
+            result.is_err(),
+            "unsigned response should fail verification"
+        );
+    }
+
+    #[test]
+    fn test_tampered_response_rejected() {
+        let (signing_key, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        sign_service_response(&mut response, &signing_key).expect("signing should succeed");
+
+        // Tamper: change the query_id after signing
+        if let ServiceDiscoveryMessage::Response {
+            ref mut query_id, ..
+        } = response
+        {
+            *query_id = "q-TAMPERED".to_string();
+        }
+
+        let result = verify_service_response(&response);
+        assert!(
+            result.is_err(),
+            "tampered response should fail verification"
+        );
+    }
+
+    #[test]
+    fn test_wrong_key_response_rejected() {
+        let (key_a, _did_a) = make_keypair();
+        let (_key_b, did_b) = make_keypair();
+        let ep = make_endpoint(&did_b);
+
+        // Sign with key_a but set responder to did_b
+        let mut response =
+            make_response("q-1", &did_b, vec![ep], ScopeLevel::Org, future_timestamp());
+        sign_service_response(&mut response, &key_a).expect("signing should succeed");
+
+        let result = verify_service_response(&response);
+        assert!(
+            result.is_err(),
+            "response signed with wrong key should fail verification"
+        );
+    }
+
+    #[test]
+    fn test_expired_response_rejected() {
+        let (signing_key, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        // expires_at is in the past
+        let past = 1_000_000;
+        let mut response = make_response("q-1", &did, vec![ep], ScopeLevel::Org, past);
+        sign_service_response(&mut response, &signing_key).expect("signing should succeed");
+
+        let valid = validate_service_response(&response, &ScopeLevel::Federation);
+        assert!(!valid, "expired response should be rejected by validation");
+    }
+
+    #[test]
+    fn test_wrong_scope_response_rejected() {
+        let (signing_key, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        // Response scope (Federation) exceeds query scope (Org)
+        let mut response = make_response(
+            "q-1",
+            &did,
+            vec![ep],
+            ScopeLevel::Federation,
+            future_timestamp(),
+        );
+        sign_service_response(&mut response, &signing_key).expect("signing should succeed");
+
+        let valid = validate_service_response(&response, &ScopeLevel::Org);
+        assert!(
+            !valid,
+            "response with scope exceeding query scope should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_valid_response_passes_validation() {
+        let (signing_key, did) = make_keypair();
+        let ep = make_endpoint(&did);
+
+        let mut response =
+            make_response("q-1", &did, vec![ep], ScopeLevel::Org, future_timestamp());
+        sign_service_response(&mut response, &signing_key).expect("signing should succeed");
+
+        // Query scope (Federation) includes response scope (Org) -- should pass
+        let valid = validate_service_response(&response, &ScopeLevel::Federation);
+        assert!(
+            valid,
+            "valid signed response within scope should pass validation"
+        );
+
+        // Query scope (Org) equals response scope (Org) -- should also pass
+        let valid = validate_service_response(&response, &ScopeLevel::Org);
+        assert!(
+            valid,
+            "valid signed response at exact scope should pass validation"
+        );
     }
 }

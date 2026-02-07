@@ -1443,3 +1443,250 @@ async fn test_high_value_task_quorum_flow() {
         "Medium-value task submitted successfully"
     );
 }
+
+// ===== Issue #1074: Execute-by-Hash Tests =====
+
+fn make_wasm_ref_task(id: &str, submitter: &str, wasm_hash: [u8; 32]) -> ComputeTask {
+    // Uses Ccl capability for the capability gate check because tests use
+    // LocalExecutor (Ccl-only). The WasmRef resolution happens BEFORE the
+    // sync Executor::execute() call, so the capability gate doesn't affect
+    // the resolution path being tested. After resolution, the task code
+    // becomes WasmInline which the executor handles (returns "WASM not
+    // yet supported" without the wasm feature, which is fine for testing
+    // the resolution flow).
+    ComputeTask {
+        id: id.into(),
+        submitter: submitter.into(),
+        coop_id: None,
+        code: TaskCode::WasmRef(wasm_hash),
+        inputs: vec![],
+        fuel_limit: FuelLimit::default(),
+        required_capabilities: vec![ExecutorCapability::Ccl],
+        priority: crate::types::TaskPriority::Normal,
+        created_at: 1000,
+        deadline: None,
+        payment_rate: None,
+        payment_currency: None,
+        resource_profile: None,
+        actor_mode: None,
+        placement_constraints: None,
+        federation_constraints: None,
+        estimated_value: None,
+        verification: None,
+    }
+}
+
+/// Minimal valid WASM module (magic + version only).
+fn sample_wasm() -> Vec<u8> {
+    vec![
+        0x00, 0x61, 0x73, 0x6D, // magic: \0asm
+        0x01, 0x00, 0x00, 0x00, // version: 1
+    ]
+}
+
+/// Test: WasmRef task with module found locally in registry.
+/// The executor should resolve the module and attempt execution
+/// (will fail with "not enabled" or "no run function" depending on features,
+/// but proves the registry lookup path works).
+#[tokio::test]
+async fn test_execute_by_hash_local_hit() {
+    use crate::wasm_registry::{compute_hash, WasmRegistry};
+
+    let wasm = sample_wasm();
+    let wasm_hash = compute_hash(&wasm);
+
+    // Create a registry and deploy the module
+    let registry = Arc::new(WasmRegistry::new());
+    registry
+        .deploy(wasm, "did:icn:deployer", |m| m)
+        .await
+        .unwrap();
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_wasm_registry(registry);
+    let handle = actor.spawn();
+
+    // Submit a WasmRef task via gossip (triggers on_task_submitted)
+    let task = make_wasm_ref_task("wasm-local", "did:icn:alice", wasm_hash);
+    let task_hash = task.hash();
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .unwrap();
+
+    // Wait for processing (the actor command loop runs as a spawned task;
+    // WasmRef resolution is async and may need multiple poll cycles)
+    for _ in 0..20 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let status = handle.status(task_hash).await.unwrap();
+        if matches!(status, Some(TaskStatus::Completed { .. })) {
+            return; // Success
+        }
+    }
+
+    // Final check with assertion
+    let status = handle.status(task_hash).await.unwrap();
+    assert!(
+        matches!(status, Some(TaskStatus::Completed { .. })),
+        "Task should reach Completed state (resolution succeeded), got: {status:?}"
+    );
+}
+
+/// Test: WasmRef task with module fetched remotely.
+#[tokio::test]
+async fn test_execute_by_hash_remote_fetch() {
+    use crate::wasm_registry::{compute_hash, WasmRegistry};
+
+    let wasm = sample_wasm();
+    let wasm_hash = compute_hash(&wasm);
+    let wasm_clone = wasm.clone();
+
+    // Create a registry WITHOUT the module deployed locally
+    let mut registry = WasmRegistry::new();
+    registry.set_fetch_callback(Arc::new(move |hash| {
+        let data = wasm_clone.clone();
+        Box::pin(async move {
+            if hash == compute_hash(&data) {
+                Ok(data)
+            } else {
+                Err("not found".into())
+            }
+        })
+    }));
+    let registry = Arc::new(registry);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_wasm_registry(registry);
+    let handle = actor.spawn();
+
+    let task = make_wasm_ref_task("wasm-remote", "did:icn:alice", wasm_hash);
+    let task_hash = task.hash();
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .unwrap();
+
+    // Wait for processing (remote fetch + execution may need multiple poll cycles)
+    for _ in 0..20 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let status = handle.status(task_hash).await.unwrap();
+        if matches!(status, Some(TaskStatus::Completed { .. })) {
+            return; // Success
+        }
+    }
+
+    // Final check with assertion
+    let status = handle.status(task_hash).await.unwrap();
+    assert!(
+        matches!(status, Some(TaskStatus::Completed { .. })),
+        "Task should reach Completed state (remote fetch succeeded), got: {status:?}"
+    );
+}
+
+/// Test: WasmRef task when fetch fails (module not available anywhere).
+#[tokio::test]
+async fn test_execute_by_hash_fetch_failure() {
+    use crate::wasm_registry::WasmRegistry;
+
+    let fake_hash = [0xAA; 32];
+
+    // Create a registry with a fetch callback that always fails
+    let mut registry = WasmRegistry::new();
+    registry.set_fetch_callback(Arc::new(move |_hash| {
+        Box::pin(async move { Err("peer unreachable".into()) })
+    }));
+    let registry = Arc::new(registry);
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_wasm_registry(registry);
+    let handle = actor.spawn();
+
+    let task = make_wasm_ref_task("wasm-fail", "did:icn:alice", fake_hash);
+    let task_hash = task.hash();
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Task should be marked as Failed (not completed)
+    let status = handle.status(task_hash).await.unwrap();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "Task should be Failed when fetch fails, got: {status:?}"
+    );
+}
+
+/// Test: WasmRef task without WASM registry configured.
+#[tokio::test]
+async fn test_execute_by_hash_no_registry() {
+    let fake_hash = [0xBB; 32];
+
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    // Deliberately NOT setting wasm_registry
+    let handle = actor.spawn();
+
+    let task = make_wasm_ref_task("wasm-no-reg", "did:icn:alice", fake_hash);
+    let task_hash = task.hash();
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Task should be marked as Failed
+    let status = handle.status(task_hash).await.unwrap();
+    assert!(
+        matches!(status, Some(TaskStatus::Failed { .. })),
+        "Task should be Failed without registry, got: {status:?}"
+    );
+}
+
+/// Test: Authz check (trust) happens BEFORE fetch attempt.
+/// A low-trust executor should never attempt to fetch the module.
+#[tokio::test]
+async fn test_execute_by_hash_authz_before_fetch() {
+    use crate::wasm_registry::WasmRegistry;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let fetch_attempted = Arc::new(AtomicBool::new(false));
+    let fetch_attempted_clone = fetch_attempted.clone();
+
+    let mut registry = WasmRegistry::new();
+    registry.set_fetch_callback(Arc::new(move |_hash| {
+        fetch_attempted_clone.store(true, Ordering::SeqCst);
+        Box::pin(async move { Ok(vec![]) })
+    }));
+    let registry = Arc::new(registry);
+
+    // Trust too low to execute (below MIN_TRUST_EXECUTE = 0.3)
+    let trust_cb: TrustCallback = Arc::new(|_| 0.1);
+    let mut actor = ComputeActor::new("did:icn:low-trust".into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+    actor.set_wasm_registry(registry);
+    let handle = actor.spawn();
+
+    let task = make_wasm_ref_task("wasm-authz", "did:icn:alice", [0xCC; 32]);
+    handle
+        .handle_gossip(ComputeMessage::TaskSubmitted(Box::new(task)))
+        .await
+        .unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Fetch should NOT have been attempted because the executor was rejected by trust check
+    assert!(
+        !fetch_attempted.load(Ordering::SeqCst),
+        "Fetch should NOT be attempted when executor trust is too low"
+    );
+}

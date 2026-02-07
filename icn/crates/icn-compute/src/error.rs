@@ -84,6 +84,16 @@ pub enum ComputeError {
     /// Accounting infrastructure only — enforcement at scheduling time is deferred.
     #[error("insufficient commons credits: balance={balance}, required={required}")]
     InsufficientCommonsCredits { balance: i64, required: i64 },
+
+    /// WASM module fetch from remote peer failed (Issue #1074).
+    /// Distinct from execution failure -- the module was never obtained.
+    #[error("module fetch failed for {hash}: {reason}")]
+    ModuleFetchFailed { hash: String, reason: String },
+
+    /// WASM module hash mismatch after remote fetch (Issue #1074).
+    /// The fetched bytes do not match the expected content hash.
+    #[error("module hash mismatch: expected {expected}, got {actual}")]
+    ModuleHashMismatch { expected: String, actual: String },
 }
 
 impl From<icn_encoding::Error> for ComputeError {

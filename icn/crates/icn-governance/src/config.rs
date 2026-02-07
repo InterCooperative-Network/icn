@@ -113,12 +113,11 @@ impl GovernanceConfig {
                 ),
 
                 TreasuryProposalOperation::Withdraw { .. }
-                | TreasuryProposalOperation::TransferBetweenBudgets { .. } => {
-                    ProposalThresholds::new(
-                        self.emergency.treasury_withdrawal_quorum_percentage,
-                        self.emergency.treasury_withdrawal_approval_percentage,
-                    )
-                }
+                | TreasuryProposalOperation::TransferBetweenBudgets { .. }
+                | TreasuryProposalOperation::Spend { .. } => ProposalThresholds::new(
+                    self.emergency.treasury_withdrawal_quorum_percentage,
+                    self.emergency.treasury_withdrawal_approval_percentage,
+                ),
 
                 TreasuryProposalOperation::ModifySpendingRule { .. } => ProposalThresholds::new(
                     self.emergency.treasury_rule_quorum_percentage,

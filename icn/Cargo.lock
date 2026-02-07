@@ -2887,6 +2887,7 @@ name = "icn-coop"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "ed25519-dalek",
  "hex",
  "icn-encoding",
  "icn-gossip",
@@ -2896,6 +2897,7 @@ dependencies = [
  "icn-store",
  "icn-trust",
  "serde",
+ "serde_json",
  "sled",
  "tempfile",
  "thiserror 2.0.18",

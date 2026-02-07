@@ -1,6 +1,7 @@
 //! Service Discovery Manager
 //!
-//! In-memory registry for service endpoints with background expiry.
+//! In-memory registry for service endpoints with background expiry
+//! and gossip-based remote discovery aggregation.
 
 use icn_kernel_api::naming::{
     AsyncScopedDiscovery, NamingError, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
@@ -9,12 +10,18 @@ use icn_kernel_api::naming::{
 use icn_kernel_api::scope::ScopeLevel;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tokio::sync::{mpsc, RwLock};
+use tracing::{debug, info, warn};
 
 /// Maximum number of service endpoints the registry will hold.
 /// Prevents unbounded memory growth in long-running deployments.
 const MAX_REGISTRY_SIZE: usize = 10_000;
+
+/// Default timeout for remote discovery queries via gossip.
+const DEFAULT_REMOTE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Maximum number of concurrent pending remote queries.
+const MAX_PENDING_QUERIES: usize = 64;
 
 /// Debug-only check that warns if called from within a Tokio async runtime.
 /// This catches accidental use of blocking ScopedDiscovery methods from async code.
@@ -30,13 +37,31 @@ fn debug_assert_blocking_context(method: &str) {
     }
 }
 
-/// In-memory service endpoint registry with TTL-based expiry.
+/// Outcome of a remote discovery query.
+#[derive(Debug)]
+pub enum RemoteDiscoverOutcome {
+    /// Results arrived within the timeout.
+    Results(Vec<ServiceEndpoint>),
+    /// No results arrived (peers responded but had nothing).
+    NoResults,
+    /// The timeout elapsed before all expected responses arrived.
+    Timeout(Vec<ServiceEndpoint>),
+}
+
+/// In-memory service endpoint registry with TTL-based expiry
+/// and gossip-based remote discovery aggregation.
 #[derive(Clone)]
 pub struct ServiceDiscoveryManager {
     /// service_id → ServiceEndpoint
     registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
     /// Optional gossip handle for propagating announcements/withdrawals
     gossip_handle: Option<icn_gossip::GossipHandle>,
+    /// Pending remote discovery queries: query_id → response sender
+    pending_queries: Arc<RwLock<HashMap<String, mpsc::Sender<Vec<ServiceEndpoint>>>>>,
+    /// Own signing key for generating signed responses to incoming queries
+    own_signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    /// Own DID for response attribution
+    own_did: Option<icn_identity::Did>,
 }
 
 impl ServiceDiscoveryManager {
@@ -45,6 +70,9 @@ impl ServiceDiscoveryManager {
         Self {
             registry: Arc::new(RwLock::new(HashMap::new())),
             gossip_handle: None,
+            pending_queries: Arc::new(RwLock::new(HashMap::new())),
+            own_signing_key: None,
+            own_did: None,
         }
     }
 
@@ -69,45 +97,74 @@ impl ServiceDiscoveryManager {
         let manager = Self {
             registry: registry.clone(),
             gossip_handle: Some(gossip_handle.clone()),
+            pending_queries: Arc::new(RwLock::new(HashMap::new())),
+            own_signing_key: None,
+            own_did: Some(own_did.clone()),
         };
 
         let mut gossip = gossip_handle.write().await;
 
-        // Create the topic if it doesn't exist (idempotent - safe to call multiple times)
-        // Note: create_topic is a void method that handles existing topics gracefully
-        let topic_name = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
+        // Create announce topic
+        let announce_topic = icn_gossip::service_discovery_topics::SERVICES_ANNOUNCE;
         let topic = icn_gossip::types::Topic::new(
-            topic_name.to_string(),
+            announce_topic.to_string(),
             icn_gossip::AccessControl::Public,
         );
-
         gossip.create_topic(topic);
+        gossip
+            .subscribe(announce_topic, own_did.clone())
+            .await
+            .map_err(|e| {
+                NamingError::Internal(format!("Failed to subscribe to gossip topic: {e}"))
+            })?;
 
-        // Subscribe to the topic
-        gossip.subscribe(topic_name, own_did).await.map_err(|e| {
-            NamingError::Internal(format!("Failed to subscribe to gossip topic: {e}"))
+        // Create query topic
+        let query_topic = icn_gossip::service_discovery_topics::SERVICES_QUERY;
+        let topic = icn_gossip::types::Topic::new(
+            query_topic.to_string(),
+            icn_gossip::AccessControl::Public,
+        );
+        gossip.create_topic(topic);
+        gossip.subscribe(query_topic, own_did).await.map_err(|e| {
+            NamingError::Internal(format!("Failed to subscribe to gossip query topic: {e}"))
         })?;
 
         info!(
-            "ServiceDiscoveryManager subscribed to gossip topic: {}",
-            topic_name
+            "ServiceDiscoveryManager subscribed to gossip topics: {}, {}",
+            announce_topic, query_topic
         );
 
         Ok(manager)
+    }
+
+    /// Set the signing key for generating signed responses to incoming queries.
+    ///
+    /// Without a signing key, the manager cannot respond to remote queries.
+    pub fn set_signing_key(&mut self, key: ed25519_dalek::SigningKey) {
+        self.own_signing_key = Some(Arc::new(key));
     }
 
     /// Handle incoming gossip entry for service discovery.
     ///
     /// This is the primary method for supervisor integration. The supervisor's
     /// central notification callback should call this method when a service
-    /// discovery message is received on the `services:announce` topic.
+    /// discovery message is received on the `services:announce` or
+    /// `services:query` topic.
     ///
     /// Returns an error if message processing fails (for logging purposes).
     pub async fn handle_incoming_gossip(
         &self,
         entry: icn_gossip::GossipEntry,
     ) -> Result<(), String> {
-        Self::handle_gossip_entry_internal(self.registry.clone(), entry).await
+        Self::handle_gossip_entry_internal(
+            self.registry.clone(),
+            Some(self.pending_queries.clone()),
+            self.own_signing_key.clone(),
+            self.own_did.clone(),
+            self.gossip_handle.clone(),
+            entry,
+        )
+        .await
     }
 
     /// Internal static handler for gossip entries (exposed for testing).
@@ -120,12 +177,142 @@ impl ServiceDiscoveryManager {
         registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
         entry: icn_gossip::GossipEntry,
     ) -> Result<(), String> {
-        Self::handle_gossip_entry_internal(registry, entry).await
+        Self::handle_gossip_entry_internal(registry, None, None, None, None, entry).await
+    }
+
+    /// Discover services remotely via gossip query fanout.
+    ///
+    /// Sends a `Query` message on the `services:query` gossip topic and
+    /// aggregates signed `Response` messages from peers within a timeout.
+    ///
+    /// Returns a `RemoteDiscoverOutcome` distinguishing between:
+    /// - `Results`: at least one valid response arrived
+    /// - `NoResults`: timeout elapsed, no responses received
+    /// - `Timeout`: timeout elapsed but some partial results arrived
+    pub async fn discover_remote(
+        &self,
+        scope: ScopeLevel,
+        service_type: Option<&ServiceType>,
+        required_capabilities: &[String],
+        timeout: Option<std::time::Duration>,
+    ) -> Result<RemoteDiscoverOutcome, NamingError> {
+        let gossip_handle = self.gossip_handle.as_ref().ok_or_else(|| {
+            NamingError::Internal("Gossip not configured for remote discovery".to_string())
+        })?;
+
+        let own_did = self.own_did.as_ref().ok_or_else(|| {
+            NamingError::Internal("Own DID not configured for remote discovery".to_string())
+        })?;
+
+        // Enforce pending query limit
+        {
+            let pq = self.pending_queries.read().await;
+            if pq.len() >= MAX_PENDING_QUERIES {
+                return Err(NamingError::Internal(
+                    "Too many pending remote queries".to_string(),
+                ));
+            }
+        }
+
+        let query_id = format!("q-{}", uuid::Uuid::new_v4());
+        let timeout_duration = timeout.unwrap_or(DEFAULT_REMOTE_TIMEOUT);
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| NamingError::Internal(format!("System time error: {e}")))?
+            .as_secs();
+        let expires_at = now_secs + timeout_duration.as_secs() + 30; // pad expiry beyond timeout
+
+        // Create response channel
+        let (tx, mut rx) = mpsc::channel::<Vec<ServiceEndpoint>>(32);
+        {
+            let mut pq = self.pending_queries.write().await;
+            pq.insert(query_id.clone(), tx);
+        }
+
+        // Build and publish query
+        let query_msg = icn_gossip::ServiceDiscoveryMessage::Query {
+            requester: own_did.clone(),
+            service_type: service_type.cloned().unwrap_or_else(|| ServiceType {
+                name: "*".to_string(),
+                version: String::new(),
+            }),
+            max_scope: scope,
+            required_capabilities: required_capabilities.to_vec(),
+            query_id: query_id.clone(),
+            expires_at,
+        };
+
+        let encoded = icn_encoding::encode(&query_msg)
+            .map_err(|e| NamingError::Internal(format!("Failed to encode query: {e}")))?;
+
+        {
+            let topic = icn_gossip::service_discovery_topics::SERVICES_QUERY;
+            let mut gossip = gossip_handle.write().await;
+            gossip
+                .publish(topic, encoded)
+                .await
+                .map_err(|e| NamingError::Internal(format!("Failed to publish query: {e}")))?;
+        }
+
+        debug!(query_id = %query_id, "Published remote discovery query");
+
+        // Collect responses within timeout
+        let mut all_endpoints = Vec::new();
+        let deadline = tokio::time::Instant::now() + timeout_duration;
+        let timed_out;
+
+        loop {
+            match tokio::time::timeout_at(deadline, rx.recv()).await {
+                Ok(Some(endpoints)) => {
+                    all_endpoints.extend(endpoints);
+                }
+                Ok(None) => {
+                    // Channel closed (all senders dropped)
+                    timed_out = false;
+                    break;
+                }
+                Err(_) => {
+                    // Timeout elapsed
+                    timed_out = true;
+                    break;
+                }
+            }
+        }
+
+        // Clean up pending query
+        {
+            let mut pq = self.pending_queries.write().await;
+            pq.remove(&query_id);
+        }
+
+        // Deduplicate by service_id (keep first seen)
+        let mut seen = std::collections::HashSet::new();
+        all_endpoints.retain(|ep| seen.insert(ep.service_id.clone()));
+
+        debug!(
+            query_id = %query_id,
+            results = all_endpoints.len(),
+            timed_out,
+            "Remote discovery completed"
+        );
+
+        if all_endpoints.is_empty() {
+            Ok(RemoteDiscoverOutcome::NoResults)
+        } else if timed_out {
+            Ok(RemoteDiscoverOutcome::Timeout(all_endpoints))
+        } else {
+            Ok(RemoteDiscoverOutcome::Results(all_endpoints))
+        }
     }
 
     /// Internal implementation for processing gossip entries.
+    #[allow(clippy::type_complexity)]
     async fn handle_gossip_entry_internal(
         registry: Arc<RwLock<HashMap<String, ServiceEndpoint>>>,
+        pending_queries: Option<Arc<RwLock<HashMap<String, mpsc::Sender<Vec<ServiceEndpoint>>>>>>,
+        own_signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+        own_did: Option<icn_identity::Did>,
+        gossip_handle: Option<icn_gossip::GossipHandle>,
         entry: icn_gossip::GossipEntry,
     ) -> Result<(), String> {
         // Decode the message (handling possible compression via get_data)
@@ -138,7 +325,6 @@ impl ServiceDiscoveryManager {
         match msg {
             icn_gossip::ServiceDiscoveryMessage::Announce { endpoint } => {
                 // Verify signature (supports key rotation)
-                // Note: No rotation cache available here - supervisor integration would provide it
                 if let Err(e) = icn_gossip::verify_service_endpoint_with_rotation(&endpoint, None) {
                     return Err(format!(
                         "Invalid signature for {}: {}",
@@ -158,8 +344,6 @@ impl ServiceDiscoveryManager {
                 // Store in registry (deduplication by service_id)
                 let mut reg = registry.write().await;
 
-                // Allow updates to existing entries even when at capacity
-                // (consistent with announce() method behavior)
                 let is_update = reg.contains_key(&endpoint.service_id);
                 if !is_update && reg.len() >= MAX_REGISTRY_SIZE {
                     return Err(format!(
@@ -181,7 +365,6 @@ impl ServiceDiscoveryManager {
                 ..
             } => {
                 // SECURITY: Verify that the gossip entry author matches the provider DID
-                // This prevents nodes from forging withdrawal messages for services they didn't create
                 if entry.author != provider {
                     return Err(format!(
                         "Withdrawal author mismatch: entry.author={}, provider={} (service: {})",
@@ -190,7 +373,6 @@ impl ServiceDiscoveryManager {
                 }
 
                 let mut reg = registry.write().await;
-                // Only withdraw if the provider matches
                 if let Some(ep) = reg.get(&service_id) {
                     if ep.provider == provider.as_str() {
                         reg.remove(&service_id);
@@ -204,14 +386,132 @@ impl ServiceDiscoveryManager {
                         ))
                     }
                 } else {
-                    // Not an error - service might have already been withdrawn
                     Ok(())
                 }
             }
-            icn_gossip::ServiceDiscoveryMessage::Query { .. }
-            | icn_gossip::ServiceDiscoveryMessage::Response { .. } => {
-                // Query/Response not handled in this callback
-                // (would need additional wiring for interactive query/response)
+            icn_gossip::ServiceDiscoveryMessage::Query {
+                service_type,
+                max_scope,
+                required_capabilities,
+                query_id,
+                expires_at,
+                ..
+            } => {
+                // Check if query has expired
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                if now_secs > expires_at {
+                    debug!(query_id = %query_id, "Ignoring expired query");
+                    return Ok(());
+                }
+
+                // Only respond if we have a signing key
+                let (signing_key, responder_did) =
+                    match (own_signing_key.as_ref(), own_did.as_ref()) {
+                        (Some(k), Some(d)) => (k.clone(), d.clone()),
+                        _ => {
+                            debug!("No signing key configured, cannot respond to query");
+                            return Ok(());
+                        }
+                    };
+
+                // Search local registry for matching endpoints
+                let reg = registry.read().await;
+                let matching: Vec<ServiceEndpoint> = reg
+                    .values()
+                    .filter(|ep| max_scope.includes(ep.scope_visibility))
+                    .filter(|ep| {
+                        if service_type.name == "*" {
+                            true
+                        } else {
+                            ep.service_type.name == service_type.name
+                        }
+                    })
+                    .filter(|ep| {
+                        required_capabilities
+                            .iter()
+                            .all(|cap| ep.capabilities.contains(cap))
+                    })
+                    .filter(|ep| !ep.is_expired())
+                    .cloned()
+                    .collect();
+                drop(reg);
+
+                if matching.is_empty() {
+                    debug!(query_id = %query_id, "No matching endpoints for query");
+                    return Ok(());
+                }
+
+                // Build and sign response
+                let response_expires = now_secs + 300; // 5 min TTL on responses
+                let mut response = icn_gossip::ServiceDiscoveryMessage::Response {
+                    query_id: query_id.clone(),
+                    endpoints: matching,
+                    responder: responder_did,
+                    signature: Vec::new(),
+                    expires_at: response_expires,
+                    scope: max_scope,
+                };
+
+                if let Err(e) = icn_gossip::sign_service_response(&mut response, &signing_key) {
+                    warn!(query_id = %query_id, error = %e, "Failed to sign response");
+                    return Err(format!("Failed to sign response: {e}"));
+                }
+
+                // Publish response on query topic
+                if let Some(gossip) = gossip_handle.as_ref() {
+                    let encoded = icn_encoding::encode(&response)
+                        .map_err(|e| format!("Failed to encode response: {e}"))?;
+                    let topic = icn_gossip::service_discovery_topics::SERVICES_QUERY;
+                    let mut gossip_guard = gossip.write().await;
+                    gossip_guard
+                        .publish(topic, encoded)
+                        .await
+                        .map_err(|e| format!("Failed to publish response: {e}"))?;
+                    debug!(query_id = %query_id, "Published response to query");
+                }
+
+                Ok(())
+            }
+            ref response @ icn_gossip::ServiceDiscoveryMessage::Response {
+                ref query_id,
+                ref scope,
+                ..
+            } => {
+                // Validate the response signature, TTL, scope
+                if !icn_gossip::validate_service_response(response, scope) {
+                    debug!(
+                        query_id = %query_id,
+                        "Dropping invalid/expired/unsigned response"
+                    );
+                    return Ok(());
+                }
+
+                // Extract endpoints for routing (after validation)
+                let (qid, eps) = match msg {
+                    icn_gossip::ServiceDiscoveryMessage::Response {
+                        query_id,
+                        endpoints,
+                        ..
+                    } => (query_id, endpoints),
+                    _ => unreachable!(),
+                };
+
+                // Route to pending query if we have one
+                if let Some(ref pq) = pending_queries {
+                    let pq_read = pq.read().await;
+                    if let Some(sender) = pq_read.get(&qid) {
+                        if sender.try_send(eps).is_err() {
+                            warn!(
+                                query_id = %qid,
+                                "Pending query response dropped: channel full or closed"
+                            );
+                        }
+                    }
+                }
+
                 Ok(())
             }
         }
@@ -541,6 +841,31 @@ mod tests {
     use super::*;
     use icn_kernel_api::types::{Endpoint, Signature};
 
+    fn make_gossip_entry(
+        author: icn_identity::Did,
+        data: Vec<u8>,
+        topic: &str,
+    ) -> icn_gossip::GossipEntry {
+        // Simple hash for test entries (not cryptographic, just unique)
+        let mut hash = [0u8; 32];
+        for (i, byte) in data.iter().enumerate() {
+            hash[i % 32] ^= byte;
+        }
+        icn_gossip::GossipEntry {
+            hash,
+            author,
+            clock: icn_gossip::VectorClock::new(),
+            topic: topic.to_string(),
+            data,
+            compressed: false,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            replica_offered: None,
+        }
+    }
+
     fn make_endpoint(id: &str, scope: ScopeLevel, ttl: u64) -> ServiceEndpoint {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -767,5 +1092,252 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].service_id, "svc-rw");
+    }
+
+    // ========== B3: Remote Discovery Aggregator Tests (#1081) ==========
+
+    #[tokio::test]
+    async fn test_discover_remote_without_gossip_returns_error() {
+        let mgr = ServiceDiscoveryManager::new();
+
+        let result = mgr.discover_remote(ScopeLevel::Org, None, &[], None).await;
+
+        assert!(result.is_err());
+        match result {
+            Err(NamingError::Internal(msg)) => {
+                assert!(msg.contains("Gossip not configured"));
+            }
+            other => panic!("Expected Internal error, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pending_queries_state_management() {
+        let mgr = ServiceDiscoveryManager::new();
+
+        // Verify initial state is empty
+        let pq = mgr.pending_queries.read().await;
+        assert!(pq.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_remote_discover_outcome_variants() {
+        // Verify RemoteDiscoverOutcome can represent all states
+        let eps = vec![make_endpoint("svc-1", ScopeLevel::Org, 3600)];
+
+        let results = RemoteDiscoverOutcome::Results(eps.clone());
+        match results {
+            RemoteDiscoverOutcome::Results(r) => assert_eq!(r.len(), 1),
+            _ => panic!("Expected Results"),
+        }
+
+        let timeout = RemoteDiscoverOutcome::Timeout(eps);
+        match timeout {
+            RemoteDiscoverOutcome::Timeout(r) => assert_eq!(r.len(), 1),
+            _ => panic!("Expected Timeout"),
+        }
+
+        let no_results = RemoteDiscoverOutcome::NoResults;
+        assert!(matches!(no_results, RemoteDiscoverOutcome::NoResults));
+    }
+
+    #[tokio::test]
+    async fn test_query_handling_responds_with_local_results() {
+        // Test that handle_gossip_entry_internal processes Query messages
+        // and responds with matching local endpoints
+        let registry = Arc::new(RwLock::new(HashMap::new()));
+        let ep = make_endpoint("local-svc", ScopeLevel::Org, 3600);
+        {
+            let mut reg = registry.write().await;
+            reg.insert("local-svc".to_string(), ep);
+        }
+
+        // Build a Query message
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let query = icn_gossip::ServiceDiscoveryMessage::Query {
+            requester: kp.did().clone(),
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            max_scope: ScopeLevel::Org,
+            required_capabilities: vec![],
+            query_id: "test-q-1".to_string(),
+            expires_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 300,
+        };
+
+        let encoded = icn_encoding::encode(&query).unwrap();
+        let entry = make_gossip_entry(kp.did().clone(), encoded, "services:query");
+
+        // Without a signing key, should succeed but not generate a response
+        let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
+            registry, None, None, None, None, entry,
+        )
+        .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_expired_query_ignored() {
+        let registry = Arc::new(RwLock::new(HashMap::new()));
+        let ep = make_endpoint("local-svc", ScopeLevel::Org, 3600);
+        {
+            let mut reg = registry.write().await;
+            reg.insert("local-svc".to_string(), ep);
+        }
+
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        // Query expired 10 seconds ago
+        let query = icn_gossip::ServiceDiscoveryMessage::Query {
+            requester: kp.did().clone(),
+            service_type: ServiceType {
+                name: "ledger".to_string(),
+                version: "1.0".to_string(),
+            },
+            max_scope: ScopeLevel::Org,
+            required_capabilities: vec![],
+            query_id: "expired-q".to_string(),
+            expires_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                - 10,
+        };
+
+        let encoded = icn_encoding::encode(&query).unwrap();
+        let entry = make_gossip_entry(kp.did().clone(), encoded, "services:query");
+
+        let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
+            registry, None, None, None, None, entry,
+        )
+        .await;
+
+        // Should succeed (expired queries are silently ignored)
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_response_routed_to_pending_query() {
+        let registry = Arc::new(RwLock::new(HashMap::new()));
+        let pending = Arc::new(RwLock::new(HashMap::new()));
+
+        // Set up a pending query with a channel
+        let (tx, mut rx) = mpsc::channel::<Vec<ServiceEndpoint>>(8);
+        {
+            let mut pq = pending.write().await;
+            pq.insert("route-test-q".to_string(), tx);
+        }
+
+        // Build a signed response
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&kp.to_signing_key_bytes());
+        let ep = make_endpoint("remote-svc", ScopeLevel::Org, 3600);
+
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut response = icn_gossip::ServiceDiscoveryMessage::Response {
+            query_id: "route-test-q".to_string(),
+            endpoints: vec![ep],
+            responder: kp.did().clone(),
+            signature: Vec::new(),
+            expires_at: now_secs + 300,
+            scope: ScopeLevel::Org,
+        };
+        icn_gossip::sign_service_response(&mut response, &signing_key).unwrap();
+
+        let encoded = icn_encoding::encode(&response).unwrap();
+        let entry = make_gossip_entry(kp.did().clone(), encoded, "services:query");
+
+        let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
+            registry,
+            Some(pending.clone()),
+            None,
+            None,
+            None,
+            entry,
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        // Check that the response was routed to the channel
+        match rx.try_recv() {
+            Ok(endpoints) => {
+                assert_eq!(endpoints.len(), 1);
+                assert_eq!(endpoints[0].service_id, "remote-svc");
+            }
+            Err(_) => panic!("Expected endpoints to be routed to pending query channel"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unsigned_response_dropped() {
+        let registry = Arc::new(RwLock::new(HashMap::new()));
+        let pending = Arc::new(RwLock::new(HashMap::new()));
+
+        let (tx, mut rx) = mpsc::channel::<Vec<ServiceEndpoint>>(8);
+        {
+            let mut pq = pending.write().await;
+            pq.insert("unsigned-q".to_string(), tx);
+        }
+
+        // Build an unsigned response (empty signature)
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let ep = make_endpoint("unsigned-svc", ScopeLevel::Org, 3600);
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let response = icn_gossip::ServiceDiscoveryMessage::Response {
+            query_id: "unsigned-q".to_string(),
+            endpoints: vec![ep],
+            responder: kp.did().clone(),
+            signature: vec![0; 64], // Invalid signature
+            expires_at: now_secs + 300,
+            scope: ScopeLevel::Org,
+        };
+
+        let encoded = icn_encoding::encode(&response).unwrap();
+        let entry = make_gossip_entry(kp.did().clone(), encoded, "services:query");
+
+        let result = ServiceDiscoveryManager::handle_gossip_entry_internal(
+            registry,
+            Some(pending),
+            None,
+            None,
+            None,
+            entry,
+        )
+        .await;
+
+        // Should succeed (invalid responses silently dropped)
+        assert!(result.is_ok());
+
+        // But nothing should have been sent to the channel
+        assert!(
+            rx.try_recv().is_err(),
+            "Unsigned response should not reach pending query"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_set_signing_key() {
+        let mut mgr = ServiceDiscoveryManager::new();
+        assert!(mgr.own_signing_key.is_none());
+
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&kp.to_signing_key_bytes());
+        mgr.set_signing_key(signing_key);
+
+        assert!(mgr.own_signing_key.is_some());
     }
 }

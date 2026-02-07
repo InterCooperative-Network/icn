@@ -119,6 +119,7 @@ pub async fn run_supervisor(
             entity: gateway_handles.entity,
             steward: gateway_handles.steward,
             agreement_manager: gateway_handles.agreement_manager,
+            service_discovery_manager: gateway_handles.service_discovery_manager,
         },
     );
 
@@ -360,11 +361,34 @@ async fn spawn_actors_with_identity(
     // Store entity handle for notification routing
     let entity_handle = entity_services.entity_handle.clone();
 
+    // Initialize service discovery manager with gossip propagation
+    let service_discovery_mgr =
+        match icn_gateway::service_discovery_mgr::ServiceDiscoveryManager::with_gossip(
+            gossip_handle.clone(),
+            did.clone(),
+        )
+        .await
+        {
+            Ok(mgr) => {
+                let mgr = Arc::new(mgr);
+                info!("Service discovery manager initialized with gossip wiring");
+                Some(mgr)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to initialize service discovery manager with gossip: {}",
+                    e
+                );
+                None
+            }
+        };
+
     // Store handles for gateway integration
     gateway_handles.coop = Some(coop_handle);
     gateway_handles.community = Some(community_services.community_handle);
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
+    gateway_handles.service_discovery_manager = service_discovery_mgr.clone();
 
     // Spawn Identity actor (provides signing and trust service access)
     let identity_handle = crate::identity::IdentityActor::spawn(
@@ -473,6 +497,7 @@ async fn spawn_actors_with_identity(
         &contract_registry_holder,
         &entity_handle,
         &trust_service_from_registry,
+        &service_discovery_mgr,
         config,
         shutdown_tx,
         background_tasks,
@@ -894,6 +919,9 @@ async fn configure_gossip_actor(
     contract_registry_holder: &Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>,
     entity_handle: &icn_entity::EntityHandle,
     trust_service: &Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    service_discovery_manager: &Option<
+        Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>,
+    >,
     config: &Config,
     shutdown_tx: &ShutdownTx,
     background_tasks: &mut JoinSet<()>,
@@ -938,6 +966,7 @@ async fn configure_gossip_actor(
             contract_registry: contract_registry_holder.clone(),
             nat_dial_config: config.network.nat_dial.clone(),
             entity_handle: Some(entity_handle.clone()), // Pass entity handle for gossip sync
+            service_discovery_manager: service_discovery_manager.clone(),
         },
     );
 

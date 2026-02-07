@@ -13,6 +13,8 @@
 //! wasm_owner:<did>      → Vec<[u8; 32]> (list of hashes)
 //! ```
 
+use icn_kernel_api::state::{BlobService, StateError};
+use icn_kernel_api::types::Namespace;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -120,9 +122,36 @@ fn validate_wasm(wasm_bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
+/// Default namespace for WASM blobs in BlobService.
+const WASM_BLOB_NAMESPACE: &str = "wasm";
+
+/// Callback invoked after a WASM module is deployed, to announce availability via gossip.
+/// Parameters: (blob_hash, size_bytes)
+pub type BlobAnnounceCallback = Arc<dyn Fn([u8; 32], u64) + Send + Sync>;
+
+/// Callback invoked to fetch a WASM module from a remote peer via blob transfer.
+/// Parameters: (blob_hash) -> Result<Vec<u8>>
+pub type BlobFetchCallback = Arc<
+    dyn Fn(
+            [u8; 32],
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = std::result::Result<
+                            Vec<u8>,
+                            Box<dyn std::error::Error + Send + Sync>,
+                        >,
+                    > + Send,
+            >,
+        > + Send
+        + Sync,
+>;
+
 /// WASM Registry - stores WASM modules with metadata
 ///
 /// Thread-safe with in-memory caching and optional persistent storage.
+/// When a `BlobService` is provided, bytecode is delegated to it (source of truth).
+/// Metadata and owner index remain in the local sled store / in-memory cache.
 pub struct WasmRegistry {
     /// In-memory module cache
     modules: Arc<RwLock<HashMap<WasmHash, Vec<u8>>>>,
@@ -130,8 +159,14 @@ pub struct WasmRegistry {
     metadata: Arc<RwLock<HashMap<WasmHash, WasmMetadata>>>,
     /// Owner → modules index
     owner_index: Arc<RwLock<HashMap<String, Vec<WasmHash>>>>,
-    /// Optional persistent store
+    /// Optional persistent store (metadata + fallback bytecode)
     store: Option<sled::Db>,
+    /// Optional content-addressed blob storage (bytecode source of truth when present)
+    blob_service: Option<Arc<dyn BlobService>>,
+    /// Callback to announce blob availability via gossip after deploy (#1073)
+    announce_callback: Option<BlobAnnounceCallback>,
+    /// Callback to fetch a blob from a remote peer (#1073)
+    fetch_callback: Option<BlobFetchCallback>,
 }
 
 impl WasmRegistry {
@@ -142,6 +177,9 @@ impl WasmRegistry {
             metadata: Arc::new(RwLock::new(HashMap::new())),
             owner_index: Arc::new(RwLock::new(HashMap::new())),
             store: None,
+            blob_service: None,
+            announce_callback: None,
+            fetch_callback: None,
         }
     }
 
@@ -152,7 +190,36 @@ impl WasmRegistry {
             metadata: Arc::new(RwLock::new(HashMap::new())),
             owner_index: Arc::new(RwLock::new(HashMap::new())),
             store: Some(db),
+            blob_service: None,
+            announce_callback: None,
+            fetch_callback: None,
         }
+    }
+
+    /// Create a registry backed by a BlobService for bytecode storage.
+    ///
+    /// When a BlobService is provided, it becomes the source of truth for
+    /// WASM bytecode. Metadata is still stored in the sled store.
+    pub fn with_blob_service(db: sled::Db, blob_service: Arc<dyn BlobService>) -> Self {
+        Self {
+            modules: Arc::new(RwLock::new(HashMap::new())),
+            metadata: Arc::new(RwLock::new(HashMap::new())),
+            owner_index: Arc::new(RwLock::new(HashMap::new())),
+            store: Some(db),
+            blob_service: Some(blob_service),
+            announce_callback: None,
+            fetch_callback: None,
+        }
+    }
+
+    /// Set the gossip announce callback for notifying peers about new deployments.
+    pub fn set_announce_callback(&mut self, cb: BlobAnnounceCallback) {
+        self.announce_callback = Some(cb);
+    }
+
+    /// Set the remote fetch callback for fetching modules from peers.
+    pub fn set_fetch_callback(&mut self, cb: BlobFetchCallback) {
+        self.fetch_callback = Some(cb);
     }
 
     /// Open a registry with persistent storage at the given path
@@ -168,6 +235,11 @@ impl WasmRegistry {
             .open()
             .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
         Ok(Self::with_store(db))
+    }
+
+    /// Returns the namespace used for WASM blobs in BlobService.
+    fn blob_namespace() -> Namespace {
+        Namespace::new("icn", WASM_BLOB_NAMESPACE)
     }
 
     /// Deploy a WASM module to the registry
@@ -208,8 +280,12 @@ impl WasmRegistry {
             }
         }
 
-        // Check persistent store
-        if let Some(store) = &self.store {
+        // Check BlobService first, then persistent store
+        if let Some(bs) = &self.blob_service {
+            if bs.exists(&hash).unwrap_or(false) {
+                return Err(WasmRegistryError::AlreadyExists(hash_hex));
+            }
+        } else if let Some(store) = &self.store {
             let key = format!("wasm:{hash_hex}");
             if store
                 .contains_key(key.as_bytes())
@@ -219,16 +295,34 @@ impl WasmRegistry {
             }
         }
 
+        // Capture size before wasm_bytes is moved
+        let wasm_size = wasm_bytes.len() as u64;
+
         // Build metadata
         let metadata = metadata_builder(WasmMetadata::new(&wasm_bytes, owner));
 
-        // Persist to store if available
-        if let Some(store) = &self.store {
+        // Store bytecode: prefer BlobService, fall back to sled
+        if let Some(bs) = &self.blob_service {
+            let stored_hash = bs
+                .put(&Self::blob_namespace(), &wasm_bytes)
+                .map_err(|e| WasmRegistryError::StorageError(format!("BlobService put: {e}")))?;
+            // Verify BlobService computed the same hash
+            if stored_hash != hash {
+                return Err(WasmRegistryError::StorageError(format!(
+                    "BlobService hash mismatch: expected {}, got {}",
+                    hex::encode(hash),
+                    hex::encode(stored_hash),
+                )));
+            }
+        } else if let Some(store) = &self.store {
             let wasm_key = format!("wasm:{hash_hex}");
             store
                 .insert(wasm_key.as_bytes(), wasm_bytes.as_slice())
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
+        }
 
+        // Persist metadata to sled (always, regardless of blob storage backend)
+        if let Some(store) = &self.store {
             let meta_key = format!("wasm_meta:{hash_hex}");
             let meta_bytes = icn_encoding::encode_versioned(&metadata)
                 .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
@@ -266,7 +360,108 @@ impl WasmRegistry {
             "WASM module deployed to registry"
         );
 
+        // Announce availability via gossip (fire and forget)
+        if let Some(ref cb) = self.announce_callback {
+            tracing::debug!(
+                hash = %hash_hex,
+                size = wasm_size,
+                "Announcing WASM module via gossip"
+            );
+            cb(hash, wasm_size);
+        }
+
         Ok(hash)
+    }
+
+    /// Fetch a WASM module from a remote peer via the blob transfer protocol.
+    ///
+    /// Calls the configured `fetch_callback` to request the blob from peers,
+    /// then verifies the content hash matches before returning.
+    ///
+    /// Returns an error if no fetch callback is configured or the fetch fails.
+    pub async fn fetch_remote(&self, hash: &WasmHash) -> Result<Vec<u8>> {
+        let cb = self.fetch_callback.as_ref().ok_or_else(|| {
+            WasmRegistryError::StorageError("No remote fetch callback configured".into())
+        })?;
+
+        let bytes = (cb)(*hash)
+            .await
+            .map_err(|e| WasmRegistryError::StorageError(format!("Remote fetch failed: {e}")))?;
+
+        // Verify hash matches
+        let actual = compute_hash(&bytes);
+        if actual != *hash {
+            return Err(WasmRegistryError::StorageError(format!(
+                "Remote fetch hash mismatch: expected {}, got {}",
+                hex::encode(hash),
+                hex::encode(actual),
+            )));
+        }
+
+        // Validate WASM format
+        validate_wasm(&bytes)?;
+
+        Ok(bytes)
+    }
+
+    /// Resolve a WASM module by hash, fetching from remote peers if not found locally.
+    ///
+    /// This is the primary entry point for execute-by-hash (#1074):
+    /// 1. Check local cache / BlobService / sled store
+    /// 2. If not found locally, attempt remote fetch via gossip
+    /// 3. Verify content hash matches after fetch
+    /// 4. Store fetched module locally for future use
+    ///
+    /// Returns `Ok(bytes)` on success, or `Err` if the module cannot be obtained.
+    pub async fn resolve_or_fetch(&self, hash: &WasmHash) -> Result<Vec<u8>> {
+        // Try local first
+        if let Some(bytes) = self.get(hash).await? {
+            tracing::debug!(
+                hash = %hex::encode(hash),
+                "WASM module found locally"
+            );
+            return Ok(bytes);
+        }
+
+        // Not found locally -- attempt remote fetch
+        tracing::info!(
+            hash = %hex::encode(hash),
+            "WASM module not found locally, attempting remote fetch"
+        );
+
+        let bytes = self.fetch_remote(hash).await?;
+
+        // fetch_remote already verifies hash and validates WASM magic bytes.
+        // Store the fetched module locally for future use.
+        // Use deploy_sync which handles dedup (AlreadyExists is not an error here).
+        let store_result = self.deploy_sync(bytes.clone(), "remote", |m| m);
+        match store_result {
+            Ok(_) => {
+                tracing::info!(
+                    hash = %hex::encode(hash),
+                    size = bytes.len(),
+                    "Remote WASM module fetched and stored locally"
+                );
+            }
+            Err(WasmRegistryError::AlreadyExists(_)) => {
+                // Race condition: another task stored it between our get() and deploy_sync().
+                // This is fine.
+                tracing::debug!(
+                    hash = %hex::encode(hash),
+                    "Remote WASM module already stored (race)"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    hash = %hex::encode(hash),
+                    error = %e,
+                    "Failed to store fetched WASM module locally"
+                );
+                return Err(e);
+            }
+        }
+
+        Ok(bytes)
     }
 
     /// Get WASM bytecode by hash (async wrapper)
@@ -277,8 +472,9 @@ impl WasmRegistry {
     /// Get WASM bytecode by hash
     ///
     /// This is the main implementation, safe to call from both sync and async contexts.
+    /// Hash is verified on every load from storage backends (not cache).
     pub fn get_blocking(&self, hash: &WasmHash) -> Result<Option<Vec<u8>>> {
-        // Check cache first
+        // Check cache first (already verified on insertion)
         {
             let modules = self
                 .modules
@@ -289,14 +485,51 @@ impl WasmRegistry {
             }
         }
 
-        // Try persistent store
-        if let Some(store) = &self.store {
+        // Try BlobService first, then sled
+        if let Some(bs) = &self.blob_service {
+            match bs.get(hash) {
+                Ok(wasm_bytes) => {
+                    // Verify hash on load
+                    let actual_hash = compute_hash(&wasm_bytes);
+                    if actual_hash != *hash {
+                        return Err(WasmRegistryError::StorageError(format!(
+                            "Hash verification failed on load: expected {}, got {}",
+                            hex::encode(hash),
+                            hex::encode(actual_hash),
+                        )));
+                    }
+
+                    // Populate cache
+                    let mut modules = self.modules.write().map_err(|e| {
+                        WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
+                    })?;
+                    modules.insert(*hash, wasm_bytes.clone());
+                    return Ok(Some(wasm_bytes));
+                }
+                Err(StateError::BlobNotFound) => {}
+                Err(e) => {
+                    return Err(WasmRegistryError::StorageError(format!(
+                        "BlobService get: {e}"
+                    )));
+                }
+            }
+        } else if let Some(store) = &self.store {
             let key = format!("wasm:{}", hex::encode(hash));
             if let Some(bytes) = store
                 .get(key.as_bytes())
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?
             {
                 let wasm_bytes = bytes.to_vec();
+
+                // Verify hash on load
+                let actual_hash = compute_hash(&wasm_bytes);
+                if actual_hash != *hash {
+                    return Err(WasmRegistryError::StorageError(format!(
+                        "Hash verification failed on load: expected {}, got {}",
+                        hex::encode(hash),
+                        hex::encode(actual_hash),
+                    )));
+                }
 
                 // Populate cache
                 let mut modules = self
@@ -368,6 +601,12 @@ impl WasmRegistry {
             }
         }
 
+        if let Some(bs) = &self.blob_service {
+            if bs.exists(hash).unwrap_or(false) {
+                return true;
+            }
+        }
+
         if let Some(store) = &self.store {
             let key = format!("wasm:{}", hex::encode(hash));
             store.contains_key(key.as_bytes()).unwrap_or(false)
@@ -431,6 +670,9 @@ impl WasmRegistry {
     }
 
     /// Load modules from persistent store into cache (sync version)
+    ///
+    /// When BlobService is configured, scans metadata from sled and fetches
+    /// bytecode from BlobService. Otherwise falls back to loading both from sled.
     pub fn load_from_store_sync(&self) -> Result<usize> {
         let Some(store) = &self.store else {
             return Ok(0);
@@ -438,44 +680,27 @@ impl WasmRegistry {
 
         let mut loaded = 0;
 
-        // Scan for wasm keys
-        for item in store.scan_prefix(b"wasm:") {
-            let (key, value) = item.map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
-            let key_str = String::from_utf8_lossy(&key);
+        if self.blob_service.is_some() {
+            // BlobService mode: scan metadata keys, fetch bytecode from BlobService
+            for item in store.scan_prefix(b"wasm_meta:") {
+                let (key, value) =
+                    item.map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
+                let key_str = String::from_utf8_lossy(&key);
 
-            // Skip metadata keys
-            if key_str.starts_with("wasm_meta:") {
-                continue;
-            }
+                if let Some(hash_hex) = key_str.strip_prefix("wasm_meta:") {
+                    if let Ok(hash_bytes) = hex::decode(hash_hex) {
+                        if hash_bytes.len() == 32 {
+                            let mut hash = [0u8; 32];
+                            hash.copy_from_slice(&hash_bytes);
 
-            if let Some(hash_hex) = key_str.strip_prefix("wasm:") {
-                if let Ok(hash_bytes) = hex::decode(hash_hex) {
-                    if hash_bytes.len() == 32 {
-                        let mut hash = [0u8; 32];
-                        hash.copy_from_slice(&hash_bytes);
-
-                        let wasm_bytes = value.to_vec();
-
-                        // Load into cache
-                        {
-                            let mut modules = self.modules.write().map_err(|e| {
-                                WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
-                            })?;
-                            modules.insert(hash, wasm_bytes);
-                        }
-
-                        // Also load metadata
-                        let meta_key = format!("wasm_meta:{hash_hex}");
-                        if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
-                            if let Ok(meta) =
-                                icn_encoding::decode_versioned::<WasmMetadata>(&meta_bytes)
+                            // Load metadata
+                            if let Ok(meta) = icn_encoding::decode_versioned::<WasmMetadata>(&value)
                             {
                                 let mut metadata = self.metadata.write().map_err(|e| {
                                     WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
                                 })?;
                                 metadata.insert(hash, meta.clone());
 
-                                // Rebuild owner index
                                 let mut owner_index = self.owner_index.write().map_err(|e| {
                                     WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
                                 })?;
@@ -484,9 +709,68 @@ impl WasmRegistry {
                                     .or_default()
                                     .push(hash);
                             }
+                            // Bytecode not pre-loaded; fetched on demand from BlobService
+                            loaded += 1;
                         }
+                    }
+                }
+            }
+        } else {
+            // Legacy mode: scan wasm: keys for bytecode
+            for item in store.scan_prefix(b"wasm:") {
+                let (key, value) =
+                    item.map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
+                let key_str = String::from_utf8_lossy(&key);
 
-                        loaded += 1;
+                // Skip metadata keys
+                if key_str.starts_with("wasm_meta:") {
+                    continue;
+                }
+
+                if let Some(hash_hex) = key_str.strip_prefix("wasm:") {
+                    if let Ok(hash_bytes) = hex::decode(hash_hex) {
+                        if hash_bytes.len() == 32 {
+                            let mut hash = [0u8; 32];
+                            hash.copy_from_slice(&hash_bytes);
+
+                            let wasm_bytes = value.to_vec();
+
+                            // Load into cache
+                            {
+                                let mut modules = self.modules.write().map_err(|e| {
+                                    WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
+                                })?;
+                                modules.insert(hash, wasm_bytes);
+                            }
+
+                            // Also load metadata
+                            let meta_key = format!("wasm_meta:{hash_hex}");
+                            if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
+                                if let Ok(meta) =
+                                    icn_encoding::decode_versioned::<WasmMetadata>(&meta_bytes)
+                                {
+                                    let mut metadata = self.metadata.write().map_err(|e| {
+                                        WasmRegistryError::StorageError(format!(
+                                            "Lock poisoned: {e}"
+                                        ))
+                                    })?;
+                                    metadata.insert(hash, meta.clone());
+
+                                    let mut owner_index =
+                                        self.owner_index.write().map_err(|e| {
+                                            WasmRegistryError::StorageError(format!(
+                                                "Lock poisoned: {e}"
+                                            ))
+                                        })?;
+                                    owner_index
+                                        .entry(meta.owner.clone())
+                                        .or_default()
+                                        .push(hash);
+                                }
+                            }
+
+                            loaded += 1;
+                        }
                     }
                 }
             }
@@ -514,6 +798,66 @@ pub struct WasmRegistryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_kernel_api::state::BlobMetadata;
+    use std::collections::HashMap as StdHashMap;
+    use std::sync::Mutex;
+
+    /// In-memory BlobService implementation for testing.
+    #[allow(clippy::type_complexity)]
+    struct MockBlobService {
+        blobs: Mutex<StdHashMap<[u8; 32], (Vec<u8>, Namespace)>>,
+    }
+
+    impl MockBlobService {
+        fn new() -> Self {
+            Self {
+                blobs: Mutex::new(StdHashMap::new()),
+            }
+        }
+    }
+
+    impl BlobService for MockBlobService {
+        fn put(
+            &self,
+            namespace: &Namespace,
+            data: &[u8],
+        ) -> std::result::Result<[u8; 32], StateError> {
+            let hash = *blake3::hash(data).as_bytes();
+            let mut blobs = self.blobs.lock().unwrap();
+            blobs.insert(hash, (data.to_vec(), namespace.clone()));
+            Ok(hash)
+        }
+
+        fn get(&self, hash: &[u8; 32]) -> std::result::Result<Vec<u8>, StateError> {
+            let blobs = self.blobs.lock().unwrap();
+            blobs
+                .get(hash)
+                .map(|(data, _)| data.clone())
+                .ok_or(StateError::BlobNotFound)
+        }
+
+        fn exists(&self, hash: &[u8; 32]) -> std::result::Result<bool, StateError> {
+            let blobs = self.blobs.lock().unwrap();
+            Ok(blobs.contains_key(hash))
+        }
+
+        fn delete(&self, hash: &[u8; 32]) -> std::result::Result<(), StateError> {
+            let mut blobs = self.blobs.lock().unwrap();
+            blobs.remove(hash);
+            Ok(())
+        }
+
+        fn metadata(&self, hash: &[u8; 32]) -> std::result::Result<BlobMetadata, StateError> {
+            let blobs = self.blobs.lock().unwrap();
+            let (data, ns) = blobs.get(hash).ok_or(StateError::BlobNotFound)?;
+            Ok(BlobMetadata {
+                size: data.len() as u64,
+                namespace: ns.clone(),
+                created_at: 0,
+                content_type: None,
+            })
+        }
+    }
 
     fn sample_wasm() -> Vec<u8> {
         // Minimal valid WASM module (just magic + version)
@@ -695,5 +1039,303 @@ mod tests {
         // Wrong magic
         let wrong_magic = vec![0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00];
         assert!(validate_wasm(&wrong_magic).is_err());
+    }
+
+    // --- BlobService integration tests ---
+
+    fn blob_registry() -> WasmRegistry {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let bs = Arc::new(MockBlobService::new());
+        WasmRegistry::with_blob_service(db, bs)
+    }
+
+    #[tokio::test]
+    async fn test_blob_deploy_and_get() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        let retrieved = registry.get(&hash).await.unwrap().unwrap();
+        assert_eq!(retrieved, wasm);
+    }
+
+    #[tokio::test]
+    async fn test_blob_deploy_metadata_persists() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        let hash = registry
+            .deploy(wasm, "did:icn:alice", |m| {
+                m.with_name("blob-mod").with_description("Blob test")
+            })
+            .await
+            .unwrap();
+
+        let meta = registry.get_metadata(&hash).await.unwrap().unwrap();
+        assert_eq!(meta.name, Some("blob-mod".to_string()));
+        assert_eq!(meta.owner, "did:icn:alice");
+    }
+
+    #[tokio::test]
+    async fn test_blob_duplicate_rejected() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        let result = registry.deploy(wasm, "did:icn:owner", |m| m).await;
+        assert!(matches!(result, Err(WasmRegistryError::AlreadyExists(_))));
+    }
+
+    #[tokio::test]
+    async fn test_blob_hash_verified_on_load() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        // Clear in-memory cache to force load from BlobService
+        {
+            let mut modules = registry.modules.write().unwrap();
+            modules.clear();
+        }
+
+        // Get should succeed and return correct data
+        let retrieved = registry.get(&hash).await.unwrap().unwrap();
+        assert_eq!(retrieved, wasm);
+        assert_eq!(compute_hash(&retrieved), hash);
+    }
+
+    #[tokio::test]
+    async fn test_blob_exists() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+        let fake_hash = [0xAA; 32];
+
+        let hash = registry.deploy(wasm, "did:icn:owner", |m| m).await.unwrap();
+
+        assert!(registry.exists(&hash).await);
+        assert!(!registry.exists(&fake_hash).await);
+    }
+
+    #[tokio::test]
+    async fn test_blob_load_from_store() {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let bs = Arc::new(MockBlobService::new());
+        let registry = WasmRegistry::with_blob_service(db.clone(), bs.clone());
+        let wasm = sample_wasm();
+
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:alice", |m| {
+                m.with_name("persist-test")
+            })
+            .await
+            .unwrap();
+
+        // Create a new registry pointing to same db + blob_service
+        let registry2 = WasmRegistry::with_blob_service(db, bs);
+        let loaded = registry2.load_from_store_sync().unwrap();
+        assert_eq!(loaded, 1);
+
+        // Metadata should be loaded
+        let meta = registry2.get_metadata(&hash).await.unwrap().unwrap();
+        assert_eq!(meta.name, Some("persist-test".to_string()));
+
+        // Bytecode should be fetchable from BlobService
+        let retrieved = registry2.get(&hash).await.unwrap().unwrap();
+        assert_eq!(retrieved, wasm);
+    }
+
+    // --- Gossip announce tests (#1073) ---
+
+    #[tokio::test]
+    async fn test_deploy_emits_announce() {
+        #[allow(clippy::type_complexity)]
+        let announced: Arc<Mutex<Vec<([u8; 32], u64)>>> = Arc::new(Mutex::new(Vec::new()));
+        let announced_clone = announced.clone();
+
+        let mut registry = blob_registry();
+        registry.set_announce_callback(Arc::new(move |hash, size| {
+            announced_clone.lock().unwrap().push((hash, size));
+        }));
+
+        let wasm = sample_wasm();
+        let wasm_size = wasm.len() as u64;
+        let hash = registry.deploy(wasm, "did:icn:owner", |m| m).await.unwrap();
+
+        let announces = announced.lock().unwrap();
+        assert_eq!(announces.len(), 1, "exactly one announce after deploy");
+        assert_eq!(
+            announces[0].0, hash,
+            "announced hash must match deployed hash"
+        );
+        assert_eq!(announces[0].1, wasm_size, "announced size must match");
+    }
+
+    #[tokio::test]
+    async fn test_no_announce_without_callback() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        // Should succeed without announce callback
+        let result = registry.deploy(wasm, "did:icn:owner", |m| m).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_success() {
+        let wasm = sample_wasm();
+        let expected_hash = compute_hash(&wasm);
+        let wasm_clone = wasm.clone();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |hash| {
+            let data = wasm_clone.clone();
+            let h = hash;
+            Box::pin(async move {
+                // Simulate remote fetch: return data if hash matches
+                if h == compute_hash(&data) {
+                    Ok(data)
+                } else {
+                    Err("not found".into())
+                }
+            })
+        }));
+
+        let fetched = registry.fetch_remote(&expected_hash).await.unwrap();
+        assert_eq!(fetched, wasm);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_hash_mismatch() {
+        let _wasm = sample_wasm();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            // Return wrong data (doesn't match requested hash)
+            Box::pin(async move { Ok(vec![0xFF; 100]) })
+        }));
+
+        let fake_hash = [0xAA; 32];
+        let result = registry.fetch_remote(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("mismatch") || err_msg.contains("Invalid"));
+    }
+
+    #[tokio::test]
+    async fn test_fetch_remote_no_callback() {
+        let registry = blob_registry();
+        let result = registry.fetch_remote(&[0xBB; 32]).await;
+        assert!(result.is_err());
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(err_msg.contains("No remote fetch callback"));
+    }
+
+    // --- resolve_or_fetch tests (#1074) ---
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_local_hit() {
+        let registry = blob_registry();
+        let wasm = sample_wasm();
+
+        // Deploy locally first
+        let hash = registry
+            .deploy(wasm.clone(), "did:icn:owner", |m| m)
+            .await
+            .unwrap();
+
+        // resolve_or_fetch should return local bytes without needing fetch callback
+        let resolved = registry.resolve_or_fetch(&hash).await.unwrap();
+        assert_eq!(resolved, wasm);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_remote_success() {
+        let wasm = sample_wasm();
+        let expected_hash = compute_hash(&wasm);
+        let wasm_clone = wasm.clone();
+
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |hash| {
+            let data = wasm_clone.clone();
+            let h = hash;
+            Box::pin(async move {
+                if h == compute_hash(&data) {
+                    Ok(data)
+                } else {
+                    Err("not found".into())
+                }
+            })
+        }));
+
+        // Module is NOT deployed locally -- resolve_or_fetch should fetch remotely
+        let resolved = registry.resolve_or_fetch(&expected_hash).await.unwrap();
+        assert_eq!(resolved, wasm);
+
+        // After fetch, module should be stored locally
+        assert!(registry.exists(&expected_hash).await);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_remote_failure() {
+        let mut registry = blob_registry();
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            Box::pin(async move { Err("peer unreachable".into()) })
+        }));
+
+        let fake_hash = [0xCC; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("Remote fetch failed"),
+            "Expected 'Remote fetch failed', got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_no_callback_no_local() {
+        let registry = blob_registry();
+        // No fetch callback, module not deployed locally
+        let fake_hash = [0xDD; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("No remote fetch callback"),
+            "Expected 'No remote fetch callback', got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_or_fetch_hash_mismatch() {
+        let mut registry = blob_registry();
+        // Return wrong data that doesn't match the requested hash
+        registry.set_fetch_callback(Arc::new(move |_hash| {
+            Box::pin(async move {
+                // Return valid WASM but with wrong content
+                Ok(vec![0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, 0xFF])
+            })
+        }));
+
+        let fake_hash = [0xEE; 32];
+        let result = registry.resolve_or_fetch(&fake_hash).await;
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("mismatch"),
+            "Expected hash mismatch error, got: {err_msg}"
+        );
     }
 }
