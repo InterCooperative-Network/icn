@@ -22,6 +22,9 @@ icn/apps/*/Cargo.lock
 .claude/settings.local.json
 .claude/.env
 
+# Local cargo config overrides (machine-specific, not for CI)
+icn/.cargo/config.user.toml
+
 # ICN data directories
 /data/
 *.db

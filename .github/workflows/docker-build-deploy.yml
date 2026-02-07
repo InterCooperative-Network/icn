@@ -33,6 +33,10 @@ env:
   CXX: clang++
   # Limit parallel compilation jobs to avoid OOM on self-hosted runner (11GB RAM)
   CARGO_BUILD_JOBS: 2
+  # Use mold linker on self-hosted runner (faster, less memory than GNU ld).
+  # mold is installed in the "Install build tools" step.
+  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
+  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
 jobs:
   # Standard CI jobs run on GitHub-hosted runners
@@ -56,8 +60,6 @@ jobs:
           if ! command -v clang &> /dev/null; then
             PACKAGES="$PACKAGES clang"
           fi
-          # mold linker is much faster and uses less memory than GNU ld
-          # This prevents linker SIGSEGV on large link jobs
           if ! command -v mold &> /dev/null; then
             PACKAGES="$PACKAGES mold"
           fi

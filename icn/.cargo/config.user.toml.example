@@ -1,0 +1,16 @@
+# Local cargo overrides — copy to config.user.toml and customize.
+#
+# These settings are NOT committed and NOT used by CI.
+# To use mold linker locally (much faster linking):
+#
+#   1. Install mold: sudo apt install mold (or brew install mold)
+#   2. Copy this file: cp config.user.toml.example config.user.toml
+#   3. Uncomment the settings below
+#
+# Alternatively, use environment variables:
+#   CARGO_BUILD_JOBS=8 cargo build         # override parallelism
+#   RUSTC_WRAPPER=sccache cargo build      # enable sccache
+
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
