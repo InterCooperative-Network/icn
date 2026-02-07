@@ -615,6 +615,23 @@ impl WasmRegistry {
         }
     }
 
+    /// List all modules in the registry (paginated)
+    pub async fn list_all(&self, offset: usize, limit: usize) -> Result<Vec<WasmMetadata>> {
+        self.list_all_sync(offset, limit)
+    }
+
+    /// List all modules in the registry (sync, paginated)
+    pub fn list_all_sync(&self, offset: usize, limit: usize) -> Result<Vec<WasmMetadata>> {
+        let metadata = self
+            .metadata
+            .read()
+            .map_err(|e| WasmRegistryError::StorageError(format!("Lock poisoned: {e}")))?;
+        let mut all: Vec<WasmMetadata> = metadata.values().cloned().collect();
+        // Sort by deployed_at descending for deterministic ordering
+        all.sort_by(|a, b| b.deployed_at.cmp(&a.deployed_at));
+        Ok(all.into_iter().skip(offset).take(limit).collect())
+    }
+
     /// List modules by owner
     pub async fn list_by_owner(&self, owner: &str) -> Result<Vec<WasmMetadata>> {
         self.list_by_owner_sync(owner)

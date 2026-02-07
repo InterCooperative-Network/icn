@@ -25,6 +25,8 @@ tokio = { workspace = true }
 uuid = { version = "1.20", features = ["v4", "serde"] }
 sha2.workspace = true
 hex = "0.4"
+blake3 = "1.8"
+ed25519-dalek.workspace = true
 lru = "0.16"
 tracing.workspace = true
 

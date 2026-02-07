@@ -151,6 +151,22 @@ import {
   ListRateSourcesResponse,
   SetManualRateRequest,
   SetManualRateResponse,
+  // WASM module types
+  WasmModuleMetadata,
+  UploadWasmRequest,
+  UploadWasmResponse,
+  WasmModuleListResponse,
+  // Treasury types
+  TreasuryStatus,
+  TreasuryBalance,
+  ProposeTreasurySpendRequest,
+  ProposeTreasurySpendResponse,
+  // Service discovery types
+  ServiceEndpointInfo,
+  AnnounceServiceRequest,
+  AnnounceServiceResponse,
+  DiscoverServicesRequest,
+  DiscoverServicesResponse,
 } from './types';
 
 export * from './types';
@@ -1126,6 +1142,267 @@ export class ICNClient {
       `/compute/cancel/${taskHash}`,
       req || {}
     );
+  }
+
+  // ===========================================================================
+  // WASM Module Management
+  // ===========================================================================
+
+  /**
+   * Upload a WASM module to the registry
+   *
+   * @example
+   * ```typescript
+   * const wasmBytes = await fs.readFile('module.wasm');
+   * const result = await client.uploadWasm(new Uint8Array(wasmBytes), {
+   *   name: 'my-module',
+   *   version: '1.0.0',
+   * });
+   * console.log('Uploaded:', result.hash);
+   * ```
+   */
+  async uploadWasm(
+    wasmBytes: Uint8Array | ArrayBuffer,
+    options: { name: string; version: string }
+  ): Promise<UploadWasmResponse> {
+    const bytes = wasmBytes instanceof ArrayBuffer
+      ? new Uint8Array(wasmBytes)
+      : wasmBytes;
+
+    let base64: string;
+    if (typeof Buffer !== 'undefined') {
+      base64 = Buffer.from(bytes).toString('base64');
+    } else if (typeof btoa !== 'undefined') {
+      const CHUNK_SIZE = 32768;
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      }
+      base64 = btoa(binary);
+    } else {
+      throw new Error('No base64 encoding method available');
+    }
+
+    const req: UploadWasmRequest = {
+      wasm_bytes: base64,
+      name: options.name,
+      version: options.version,
+    };
+    return this.post<UploadWasmResponse>('/compute/wasm/upload', req);
+  }
+
+  /**
+   * List WASM modules in the registry
+   *
+   * @param options - Pagination options
+   * @returns Paginated list of WASM module metadata
+   *
+   * @example
+   * ```typescript
+   * const modules = await client.listWasm({ limit: 10 });
+   * for (const mod of modules.modules) {
+   *   console.log(`${mod.name}@${mod.version}: ${mod.hash}`);
+   * }
+   * ```
+   */
+  async listWasm(options?: { offset?: number; limit?: number }): Promise<WasmModuleListResponse> {
+    const params = new URLSearchParams();
+    if (options?.offset !== undefined) {
+      params.set('offset', options.offset.toString());
+    }
+    if (options?.limit !== undefined) {
+      params.set('limit', options.limit.toString());
+    }
+    const query = params.toString();
+    return this.get<WasmModuleListResponse>(`/compute/wasm${query ? `?${query}` : ''}`);
+  }
+
+  /**
+   * Get WASM module metadata by hash
+   *
+   * @param hash - Blake3 hash of the WASM module (hex string)
+   *
+   * @example
+   * ```typescript
+   * const metadata = await client.getWasm('abc123...');
+   * console.log(`${metadata.name}@${metadata.version}, ${metadata.size} bytes`);
+   * ```
+   */
+  async getWasm(hash: string): Promise<WasmModuleMetadata> {
+    return this.get<WasmModuleMetadata>(`/compute/wasm/${hash}`);
+  }
+
+  /**
+   * Submit a compute task using a previously uploaded WASM module
+   *
+   * @param wasmHash - Blake3 hash of the WASM module (hex string)
+   * @param options - Task submission options
+   *
+   * @example
+   * ```typescript
+   * // Upload the module once
+   * const upload = await client.uploadWasm(wasmBytes, {
+   *   name: 'my-module',
+   *   version: '1.0.0',
+   * });
+   *
+   * // Submit tasks by hash (no need to re-upload)
+   * const result = await client.submitWasmByHash(upload.hash, {
+   *   fuel_limit: 10000,
+   *   inputs: { x: 42 },
+   * });
+   * ```
+   */
+  async submitWasmByHash(
+    wasmHash: string,
+    options?: Omit<SubmitTaskRequest, 'code' | 'wasm_bytes' | 'wasm_hash' | 'code_type'>
+  ): Promise<SubmitTaskResponse> {
+    return this.submitTask({
+      ...options,
+      code_type: 'wasm',
+      wasm_hash: wasmHash,
+    });
+  }
+
+  // ===========================================================================
+  // Treasury
+  // ===========================================================================
+
+  /**
+   * Get treasury status for a cooperative
+   *
+   * @example
+   * ```typescript
+   * const status = await client.getTreasuryStatus('my-coop');
+   * console.log(`Balance: ${status.balance} ${status.currency}`);
+   * ```
+   */
+  async getTreasuryStatus(coopId: string): Promise<TreasuryStatus> {
+    return this.get<TreasuryStatus>(`/treasury/${coopId}/status`);
+  }
+
+  /**
+   * Get treasury balance for a cooperative
+   *
+   * @example
+   * ```typescript
+   * const balance = await client.getTreasuryBalance('my-coop');
+   * console.log(`${balance.balance} ${balance.currency}`);
+   * ```
+   */
+  async getTreasuryBalance(coopId: string): Promise<TreasuryBalance> {
+    return this.get<TreasuryBalance>(`/treasury/${coopId}/balance`);
+  }
+
+  /**
+   * Propose a treasury spend (creates a governance proposal)
+   *
+   * The spend must be approved through the governance process before
+   * funds are disbursed.
+   *
+   * @example
+   * ```typescript
+   * const proposal = await client.proposeTreasurySpend('my-coop', {
+   *   amount: 1000,
+   *   recipient: 'did:icn:bob',
+   *   currency: 'credits',
+   *   memo: 'Equipment purchase',
+   * });
+   * console.log('Proposal created:', proposal.proposal_id);
+   * ```
+   */
+  async proposeTreasurySpend(
+    coopId: string,
+    req: ProposeTreasurySpendRequest
+  ): Promise<ProposeTreasurySpendResponse> {
+    return this.post<ProposeTreasurySpendResponse>(`/treasury/${coopId}/spend`, req);
+  }
+
+  // ===========================================================================
+  // Service Discovery
+  // ===========================================================================
+
+  /**
+   * Announce a service endpoint for discovery by other nodes
+   *
+   * @example
+   * ```typescript
+   * await client.announceService({
+   *   service_id: 'ledger-node-1',
+   *   service_type: { name: 'ledger', version: '1.0' },
+   *   addresses: [{ protocol: 'https', host: 'node1.example.com', port: 8080 }],
+   *   capabilities: ['read', 'write'],
+   *   scope: 'org',
+   * });
+   * ```
+   */
+  async announceService(req: AnnounceServiceRequest): Promise<AnnounceServiceResponse> {
+    return this.post<AnnounceServiceResponse>('/services/announce', req);
+  }
+
+  /**
+   * Withdraw a previously announced service endpoint
+   *
+   * @param serviceId - The service ID to withdraw
+   *
+   * @example
+   * ```typescript
+   * await client.withdrawService('ledger-node-1');
+   * ```
+   */
+  async withdrawService(serviceId: string): Promise<void> {
+    return this.delete<void>(`/services/${encodeURIComponent(serviceId)}`);
+  }
+
+  /**
+   * Discover available service endpoints
+   *
+   * @example
+   * ```typescript
+   * // Discover all services
+   * const all = await client.discoverServices();
+   *
+   * // Discover ledger services with read capability
+   * const ledgers = await client.discoverServices({
+   *   service_type: 'ledger',
+   *   required_capabilities: ['read'],
+   *   scope: 'org',
+   * });
+   *
+   * for (const svc of ledgers.services) {
+   *   console.log(`${svc.service_id} at ${svc.addresses[0]?.host}:${svc.addresses[0]?.port}`);
+   * }
+   * ```
+   */
+  async discoverServices(req?: DiscoverServicesRequest): Promise<DiscoverServicesResponse> {
+    const params = new URLSearchParams();
+    if (req?.scope) {
+      params.set('scope', req.scope);
+    }
+    if (req?.service_type) {
+      params.set('service_type', req.service_type);
+    }
+    if (req?.required_capabilities && req.required_capabilities.length > 0) {
+      params.set('capabilities', req.required_capabilities.join(','));
+    }
+    const query = params.toString();
+    return this.get<DiscoverServicesResponse>(`/services${query ? `?${query}` : ''}`);
+  }
+
+  /**
+   * Get a specific service endpoint by ID
+   *
+   * @param serviceId - The service ID to look up
+   *
+   * @example
+   * ```typescript
+   * const svc = await client.getService('ledger-node-1');
+   * console.log(`Provider: ${svc.provider}`);
+   * ```
+   */
+  async getService(serviceId: string): Promise<ServiceEndpointInfo> {
+    return this.get<ServiceEndpointInfo>(`/services/${encodeURIComponent(serviceId)}`);
   }
 
   // ===========================================================================

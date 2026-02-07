@@ -48,8 +48,11 @@ pub enum RemoteDiscoverOutcome {
     Timeout(Vec<ServiceEndpoint>),
 }
 
-/// In-memory service endpoint registry with TTL-based expiry
-/// and gossip-based remote discovery aggregation.
+/// Sled tree name for persisted service endpoints.
+const SLED_TREE_NAME: &str = "service_endpoints";
+
+/// In-memory service endpoint registry with TTL-based expiry,
+/// gossip-based remote discovery aggregation, and optional sled persistence.
 #[derive(Clone)]
 pub struct ServiceDiscoveryManager {
     /// service_id → ServiceEndpoint
@@ -62,6 +65,8 @@ pub struct ServiceDiscoveryManager {
     own_signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     /// Own DID for response attribution
     own_did: Option<icn_identity::Did>,
+    /// Optional sled tree for write-through persistence
+    sled_tree: Option<sled::Tree>,
 }
 
 impl ServiceDiscoveryManager {
@@ -73,7 +78,60 @@ impl ServiceDiscoveryManager {
             pending_queries: Arc::new(RwLock::new(HashMap::new())),
             own_signing_key: None,
             own_did: None,
+            sled_tree: None,
         }
+    }
+
+    /// Create a new manager backed by sled for persistence.
+    ///
+    /// On construction, loads all non-expired endpoints from sled into memory.
+    /// Subsequent announce/withdraw calls write through to sled.
+    pub fn with_sled(db: &sled::Db) -> Result<Self, NamingError> {
+        let tree = db.open_tree(SLED_TREE_NAME).map_err(|e| {
+            NamingError::Internal(format!("Failed to open sled tree: {e}"))
+        })?;
+
+        // Load existing entries from sled
+        let mut registry = HashMap::new();
+        let mut expired_keys = Vec::new();
+
+        for entry in tree.iter() {
+            let (key, value) = entry.map_err(|e| {
+                NamingError::Internal(format!("Failed to read sled entry: {e}"))
+            })?;
+            match serde_json::from_slice::<ServiceEndpoint>(&value) {
+                Ok(ep) => {
+                    if ep.is_expired() {
+                        expired_keys.push(key);
+                    } else {
+                        registry.insert(ep.service_id.clone(), ep);
+                    }
+                }
+                Err(e) => {
+                    warn!("Skipping corrupt sled entry: {}", e);
+                    expired_keys.push(key);
+                }
+            }
+        }
+
+        // Clean up expired/corrupt entries
+        for key in expired_keys {
+            let _ = tree.remove(key);
+        }
+
+        info!(
+            "Loaded {} service endpoints from sled persistence",
+            registry.len()
+        );
+
+        Ok(Self {
+            registry: Arc::new(RwLock::new(registry)),
+            gossip_handle: None,
+            pending_queries: Arc::new(RwLock::new(HashMap::new())),
+            own_signing_key: None,
+            own_did: None,
+            sled_tree: Some(tree),
+        })
     }
 
     /// Create a new manager with gossip propagation enabled.
@@ -100,6 +158,7 @@ impl ServiceDiscoveryManager {
             pending_queries: Arc::new(RwLock::new(HashMap::new())),
             own_signing_key: None,
             own_did: Some(own_did.clone()),
+            sled_tree: None,
         };
 
         let mut gossip = gossip_handle.write().await;
@@ -535,6 +594,16 @@ impl ServiceDiscoveryManager {
         reg.insert(id.clone(), endpoint.clone());
         drop(reg); // Release lock before gossip
 
+        // Write-through to sled if configured
+        if let Some(ref tree) = self.sled_tree {
+            let encoded = serde_json::to_vec(&endpoint).map_err(|e| {
+                NamingError::Internal(format!("Failed to serialize endpoint: {e}"))
+            })?;
+            tree.insert(id.as_bytes(), encoded).map_err(|e| {
+                NamingError::Internal(format!("Failed to persist endpoint: {e}"))
+            })?;
+        }
+
         debug!("Service announced: {}", id);
         icn_obs::metrics::service_discovery::announcements_inc();
 
@@ -569,6 +638,11 @@ impl ServiceDiscoveryManager {
             Some(ep) if ep.provider == provider => {
                 reg.remove(service_id);
                 drop(reg); // Release lock before gossip
+
+                // Remove from sled if configured
+                if let Some(ref tree) = self.sled_tree {
+                    let _ = tree.remove(service_id.as_bytes());
+                }
 
                 debug!("Service withdrawn: {}", service_id);
                 icn_obs::metrics::service_discovery::withdrawals_inc();
@@ -656,8 +730,24 @@ impl ServiceDiscoveryManager {
     pub async fn remove_expired(&self) -> usize {
         let mut reg = self.registry.write().await;
         let before = reg.len();
-        reg.retain(|_, ep| !ep.is_expired());
+        let mut expired_ids = Vec::new();
+        reg.retain(|id, ep| {
+            if ep.is_expired() {
+                expired_ids.push(id.clone());
+                false
+            } else {
+                true
+            }
+        });
         let removed = before - reg.len();
+
+        // Remove expired entries from sled
+        if let Some(ref tree) = self.sled_tree {
+            for id in &expired_ids {
+                let _ = tree.remove(id.as_bytes());
+            }
+        }
+
         if removed > 0 {
             debug!("Removed {} expired service endpoints", removed);
             icn_obs::metrics::service_discovery::expired_removed_add(removed as u64);
@@ -1339,5 +1429,94 @@ mod tests {
         mgr.set_signing_key(signing_key);
 
         assert!(mgr.own_signing_key.is_some());
+    }
+
+    // ========== N3: Sled Persistence Tests ==========
+
+    #[tokio::test]
+    async fn test_sled_persistence_announce_and_reload() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        // Create manager with sled, announce an endpoint
+        {
+            let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
+            let ep = make_endpoint("persist-svc", ScopeLevel::Org, 3600);
+            mgr.announce(ep).await.unwrap();
+        }
+
+        // Create a new manager from the same sled — endpoint should be loaded
+        let mgr2 = ServiceDiscoveryManager::with_sled(&db).unwrap();
+        let result = mgr2.get("persist-svc").await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().service_id, "persist-svc");
+    }
+
+    #[tokio::test]
+    async fn test_sled_persistence_withdraw_removes_entry() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
+        let ep = make_endpoint("withdraw-svc", ScopeLevel::Org, 3600);
+        mgr.announce(ep).await.unwrap();
+        mgr.withdraw("withdraw-svc", "did:icn:test").await.unwrap();
+
+        // Reload from sled — should be gone
+        let mgr2 = ServiceDiscoveryManager::with_sled(&db).unwrap();
+        assert!(mgr2.get("withdraw-svc").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sled_persistence_expired_cleaned_on_load() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        // Write an expired endpoint directly to sled
+        {
+            let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
+            let mut ep = make_endpoint("expired-persist", ScopeLevel::Org, 1);
+            ep.updated_at = 1000; // Way in the past → expired
+            // Bypass announce to force it into sled even though expired
+            let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+            let encoded = serde_json::to_vec(&ep).unwrap();
+            tree.insert(ep.service_id.as_bytes(), encoded).unwrap();
+            // Also add a fresh one
+            let fresh = make_endpoint("fresh-persist", ScopeLevel::Org, 3600);
+            mgr.announce(fresh).await.unwrap();
+        }
+
+        // Reload — expired entry should be cleaned up
+        let mgr2 = ServiceDiscoveryManager::with_sled(&db).unwrap();
+        assert!(mgr2.get("expired-persist").await.is_none());
+        assert!(mgr2.get("fresh-persist").await.is_some());
+
+        // Verify sled is also cleaned
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        assert!(tree.get("expired-persist").unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sled_remove_expired_cleans_sled() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let db = sled::open(tmpdir.path()).unwrap();
+
+        let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
+        let mut ep = make_endpoint("will-expire", ScopeLevel::Org, 1);
+        ep.updated_at = 1000; // Already expired
+        // Insert directly into registry + sled to test remove_expired
+        {
+            let mut reg = mgr.registry.write().await;
+            reg.insert("will-expire".to_string(), ep.clone());
+        }
+        let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
+        let encoded = serde_json::to_vec(&ep).unwrap();
+        tree.insert("will-expire".as_bytes(), encoded).unwrap();
+
+        let removed = mgr.remove_expired().await;
+        assert_eq!(removed, 1);
+
+        // Verify sled is also cleaned
+        assert!(tree.get("will-expire").unwrap().is_none());
     }
 }

@@ -415,6 +415,8 @@ export interface SubmitTaskRequest {
   code?: string;
   /** WASM bytecode as base64 string (for code_type: wasm) */
   wasm_bytes?: string;
+  /** Blake3 hash of a previously uploaded WASM module (hex string) */
+  wasm_hash?: string;
   /** Code type: "ccl" (default) or "wasm" */
   code_type?: CodeType;
   /** Input arguments */
@@ -1701,4 +1703,193 @@ export interface SetManualRateResponse {
   set_by: string;
   /** When the rate was set (Unix timestamp) */
   set_at: number;
+}
+
+// ============================================================================
+// WASM Module Management
+// ============================================================================
+
+/** Metadata for a deployed WASM module */
+export interface WasmModuleMetadata {
+  /** Blake3 hash of the WASM bytes (hex-encoded) */
+  hash: string;
+  /** Human-readable name */
+  name: string;
+  /** Module version */
+  version: string;
+  /** Size in bytes */
+  size: number;
+  /** DID of the deployer */
+  deployed_by: string;
+  /** Deployment timestamp (Unix seconds) */
+  deployed_at: number;
+}
+
+/** Request to upload a WASM module */
+export interface UploadWasmRequest {
+  /** WASM bytecode as base64 string */
+  wasm_bytes: string;
+  /** Human-readable module name */
+  name: string;
+  /** Module version */
+  version: string;
+}
+
+/** Response from uploading a WASM module */
+export interface UploadWasmResponse {
+  /** Blake3 hash of the WASM bytes (hex-encoded) */
+  hash: string;
+  /** Size in bytes */
+  size: number;
+  /** Module name */
+  name: string;
+}
+
+/** Paginated list of WASM modules */
+export interface WasmModuleListResponse {
+  /** List of module metadata */
+  modules: WasmModuleMetadata[];
+  /** Total number of modules */
+  total: number;
+  /** Offset used */
+  offset: number;
+  /** Limit used */
+  limit: number;
+}
+
+// ============================================================================
+// Treasury
+// ============================================================================
+
+/** Treasury status response */
+export interface TreasuryStatus {
+  /** Cooperative ID */
+  coop_id: string;
+  /** Treasury DID */
+  treasury_did: string;
+  /** Current balance */
+  balance: number;
+  /** Currency */
+  currency: string;
+  /** Number of pending spend proposals */
+  pending_proposals: number;
+}
+
+/** Treasury balance response */
+export interface TreasuryBalance {
+  /** Cooperative ID */
+  coop_id: string;
+  /** Current balance */
+  balance: number;
+  /** Currency */
+  currency: string;
+}
+
+/** Request to propose a treasury spend */
+export interface ProposeTreasurySpendRequest {
+  /** Amount to spend */
+  amount: number;
+  /** Recipient DID */
+  recipient: string;
+  /** Currency */
+  currency: string;
+  /** Memo/reason for the spend */
+  memo: string;
+}
+
+/** Response from proposing a treasury spend */
+export interface ProposeTreasurySpendResponse {
+  /** ID of the created governance proposal */
+  proposal_id: string;
+  /** Domain ID for the governance proposal */
+  domain_id: string;
+  /** Status message */
+  status: string;
+}
+
+// ============================================================================
+// Service Discovery / Naming
+// ============================================================================
+
+/** Scope level for service visibility */
+export type ScopeLevel = 'local' | 'org' | 'federation' | 'commons';
+
+/** Service type descriptor */
+export interface ServiceTypeDescriptor {
+  /** Service type name (e.g., "ledger", "compute") */
+  name: string;
+  /** Service version */
+  version: string;
+}
+
+/** Network endpoint address */
+export interface ServiceAddress {
+  /** Protocol (e.g., "https", "grpc") */
+  protocol: string;
+  /** Hostname */
+  host: string;
+  /** Port number */
+  port: number;
+}
+
+/** Service endpoint as returned by discovery */
+export interface ServiceEndpointInfo {
+  /** Unique service ID */
+  service_id: string;
+  /** Provider DID */
+  provider: string;
+  /** Service type */
+  service_type: ServiceTypeDescriptor;
+  /** Network endpoints */
+  addresses: ServiceAddress[];
+  /** Capabilities offered */
+  capabilities: string[];
+  /** Scope visibility */
+  scope: ScopeLevel;
+  /** TTL in seconds */
+  ttl_secs: number;
+  /** Created timestamp (Unix seconds) */
+  created_at: number;
+}
+
+/** Request to announce a service */
+export interface AnnounceServiceRequest {
+  /** Unique service ID */
+  service_id: string;
+  /** Service type */
+  service_type: ServiceTypeDescriptor;
+  /** Network endpoints */
+  addresses: ServiceAddress[];
+  /** Capabilities offered */
+  capabilities: string[];
+  /** Scope visibility */
+  scope: ScopeLevel;
+  /** TTL in seconds (default: 3600) */
+  ttl_secs?: number;
+}
+
+/** Response from announcing a service */
+export interface AnnounceServiceResponse {
+  /** Service ID that was registered */
+  service_id: string;
+  /** Status message */
+  status: string;
+}
+
+/** Request to discover services */
+export interface DiscoverServicesRequest {
+  /** Scope level to search within */
+  scope?: ScopeLevel;
+  /** Filter by service type name */
+  service_type?: string;
+  /** Required capabilities */
+  required_capabilities?: string[];
+}
+
+/** Response from service discovery */
+export interface DiscoverServicesResponse {
+  /** Matching service endpoints */
+  services: ServiceEndpointInfo[];
+  /** Total results */
+  total: number;
 }

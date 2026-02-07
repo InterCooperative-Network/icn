@@ -859,6 +859,143 @@ pub async fn deposit_to_treasury(
 }
 
 // ============================================================================
+// Treasury Spend
+// ============================================================================
+
+/// Request to propose a treasury spend
+#[derive(Debug, Deserialize)]
+pub struct SpendRequest {
+    /// Amount to spend (must be positive)
+    pub amount: i64,
+    /// Recipient DID
+    pub recipient: String,
+    /// Human-readable memo / purpose
+    pub memo: String,
+    /// Currency (defaults to "credits")
+    #[serde(default = "default_spend_currency")]
+    pub currency: String,
+}
+
+fn default_spend_currency() -> String {
+    "credits".to_string()
+}
+
+/// POST /treasury/{coop_id}/spend - Propose a treasury spend
+///
+/// Creates a governance proposal for a direct treasury disbursement.
+/// The spend is charged against the treasury's unallocated balance.
+/// Requires governance approval before execution.
+#[post("/{coop_id}/spend")]
+pub async fn propose_spend(
+    req: HttpRequest,
+    path: web::Path<String>,
+    body: web::Json<SpendRequest>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    governance_mgr: web::Data<Arc<GovernanceManager>>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "treasury:write")?;
+
+    let coop_id = path.into_inner();
+    require_coop_access(&req, &coop_id)?;
+
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let proposer_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    // Validate inputs
+    if body.amount <= 0 {
+        return Err(GatewayError::BadRequest(
+            "Spend amount must be positive".to_string(),
+        ));
+    }
+    if body.memo.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Memo cannot be empty".to_string(),
+        ));
+    }
+    let recipient_did: Did = body
+        .recipient
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid recipient DID: {e}")))?;
+
+    // Ensure treasury exists
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    let _treasury = treasury.ok_or_else(|| {
+        GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'"
+        ))
+    })?;
+
+    // Nonce is checked at execution time by the TreasuryManager.
+    // For the proposal, we use 0 — the executor reads the current nonce atomically.
+    let nonce = 0u64;
+
+    info!(
+        coop_id = %coop_id,
+        amount = body.amount,
+        recipient = %body.recipient,
+        nonce = nonce,
+        "Creating governance proposal for treasury spend"
+    );
+
+    let proposal_id = ProposalId::generate();
+    let domain_id = GovernanceDomainId::new(&coop_id);
+
+    let payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::Spend {
+            amount: body.amount,
+            recipient: recipient_did,
+            memo: body.memo.clone(),
+            nonce,
+        },
+    };
+
+    let title = format!("Treasury Spend: {} {}", body.amount, body.currency);
+    let description = format!(
+        "Proposal to spend {} {} from treasury to {} — {}",
+        body.amount, body.currency, body.recipient, body.memo
+    );
+
+    let created_proposal_id = governance_mgr
+        .create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            proposer_did,
+            title,
+            description,
+            payload,
+        )
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to create proposal: {e}")))?;
+
+    info!(
+        proposal_id = %created_proposal_id,
+        coop_id = %coop_id,
+        "Treasury spend proposal created"
+    );
+
+    let response = serde_json::json!({
+        "status": "proposal_created",
+        "message": "Treasury spend requires governance approval",
+        "proposal_id": created_proposal_id.to_string(),
+        "coop_id": coop_id,
+        "amount": body.amount,
+        "currency": body.currency,
+        "recipient": body.recipient,
+        "memo": body.memo,
+        "nonce": nonce
+    });
+
+    Ok(HttpResponse::Accepted().json(response))
+}
+
+// ============================================================================
 // Route Configuration
 // ============================================================================
 
@@ -871,7 +1008,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(create_budget)
         .service(list_spending_rules)
         .service(get_audit_trail)
-        .service(deposit_to_treasury);
+        .service(deposit_to_treasury)
+        .service(propose_spend);
 }
 
 #[cfg(test)]

@@ -53,6 +53,9 @@ pub struct SubmitTaskRequest {
     /// WASM bytecode as base64 (for code_type: wasm)
     #[serde(default)]
     pub wasm_bytes: Option<String>,
+    /// WASM module hash reference (for code_type: wasm, alternative to wasm_bytes)
+    #[serde(default)]
+    pub wasm_hash: Option<String>,
     /// Code type: "ccl" (default) or "wasm"
     #[serde(default)]
     pub code_type: CodeType,
@@ -142,17 +145,32 @@ pub async fn submit_task(
             TaskCode::Ccl(code.clone())
         }
         CodeType::Wasm => {
-            let wasm_b64 = req.wasm_bytes.as_ref().ok_or_else(|| {
-                crate::error::GatewayError::BadRequest(
-                    "Missing 'wasm_bytes' field for WASM task".to_string(),
-                )
-            })?;
-            let wasm_bytes = base64::engine::general_purpose::STANDARD
-                .decode(wasm_b64)
-                .map_err(|e| {
-                    crate::error::GatewayError::BadRequest(format!("Invalid base64: {e}"))
+            if let Some(ref hash_hex) = req.wasm_hash {
+                // Reference by hash (deploy-once, reference-by-hash)
+                let hash_bytes = hex::decode(hash_hex).map_err(|_| {
+                    crate::error::GatewayError::BadRequest("Invalid wasm_hash hex".to_string())
                 })?;
-            TaskCode::WasmInline(wasm_bytes)
+                if hash_bytes.len() != 32 {
+                    return Err(crate::error::GatewayError::BadRequest(
+                        "wasm_hash must be 32 bytes".to_string(),
+                    ));
+                }
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                TaskCode::WasmRef(hash)
+            } else if let Some(ref wasm_b64) = req.wasm_bytes {
+                // Inline WASM bytes
+                let wasm_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(wasm_b64)
+                    .map_err(|e| {
+                        crate::error::GatewayError::BadRequest(format!("Invalid base64: {e}"))
+                    })?;
+                TaskCode::WasmInline(wasm_bytes)
+            } else {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "WASM task requires either 'wasm_bytes' or 'wasm_hash'".to_string(),
+                ));
+            }
         }
     };
 
@@ -310,13 +328,200 @@ pub async fn cancel_task(
     }))
 }
 
+// ============================================================================
+// WASM Registry Endpoints
+// ============================================================================
+
+/// Request body for WASM upload (base64-encoded bytes)
+#[derive(Debug, serde::Deserialize)]
+pub struct UploadWasmRequest {
+    /// WASM bytecode as base64
+    pub wasm_bytes: String,
+    /// Module name (optional)
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Module description (optional)
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// Response from uploading a WASM module
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct UploadWasmResponse {
+    pub hash: String,
+    pub size: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Response for listing WASM modules
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct WasmMetadataResponse {
+    pub hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub size_bytes: usize,
+    pub owner: String,
+    pub deployed_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl From<icn_compute::WasmMetadata> for WasmMetadataResponse {
+    fn from(m: icn_compute::WasmMetadata) -> Self {
+        Self {
+            hash: hex::encode(m.code_hash),
+            name: m.name,
+            size_bytes: m.size_bytes,
+            owner: m.owner,
+            deployed_at: m.deployed_at,
+            description: m.description,
+        }
+    }
+}
+
+/// Pagination query parameters
+#[derive(Debug, serde::Deserialize)]
+pub struct PaginationQuery {
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default = "default_page_limit")]
+    pub limit: usize,
+}
+
+fn default_page_limit() -> usize {
+    50
+}
+
+/// POST /compute/wasm/upload — Upload a WASM module
+#[post("/wasm/upload")]
+pub async fn upload_wasm(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    req: web::Json<UploadWasmRequest>,
+) -> Result<HttpResponse> {
+    use base64::Engine;
+
+    require_scope(&http_req, "compute:write")?;
+
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let registry = compute_mgr.wasm_registry().ok_or_else(|| {
+        crate::error::GatewayError::InternalError("WASM registry not configured".to_string())
+    })?;
+
+    let wasm_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&req.wasm_bytes)
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid base64: {e}")))?;
+
+    let name = req.name.clone();
+    let description = req.description.clone();
+
+    let hash = registry
+        .deploy(wasm_bytes, &claims.sub, |mut m| {
+            if let Some(ref n) = name {
+                m = m.with_name(n.clone());
+            }
+            if let Some(ref d) = description {
+                m = m.with_description(d.clone());
+            }
+            m
+        })
+        .await
+        .map_err(|e| match e {
+            icn_compute::WasmRegistryError::AlreadyExists(h) => {
+                crate::error::GatewayError::Conflict(format!("WASM module already exists: {h}"))
+            }
+            icn_compute::WasmRegistryError::InvalidModule(msg) => {
+                crate::error::GatewayError::BadRequest(format!("Invalid WASM: {msg}"))
+            }
+            other => crate::error::GatewayError::InternalError(other.to_string()),
+        })?;
+
+    let meta = registry
+        .get_metadata(&hash)
+        .await
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Created().json(UploadWasmResponse {
+        hash: hex::encode(hash),
+        size: meta.map(|m| m.size_bytes).unwrap_or(0),
+        name: req.name.clone(),
+    }))
+}
+
+/// GET /compute/wasm — List WASM modules (paginated)
+#[get("/wasm")]
+pub async fn list_wasm(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    query: web::Query<PaginationQuery>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "compute:read")?;
+
+    let registry = compute_mgr.wasm_registry().ok_or_else(|| {
+        crate::error::GatewayError::InternalError("WASM registry not configured".to_string())
+    })?;
+
+    let offset = query.offset.unwrap_or(0);
+    let limit = query.limit.min(100); // Cap at 100
+
+    let modules = registry
+        .list_all(offset, limit)
+        .await
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    let response: Vec<WasmMetadataResponse> = modules.into_iter().map(Into::into).collect();
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// GET /compute/wasm/{hash} — Get WASM module metadata by hash
+#[get("/wasm/{hash}")]
+pub async fn get_wasm_metadata(
+    http_req: HttpRequest,
+    compute_mgr: web::Data<Arc<ComputeManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "compute:read")?;
+
+    let registry = compute_mgr.wasm_registry().ok_or_else(|| {
+        crate::error::GatewayError::InternalError("WASM registry not configured".to_string())
+    })?;
+
+    let hash_hex = path.into_inner();
+    let hash_bytes = hex::decode(&hash_hex)
+        .map_err(|_| crate::error::GatewayError::BadRequest("Invalid hash hex".to_string()))?;
+    if hash_bytes.len() != 32 {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Hash must be 32 bytes".to_string(),
+        ));
+    }
+
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&hash_bytes);
+
+    match registry.get_metadata(&hash).await {
+        Ok(Some(meta)) => Ok(HttpResponse::Ok().json(WasmMetadataResponse::from(meta))),
+        Ok(None) => Err(crate::error::GatewayError::NotFound(
+            "WASM module not found".to_string(),
+        )),
+        Err(e) => Err(crate::error::GatewayError::InternalError(e.to_string())),
+    }
+}
+
 /// Configure compute routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/compute")
             .service(submit_task)
             .service(cancel_task)
-            .service(get_status),
+            .service(get_status)
+            .service(upload_wasm)
+            .service(list_wasm)
+            .service(get_wasm_metadata),
     );
 }
 

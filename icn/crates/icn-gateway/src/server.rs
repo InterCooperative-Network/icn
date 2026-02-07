@@ -1115,6 +1115,9 @@ impl GatewayServer {
                             web::scope("/compute")
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
+                                .service(api::compute::upload_wasm)
+                                .service(api::compute::list_wasm)
+                                .service(api::compute::get_wasm_metadata)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

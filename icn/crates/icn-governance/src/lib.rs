@@ -49,6 +49,7 @@ pub mod membership;
 #[allow(missing_docs)]
 pub mod message;
 pub mod profile;
+pub mod proof;
 #[allow(missing_docs)]
 pub mod proposal;
 #[allow(missing_docs)]
@@ -112,6 +113,7 @@ pub use handle::GovernanceOps;
 pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
+pub use proof::{GovernanceProof, ProofOutcome};
 pub use proposal::{
     DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome, FederationProposal,
     FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload,
