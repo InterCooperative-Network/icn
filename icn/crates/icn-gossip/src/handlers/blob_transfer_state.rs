@@ -214,10 +214,7 @@ impl TransferSessionManager {
         }
 
         // Generate request_id from blake3(blob_hash || requester_did || timestamp)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0);
+        let now = icn_time::current_timestamp_nanos() as u64;
         let mut hasher = blake3::Hasher::new();
         hasher.update(&blob_hash);
         hasher.update(requester_did.as_str().as_bytes());
@@ -284,10 +281,7 @@ impl TransferSessionManager {
             .ok_or(ErrCode::InvalidRequest)?;
 
         // Check expiry
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = icn_time::current_timestamp_secs();
         if session.expires_at > 0 && now > session.expires_at {
             session.state = TransferState::Failed(ErrCode::Expired);
             return Err(ErrCode::Expired);

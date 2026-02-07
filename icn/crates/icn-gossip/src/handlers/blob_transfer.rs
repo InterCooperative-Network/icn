@@ -16,11 +16,12 @@
 
 use crate::gossip::GossipActor;
 use crate::handlers::blob_nonce_guard::composite_chunk_nonce;
-use crate::handlers::blob_transfer_state::ChunkResult;
+use crate::handlers::blob_transfer_state::{ChunkResult, RequestId, TransferSessionManager};
 use crate::types::{ContentHash, GossipMessage};
 use anyhow::Result;
 use icn_identity::Did;
 use icn_kernel_api::proofs::ArtifactReceipt;
+use std::sync::Mutex;
 use tracing::{debug, info, warn};
 
 /// Maximum chunk size: 64 KB
@@ -44,6 +45,43 @@ pub mod topics {
     pub const BLOB_REQUEST: &str = "blob:request";
     /// Topic for blob transfer chunks
     pub const BLOB_TRANSFER: &str = "blob:transfer";
+}
+
+/// RAII guard for the two-phase assembly section.
+///
+/// Ensures `active_reassemblies` is decremented and the session is cleaned up
+/// even if an error occurs between `begin_assembly` and `complete_assembly`.
+/// Call `defuse()` after successful storage to prevent cleanup on drop.
+struct AssemblyGuard<'a> {
+    manager: &'a Mutex<TransferSessionManager>,
+    request_id: RequestId,
+    defused: bool,
+}
+
+impl<'a> AssemblyGuard<'a> {
+    fn new(manager: &'a Mutex<TransferSessionManager>, request_id: RequestId) -> Self {
+        Self {
+            manager,
+            request_id,
+            defused: false,
+        }
+    }
+
+    /// Mark the assembly as successful; drop will not clean up.
+    fn defuse(&mut self) {
+        self.defused = true;
+    }
+}
+
+impl Drop for AssemblyGuard<'_> {
+    fn drop(&mut self) {
+        if !self.defused {
+            if let Ok(mut mgr) = self.manager.lock() {
+                let _ = mgr.complete_assembly(self.request_id, false);
+                mgr.cleanup_session(self.request_id);
+            }
+        }
+    }
 }
 
 impl GossipActor {
@@ -91,10 +129,7 @@ impl GossipActor {
         }
 
         // Validate: check expiration
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = icn_time::current_timestamp_secs();
         if expires_at > 0 && now > expires_at {
             warn!(
                 sender = %sender,
@@ -299,7 +334,11 @@ impl GossipActor {
             return Ok(());
         }
 
-        // All chunks received — begin two-phase assembly
+        // All chunks received — begin two-phase assembly with RAII guard.
+        // The guard ensures active_reassemblies is decremented and the session
+        // is cleaned up even if an error occurs mid-assembly.
+        let mut guard = AssemblyGuard::new(transfer_manager, request_id);
+
         // Phase 2a: begin_assembly (lock held) — marks Assembling, returns job
         let assembly_job = {
             let mut mgr = transfer_manager
@@ -308,6 +347,9 @@ impl GossipActor {
             match mgr.begin_assembly(request_id) {
                 Ok(job) => job,
                 Err(err_code) => {
+                    // begin_assembly failed — guard has nothing to clean up since
+                    // active_reassemblies was never incremented
+                    guard.defuse();
                     warn!(
                         request_id = %hex::encode(request_id),
                         error = %err_code,
@@ -319,30 +361,27 @@ impl GossipActor {
         };
 
         // Phase 2b: execute assembly (NO lock held — disk IO + hash verification)
-        let assembly_result = assembly_job.execute();
+        let assembled_data = match assembly_job.execute() {
+            Ok(data) => data,
+            Err(err_code) => {
+                // Guard will call complete_assembly(false) + cleanup_session on drop
+                warn!(
+                    request_id = %hex::encode(request_id),
+                    error = %err_code,
+                    "Blob assembly failed, session cleaned up"
+                );
+                return Ok(());
+            }
+        };
 
-        // Phase 2c: complete_assembly (lock held) — marks Verified/Failed
-        let assembled_data = {
+        // Phase 2c: complete_assembly success (lock held) — marks Verified
+        {
             let mut mgr = transfer_manager
                 .lock()
                 .map_err(|e| anyhow::anyhow!("Transfer manager lock poisoned: {e}"))?;
-            match &assembly_result {
-                Ok(_) => {
-                    mgr.complete_assembly(request_id, true)
-                        .map_err(|e| anyhow::anyhow!("complete_assembly failed: {e}"))?;
-                }
-                Err(_) => {
-                    let _ = mgr.complete_assembly(request_id, false);
-                    mgr.cleanup_session(request_id);
-                    warn!(
-                        request_id = %hex::encode(request_id),
-                        "Blob assembly failed, session cleaned up"
-                    );
-                    return Ok(());
-                }
-            }
-            assembly_result.map_err(|e| anyhow::anyhow!("Assembly failed: {e}"))?
-        };
+            mgr.complete_assembly(request_id, true)
+                .map_err(|e| anyhow::anyhow!("complete_assembly failed: {e}"))?;
+        }
 
         // Store in BlobStore
         if let Some(blob_store) = &self.blob_store {
@@ -361,9 +400,14 @@ impl GossipActor {
                         error = %e,
                         "Failed to store assembled blob"
                     );
+                    // Guard will clean up on drop
+                    return Ok(());
                 }
             }
         }
+
+        // All done — defuse the guard so it doesn't clean up on drop
+        guard.defuse();
 
         // Mark stored and get session metadata for receipt
         let (provider_did, requester_did, scope_id) = {
@@ -386,10 +430,7 @@ impl GossipActor {
         };
 
         // Emit ArtifactReceipt
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = icn_time::current_timestamp_secs();
 
         let receipt = ArtifactReceipt::new(
             blob_hash,
