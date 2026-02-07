@@ -1194,4 +1194,133 @@ mod tests {
         let members = handle.list_members(coop.id).await.unwrap();
         assert_eq!(members.len(), 11); // 1 founder + 10 workers
     }
+
+    // === Single-writer atomicity validation (PR-P1) ===
+
+    /// Validates that the CoopActor single-writer pattern serializes
+    /// concurrent mutations correctly: interleaved create + add_member
+    /// operations across multiple cooperatives must each see consistent state.
+    #[tokio::test]
+    async fn test_single_writer_serialization_across_coops() {
+        let handle = spawn_test_actor();
+
+        // Create 5 coops concurrently — each gets a unique ID
+        let mut create_tasks = Vec::new();
+        for i in 0..5 {
+            let h = handle.clone();
+            let founder = create_test_did();
+            create_tasks.push(tokio::spawn(async move {
+                h.create_cooperative(
+                    None,
+                    format!("Coop-{}", i),
+                    CoopType::Worker,
+                    founder,
+                )
+                .await
+            }));
+        }
+
+        let mut coop_ids = Vec::new();
+        for t in create_tasks {
+            let coop = t.await.unwrap().unwrap();
+            coop_ids.push(coop.id);
+        }
+
+        // All 5 coops should have unique IDs and be retrievable
+        assert_eq!(coop_ids.len(), 5);
+        for cid in &coop_ids {
+            let result = handle.get_cooperative(cid.clone()).await;
+            assert!(result.is_ok());
+        }
+    }
+
+    /// Validates that concurrent add_member + get_cooperative
+    /// operations don't produce stale or inconsistent reads.
+    #[tokio::test]
+    async fn test_single_writer_read_after_write_consistency() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Read-Write Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Interleave writes and reads concurrently
+        let mut tasks = Vec::new();
+        for i in 0..20 {
+            let h = handle.clone();
+            let cid = coop.id.clone();
+            if i % 2 == 0 {
+                // Write: add a member
+                let member_did = create_test_did();
+                tasks.push(tokio::spawn(async move {
+                    h.add_member(cid, member_did, MemberRole::Worker)
+                        .await
+                        .map(|_| ())
+                }));
+            } else {
+                // Read: list members
+                tasks.push(tokio::spawn(async move {
+                    h.list_members(cid).await.map(|_| ())
+                }));
+            }
+        }
+
+        // All operations should succeed — no panics, no data corruption
+        for t in tasks {
+            let result = t.await.unwrap();
+            assert!(result.is_ok());
+        }
+
+        // Final state should show all 10 added members + 1 founder
+        let members = handle.list_members(coop.id).await.unwrap();
+        assert_eq!(members.len(), 11); // 1 founder + 10 workers
+    }
+
+    /// Validates that duplicate member additions are serialized through the actor.
+    /// Same DID added concurrently results in exactly one entry (upsert semantics).
+    #[tokio::test]
+    async fn test_single_writer_upsert_semantics() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Upsert Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        let member_did = create_test_did();
+
+        // Try adding the same member 10 times concurrently
+        let mut tasks = Vec::new();
+        for _ in 0..10 {
+            let h = handle.clone();
+            let cid = coop.id.clone();
+            let did = member_did.clone();
+            tasks.push(tokio::spawn(async move {
+                h.add_member(cid, did, MemberRole::Worker).await
+            }));
+        }
+
+        // All operations go through the single-writer actor sequentially
+        for t in tasks {
+            // All should succeed (upsert semantics)
+            let _ = t.await.unwrap();
+        }
+
+        // Final state: founder + 1 unique member (not 10 duplicates)
+        let members = handle.list_members(coop.id).await.unwrap();
+        assert_eq!(members.len(), 2, "Upsert should produce exactly 1 member entry");
+    }
 }

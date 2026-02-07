@@ -67,6 +67,27 @@ struct Args {
     /// Tracing sampling rate (0.0 to 1.0, default: 0.1)
     #[arg(long)]
     tracing_sampling_rate: Option<f64>,
+
+    /// Initialize a new node: generate identity, write default config, and exit.
+    /// Uses ICN_KEYSTORE_PASSPHRASE env var or prompts interactively.
+    #[arg(long)]
+    init: bool,
+
+    /// Node name for the generated config (used in --init)
+    #[arg(long, default_value = "icn-node")]
+    node_name: String,
+
+    /// Gateway port for the generated config (used in --init)
+    #[arg(long)]
+    init_gateway_port: Option<u16>,
+
+    /// Gossip port for the generated config (used in --init)
+    #[arg(long)]
+    init_gossip_port: Option<u16>,
+
+    /// Bootstrap peer addresses (used in --init, can be repeated)
+    #[arg(long)]
+    bootstrap_peer: Vec<String>,
 }
 
 /// Build the service registry and bootstrap handles with domain app services
@@ -234,9 +255,88 @@ async fn build_services(
     Ok((registry, Some(bootstrap_handles)))
 }
 
+/// Handle `icnd --init`: generate a fresh identity and default config, then exit.
+///
+/// Creates:
+/// 1. Data directory structure
+/// 2. Age-encrypted keystore with a new Ed25519 identity
+/// 3. `config.toml` with sane defaults for the node
+///
+/// Uses `ICN_KEYSTORE_PASSPHRASE` env var or prompts interactively.
+fn handle_init(args: &Args) -> Result<()> {
+    let data_dir = args
+        .data_dir
+        .clone()
+        .unwrap_or_else(|| Config::default().data_dir);
+
+    std::fs::create_dir_all(&data_dir)
+        .with_context(|| format!("Failed to create data directory: {}", data_dir.display()))?;
+
+    let keystore_path = data_dir.join("identity.age");
+    let config_path = data_dir.join("config.toml");
+
+    // Check if already initialized
+    if keystore_path.exists() {
+        anyhow::bail!(
+            "Node already initialized (keystore exists at {}). \
+             Remove the data directory to re-initialize.",
+            keystore_path.display()
+        );
+    }
+
+    println!("Initializing ICN node in {}...\n", data_dir.display());
+
+    // Get passphrase
+    let passphrase =
+        read_passphrase("Enter passphrase for new keystore: ").context("Failed to read passphrase")?;
+
+    // Initialize keystore (generates Ed25519 keypair + TLS binding)
+    let keystore = AgeKeyStore::init(&keystore_path, &passphrase)
+        .context("Failed to initialize keystore")?;
+    let did = keystore.get_keypair()
+        .context("Failed to read keypair from new keystore")?
+        .did()
+        .clone();
+
+    println!("  Identity: {did}");
+    println!("  Keystore: {}", keystore_path.display());
+
+    // Build config with CLI overrides
+    let gateway_port = args.init_gateway_port.unwrap_or(8000);
+    let gossip_port = args.init_gossip_port.unwrap_or(9000);
+    let did_str = did.to_string();
+
+    let mut config = Config {
+        data_dir: data_dir.clone(),
+        ..Config::default()
+    };
+    config.gateway.enabled = true;
+    config.gateway.bind_addr = format!("0.0.0.0:{gateway_port}");
+    // Derive a development JWT secret from the node DID (not for production)
+    config.gateway.jwt_secret = format!("icn-dev-{}", &did_str[8..std::cmp::min(40, did_str.len())]);
+    config.network.listen_addr = format!("0.0.0.0:{gossip_port}");
+    config.network.bootstrap_peers = args.bootstrap_peer.clone();
+
+    // Write config
+    config
+        .to_file(&config_path)
+        .with_context(|| format!("Failed to write config to {}", config_path.display()))?;
+
+    println!("  Config:   {}\n", config_path.display());
+    println!("Node initialized successfully.");
+    println!("  Start with: icnd --config {}", config_path.display());
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Handle --init: generate identity + config and exit
+    if args.init {
+        return handle_init(&args);
+    }
 
     // Initialize rustls crypto provider (required for QUIC/TLS)
     rustls::crypto::aws_lc_rs::default_provider()

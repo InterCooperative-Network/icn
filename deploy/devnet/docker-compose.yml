@@ -22,6 +22,12 @@ services:
       - node-a-data:/data/node-a
     networks:
       - icn-devnet
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
     command: ["icnd", "--config", "/data/node-a/config.toml"]
 
   node-b:
@@ -46,7 +52,14 @@ services:
     networks:
       - icn-devnet
     depends_on:
-      - node-a
+      node-a:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
     command: ["icnd", "--config", "/data/node-b/config.toml"]
 
   node-c:
@@ -71,8 +84,16 @@ services:
     networks:
       - icn-devnet
     depends_on:
-      - node-a
-      - node-b
+      node-a:
+        condition: service_healthy
+      node-b:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8002/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
     command: ["icnd", "--config", "/data/node-c/config.toml"]
 
 volumes:
