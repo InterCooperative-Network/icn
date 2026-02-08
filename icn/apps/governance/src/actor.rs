@@ -959,9 +959,10 @@ impl GovernanceActor {
             g.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
                 // Accept local governance topic and any federation governance topic
                 // (federation topics have format "federation:governance:<fed_id>")
-                if topic != GOVERNANCE_TOPIC
-                    && !topic.starts_with(icn_federation::TOPIC_FEDERATION_GOVERNANCE)
-                {
+                let is_federation_gov = topic == icn_federation::TOPIC_FEDERATION_GOVERNANCE
+                    || topic
+                        .starts_with(&format!("{}:", icn_federation::TOPIC_FEDERATION_GOVERNANCE));
+                if topic != GOVERNANCE_TOPIC && !is_federation_gov {
                     return;
                 }
 
@@ -1301,12 +1302,16 @@ impl GovernanceActor {
                 self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::deliberation_started(
+                let delib_msg = GovernanceMessage::deliberation_started(
                     proposal_id.clone(),
                     started_at,
                     ends_at,
-                ))
-                .await?;
+                );
+                self.publish(delib_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, delib_msg)
+                    .await;
 
                 info!(
                     "✓ Deliberation started for proposal: {} (ends in {}s)",
@@ -1357,13 +1362,17 @@ impl GovernanceActor {
                 // Broadcast deliberation ended to network
                 // Note: comment_count and participant_count are 0 since
                 // comment tracking is not yet implemented in the actor
-                self.publish(GovernanceMessage::deliberation_ended(
+                let ended_msg = GovernanceMessage::deliberation_ended(
                     proposal_id.clone(),
                     opened_at, // ended_at == opened_at (same moment)
                     0,         // comment_count - not yet tracked
                     0,         // participant_count - not yet tracked
-                ))
-                .await?;
+                );
+                self.publish(ended_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, ended_msg)
+                    .await;
 
                 // Broadcast proposal opened to network
                 let opened_msg =
@@ -1451,8 +1460,13 @@ impl GovernanceActor {
                 )?;
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::vote_cast(vote, None))
-                    .await?;
+                let vote_msg = GovernanceMessage::vote_cast(vote, None);
+                self.publish(vote_msg.clone()).await?;
+
+                // Forward vote to federation topic if proposal is federation-scoped
+                if let Some(proposal) = self.load_proposal(&proposal_id)? {
+                    self.publish_federation_if_scoped(&proposal, vote_msg).await;
+                }
 
                 info!("✓ Vote cast: {:?}", choice);
             }
