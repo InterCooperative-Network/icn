@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
@@ -292,6 +292,30 @@ impl GovernanceHandle {
     /// Get list of voter DIDs for a proposal
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         self.inner.read().await.get_voter_dids(proposal_id)
+    }
+
+    /// Get the GovernanceProof for a closed proposal (if one was generated)
+    pub async fn get_proof(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Option<icn_governance::GovernanceProof>> {
+        let actor = self.inner.read().await;
+        let proof_key = format!("governance:proof:{}", proposal_id.0);
+        match actor.store.get(proof_key.as_bytes())? {
+            Some(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(proof) => Ok(Some(proof)),
+                Err(err) => {
+                    // Treat invalid/malformed stored proofs as missing to avoid
+                    // poisoning the gateway call path with persistent 500 errors
+                    warn!(
+                        "Failed to deserialize GovernanceProof for {}: {}",
+                        proposal_id.0, err
+                    );
+                    Ok(None)
+                }
+            },
+            None => Ok(None),
+        }
     }
 
     /// Start deliberation period for a proposal
@@ -861,6 +885,13 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         Self::get_voter_dids(self, proposal_id).await
     }
 
+    async fn get_proof(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Option<icn_governance::GovernanceProof>> {
+        Self::get_proof(self, proposal_id).await
+    }
+
     // Protocol parameter operations (Phase 20)
 
     async fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
@@ -897,6 +928,8 @@ pub struct GovernanceActor {
     event_bus: Option<Arc<dyn EventEmitter>>,
     /// Protocol parameter store for governable parameters (Phase 20)
     protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
+    /// Ed25519 signing key for generating GovernanceProofs
+    signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
 }
 
 impl GovernanceActor {
@@ -907,6 +940,7 @@ impl GovernanceActor {
         gossip: Arc<RwLock<GossipActor>>,
         resolver: Arc<dyn MembershipResolver + Send + Sync>,
         event_bus: Option<Arc<dyn EventEmitter>>,
+        signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     ) -> Result<GovernanceHandle> {
         info!("Spawning GovernanceActor for DID: {}", did);
 
@@ -959,6 +993,7 @@ impl GovernanceActor {
             cancel_tx,
             event_bus,
             protocol_params: None,
+            signing_key,
         };
 
         let handle = GovernanceHandle {
@@ -1425,9 +1460,12 @@ impl GovernanceActor {
                     .load_domain(&proposal.domain_id)?
                     .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
 
-                // Load and tally votes
+                // Load and tally votes (keep votes for proof generation)
                 let votes = self.load_votes(&proposal_id)?;
-                let tally = VoteTally::from(votes);
+                let mut tally = VoteTally::empty();
+                for v in &votes {
+                    tally.add_vote(v);
+                }
 
                 // Resolve eligible membership
                 let eligible_count = self.resolver.member_count(&domain)?;
@@ -1498,6 +1536,44 @@ impl GovernanceActor {
                 self.store
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
+                // Generate GovernanceProof if signing key is available
+                let proof_bytes = if let Some(ref signing_key) = self.signing_key {
+                    use icn_governance::ProofOutcome;
+
+                    let proof_outcome = match outcome_result {
+                        DecisionOutcome::Accepted => ProofOutcome::Accepted,
+                        DecisionOutcome::Rejected => ProofOutcome::Rejected,
+                        DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
+                    };
+
+                    let mut proof = icn_governance::GovernanceProof::new(
+                        proposal_id.0.clone(),
+                        proposal.domain_id.0.clone(),
+                        proof_outcome,
+                        tally.clone(),
+                        &votes,
+                        now,
+                        self.did.to_string(),
+                    );
+                    proof.sign(signing_key);
+
+                    let serialized = serde_json::to_vec(&proof)?;
+
+                    // Persist proof for later retrieval
+                    let proof_key = format!("governance:proof:{}", proposal_id.0);
+                    self.store.put(proof_key.as_bytes(), &serialized)?;
+
+                    info!(
+                        "GovernanceProof signed for proposal {} (hash: {})",
+                        proposal_id.0,
+                        hex::encode(proof.proof_hash)
+                    );
+
+                    Some(serialized)
+                } else {
+                    None
+                };
+
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
                     tally.for_votes,
@@ -1519,6 +1595,7 @@ impl GovernanceActor {
                     outcome_msg,
                     now,
                     tally_snapshot,
+                    proof_bytes,
                 ))
                 .await?;
 
@@ -2282,6 +2359,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
             id,
             outcome,
             closed_at,
+            proof_bytes,
             ..
         } => {
             if let Some(mut proposal) = load_json::<Proposal>(store, &proposal_key(&id))? {
@@ -2292,6 +2370,68 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
                 };
                 proposal.close(new_state)?;
                 store.put(&proposal_key(&id), &serde_json::to_vec(&proposal)?)?;
+            }
+            // Persist proof from remote node (if included and valid)
+            if let Some(bytes) = proof_bytes {
+                let proof_key = format!("governance:proof:{}", id.0);
+
+                // Don't overwrite a locally-generated proof with a remote one
+                if store.get(proof_key.as_bytes())?.is_some() {
+                    debug!(
+                        "Skipping remote proof for proposal {} — local proof already exists",
+                        id.0
+                    );
+                } else {
+                    // Validate remote proof before storing (untrusted gossip input)
+                    match serde_json::from_slice::<icn_governance::GovernanceProof>(&bytes) {
+                        Ok(proof) => {
+                            // Verify binding hash (tamper check)
+                            if !proof.verify_binding() {
+                                warn!(
+                                    "Rejected remote proof for proposal {} — binding hash mismatch",
+                                    id.0
+                                );
+                            } else if proof.proposal_id != id.0 {
+                                warn!(
+                                    "Rejected remote proof — proposal_id mismatch: expected {}, got {}",
+                                    id.0, proof.proposal_id
+                                );
+                            } else {
+                                // Verify signature via DID resolution
+                                match Did::from_str(&proof.signer_did)
+                                    .and_then(|did| did.to_verifying_key())
+                                {
+                                    Ok(vk) => {
+                                        if proof.verify_signature(&vk) {
+                                            store.put(proof_key.as_bytes(), &bytes)?;
+                                            info!(
+                                                "Stored validated governance proof from remote for proposal {}",
+                                                id.0
+                                            );
+                                        } else {
+                                            warn!(
+                                                "Rejected remote proof for proposal {} — invalid signature",
+                                                id.0
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            "Rejected remote proof for proposal {} — cannot resolve signer DID: {}",
+                                            id.0, e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Rejected remote proof for proposal {} — invalid JSON: {}",
+                                id.0, e
+                            );
+                        }
+                    }
+                }
             }
         }
 

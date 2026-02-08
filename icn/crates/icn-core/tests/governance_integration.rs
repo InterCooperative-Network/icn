@@ -160,7 +160,7 @@ impl TestNode {
                             id,
                             outcome,
                             closed_at,
-                            tally: _,
+                            ..
                         } => {
                             if let Some(proposal) = proposals_clone.write().await.get_mut(&id) {
                                 // Update proposal state based on outcome
@@ -455,8 +455,13 @@ impl TestNode {
             eligible_count,
         );
 
-        let msg =
-            GovernanceMessage::proposal_closed(proposal_id, outcome.clone(), now, tally_snapshot);
+        let msg = GovernanceMessage::proposal_closed(
+            proposal_id,
+            outcome.clone(),
+            now,
+            tally_snapshot,
+            None,
+        );
         self.publish_governance(msg).await?;
 
         Ok(outcome)

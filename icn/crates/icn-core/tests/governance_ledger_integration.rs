@@ -158,6 +158,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
         gossip_handle,
         membership_resolver,
         Some(event_bus.clone()),
+        None, // No signing key in test — proof generation optional
     )
     .await?;
 

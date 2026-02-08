@@ -31,6 +31,10 @@ icn-obs = { path = "../../crates/icn-obs" }
 # Time utilities
 icn-time = { path = "../../crates/icn-time" }
 
+# Cryptography (for GovernanceProof signing)
+ed25519-dalek.workspace = true
+hex = "0.4"
+
 # Error handling
 anyhow = "1.0"
 

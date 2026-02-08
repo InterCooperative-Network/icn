@@ -726,6 +726,18 @@ impl GovernanceManager {
         Ok(voter_dids)
     }
 
+    /// Get the GovernanceProof for a closed proposal (if one was generated)
+    pub async fn get_proof(
+        &self,
+        proposal_id: &ProposalId,
+    ) -> Result<Option<icn_governance::GovernanceProof>> {
+        if let Some(ref handle) = self.governance_handle {
+            return handle.get_proof(proposal_id).await;
+        }
+        // Standalone mode: no proof generation
+        Ok(None)
+    }
+
     /// Cast a vote on a proposal
     ///
     /// In actor-backed mode, the `voter` parameter is ignored - the actor

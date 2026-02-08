@@ -1133,3 +1133,100 @@ fn test_proposal_emergency_type_identification() {
     assert_eq!(budget.emergency_type(), None);
     assert!(!budget.is_emergency());
 }
+
+// =============================================================================
+// GovernanceProof Integration Tests
+// =============================================================================
+
+#[test]
+fn test_governance_proof_roundtrip() {
+    use icn_governance::{GovernanceProof, ProofOutcome};
+
+    let signer_kp = KeyPair::generate().unwrap();
+    let voter1 = KeyPair::generate().unwrap();
+    let voter2 = KeyPair::generate().unwrap();
+    let voter3 = KeyPair::generate().unwrap();
+    let proposal_id = ProposalId::generate();
+
+    let votes = vec![
+        Vote::new(proposal_id.clone(), voter1.did().clone(), VoteChoice::For),
+        Vote::new(proposal_id.clone(), voter2.did().clone(), VoteChoice::For),
+        Vote::new(
+            proposal_id.clone(),
+            voter3.did().clone(),
+            VoteChoice::Against,
+        ),
+    ];
+
+    let tally = VoteTally::new(2, 1, 0);
+
+    let mut proof = GovernanceProof::new(
+        proposal_id.0.clone(),
+        "test-domain".to_string(),
+        ProofOutcome::Accepted,
+        tally,
+        &votes,
+        1234567890,
+        signer_kp.did().to_string(),
+    );
+
+    // Before signing: binding hash is valid, signature is empty
+    assert!(proof.verify_binding());
+    assert!(proof.signature.is_empty());
+
+    // Sign with the signer's key
+    let signing_key_bytes = signer_kp.to_signing_key_bytes();
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
+    proof.sign(&signing_key);
+
+    // After signing: both binding and signature should verify
+    assert!(proof.verify_binding());
+    assert!(proof.verify_signature(&signing_key.verifying_key()));
+
+    // Verify via DID resolution (the key path that Node B would use)
+    let resolved_key = signer_kp.did().to_verifying_key().unwrap();
+    assert!(proof.verify_signature(&resolved_key));
+
+    // Serialize and deserialize (simulates gossip transport)
+    let json = serde_json::to_vec(&proof).unwrap();
+    let deserialized: GovernanceProof = serde_json::from_slice(&json).unwrap();
+    assert!(deserialized.verify_binding());
+    assert!(deserialized.verify_signature(&resolved_key));
+}
+
+#[test]
+fn test_governance_proof_tamper_detection() {
+    use icn_governance::{GovernanceProof, ProofOutcome};
+
+    let signer_kp = KeyPair::generate().unwrap();
+    let voter1 = KeyPair::generate().unwrap();
+    let proposal_id = ProposalId::generate();
+
+    let votes = vec![Vote::new(
+        proposal_id.clone(),
+        voter1.did().clone(),
+        VoteChoice::For,
+    )];
+
+    let tally = VoteTally::new(1, 0, 0);
+
+    let mut proof = GovernanceProof::new(
+        proposal_id.0.clone(),
+        "test-domain".to_string(),
+        ProofOutcome::Accepted,
+        tally,
+        &votes,
+        1234567890,
+        signer_kp.did().to_string(),
+    );
+
+    let signing_key_bytes = signer_kp.to_signing_key_bytes();
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
+    proof.sign(&signing_key);
+
+    // Tamper with the outcome
+    proof.outcome = ProofOutcome::Rejected;
+
+    // Binding hash should now fail (fields don't match proof_hash)
+    assert!(!proof.verify_binding());
+}
