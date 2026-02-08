@@ -1065,6 +1065,7 @@ impl GatewayServer {
                                 .service(api::governance::list_proposals)
                                 .service(api::governance::get_proposal)
                                 .service(api::governance::get_votes)
+                                .service(api::governance::get_proposal_proof)
                                 .service(api::governance::open_proposal)
                                 .service(api::governance::close_proposal)
                                 // Federation proposal endpoints

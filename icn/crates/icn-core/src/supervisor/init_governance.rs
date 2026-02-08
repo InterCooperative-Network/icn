@@ -32,6 +32,8 @@ pub struct GovernanceDeps {
     pub shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     /// Pre-created parameter store from daemon (with defaults already loaded)
     pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
+    /// Ed25519 signing key for GovernanceProof generation (None if keystore unavailable)
+    pub signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
 }
 
 /// Services returned from governance initialization
@@ -83,6 +85,7 @@ pub async fn init_governance_services(
         deps.gossip_handle.clone(),
         gov_resolver,
         Some(deps.event_bus.clone()),
+        deps.signing_key,
     )
     .await?;
 

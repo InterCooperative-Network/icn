@@ -64,6 +64,10 @@ pub enum GovernanceMessage {
 
         /// Vote tally snapshot
         tally: TallySnapshot,
+
+        /// Serialized GovernanceProof (JSON bytes), if signing key was available
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof_bytes: Option<Vec<u8>>,
     },
 
     /// A proposal has been cancelled
@@ -250,12 +254,14 @@ impl GovernanceMessage {
         outcome: ProposalOutcome,
         closed_at: u64,
         tally: TallySnapshot,
+        proof_bytes: Option<Vec<u8>>,
     ) -> Self {
         Self::ProposalClosed {
             id,
             outcome,
             closed_at,
             tally,
+            proof_bytes,
         }
     }
 
@@ -504,6 +510,7 @@ mod tests {
             ProposalOutcome::Accepted,
             12345678,
             tally.clone(),
+            None,
         );
 
         match msg {

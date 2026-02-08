@@ -627,6 +627,27 @@ pub async fn get_votes(
     Ok(HttpResponse::Ok().json(response))
 }
 
+/// GET /gov/proposals/{id}/proof - Get cryptographic proof of proposal outcome
+#[get("/proposals/{id}/proof")]
+pub async fn get_proposal_proof(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:read")?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    let proof = gov_mgr.get_proof(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!(
+            "No proof found for proposal: {}",
+            proposal_id.0
+        ))
+    })?;
+
+    Ok(HttpResponse::Ok().json(proof))
+}
+
 /// POST /gov/proposals/{id}/open - Open a proposal for voting
 #[post("/proposals/{id}/open")]
 pub async fn open_proposal(

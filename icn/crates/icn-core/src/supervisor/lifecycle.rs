@@ -540,6 +540,12 @@ async fn spawn_actors_with_identity(
 
     // Protocol parameter store was extracted from BootstrapHandles above.
 
+    // Extract signing key for GovernanceProof generation
+    let governance_signing_key = identity_bundle.keypair().ok().map(|kp| {
+        let bytes = kp.to_signing_key_bytes();
+        Arc::new(ed25519_dalek::SigningKey::from_bytes(&bytes))
+    });
+
     // Initialize governance services
     let governance_services = super::init_governance::init_governance_services(
         config,
@@ -549,6 +555,7 @@ async fn spawn_actors_with_identity(
             event_bus: event_bus.clone(),
             shutdown_rx: shutdown_tx.subscribe(),
             protocol_parameter_store: protocol_parameter_store_from_daemon,
+            signing_key: governance_signing_key,
         },
     )
     .await?;
