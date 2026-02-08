@@ -853,6 +853,20 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             .await
     }
 
+    async fn update_domain_membership(
+        &self,
+        domain_id: GovernanceDomainId,
+        member: Did,
+        action: icn_governance::MembershipAction,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::UpdateMembership {
+            domain_id,
+            action,
+            member,
+        })
+        .await
+    }
+
     // Delegation operations
 
     async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
@@ -1366,11 +1380,8 @@ impl GovernanceActor {
                 .await?;
 
                 // Broadcast proposal opened to network
-                let opened_msg = GovernanceMessage::proposal_opened(
-                    proposal_id.clone(),
-                    opened_at,
-                    closes_at,
-                );
+                let opened_msg =
+                    GovernanceMessage::proposal_opened(proposal_id.clone(), opened_at, closes_at);
                 self.publish(opened_msg.clone()).await?;
 
                 // Also broadcast on federation topic if federation-scoped
@@ -1421,11 +1432,8 @@ impl GovernanceActor {
                 self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
-                let opened_msg = GovernanceMessage::proposal_opened(
-                    proposal_id.clone(),
-                    opened_at,
-                    closes_at,
-                );
+                let opened_msg =
+                    GovernanceMessage::proposal_opened(proposal_id.clone(), opened_at, closes_at);
                 self.publish(opened_msg.clone()).await?;
 
                 // Also broadcast on federation topic if federation-scoped
