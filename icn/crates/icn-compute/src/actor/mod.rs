@@ -295,6 +295,30 @@ impl ComputeActor {
         self.wasm_registry = Some(registry);
     }
 
+    /// Wire the WASM executor into the local executor.
+    ///
+    /// Creates a `WasmExecutor` with the given registry and installs it
+    /// inside the `LocalExecutor` so that `WasmRef` and `WasmInline` tasks
+    /// are delegated to wasmtime instead of returning "not supported".
+    #[cfg(feature = "wasm")]
+    pub async fn wire_wasm_executor(&self, registry: Arc<WasmRegistry>) {
+        use crate::wasm_executor::WasmExecutor;
+
+        match WasmExecutor::new() {
+            Ok(wasm_exec) => {
+                let wasm_exec = wasm_exec.with_registry(registry);
+                self.executor
+                    .write()
+                    .await
+                    .set_wasm_executor(Arc::new(wasm_exec));
+                tracing::info!("WASM executor wired into LocalExecutor");
+            }
+            Err(e) => {
+                tracing::error!("Failed to create WasmExecutor: {e}");
+            }
+        }
+    }
+
     /// Set the demand adjustment configuration (Epic 2 #933).
     pub fn set_demand_adjustment_config(
         &mut self,

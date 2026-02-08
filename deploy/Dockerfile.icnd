@@ -21,7 +21,7 @@ COPY . .
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
 # -j 2: Limit parallelism to reduce peak memory usage
 ENV RUST_MIN_STACK=33554432
-RUN cargo build --release --bin icnd --bin icnctl -j 2
+RUN cargo build --release --bin icnd --bin icnctl --features wasm -j 2
 
 # Runtime image
 FROM debian:bookworm-slim
@@ -38,12 +38,12 @@ COPY --from=builder /build/target/release/icnctl /usr/local/bin/
 # Create data directory
 RUN mkdir -p /root/.icn
 
-# Expose ports
-EXPOSE 7777 8080 9090 5601
+# Expose ports: 8000=gateway, 9000=p2p
+EXPOSE 8000 9000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/v1/health || exit 1
+    CMD curl -f http://localhost:8000/v1/health || exit 1
 
 # Run icnd
 ENTRYPOINT ["icnd"]

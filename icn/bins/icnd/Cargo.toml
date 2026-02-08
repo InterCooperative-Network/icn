@@ -10,6 +10,8 @@ path = "src/main.rs"
 
 [features]
 default = []
+# WASM execution via wasmtime
+wasm = ["icn-core/wasm"]
 # HSM support via PKCS#11 (requires cryptoki system library)
 hsm = ["icn-identity/hsm"]
 # TPM 2.0 support (experimental, requires tss2 system libraries)
