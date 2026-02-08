@@ -645,6 +645,18 @@ pub async fn get_proposal_proof(
         ))
     })?;
 
+    // Verify cryptographic binding before serving to clients
+    if !proof.verify_binding() {
+        tracing::warn!(
+            "Invalid proof binding for proposal {} — not serving",
+            proposal_id.0
+        );
+        return Err(crate::error::GatewayError::NotFound(format!(
+            "No valid proof found for proposal: {}",
+            proposal_id.0
+        )));
+    }
+
     Ok(HttpResponse::Ok().json(proof))
 }
 

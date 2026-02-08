@@ -561,4 +561,63 @@ mod tests {
             "ProposalOpened"
         );
     }
+
+    #[test]
+    fn test_proposal_closed_backward_compat_no_proof_bytes() {
+        // Simulate a ProposalClosed message serialized before proof_bytes was added.
+        // Old nodes omit proof_bytes entirely; new nodes must deserialize this fine.
+        let json = r#"{
+            "ProposalClosed": {
+                "id": "test-proposal-id",
+                "outcome": "Accepted",
+                "closed_at": 12345678,
+                "tally": {
+                    "for_votes": 60,
+                    "against_votes": 30,
+                    "abstain_votes": 10,
+                    "eligible_voters": 100
+                }
+            }
+        }"#;
+
+        let msg: GovernanceMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            GovernanceMessage::ProposalClosed {
+                id,
+                outcome,
+                proof_bytes,
+                ..
+            } => {
+                assert_eq!(id.0, "test-proposal-id");
+                assert_eq!(outcome, ProposalOutcome::Accepted);
+                // proof_bytes defaults to None when absent
+                assert!(proof_bytes.is_none());
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+
+    #[test]
+    fn test_proposal_closed_with_proof_bytes_roundtrip() {
+        let tally = TallySnapshot::new(60, 30, 10, 100);
+        let proof_data = b"some-proof-bytes".to_vec();
+
+        let msg = GovernanceMessage::proposal_closed(
+            ProposalId("test-id".into()),
+            ProposalOutcome::Accepted,
+            12345678,
+            tally,
+            Some(proof_data.clone()),
+        );
+
+        let json = serde_json::to_string(&msg).unwrap();
+        let deserialized: GovernanceMessage = serde_json::from_str(&json).unwrap();
+
+        match deserialized {
+            GovernanceMessage::ProposalClosed { proof_bytes, .. } => {
+                assert_eq!(proof_bytes, Some(proof_data));
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
 }
