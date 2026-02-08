@@ -2498,6 +2498,8 @@ mod tests {
     fn test_proposal_scope_serde_roundtrip_federation() {
         let scope = ProposalScope::Federation("food-coop-fed".to_string());
         let json = serde_json::to_string(&scope).unwrap();
+        // Assert exact wire format for determinism
+        assert_eq!(json, r#"{"federation":"food-coop-fed"}"#);
         let back: ProposalScope = serde_json::from_str(&json).unwrap();
         assert_eq!(back, ProposalScope::Federation("food-coop-fed".to_string()));
     }

@@ -520,9 +520,8 @@ pub async fn list_proposals(
             }
             other => {
                 // Treat as federation ID filter
-                let fed_id = other.to_string();
                 proposals.retain(|p| {
-                    matches!(&p.scope, icn_governance::ProposalScope::Federation(id) if id == &fed_id)
+                    matches!(&p.scope, icn_governance::ProposalScope::Federation(id) if id.as_str() == other)
                 });
             }
         }
