@@ -17,6 +17,8 @@ pub type TaskHash = [u8; 32];
 pub struct ComputeManager {
     /// Compute service (shared layer)
     compute_service: Option<Arc<icn_api::ComputeService>>,
+    /// WASM registry for module management
+    wasm_registry: Option<Arc<icn_compute::WasmRegistry>>,
 }
 
 impl ComputeManager {
@@ -24,6 +26,7 @@ impl ComputeManager {
     pub fn new() -> Self {
         ComputeManager {
             compute_service: None,
+            wasm_registry: None,
         }
     }
 
@@ -31,12 +34,23 @@ impl ComputeManager {
     pub fn with_service(service: Arc<icn_api::ComputeService>) -> Self {
         ComputeManager {
             compute_service: Some(service),
+            wasm_registry: None,
         }
     }
 
     /// Set compute service (for late binding)
     pub fn set_service(&mut self, service: Arc<icn_api::ComputeService>) {
         self.compute_service = Some(service);
+    }
+
+    /// Set WASM registry for module management
+    pub fn set_wasm_registry(&mut self, registry: Arc<icn_compute::WasmRegistry>) {
+        self.wasm_registry = Some(registry);
+    }
+
+    /// Get a reference to the WASM registry (if configured)
+    pub fn wasm_registry(&self) -> Option<&Arc<icn_compute::WasmRegistry>> {
+        self.wasm_registry.as_ref()
     }
 
     /// Submit a compute task (CCL code)
@@ -106,8 +120,9 @@ impl ComputeManager {
             TaskCode::CclRef { .. } => {
                 anyhow::bail!("CclRef not supported via gateway API");
             }
-            TaskCode::WasmRef(_) => {
-                anyhow::bail!("WasmRef not supported via gateway API");
+            TaskCode::WasmRef(hash) => {
+                let hash_hex = hex::encode(hash);
+                (None, Some(hash_hex), icn_api::compute::CodeTypeParam::Wasm)
             }
         };
 

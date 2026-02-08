@@ -1,4 +1,4 @@
-.PHONY: up down restart logs clean status build
+.PHONY: up down restart logs clean status build demo
 
 # Start the 3-node devnet
 up:
@@ -55,3 +55,8 @@ build:
 test:
 	@echo "Running devnet smoke tests..."
 	cd ../../icn && cargo test --test devnet_smoke -- --test-threads=1 --nocapture
+
+# Run the pilot demo (all three flows) against a running devnet
+demo:
+	@echo "Running pilot demo flows..."
+	bash ../../scripts/demo-runner.sh
