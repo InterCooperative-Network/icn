@@ -826,28 +826,39 @@ impl EntityRegistry for SledEntityRegistry {
     }
 
     fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()> {
+        let rel_tag = serde_json::to_string(&relationship.relationship)
+            .unwrap_or_else(|_| format!("{:?}", relationship.relationship));
         let key = format!(
-            "rel:from:{}:{}",
+            "rel:from:{}:{}:{}",
             relationship.source.as_str(),
-            relationship.target.as_str()
+            relationship.target.as_str(),
+            rel_tag,
         );
         let rev_key = format!(
-            "rel:to:{}:{}",
+            "rel:to:{}:{}:{}",
             relationship.target.as_str(),
-            relationship.source.as_str()
+            relationship.source.as_str(),
+            rel_tag,
         );
         let value = Self::serialize_entity_rel(&relationship)?;
 
+        // Atomic dual-index write via transaction
         self.db
-            .insert(key.as_bytes(), value.as_slice())
-            .map_err(|e| {
-                EntityError::RegistryError(format!("Failed to store relationship: {e}"))
-            })?;
-        self.db
-            .insert(rev_key.as_bytes(), value.as_slice())
-            .map_err(|e| {
-                EntityError::RegistryError(format!("Failed to store reverse relationship: {e}"))
-            })?;
+            .transaction(|tx| {
+                // Reject duplicates
+                if tx.get(key.as_bytes())?.is_some() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::RegistryError(format!(
+                            "Relationship {} already exists between {} and {}",
+                            rel_tag, relationship.source, relationship.target
+                        )),
+                    ));
+                }
+                tx.insert(key.as_bytes(), value.as_slice())?;
+                tx.insert(rev_key.as_bytes(), value.as_slice())?;
+                Ok(())
+            })
+            .map_err(|e| handle_transaction_error(e, "relationship storage"))?;
         Ok(())
     }
 
@@ -1358,6 +1369,71 @@ mod tests {
             assert_eq!(registry.member_count(&coop_id).unwrap(), 1);
         }
         // Both failed is also possible in edge cases (e.g., entity deleted between checks)
+    }
+
+    #[test]
+    fn test_store_and_query_relationships() {
+        use crate::entity::{EntityRelationship, RelationType};
+
+        let mut registry = SledEntityRegistry::temporary().unwrap();
+
+        let coop_a = create_test_coop("rel-coop-a");
+        let coop_b = create_test_coop("rel-coop-b");
+        let fed = CooperativeEntity::federation("rel-test-fed", "Test Fed").unwrap();
+
+        let rel_ab = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        let rel_af =
+            EntityRelationship::new(coop_a.id.clone(), fed.id.clone(), RelationType::MemberOf);
+
+        registry.store_relationship(rel_ab).unwrap();
+        registry.store_relationship(rel_af).unwrap();
+
+        // Query from source
+        let from_a = registry.get_relationships_from(&coop_a.id).unwrap();
+        assert_eq!(from_a.len(), 2);
+
+        // Query from target (bidirectional index)
+        let to_b = registry.get_relationships_to(&coop_b.id).unwrap();
+        assert_eq!(to_b.len(), 1);
+        assert_eq!(to_b[0].relationship, RelationType::FederatedWith);
+
+        let to_fed = registry.get_relationships_to(&fed.id).unwrap();
+        assert_eq!(to_fed.len(), 1);
+        assert_eq!(to_fed[0].relationship, RelationType::MemberOf);
+    }
+
+    #[test]
+    fn test_duplicate_relationship_rejected() {
+        use crate::entity::{EntityRelationship, RelationType};
+
+        let mut registry = SledEntityRegistry::temporary().unwrap();
+
+        let coop_a = create_test_coop("dup-rel-coop-a");
+        let coop_b = create_test_coop("dup-rel-coop-b");
+
+        let rel = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        registry.store_relationship(rel).unwrap();
+
+        // Same pair + same type → rejected
+        let dup = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        assert!(registry.store_relationship(dup).is_err());
+
+        // Same pair + different type → allowed
+        let different =
+            EntityRelationship::new(coop_a.id.clone(), coop_b.id.clone(), RelationType::MemberOf);
+        assert!(registry.store_relationship(different).is_ok());
     }
 
     #[test]

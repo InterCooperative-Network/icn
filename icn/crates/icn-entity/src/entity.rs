@@ -425,6 +425,7 @@ impl AccountReference {
 /// `entity_type: EntityType` field for backward-compatible serialization.
 /// The `kind` field is the source of truth for new code.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EntityKind {
     /// An individual person — no additional required fields.
     Individual,
@@ -506,15 +507,19 @@ pub struct EntityRelationship {
 }
 
 /// Types of structural relationships between entities.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RelationType {
-    /// Individual → Cooperative (member-of relationship)
+    /// Member → Parent container (directed membership edge).
+    ///
+    /// The `source` is the member entity; the `target` is the parent entity
+    /// (e.g., individual → cooperative, cooperative/community → federation).
     MemberOf,
 
     /// Cooperative ↔ Cooperative (federation peers)
     FederatedWith,
 
-    /// Federation → Cooperative (parent-child)
+    /// Parent entity → child entity (e.g., federation → cooperative)
     ParentOf,
 }
 
