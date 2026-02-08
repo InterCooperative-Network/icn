@@ -912,9 +912,7 @@ pub async fn propose_spend(
         ));
     }
     if body.memo.trim().is_empty() {
-        return Err(GatewayError::BadRequest(
-            "Memo cannot be empty".to_string(),
-        ));
+        return Err(GatewayError::BadRequest("Memo cannot be empty".to_string()));
     }
     let recipient_did: Did = body
         .recipient

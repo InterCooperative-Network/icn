@@ -205,10 +205,7 @@ impl GovernanceProof {
     }
 
     /// Verify the signature against the proof hash and expected public key.
-    pub fn verify_signature(
-        &self,
-        verifying_key: &ed25519_dalek::VerifyingKey,
-    ) -> bool {
+    pub fn verify_signature(&self, verifying_key: &ed25519_dalek::VerifyingKey) -> bool {
         use ed25519_dalek::Verifier;
         if self.signature.len() != 64 {
             return false;

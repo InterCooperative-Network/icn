@@ -1210,13 +1210,8 @@ mod tests {
             let h = handle.clone();
             let founder = create_test_did();
             create_tasks.push(tokio::spawn(async move {
-                h.create_cooperative(
-                    None,
-                    format!("Coop-{}", i),
-                    CoopType::Worker,
-                    founder,
-                )
-                .await
+                h.create_cooperative(None, format!("Coop-{}", i), CoopType::Worker, founder)
+                    .await
             }));
         }
 
@@ -1291,12 +1286,7 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(
-                None,
-                "Upsert Coop".to_string(),
-                CoopType::Worker,
-                founder,
-            )
+            .create_cooperative(None, "Upsert Coop".to_string(), CoopType::Worker, founder)
             .await
             .unwrap();
 
@@ -1321,6 +1311,10 @@ mod tests {
 
         // Final state: founder + 1 unique member (not 10 duplicates)
         let members = handle.list_members(coop.id).await.unwrap();
-        assert_eq!(members.len(), 2, "Upsert should produce exactly 1 member entry");
+        assert_eq!(
+            members.len(),
+            2,
+            "Upsert should produce exactly 1 member entry"
+        );
     }
 }

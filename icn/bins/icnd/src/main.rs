@@ -287,13 +287,14 @@ fn handle_init(args: &Args) -> Result<()> {
     println!("Initializing ICN node in {}...\n", data_dir.display());
 
     // Get passphrase
-    let passphrase =
-        read_passphrase("Enter passphrase for new keystore: ").context("Failed to read passphrase")?;
+    let passphrase = read_passphrase("Enter passphrase for new keystore: ")
+        .context("Failed to read passphrase")?;
 
     // Initialize keystore (generates Ed25519 keypair + TLS binding)
-    let keystore = AgeKeyStore::init(&keystore_path, &passphrase)
-        .context("Failed to initialize keystore")?;
-    let did = keystore.get_keypair()
+    let keystore =
+        AgeKeyStore::init(&keystore_path, &passphrase).context("Failed to initialize keystore")?;
+    let did = keystore
+        .get_keypair()
         .context("Failed to read keypair from new keystore")?
         .did()
         .clone();
@@ -313,7 +314,8 @@ fn handle_init(args: &Args) -> Result<()> {
     config.gateway.enabled = true;
     config.gateway.bind_addr = format!("0.0.0.0:{gateway_port}");
     // Derive a development JWT secret from the node DID (not for production)
-    config.gateway.jwt_secret = format!("icn-dev-{}", &did_str[8..std::cmp::min(40, did_str.len())]);
+    config.gateway.jwt_secret =
+        format!("icn-dev-{}", &did_str[8..std::cmp::min(40, did_str.len())]);
     config.network.listen_addr = format!("0.0.0.0:{gossip_port}");
     config.network.bootstrap_peers = args.bootstrap_peer.clone();
 

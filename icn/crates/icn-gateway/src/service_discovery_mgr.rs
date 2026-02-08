@@ -87,18 +87,17 @@ impl ServiceDiscoveryManager {
     /// On construction, loads all non-expired endpoints from sled into memory.
     /// Subsequent announce/withdraw calls write through to sled.
     pub fn with_sled(db: &sled::Db) -> Result<Self, NamingError> {
-        let tree = db.open_tree(SLED_TREE_NAME).map_err(|e| {
-            NamingError::Internal(format!("Failed to open sled tree: {e}"))
-        })?;
+        let tree = db
+            .open_tree(SLED_TREE_NAME)
+            .map_err(|e| NamingError::Internal(format!("Failed to open sled tree: {e}")))?;
 
         // Load existing entries from sled
         let mut registry = HashMap::new();
         let mut expired_keys = Vec::new();
 
         for entry in tree.iter() {
-            let (key, value) = entry.map_err(|e| {
-                NamingError::Internal(format!("Failed to read sled entry: {e}"))
-            })?;
+            let (key, value) = entry
+                .map_err(|e| NamingError::Internal(format!("Failed to read sled entry: {e}")))?;
             match serde_json::from_slice::<ServiceEndpoint>(&value) {
                 Ok(ep) => {
                     if ep.is_expired() {
@@ -596,12 +595,10 @@ impl ServiceDiscoveryManager {
 
         // Write-through to sled if configured
         if let Some(ref tree) = self.sled_tree {
-            let encoded = serde_json::to_vec(&endpoint).map_err(|e| {
-                NamingError::Internal(format!("Failed to serialize endpoint: {e}"))
-            })?;
-            tree.insert(id.as_bytes(), encoded).map_err(|e| {
-                NamingError::Internal(format!("Failed to persist endpoint: {e}"))
-            })?;
+            let encoded = serde_json::to_vec(&endpoint)
+                .map_err(|e| NamingError::Internal(format!("Failed to serialize endpoint: {e}")))?;
+            tree.insert(id.as_bytes(), encoded)
+                .map_err(|e| NamingError::Internal(format!("Failed to persist endpoint: {e}")))?;
         }
 
         debug!("Service announced: {}", id);
@@ -1477,7 +1474,7 @@ mod tests {
             let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
             let mut ep = make_endpoint("expired-persist", ScopeLevel::Org, 1);
             ep.updated_at = 1000; // Way in the past → expired
-            // Bypass announce to force it into sled even though expired
+                                  // Bypass announce to force it into sled even though expired
             let tree = db.open_tree(super::SLED_TREE_NAME).unwrap();
             let encoded = serde_json::to_vec(&ep).unwrap();
             tree.insert(ep.service_id.as_bytes(), encoded).unwrap();
@@ -1504,7 +1501,7 @@ mod tests {
         let mgr = ServiceDiscoveryManager::with_sled(&db).unwrap();
         let mut ep = make_endpoint("will-expire", ScopeLevel::Org, 1);
         ep.updated_at = 1000; // Already expired
-        // Insert directly into registry + sled to test remove_expired
+                              // Insert directly into registry + sled to test remove_expired
         {
             let mut reg = mgr.registry.write().await;
             reg.insert("will-expire".to_string(), ep.clone());
