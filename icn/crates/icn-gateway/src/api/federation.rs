@@ -615,22 +615,35 @@ pub async fn federation_connect(
     fed_mgr: web::Data<Arc<FederationManager>>,
     body: web::Json<crate::models::FederationConnectRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "federation:admin")?;
+    require_scope(&http_req, "federation:write")?;
 
-    let claims = get_claims(&http_req)
+    let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let own_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
-
-    // Validate address format (host:port)
-    if !body.address.contains(':') {
+    // Validate address format (host:port with valid port number)
+    let addr_parts: Vec<&str> = body.address.rsplitn(2, ':').collect();
+    if addr_parts.len() != 2
+        || addr_parts[0].parse::<u16>().is_err()
+        || addr_parts[1].is_empty()
+        || body.address.contains("://")
+    {
         return Err(GatewayError::BadRequest(
-            "Address must be in host:port format (e.g., \"node-b.local:9000\")".to_string(),
+            "Address must be in host:port format with a valid port (e.g., \"node-b.local:9000\")"
+                .to_string(),
         ));
     }
+
+    // Require peer DID for identity verification
+    let peer_did: Did = body
+        .peer_did
+        .as_ref()
+        .ok_or_else(|| {
+            GatewayError::BadRequest(
+                "peer_did is required to identify the remote cooperative".to_string(),
+            )
+        })?
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid peer DID: {e}")))?;
 
     // Ensure federation is initialized
     let own_info = fed_mgr.get_own_info().await.map_err(|_| {
@@ -639,7 +652,7 @@ pub async fn federation_connect(
         )
     })?;
 
-    // Register the peer cooperative if coop_id and name are provided
+    // Register the peer cooperative
     let peer_coop_id = body
         .coop_id
         .clone()
@@ -652,17 +665,23 @@ pub async fn federation_connect(
     let peer_info = CooperativeInfo::new(
         peer_coop_id.clone(),
         peer_name,
-        own_did, // Placeholder DID until actual handshake
+        peer_did,
         FederationPolicy::default(),
     )
     .with_gateway(format!("http://{}", body.address));
 
-    // Register the peer (ignore error if already registered)
+    // Register the peer (tolerate "already registered" but surface real errors)
     match fed_mgr.register_cooperative(peer_info).await {
         Ok(()) => {}
         Err(e) => {
-            // Log but don't fail - peer may already be registered
-            tracing::debug!("Peer registration note: {e}");
+            let msg = e.to_string();
+            if msg.contains("already") || msg.contains("exists") {
+                tracing::debug!("Peer already registered: {msg}");
+            } else {
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to register peer: {msg}"
+                )));
+            }
         }
     }
 

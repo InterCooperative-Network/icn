@@ -228,6 +228,8 @@ fn default_weight() -> f64 {
 pub struct FederationConnectRequest {
     /// Address of the peer to connect to (e.g., "node-b.local:9000")
     pub address: String,
+    /// DID of the remote cooperative (required for identity verification)
+    pub peer_did: Option<String>,
     /// Optional cooperative ID to register the peer as
     pub coop_id: Option<String>,
     /// Optional human-readable name for the peer

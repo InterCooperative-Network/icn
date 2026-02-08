@@ -695,6 +695,10 @@ enum FederationCommands {
         /// Peer address in host:port format (e.g., "node-b.local:9000")
         address: String,
 
+        /// DID of the remote cooperative (required)
+        #[arg(long)]
+        peer_did: String,
+
         /// Optional cooperative ID for the peer
         #[arg(long)]
         coop_id: Option<String>,
@@ -3216,6 +3220,7 @@ async fn handle_federation_command(
 
         FederationCommands::GatewayConnect {
             address,
+            peer_did,
             coop_id,
             name,
             gateway,
@@ -3236,6 +3241,7 @@ async fn handle_federation_command(
                 .bearer_auth(&token)
                 .json(&serde_json::json!({
                     "address": address,
+                    "peer_did": peer_did,
                     "coop_id": coop_id,
                     "name": name
                 }))
