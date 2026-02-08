@@ -957,7 +957,12 @@ impl GovernanceActor {
         {
             let mut g = gossip.write().await;
             g.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
-                if topic != GOVERNANCE_TOPIC {
+                // Accept local governance topic and any federation governance topic
+                // (federation topics have format "federation:governance:<fed_id>")
+                let is_federation_gov = topic == icn_federation::TOPIC_FEDERATION_GOVERNANCE
+                    || topic
+                        .starts_with(&format!("{}:", icn_federation::TOPIC_FEDERATION_GOVERNANCE));
+                if topic != GOVERNANCE_TOPIC && !is_federation_gov {
                     return;
                 }
 
@@ -1224,8 +1229,15 @@ impl GovernanceActor {
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::proposal_created(proposal))
+                self.publish(GovernanceMessage::proposal_created(proposal.clone()))
                     .await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(
+                    &proposal,
+                    GovernanceMessage::proposal_created(proposal.clone()),
+                )
+                .await;
 
                 info!("✓ Proposal created: {} (ID: {})", title, proposal_id.0);
             }
@@ -1290,12 +1302,16 @@ impl GovernanceActor {
                 self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::deliberation_started(
+                let delib_msg = GovernanceMessage::deliberation_started(
                     proposal_id.clone(),
                     started_at,
                     ends_at,
-                ))
-                .await?;
+                );
+                self.publish(delib_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, delib_msg)
+                    .await;
 
                 info!(
                     "✓ Deliberation started for proposal: {} (ends in {}s)",
@@ -1346,21 +1362,26 @@ impl GovernanceActor {
                 // Broadcast deliberation ended to network
                 // Note: comment_count and participant_count are 0 since
                 // comment tracking is not yet implemented in the actor
-                self.publish(GovernanceMessage::deliberation_ended(
+                let ended_msg = GovernanceMessage::deliberation_ended(
                     proposal_id.clone(),
                     opened_at, // ended_at == opened_at (same moment)
                     0,         // comment_count - not yet tracked
                     0,         // participant_count - not yet tracked
-                ))
-                .await?;
+                );
+                self.publish(ended_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, ended_msg)
+                    .await;
 
                 // Broadcast proposal opened to network
-                self.publish(GovernanceMessage::proposal_opened(
-                    proposal_id.clone(),
-                    opened_at,
-                    closes_at,
-                ))
-                .await?;
+                let opened_msg =
+                    GovernanceMessage::proposal_opened(proposal_id.clone(), opened_at, closes_at);
+                self.publish(opened_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, opened_msg)
+                    .await;
 
                 info!(
                     "✓ Deliberation ended, voting opened for proposal: {} (closes in {}s)",
@@ -1406,12 +1427,13 @@ impl GovernanceActor {
                 self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::proposal_opened(
-                    proposal_id.clone(),
-                    opened_at,
-                    closes_at,
-                ))
-                .await?;
+                let opened_msg =
+                    GovernanceMessage::proposal_opened(proposal_id.clone(), opened_at, closes_at);
+                self.publish(opened_msg.clone()).await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(&proposal, opened_msg)
+                    .await;
 
                 info!(
                     "✓ Proposal opened: {} (auto-close scheduled for {}s)",
@@ -1438,8 +1460,13 @@ impl GovernanceActor {
                 )?;
 
                 // Broadcast to network
-                self.publish(GovernanceMessage::vote_cast(vote, None))
-                    .await?;
+                let vote_msg = GovernanceMessage::vote_cast(vote, None);
+                self.publish(vote_msg.clone()).await?;
+
+                // Forward vote to federation topic if proposal is federation-scoped
+                if let Some(proposal) = self.load_proposal(&proposal_id)? {
+                    self.publish_federation_if_scoped(&proposal, vote_msg).await;
+                }
 
                 info!("✓ Vote cast: {:?}", choice);
             }
@@ -1592,12 +1619,25 @@ impl GovernanceActor {
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_closed(
                     proposal_id.clone(),
-                    outcome_msg,
+                    outcome_msg.clone(),
                     now,
-                    tally_snapshot,
-                    proof_bytes,
+                    tally_snapshot.clone(),
+                    proof_bytes.clone(),
                 ))
                 .await?;
+
+                // Also broadcast on federation topic if federation-scoped
+                self.publish_federation_if_scoped(
+                    &proposal,
+                    GovernanceMessage::proposal_closed(
+                        proposal_id.clone(),
+                        outcome_msg,
+                        now,
+                        tally_snapshot,
+                        proof_bytes,
+                    ),
+                )
+                .await;
 
                 // Emit event for downstream processing (e.g., ledger transactions)
                 if let Some(ref event_bus) = self.event_bus {
@@ -1869,6 +1909,34 @@ impl GovernanceActor {
         let mut g = self.gossip.write().await;
         let hash = g.publish(GOVERNANCE_TOPIC, bytes).await?;
         Ok(hash)
+    }
+
+    /// Publish a governance message to a specific topic
+    async fn publish_to_topic(&self, topic: &str, msg: GovernanceMessage) -> Result<[u8; 32]> {
+        let bytes = msg.to_bytes()?;
+        let mut g = self.gossip.write().await;
+        let hash = g.publish(topic, bytes).await?;
+        Ok(hash)
+    }
+
+    /// If the proposal is federation-scoped, also publish on the federation-specific topic.
+    ///
+    /// Topic format: `federation:governance:<fed_id>` — each federation gets its own topic
+    /// so multi-federation nodes don't mix governance outcomes.
+    async fn publish_federation_if_scoped(
+        &self,
+        proposal: &icn_governance::Proposal,
+        msg: GovernanceMessage,
+    ) {
+        if let icn_governance::ProposalScope::Federation(ref fed_id) = proposal.scope {
+            let topic = format!("{}:{}", icn_federation::TOPIC_FEDERATION_GOVERNANCE, fed_id);
+            if let Err(e) = self.publish_to_topic(&topic, msg).await {
+                warn!(
+                    "Failed to publish federation governance message to {}: {}",
+                    topic, e
+                );
+            }
+        }
     }
 
     /// List all domains

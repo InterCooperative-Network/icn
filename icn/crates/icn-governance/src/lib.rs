@@ -117,7 +117,8 @@ pub use proof::{GovernanceProof, ProofOutcome};
 pub use proposal::{
     DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome, FederationProposal,
     FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload,
-    ProposalState, ResourceAccessAction, TreasuryApprovalType, TreasuryProposalOperation, Version,
+    ProposalScope, ProposalState, ResourceAccessAction, TreasuryApprovalType,
+    TreasuryProposalOperation, Version,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
 pub use sdis::{

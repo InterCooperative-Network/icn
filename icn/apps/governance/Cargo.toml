@@ -25,6 +25,9 @@ icn-store = { path = "../../crates/icn-store" }
 # Gossip actor (for governance message broadcast)
 icn-gossip = { path = "../../crates/icn-gossip" }
 
+# Federation types (for federation governance topic constant)
+icn-federation = { path = "../../crates/icn-federation" }
+
 # Observability metrics
 icn-obs = { path = "../../crates/icn-obs" }
 

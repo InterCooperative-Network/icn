@@ -3192,6 +3192,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "icn-entity",
+ "icn-federation",
  "icn-gossip",
  "icn-governance",
  "icn-identity",
