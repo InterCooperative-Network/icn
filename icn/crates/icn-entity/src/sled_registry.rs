@@ -27,7 +27,7 @@
 //! use Sled transactions to ensure atomicity. If a process crash occurs mid-transaction,
 //! Sled will roll back incomplete operations on restart.
 
-use crate::entity::{CooperativeEntity, EntityId, EntityType};
+use crate::entity::{CooperativeEntity, EntityId, EntityRelationship, EntityType};
 use crate::error::{EntityError, Result};
 use crate::membership::Membership;
 use crate::registry::EntityRegistry;
@@ -823,6 +823,68 @@ impl EntityRegistry for SledEntityRegistry {
         let prefix = Self::membership_prefix(parent_id);
         let count = self.db.scan_prefix(&prefix).count();
         Ok(count)
+    }
+
+    fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()> {
+        let key = format!(
+            "rel:from:{}:{}",
+            relationship.source.as_str(),
+            relationship.target.as_str()
+        );
+        let rev_key = format!(
+            "rel:to:{}:{}",
+            relationship.target.as_str(),
+            relationship.source.as_str()
+        );
+        let value = Self::serialize_entity_rel(&relationship)?;
+
+        self.db
+            .insert(key.as_bytes(), value.as_slice())
+            .map_err(|e| {
+                EntityError::RegistryError(format!("Failed to store relationship: {e}"))
+            })?;
+        self.db
+            .insert(rev_key.as_bytes(), value.as_slice())
+            .map_err(|e| {
+                EntityError::RegistryError(format!("Failed to store reverse relationship: {e}"))
+            })?;
+        Ok(())
+    }
+
+    fn get_relationships_from(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let prefix = format!("rel:from:{}:", entity_id.as_str());
+        let mut rels = Vec::new();
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                item.map_err(|e| EntityError::RegistryError(format!("Failed to scan: {e}")))?;
+            rels.push(Self::deserialize_entity_rel(&value)?);
+        }
+        Ok(rels)
+    }
+
+    fn get_relationships_to(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let prefix = format!("rel:to:{}:", entity_id.as_str());
+        let mut rels = Vec::new();
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                item.map_err(|e| EntityError::RegistryError(format!("Failed to scan: {e}")))?;
+            rels.push(Self::deserialize_entity_rel(&value)?);
+        }
+        Ok(rels)
+    }
+}
+
+impl SledEntityRegistry {
+    fn serialize_entity_rel(rel: &EntityRelationship) -> Result<Vec<u8>> {
+        icn_encoding::encode_versioned(rel).map_err(|e| {
+            EntityError::RegistryError(format!("Failed to serialize relationship: {e}"))
+        })
+    }
+
+    fn deserialize_entity_rel(bytes: &[u8]) -> Result<EntityRelationship> {
+        icn_encoding::decode_versioned(bytes).map_err(|e| {
+            EntityError::RegistryError(format!("Failed to deserialize relationship: {e}"))
+        })
     }
 }
 

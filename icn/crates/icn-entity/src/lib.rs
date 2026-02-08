@@ -87,7 +87,8 @@ pub mod sled_registry;
 // Re-export main types at crate root
 pub use actor::{EntityActor, GossipHandle, ENTITY_TOPIC};
 pub use entity::{
-    AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType,
+    AccountId, AccountReference, CommunityProfile, CooperativeEntity, CooperativeProfile, EntityId,
+    EntityKind, EntityRelationship, EntityStatus, EntityType, FederationProfile, RelationType,
 };
 pub use error::{EntityError, Result};
 pub use handle::EntityHandle;

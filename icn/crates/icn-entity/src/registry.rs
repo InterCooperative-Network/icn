@@ -4,7 +4,7 @@
 //! This module defines the trait interface and a simple in-memory implementation
 //! for testing.
 
-use crate::entity::{CooperativeEntity, EntityId, EntityType};
+use crate::entity::{CooperativeEntity, EntityId, EntityRelationship, EntityType};
 use crate::error::{EntityError, Result};
 use crate::membership::Membership;
 use std::collections::HashMap;
@@ -120,6 +120,19 @@ pub trait EntityRegistry: Send + Sync {
 
     /// Count members of an entity
     fn member_count(&self, parent_id: &EntityId) -> Result<usize>;
+
+    // ========================================
+    // Relationship Operations
+    // ========================================
+
+    /// Store a relationship between two entities.
+    fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()>;
+
+    /// Get all relationships where `entity_id` is the source.
+    fn get_relationships_from(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>>;
+
+    /// Get all relationships where `entity_id` is the target.
+    fn get_relationships_to(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>>;
 }
 
 // ============================================================================
@@ -137,6 +150,9 @@ pub struct InMemoryRegistry {
 
     /// Membership storage: (member_id, parent_id) -> Membership
     memberships: HashMap<(String, String), Membership>,
+
+    /// Relationship storage: (source, target) -> EntityRelationship
+    relationships: HashMap<(String, String), EntityRelationship>,
 }
 
 impl InMemoryRegistry {
@@ -414,6 +430,35 @@ impl EntityRegistry for InMemoryRegistry {
             .filter(|(_, parent)| parent == parent_str)
             .count())
     }
+
+    fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()> {
+        let key = (
+            relationship.source.as_str().to_string(),
+            relationship.target.as_str().to_string(),
+        );
+        self.relationships.insert(key, relationship);
+        Ok(())
+    }
+
+    fn get_relationships_from(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let source_str = entity_id.as_str();
+        Ok(self
+            .relationships
+            .iter()
+            .filter(|((src, _), _)| src == source_str)
+            .map(|(_, r)| r.clone())
+            .collect())
+    }
+
+    fn get_relationships_to(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let target_str = entity_id.as_str();
+        Ok(self
+            .relationships
+            .iter()
+            .filter(|((_, tgt), _)| tgt == target_str)
+            .map(|(_, r)| r.clone())
+            .collect())
+    }
 }
 
 // ============================================================================
@@ -476,6 +521,30 @@ impl EntityRegistryHandle {
     pub async fn count(&self) -> Result<usize> {
         let registry = self.inner.read().await;
         registry.count()
+    }
+
+    /// Store a relationship between two entities
+    pub async fn store_relationship(&self, relationship: EntityRelationship) -> Result<()> {
+        let mut registry = self.inner.write().await;
+        registry.store_relationship(relationship)
+    }
+
+    /// Get all relationships where entity_id is the source
+    pub async fn get_relationships_from(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Vec<EntityRelationship>> {
+        let registry = self.inner.read().await;
+        registry.get_relationships_from(entity_id)
+    }
+
+    /// Get all relationships where entity_id is the target
+    pub async fn get_relationships_to(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Vec<EntityRelationship>> {
+        let registry = self.inner.read().await;
+        registry.get_relationships_to(entity_id)
     }
 }
 
