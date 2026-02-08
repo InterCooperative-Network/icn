@@ -853,20 +853,6 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             .await
     }
 
-    async fn update_domain_membership(
-        &self,
-        domain_id: GovernanceDomainId,
-        member: Did,
-        action: icn_governance::MembershipAction,
-    ) -> Result<()> {
-        self.submit(GovernanceCommand::UpdateMembership {
-            domain_id,
-            action,
-            member,
-        })
-        .await
-    }
-
     // Delegation operations
 
     async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
