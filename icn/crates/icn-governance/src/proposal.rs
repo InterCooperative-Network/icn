@@ -1203,6 +1203,22 @@ impl FederationProposal {
     }
 }
 
+/// Scope of a proposal — determines gossip routing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalScope {
+    /// Local to this node's governance domain.
+    Local,
+    /// Visible across a federation.
+    Federation(String),
+}
+
+impl Default for ProposalScope {
+    fn default() -> Self {
+        Self::Local
+    }
+}
+
 /// A proposal for a decision
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Proposal {
@@ -1232,6 +1248,10 @@ pub struct Proposal {
 
     /// When last updated
     pub updated_at: Timestamp,
+
+    /// Scope (local or federation). Defaults to Local for backward compat.
+    #[serde(default)]
+    pub scope: ProposalScope,
 }
 
 impl Proposal {
@@ -1255,7 +1275,15 @@ impl Proposal {
             state: ProposalState::Draft,
             created_at: now,
             updated_at: now,
+            scope: ProposalScope::Local,
         }
+    }
+
+    /// Set the proposal scope.
+    #[must_use]
+    pub fn with_scope(mut self, scope: ProposalScope) -> Self {
+        self.scope = scope;
+        self
     }
 
     /// Start deliberation period for the proposal
@@ -2455,5 +2483,76 @@ mod tests {
             .close(ProposalState::Accepted { closed_at: now })
             .unwrap();
         assert!(proposal.state.is_closed());
+    }
+
+    #[test]
+    fn test_proposal_scope_serde_roundtrip_local() {
+        let scope = ProposalScope::Local;
+        let json = serde_json::to_string(&scope).unwrap();
+        assert_eq!(json, "\"local\"");
+        let back: ProposalScope = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ProposalScope::Local);
+    }
+
+    #[test]
+    fn test_proposal_scope_serde_roundtrip_federation() {
+        let scope = ProposalScope::Federation("food-coop-fed".to_string());
+        let json = serde_json::to_string(&scope).unwrap();
+        let back: ProposalScope = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ProposalScope::Federation("food-coop-fed".to_string()));
+    }
+
+    #[test]
+    fn test_proposal_scope_default_is_local() {
+        assert_eq!(ProposalScope::default(), ProposalScope::Local);
+    }
+
+    #[test]
+    fn test_proposal_backward_compat_no_scope_field() {
+        // Simulate a Proposal JSON from before the scope field existed.
+        // When deserialized, scope should default to Local.
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Compat Test".to_string(),
+            "Testing backward compat".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        );
+
+        // Serialize, then strip the scope field, then deserialize
+        let mut val: serde_json::Value = serde_json::to_value(&proposal).unwrap();
+        val.as_object_mut().unwrap().remove("scope");
+
+        let restored: Proposal = serde_json::from_value(val).unwrap();
+        assert_eq!(restored.scope, ProposalScope::Local);
+    }
+
+    #[test]
+    fn test_proposal_with_scope_builder() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Federation Proposal".to_string(),
+            "A proposal scoped to a federation".to_string(),
+            ProposalPayload::Text {
+                body: "Test".to_string(),
+            },
+        )
+        .with_scope(ProposalScope::Federation("my-fed".to_string()));
+
+        assert_eq!(
+            proposal.scope,
+            ProposalScope::Federation("my-fed".to_string())
+        );
     }
 }

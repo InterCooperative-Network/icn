@@ -98,6 +98,7 @@ pub const TOPIC_FEDERATION_REGISTRY: &str = "federation:registry";
 pub const TOPIC_FEDERATION_TRUST: &str = "federation:trust";
 pub const TOPIC_FEDERATION_CLEARING: &str = "federation:clearing";
 pub const TOPIC_FEDERATION_AGREEMENTS: &str = "federation:agreements";
+pub const TOPIC_FEDERATION_GOVERNANCE: &str = "federation:governance";
 
 /// Federation gossip topics
 pub mod topics {

@@ -508,6 +508,26 @@ pub async fn list_proposals(
         }
     }
 
+    // Filter by scope if requested
+    if let Some(scope) = query.filter("scope") {
+        match scope {
+            "local" => {
+                proposals.retain(|p| matches!(p.scope, icn_governance::ProposalScope::Local));
+            }
+            "federation" => {
+                proposals
+                    .retain(|p| matches!(p.scope, icn_governance::ProposalScope::Federation(_)));
+            }
+            other => {
+                // Treat as federation ID filter
+                let fed_id = other.to_string();
+                proposals.retain(|p| {
+                    matches!(&p.scope, icn_governance::ProposalScope::Federation(id) if id == &fed_id)
+                });
+            }
+        }
+    }
+
     // Apply sorting
     // Valid sort fields for proposals
     const VALID_PROPOSAL_SORT_FIELDS: &[&str] = &["created_at", "title"];
@@ -4682,5 +4702,110 @@ mod tests {
 
         let resp: Proposal = test::call_and_read_body_json(&app, req).await;
         assert_eq!(resp.title, "Join Federation with Arbitrator");
+    }
+
+    #[actix_web::test]
+    async fn test_list_proposals_scope_filter() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create a domain
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        // Insert proposals with different scopes using the test helper
+        let local_proposal = Proposal::new(
+            GovernanceDomainId("coop:food".to_string()),
+            alice.did().clone(),
+            "Local Proposal".to_string(),
+            "A local proposal".to_string(),
+            icn_governance::ProposalPayload::Text {
+                body: "local stuff".to_string(),
+            },
+        );
+        gov_mgr.insert_test_proposal(local_proposal);
+
+        let fed_proposal = Proposal::new(
+            GovernanceDomainId("coop:food".to_string()),
+            alice.did().clone(),
+            "Federation Proposal".to_string(),
+            "A federation proposal".to_string(),
+            icn_governance::ProposalPayload::Text {
+                body: "federation stuff".to_string(),
+            },
+        )
+        .with_scope(icn_governance::ProposalScope::Federation(
+            "my-fed".to_string(),
+        ));
+        gov_mgr.insert_test_proposal(fed_proposal);
+
+        let fed_proposal_2 = Proposal::new(
+            GovernanceDomainId("coop:food".to_string()),
+            alice.did().clone(),
+            "Other Fed Proposal".to_string(),
+            "Another fed proposal".to_string(),
+            icn_governance::ProposalPayload::Text {
+                body: "other fed".to_string(),
+            },
+        )
+        .with_scope(icn_governance::ProposalScope::Federation(
+            "other-fed".to_string(),
+        ));
+        gov_mgr.insert_test_proposal(fed_proposal_2);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .service(web::scope("/gov").service(list_proposals)),
+        )
+        .await;
+
+        // Filter scope=local => 1 result
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals?scope=local")
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(proposals.len(), 1);
+        assert_eq!(proposals[0].title, "Local Proposal");
+
+        // Filter scope=federation => 2 results
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals?scope=federation")
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(proposals.len(), 2);
+
+        // Filter scope=my-fed => 1 result (specific federation ID)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/proposals?scope=my-fed")
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(proposals.len(), 1);
+        assert_eq!(proposals[0].title, "Federation Proposal");
+
+        // No scope filter => all 3
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get().uri("/gov/proposals").to_request();
+        req.extensions_mut().insert(claims);
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(proposals.len(), 3);
     }
 }

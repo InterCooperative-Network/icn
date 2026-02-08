@@ -213,6 +213,8 @@ pub struct TopicSubscriptionConfig {
 ///   - federation:registry
 ///   - federation:trust
 ///   - federation:clearing
+///   - federation:agreements
+///   - federation:governance
 pub async fn subscribe_standard_topics(
     gossip: &mut GossipActor,
     did: &Did,
@@ -317,6 +319,15 @@ pub async fn subscribe_standard_topics(
             warn!("Failed to subscribe to federation:agreements topic: {}", e);
         } else {
             info!("Subscribed to federation:agreements topic");
+        }
+
+        if let Err(e) = gossip
+            .subscribe(icn_federation::TOPIC_FEDERATION_GOVERNANCE, did.clone())
+            .await
+        {
+            warn!("Failed to subscribe to federation:governance topic: {}", e);
+        } else {
+            info!("Subscribed to federation:governance topic");
         }
     }
 }

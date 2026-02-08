@@ -957,7 +957,8 @@ impl GovernanceActor {
         {
             let mut g = gossip.write().await;
             g.set_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
-                if topic != GOVERNANCE_TOPIC {
+                if topic != GOVERNANCE_TOPIC && topic != icn_federation::TOPIC_FEDERATION_GOVERNANCE
+                {
                     return;
                 }
 
@@ -1592,12 +1593,31 @@ impl GovernanceActor {
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_closed(
                     proposal_id.clone(),
-                    outcome_msg,
+                    outcome_msg.clone(),
                     now,
-                    tally_snapshot,
-                    proof_bytes,
+                    tally_snapshot.clone(),
+                    proof_bytes.clone(),
                 ))
                 .await?;
+
+                // If federation-scoped, also broadcast on the federation governance topic
+                if let icn_governance::ProposalScope::Federation(ref _fed_id) = proposal.scope {
+                    if let Err(e) = self
+                        .publish_to_topic(
+                            icn_federation::TOPIC_FEDERATION_GOVERNANCE,
+                            GovernanceMessage::proposal_closed(
+                                proposal_id.clone(),
+                                outcome_msg,
+                                now,
+                                tally_snapshot,
+                                proof_bytes,
+                            ),
+                        )
+                        .await
+                    {
+                        warn!("Failed to publish federation governance message: {}", e);
+                    }
+                }
 
                 // Emit event for downstream processing (e.g., ledger transactions)
                 if let Some(ref event_bus) = self.event_bus {
@@ -1868,6 +1888,14 @@ impl GovernanceActor {
         let bytes = msg.to_bytes()?;
         let mut g = self.gossip.write().await;
         let hash = g.publish(GOVERNANCE_TOPIC, bytes).await?;
+        Ok(hash)
+    }
+
+    /// Publish a governance message to a specific topic
+    async fn publish_to_topic(&self, topic: &str, msg: GovernanceMessage) -> Result<[u8; 32]> {
+        let bytes = msg.to_bytes()?;
+        let mut g = self.gossip.write().await;
+        let hash = g.publish(topic, bytes).await?;
         Ok(hash)
     }
 
