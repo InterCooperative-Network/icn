@@ -1061,6 +1061,7 @@ impl GatewayServer {
                                 .service(api::governance::create_domain)
                                 .service(api::governance::list_domains)
                                 .service(api::governance::get_domain)
+                                .service(api::governance::add_domain_member)
                                 .service(api::governance::create_proposal)
                                 .service(api::governance::list_proposals)
                                 .service(api::governance::get_proposal)
@@ -1183,6 +1184,7 @@ impl GatewayServer {
                                 .service(api::federation::process_scheduled_settlements)
                                 .service(api::federation::perform_multilateral_netting)
                                 .service(api::federation::apply_multilateral_netting)
+                                .service(api::federation::federation_connect)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

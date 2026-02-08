@@ -6,8 +6,8 @@ use icn_identity::Did;
 
 use crate::{
     Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalPayload,
-    ProtocolParameter, Timestamp, VoteChoice, VoteTally,
+    MembershipAction, MembershipConfig, PaginatedResult, ParameterChange, Proposal, ProposalId,
+    ProposalPayload, ProtocolParameter, Timestamp, VoteChoice, VoteTally,
 };
 
 /// Trait for governance operations exposed to RPC layer
@@ -105,6 +105,17 @@ pub trait GovernanceOps: Send + Sync {
 
     /// Close a proposal and evaluate the outcome
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()>;
+
+    /// Add or remove a member from a governance domain
+    ///
+    /// Only works for domains with static-list membership. For trust-based
+    /// membership domains, returns an error (convert to static list first).
+    async fn update_domain_membership(
+        &self,
+        domain_id: GovernanceDomainId,
+        member: Did,
+        action: MembershipAction,
+    ) -> Result<()>;
 
     // Delegation operations
 

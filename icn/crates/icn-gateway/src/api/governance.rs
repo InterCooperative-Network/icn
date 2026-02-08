@@ -263,6 +263,65 @@ pub async fn get_domain(
     Ok(HttpResponse::Ok().json(domain))
 }
 
+/// POST /gov/domains/{domain_id}/members - Add a member to a governance domain
+#[post("/domains/{domain_id}/members")]
+pub async fn add_domain_member(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<String>,
+    body: web::Json<crate::models::AddDomainMemberRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+    let caller_did: icn_identity::Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let domain_id_str = path.into_inner();
+    validation::validate_domain_id(&domain_id_str)?;
+
+    let member_did: icn_identity::Did = body
+        .did
+        .parse()
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid member DID: {e}")))?;
+
+    let domain_id = GovernanceDomainId(domain_id_str.clone());
+
+    // Verify domain exists and caller is a member
+    let domain = gov_mgr.get_domain(&domain_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Domain not found: {domain_id_str}"))
+    })?;
+
+    let caller_is_member = match &domain.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => members.contains(&caller_did),
+        icn_governance::MembershipSource::TrustThreshold(_) => true,
+    };
+    if !caller_is_member {
+        return Err(crate::error::GatewayError::AuthorizationFailed(format!(
+            "Only domain members can add members to domain '{domain_id_str}'"
+        )));
+    }
+
+    // Add the member
+    gov_mgr
+        .update_domain_membership(
+            domain_id,
+            member_did.clone(),
+            icn_governance::MembershipAction::Add,
+        )
+        .await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "member_added",
+        "domain_id": domain_id_str,
+        "member_did": member_did.to_string()
+    })))
+}
+
 // ============================================================================
 // Proposal Endpoints
 // ============================================================================
