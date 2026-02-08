@@ -4,7 +4,7 @@
 //! This module defines the trait interface and a simple in-memory implementation
 //! for testing.
 
-use crate::entity::{CooperativeEntity, EntityId, EntityType};
+use crate::entity::{CooperativeEntity, EntityId, EntityRelationship, EntityType, RelationType};
 use crate::error::{EntityError, Result};
 use crate::membership::Membership;
 use std::collections::HashMap;
@@ -120,6 +120,19 @@ pub trait EntityRegistry: Send + Sync {
 
     /// Count members of an entity
     fn member_count(&self, parent_id: &EntityId) -> Result<usize>;
+
+    // ========================================
+    // Relationship Operations
+    // ========================================
+
+    /// Store a relationship between two entities.
+    fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()>;
+
+    /// Get all relationships where `entity_id` is the source.
+    fn get_relationships_from(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>>;
+
+    /// Get all relationships where `entity_id` is the target.
+    fn get_relationships_to(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>>;
 }
 
 // ============================================================================
@@ -137,6 +150,9 @@ pub struct InMemoryRegistry {
 
     /// Membership storage: (member_id, parent_id) -> Membership
     memberships: HashMap<(String, String), Membership>,
+
+    /// Relationship storage: (source, target, relationship_type) -> EntityRelationship
+    relationships: HashMap<(String, String, RelationType), EntityRelationship>,
 }
 
 impl InMemoryRegistry {
@@ -414,6 +430,42 @@ impl EntityRegistry for InMemoryRegistry {
             .filter(|(_, parent)| parent == parent_str)
             .count())
     }
+
+    fn store_relationship(&mut self, relationship: EntityRelationship) -> Result<()> {
+        let key = (
+            relationship.source.as_str().to_string(),
+            relationship.target.as_str().to_string(),
+            relationship.relationship.clone(),
+        );
+        if self.relationships.contains_key(&key) {
+            return Err(EntityError::RegistryError(format!(
+                "Relationship {:?} already exists between {} and {}",
+                relationship.relationship, relationship.source, relationship.target
+            )));
+        }
+        self.relationships.insert(key, relationship);
+        Ok(())
+    }
+
+    fn get_relationships_from(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let source_str = entity_id.as_str();
+        Ok(self
+            .relationships
+            .iter()
+            .filter(|((src, _, _), _)| src == source_str)
+            .map(|(_, r)| r.clone())
+            .collect())
+    }
+
+    fn get_relationships_to(&self, entity_id: &EntityId) -> Result<Vec<EntityRelationship>> {
+        let target_str = entity_id.as_str();
+        Ok(self
+            .relationships
+            .iter()
+            .filter(|((_, tgt, _), _)| tgt == target_str)
+            .map(|(_, r)| r.clone())
+            .collect())
+    }
 }
 
 // ============================================================================
@@ -476,6 +528,30 @@ impl EntityRegistryHandle {
     pub async fn count(&self) -> Result<usize> {
         let registry = self.inner.read().await;
         registry.count()
+    }
+
+    /// Store a relationship between two entities
+    pub async fn store_relationship(&self, relationship: EntityRelationship) -> Result<()> {
+        let mut registry = self.inner.write().await;
+        registry.store_relationship(relationship)
+    }
+
+    /// Get all relationships where entity_id is the source
+    pub async fn get_relationships_from(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Vec<EntityRelationship>> {
+        let registry = self.inner.read().await;
+        registry.get_relationships_from(entity_id)
+    }
+
+    /// Get all relationships where entity_id is the target
+    pub async fn get_relationships_to(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Vec<EntityRelationship>> {
+        let registry = self.inner.read().await;
+        registry.get_relationships_to(entity_id)
     }
 }
 
@@ -809,6 +885,71 @@ mod tests {
 
         // Should have all 10 entities
         assert_eq!(handle.count().await.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_store_and_query_relationships() {
+        use crate::entity::{EntityRelationship, RelationType};
+
+        let mut registry = InMemoryRegistry::new();
+
+        let coop_a = CooperativeEntity::cooperative("coop-a", "Coop A").unwrap();
+        let coop_b = CooperativeEntity::cooperative("coop-b", "Coop B").unwrap();
+        let fed = CooperativeEntity::federation("test-fed", "Test Fed").unwrap();
+
+        let rel_ab = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        let rel_af =
+            EntityRelationship::new(coop_a.id.clone(), fed.id.clone(), RelationType::MemberOf);
+
+        registry.store_relationship(rel_ab).unwrap();
+        registry.store_relationship(rel_af).unwrap();
+
+        // Query from source
+        let from_a = registry.get_relationships_from(&coop_a.id).unwrap();
+        assert_eq!(from_a.len(), 2);
+
+        // Query from target
+        let to_b = registry.get_relationships_to(&coop_b.id).unwrap();
+        assert_eq!(to_b.len(), 1);
+        assert_eq!(to_b[0].relationship, RelationType::FederatedWith);
+
+        let to_fed = registry.get_relationships_to(&fed.id).unwrap();
+        assert_eq!(to_fed.len(), 1);
+        assert_eq!(to_fed[0].relationship, RelationType::MemberOf);
+    }
+
+    #[test]
+    fn test_duplicate_relationship_rejected() {
+        use crate::entity::{EntityRelationship, RelationType};
+
+        let mut registry = InMemoryRegistry::new();
+
+        let coop_a = CooperativeEntity::cooperative("coop-a", "Coop A").unwrap();
+        let coop_b = CooperativeEntity::cooperative("coop-b", "Coop B").unwrap();
+
+        let rel = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        registry.store_relationship(rel).unwrap();
+
+        // Same pair + same type → rejected
+        let dup = EntityRelationship::new(
+            coop_a.id.clone(),
+            coop_b.id.clone(),
+            RelationType::FederatedWith,
+        );
+        assert!(registry.store_relationship(dup).is_err());
+
+        // Same pair + different type → allowed
+        let different =
+            EntityRelationship::new(coop_a.id.clone(), coop_b.id.clone(), RelationType::MemberOf);
+        assert!(registry.store_relationship(different).is_ok());
     }
 
     #[test]
