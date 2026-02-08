@@ -690,6 +690,28 @@ enum FederationCommands {
     /// Generate a federation invite URL for this node
     Invite,
 
+    /// Connect to a peer via the gateway API (registers peer cooperative)
+    GatewayConnect {
+        /// Peer address in host:port format (e.g., "node-b.local:9000")
+        address: String,
+
+        /// Optional cooperative ID for the peer
+        #[arg(long)]
+        coop_id: Option<String>,
+
+        /// Optional human-readable name for the peer
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Gateway URL (defaults to ICN_GATEWAY or http://localhost:8080)
+        #[arg(long)]
+        gateway: Option<String>,
+
+        /// Bearer token (defaults to ICN_TOKEN env var)
+        #[arg(long)]
+        token: Option<String>,
+    },
+
     /// Cooperative registry management (inter-coop federation)
     #[command(subcommand)]
     Coop(CoopCommands),
@@ -932,6 +954,25 @@ enum DomainCommands {
 
     /// List all domains
     List,
+
+    /// Add a member to a governance domain
+    AddMember {
+        /// Domain ID
+        #[arg(long)]
+        domain_id: String,
+
+        /// DID of the member to add
+        #[arg(long)]
+        did: String,
+
+        /// Gateway URL (defaults to ICN_GATEWAY or http://localhost:8080)
+        #[arg(long)]
+        gateway: Option<String>,
+
+        /// Bearer token (defaults to ICN_TOKEN env var)
+        #[arg(long)]
+        token: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -3170,6 +3211,50 @@ async fn handle_federation_command(
                         "Start icnd to generate a complete invite URL with your network address."
                     );
                 }
+            }
+        }
+
+        FederationCommands::GatewayConnect {
+            address,
+            coop_id,
+            name,
+            gateway,
+            token,
+        } => {
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let token = token
+                .or_else(|| std::env::var("ICN_TOKEN").ok())
+                .context("No token provided. Use --token or set ICN_TOKEN env var.")?;
+
+            let http_client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/federation/connect");
+
+            let resp = http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&serde_json::json!({
+                    "address": address,
+                    "coop_id": coop_id,
+                    "name": name
+                }))
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if resp.status().is_success() {
+                let data: serde_json::Value = resp.json().await?;
+                println!("Federation peer connected:");
+                println!(
+                    "  Peer: {}",
+                    data["peer_coop_id"].as_str().unwrap_or("unknown")
+                );
+                println!("  Address: {address}");
+            } else {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                bail!("Failed to connect federation peer: {status} - {body}");
             }
         }
 
@@ -5602,6 +5687,45 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
                     println!("  - {id} ({name})");
                 }
             }
+
+            DomainCommands::AddMember {
+                domain_id,
+                did,
+                gateway,
+                token,
+            } => {
+                let gateway = gateway
+                    .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                    .unwrap_or_else(|| "http://localhost:8080".to_string());
+                let token = token
+                    .or_else(|| std::env::var("ICN_TOKEN").ok())
+                    .context("No token provided. Use --token or set ICN_TOKEN env var.")?;
+
+                let http_client = reqwest::Client::new();
+                let url = format!("{gateway}/v1/gov/domains/{domain_id}/members");
+
+                let resp = http_client
+                    .post(&url)
+                    .bearer_auth(&token)
+                    .json(&serde_json::json!({
+                        "did": did,
+                        "weight": 1.0
+                    }))
+                    .send()
+                    .await
+                    .context("Failed to connect to gateway")?;
+
+                if resp.status().is_success() {
+                    let data: serde_json::Value = resp.json().await?;
+                    println!("Member added to governance domain:");
+                    println!("  Domain: {domain_id}");
+                    println!("  Member: {}", data["member_did"].as_str().unwrap_or(&did));
+                } else {
+                    let status = resp.status();
+                    let body = resp.text().await.unwrap_or_default();
+                    bail!("Failed to add member: {status} - {body}");
+                }
+            }
         },
 
         GovCommands::Proposal(proposal_cmd) => {
@@ -6537,9 +6661,7 @@ token_expiry_hours = 24
     }
 
     // Step 6: Create initial governance domain
-    // Note: This would normally be done via RPC to a running daemon.
-    // For now, we just prepare the governance setup that will be
-    // executed when the daemon starts.
+    // Save bootstrap file for offline use, then try live gateway call.
     let governance_setup_path = data_dir.join("governance_setup.json");
     let governance_setup = serde_json::json!({
         "domain": {
@@ -6556,9 +6678,76 @@ token_expiry_hours = 24
     )
     .context("Failed to write governance setup")?;
 
-    println!("✓ Governance domain configured");
-    println!("  Domain ID: {domain_id}");
-    println!("  Profile: cooperative_default (1-member-1-vote, 50% quorum)");
+    // Try to create the governance domain live if daemon is running
+    let gateway_url =
+        std::env::var("ICN_GATEWAY").unwrap_or_else(|_| "http://localhost:8080".to_string());
+    let mut domain_created_live = false;
+
+    // Check if daemon is running by hitting health endpoint
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    match http_client
+        .get(format!("{gateway_url}/v1/health"))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            println!("Step 4: Daemon detected, creating governance domain live...");
+
+            // Try to get a token if ICN_TOKEN is set
+            if let Ok(token) = std::env::var("ICN_TOKEN") {
+                let create_resp = http_client
+                    .post(format!("{gateway_url}/v1/gov/domains"))
+                    .bearer_auth(&token)
+                    .json(&serde_json::json!({
+                        "id": domain_id,
+                        "name": coop_name,
+                        "profile": "cooperative_default",
+                        "quorum_percent": 50,
+                        "approval_percent": 50,
+                        "voting_period_days": 7,
+                        "members": member_dids.iter().map(|d| d.to_string()).collect::<Vec<_>>()
+                    }))
+                    .send()
+                    .await;
+
+                match create_resp {
+                    Ok(r) if r.status().is_success() => {
+                        domain_created_live = true;
+                        println!("  Domain created via gateway API");
+                    }
+                    Ok(r) => {
+                        let status = r.status();
+                        let body = r.text().await.unwrap_or_default();
+                        println!("  Gateway domain creation returned {status}: {body}");
+                        println!("  Falling back to bootstrap file.");
+                    }
+                    Err(e) => {
+                        println!("  Gateway request failed: {e}");
+                        println!("  Falling back to bootstrap file.");
+                    }
+                }
+            } else {
+                println!("  No ICN_TOKEN set, skipping live domain creation.");
+                println!("  Set ICN_TOKEN to enable auto-setup.");
+            }
+        }
+        _ => {
+            println!("Step 4: Daemon not running, saving bootstrap file.");
+        }
+    }
+
+    if domain_created_live {
+        println!("  Domain ID: {domain_id}");
+        println!("  Profile: cooperative_default (1-member-1-vote, 50% quorum)");
+    } else {
+        println!("  Bootstrap file: {}", governance_setup_path.display());
+        println!("  Domain ID: {domain_id}");
+        println!("  Profile: cooperative_default (1-member-1-vote, 50% quorum)");
+    }
     println!();
 
     // Step 7: Create trust edges for initial members
@@ -6592,7 +6781,19 @@ token_expiry_hours = 24
     println!("════════════════════════════════════════");
     println!();
 
-    if no_start {
+    if domain_created_live {
+        println!("Governance domain created successfully via daemon.");
+        println!();
+        println!("To add more members later:");
+        println!("  icnctl gov domain add-member --domain-id {domain_id} --did <MEMBER_DID> --token <TOKEN>");
+        println!();
+        println!("To connect to federation peers:");
+        println!("  icnctl federation gateway-connect <HOST:PORT> --token <TOKEN>");
+        println!();
+        println!("Share the invite info with other members:");
+        println!("  Your DID: {my_did}");
+        println!("  Domain ID: {domain_id}");
+    } else if no_start {
         println!("Next steps:");
         println!();
         println!("  1. Edit configuration:");
@@ -6617,9 +6818,6 @@ token_expiry_hours = 24
         println!("     Your DID: {my_did}");
         println!("     Domain ID: {domain_id}");
     } else {
-        // TODO: Actually start the daemon
-        println!("Note: Automatic daemon start not yet implemented.");
-        println!();
         println!("To complete setup:");
         println!();
         println!("  1. Set JWT secret:");

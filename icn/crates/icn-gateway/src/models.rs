@@ -210,6 +210,30 @@ pub struct CreateDomainRequest {
     pub members: Vec<String>,    // List of member DIDs
 }
 
+/// Add a member to a governance domain
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AddDomainMemberRequest {
+    pub did: String,
+    /// Voting weight (reserved for future use, currently ignored)
+    #[serde(default = "default_weight")]
+    pub weight: f64,
+}
+
+fn default_weight() -> f64 {
+    1.0
+}
+
+/// Request to connect to a federation peer
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FederationConnectRequest {
+    /// Address of the peer to connect to (e.g., "node-b.local:9000")
+    pub address: String,
+    /// Optional cooperative ID to register the peer as
+    pub coop_id: Option<String>,
+    /// Optional human-readable name for the peer
+    pub name: Option<String>,
+}
+
 /// Create a new proposal
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateProposalRequest {

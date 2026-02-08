@@ -363,6 +363,58 @@ impl GovernanceManager {
         Ok(())
     }
 
+    /// Add or remove a member from a governance domain
+    ///
+    /// Only works for domains with static-list membership. For trust-based
+    /// membership domains, returns an error.
+    pub async fn update_domain_membership(
+        &self,
+        domain_id: GovernanceDomainId,
+        member: icn_identity::Did,
+        action: icn_governance::MembershipAction,
+    ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle
+                .update_domain_membership(domain_id, member, action)
+                .await;
+        }
+
+        // Standalone mode: in-memory storage
+        let mut domains = self.domains.write().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
+        let domain = domains
+            .get_mut(&domain_id)
+            .ok_or_else(|| anyhow::anyhow!("Domain '{}' not found", domain_id.0))?;
+
+        match &mut domain.config.membership.source {
+            MembershipSource::StaticList(members) => match action {
+                icn_governance::MembershipAction::Add => {
+                    if !members.contains(&member) {
+                        members.push(member);
+                    }
+                }
+                icn_governance::MembershipAction::Remove => {
+                    if let Some(pos) = members.iter().position(|m| m == &member) {
+                        members.remove(pos);
+                    }
+                }
+            },
+            MembershipSource::TrustThreshold(_) => {
+                anyhow::bail!(
+                    "Cannot modify members of trust-based membership domain '{}'. \
+                     Convert to static membership first.",
+                    domain_id.0
+                );
+            }
+        }
+
+        domain.updated_at = icn_time::current_timestamp_secs();
+        Ok(())
+    }
+
     /// Get a governance domain
     pub async fn get_domain(
         &self,
