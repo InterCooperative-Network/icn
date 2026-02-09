@@ -9,7 +9,7 @@ use tracing::{debug, error, info, warn};
 
 use super::DeadLetterQueue;
 use crate::dead_letter::{FailedOperation, FailureType};
-use icn_governance::{GovernanceProof, ProofOutcome, ProposalId};
+use icn_governance::{GovernanceProofV2, ProofOutcome, ProposalId};
 use icn_identity::Did;
 
 /// Validate that an amount is positive, handling DLQ and metrics on failure.
@@ -115,62 +115,69 @@ pub(super) fn validate_currency_match(
 /// The spend is authorized only when the proof is cryptographically valid and
 /// matches the exact accepted proposal outcome in the expected domain/time.
 fn validate_treasury_spend_proof(
-    proof: &GovernanceProof,
+    proof: &GovernanceProofV2,
     proposal_id: &ProposalId,
     domain_id: &str,
-    decided_at: u64,
 ) -> Result<(), String> {
-    if !proof.verify_binding() {
+    if !proof.verify_receipt() {
         return Err(format!(
-            "Invalid GovernanceProof binding for treasury spend proposal {}",
+            "Invalid GovernanceDecisionReceipt for treasury spend proposal {}",
             proposal_id.0
         ));
     }
 
-    if proof.proposal_id != proposal_id.0 {
+    if proof.receipt.proposal_id != proposal_id.0 {
         return Err(format!(
             "GovernanceProof proposal_id mismatch for treasury spend: expected {}, got {}",
-            proposal_id.0, proof.proposal_id
+            proposal_id.0, proof.receipt.proposal_id
         ));
     }
 
-    if proof.domain_id != domain_id {
+    if proof.receipt.domain_id != domain_id {
         return Err(format!(
             "GovernanceProof domain_id mismatch for treasury spend {}: expected {}, got {}",
-            proposal_id.0, domain_id, proof.domain_id
+            proposal_id.0, domain_id, proof.receipt.domain_id
         ));
     }
 
-    if proof.outcome != ProofOutcome::Accepted {
+    if proof.receipt.outcome != ProofOutcome::Accepted {
         return Err(format!(
             "GovernanceProof outcome must be accepted for treasury spend {} (got: {})",
-            proposal_id.0, proof.outcome
+            proposal_id.0, proof.receipt.outcome
         ));
     }
 
-    if proof.timestamp != decided_at {
+    if proof.attestations.is_empty() {
         return Err(format!(
-            "GovernanceProof timestamp mismatch for treasury spend {}: expected {}, got {}",
-            proposal_id.0, decided_at, proof.timestamp
-        ));
-    }
-
-    let verifying_key = proof
-        .signer_did
-        .parse::<Did>()
-        .and_then(|did| did.to_verifying_key())
-        .map_err(|e| {
-            format!(
-                "Unable to resolve GovernanceProof signer DID '{}' for treasury spend {}: {}",
-                proof.signer_did, proposal_id.0, e
-            )
-        })?;
-
-    if !proof.verify_signature(&verifying_key) {
-        return Err(format!(
-            "Invalid GovernanceProof signature for treasury spend proposal {}",
+            "Missing GovernanceDecisionAttestation for treasury spend proposal {}",
             proposal_id.0
         ));
+    }
+
+    for attestation in &proof.attestations {
+        if attestation.decision_hash != proof.receipt.decision_hash {
+            return Err(format!(
+                "GovernanceDecisionAttestation decision_hash mismatch for treasury spend proposal {}",
+                proposal_id.0
+            ));
+        }
+        let verifying_key = attestation
+            .signer_did
+            .parse::<Did>()
+            .and_then(|did| did.to_verifying_key())
+            .map_err(|e| {
+                format!(
+                    "Unable to resolve GovernanceDecisionAttestation signer DID '{}' for treasury spend {}: {}",
+                    attestation.signer_did, proposal_id.0, e
+                )
+            })?;
+
+        if !attestation.verify(&verifying_key) {
+            return Err(format!(
+                "Invalid GovernanceDecisionAttestation signature for treasury spend proposal {}",
+                proposal_id.0
+            ));
+        }
     }
 
     Ok(())
@@ -1725,6 +1732,38 @@ impl super::GovernanceEventHandler {
 
         tokio::spawn(async move {
             use icn_ledger::treasury::TreasuryOperation;
+            use std::time::Instant;
+
+            let start = Instant::now();
+            let audit_key = format!("gov:audit:treasury:spend:{}", proposal_id_clone.0);
+
+            // IDEMPOTENCY CHECK (must run before proof/nonce/audit side effects)
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury spend proposal {} already executed, skipping duplicate event",
+                        proposal_id_clone.0
+                    );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    let failed_op = FailedOperation::idempotency_check_failure(
+                        &proposal_id_clone.0,
+                        &e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    return;
+                }
+            }
 
             // --- Governance proof gate (fail-closed) ---
             let proof = match gov_handle.get_proof(&proposal_id_clone).await {
@@ -1795,12 +1834,9 @@ impl super::GovernanceEventHandler {
                 }
             };
 
-            if let Err(reason) = validate_treasury_spend_proof(
-                &proof,
-                &proposal_id_clone,
-                &domain_id_clone,
-                decided_at,
-            ) {
+            if let Err(reason) =
+                validate_treasury_spend_proof(&proof, &proposal_id_clone, &domain_id_clone)
+            {
                 error!("❌ {}", reason);
                 let failed_op = FailedOperation::new(
                     format!("treasury:spend:proof:{}", proposal_id_clone.0),
@@ -1926,37 +1962,6 @@ impl super::GovernanceEventHandler {
 
             // Perform the actual ledger transfer (inline from handle_budget_proposal logic)
             use icn_ledger::entry::JournalEntryBuilder;
-
-            let start = std::time::Instant::now();
-
-            // Idempotency check
-            let audit_key = format!("gov:audit:treasury:spend:{}", proposal_id_clone.0);
-            match store.get(audit_key.as_bytes()) {
-                Ok(Some(_)) => {
-                    debug!(
-                        "Treasury spend proposal {} already executed, skipping",
-                        proposal_id_clone.0
-                    );
-                    icn_obs::metrics::governance::idempotent_skips_inc();
-                    return;
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    error!(
-                        "🚨 Failed to check audit trail for spend proposal {}: {}",
-                        proposal_id_clone.0, e
-                    );
-                    let failed_op = FailedOperation::idempotency_check_failure(
-                        &proposal_id_clone.0,
-                        &e.to_string(),
-                    );
-                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
-                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                    }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
-                    return;
-                }
-            }
 
             let mut ledger_guard = ledger.write().await;
 
@@ -2521,11 +2526,14 @@ mod tests {
     use ed25519_dalek::SigningKey;
     // Keep the governance-path token count stable for the meaning-firewall
     // ratchet while treasury proof tests continue to evolve in icn-core.
-    use governance::{GovernanceProof, ProofOutcome, ProposalId, Vote, VoteChoice, VoteTally};
+    use governance::{
+        GovernanceDecisionAttestation, GovernanceDecisionReceipt, GovernanceProofV2, ProofOutcome,
+        ProposalId, Vote, VoteChoice, VoteTally,
+    };
     use icn_governance as governance;
     use icn_identity::KeyPair;
 
-    fn build_valid_proof() -> (ProposalId, String, u64, GovernanceProof) {
+    fn build_valid_proof() -> (ProposalId, String, u64, GovernanceProofV2) {
         let signer = KeyPair::generate().unwrap();
         let voter = KeyPair::generate().unwrap();
 
@@ -2536,18 +2544,21 @@ mod tests {
         let vote = Vote::new(proposal_id.clone(), voter.did().clone(), VoteChoice::For);
         let tally = VoteTally::new(1, 0, 0);
 
-        let mut proof = GovernanceProof::new(
+        let receipt = GovernanceDecisionReceipt::new(
             proposal_id.0.clone(),
             domain_id.clone(),
             ProofOutcome::Accepted,
             tally,
             &[vote],
-            decided_at,
-            signer.did().to_string(),
         );
-
         let signing_key = SigningKey::from_bytes(&signer.to_signing_key_bytes());
-        proof.sign(&signing_key);
+        let attestation = GovernanceDecisionAttestation::sign(
+            receipt.decision_hash,
+            signer.did().to_string(),
+            decided_at,
+            &signing_key,
+        );
+        let proof = GovernanceProofV2::new(receipt, vec![attestation]);
 
         (proposal_id, domain_id, decided_at, proof)
     }
@@ -2556,47 +2567,46 @@ mod tests {
     fn treasury_spend_proof_valid_passes() {
         let (proposal_id, domain_id, decided_at, proof) = build_valid_proof();
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        let _ = decided_at;
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
         assert!(result.is_ok(), "expected valid proof, got: {result:?}");
     }
 
     #[test]
     fn treasury_spend_proof_rejects_outcome_mismatch() {
         let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
-        proof.outcome = ProofOutcome::Rejected;
+        let _ = decided_at;
+        proof.receipt.outcome = ProofOutcome::Rejected;
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
         assert!(result.is_err());
     }
 
     #[test]
     fn treasury_spend_proof_rejects_domain_mismatch() {
         let (proposal_id, _domain_id, decided_at, proof) = build_valid_proof();
+        let _ = decided_at;
 
-        let result = validate_treasury_spend_proof(
-            &proof,
-            &proposal_id,
-            "coop:different-domain",
-            decided_at,
-        );
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, "coop:different-domain");
         assert!(result.is_err());
     }
 
     #[test]
-    fn treasury_spend_proof_rejects_timestamp_mismatch() {
-        let (proposal_id, domain_id, decided_at, proof) = build_valid_proof();
-
-        let result =
-            validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at + 1);
+    fn treasury_spend_proof_rejects_missing_attestation() {
+        let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
+        let _ = decided_at;
+        proof.attestations.clear();
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
         assert!(result.is_err());
     }
 
     #[test]
     fn treasury_spend_proof_rejects_bad_signature() {
         let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
-        proof.signature = vec![0xAA; 64];
+        let _ = decided_at;
+        proof.attestations[0].signature = vec![0xAA; 64];
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
         assert!(result.is_err());
     }
 }

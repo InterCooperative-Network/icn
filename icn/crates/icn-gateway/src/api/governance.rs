@@ -723,8 +723,8 @@ pub async fn get_proposal_proof(
         ))
     })?;
 
-    // Verify cryptographic binding before serving to clients
-    if !proof.verify_binding() {
+    // Verify canonical decision receipt before serving to clients
+    if !proof.verify_receipt() {
         tracing::warn!(
             "Invalid proof binding for proposal {} — not serving",
             proposal_id.0
