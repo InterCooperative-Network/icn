@@ -1,4 +1,4 @@
-.PHONY: up down restart logs clean status build demo
+.PHONY: up down restart logs clean status build demo test
 
 # Start the 3-node devnet
 up:
@@ -28,7 +28,7 @@ logs-b:
 logs-c:
 	docker-compose logs -f node-c
 
-# Clean all data volumes
+# Clean all data volumes (fresh identities on next up)
 clean: down
 	docker-compose down -v
 	@echo "All devnet data volumes removed"
@@ -38,14 +38,14 @@ status:
 	@echo "=== Node Status ==="
 	@docker-compose ps
 	@echo ""
-	@echo "=== Node A (localhost:7000) ==="
-	@curl -s http://localhost:8000/health || echo "Node A not ready"
+	@echo "=== Node A (localhost:8000) ==="
+	@curl -sf http://localhost:8000/v1/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  Not ready"
 	@echo ""
-	@echo "=== Node B (localhost:7001) ==="
-	@curl -s http://localhost:8001/health || echo "Node B not ready"
+	@echo "=== Node B (localhost:8001) ==="
+	@curl -sf http://localhost:8001/v1/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  Not ready"
 	@echo ""
-	@echo "=== Node C (localhost:7002) ==="
-	@curl -s http://localhost:8002/health || echo "Node C not ready"
+	@echo "=== Node C (localhost:8002) ==="
+	@curl -sf http://localhost:8002/v1/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  Not ready"
 
 # Rebuild images without cache
 build:
@@ -56,7 +56,7 @@ test:
 	@echo "Running devnet smoke tests..."
 	cd ../../icn && cargo test --test devnet_smoke -- --test-threads=1 --nocapture
 
-# Run the pilot demo (all three flows) against a running devnet
+# Run the comprehensive demo against node-a
 demo:
-	@echo "Running pilot demo flows..."
-	bash ../../scripts/demo-runner.sh
+	@echo "Running demo against devnet node-a..."
+	ICN_GATEWAY=http://localhost:8000 bash ../../scripts/demo-single-node.sh
