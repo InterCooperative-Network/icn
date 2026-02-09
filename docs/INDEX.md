@@ -16,6 +16,17 @@ Welcome to the ICN (Intercooperative Network) documentation! This index helps yo
 
 - [ai/CODEX_WORKFLOW.md](ai/CODEX_WORKFLOW.md) - Codex workflow aligned with ICN agent rules and routing
 
+### Current Project State
+**Location**: `docs/status/`
+
+- [status/PROJECT_STATE_2026-02-09.md](status/PROJECT_STATE_2026-02-09.md) - Code-derived snapshot of architecture, boundaries, CI posture, and known risks as of 2026-02-09
+
+### Boundary Hardening
+**Location**: `docs/ci/` and `docs/adr/`
+
+- [ci/GATE_RATCHET_PLAN.md](ci/GATE_RATCHET_PLAN.md) - CI check graduation schedule from observational to blocking
+- [adr/ADR-0010-app-topology.md](adr/ADR-0010-app-topology.md) - Canonical app-root decision and migration plan
+
 ### 🔐 Security Documentation
 **Location**: `docs/security/`
 
