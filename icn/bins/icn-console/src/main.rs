@@ -28,7 +28,7 @@ use std::time::Duration;
 #[command(about = "Interactive TUI console for ICN cooperative management")]
 struct Args {
     /// Gateway API endpoint
-    #[arg(short, long, default_value = "http://127.0.0.1:8080")]
+    #[arg(short, long, default_value = "http://127.0.0.1:8000")]
     gateway: String,
 
     /// Cooperative ID to manage
@@ -77,19 +77,17 @@ impl Tab {
 struct Member {
     did: String,
     role: String,
-    balance: f64,
-    joined_at: Option<u64>,
+    /// Per-currency balances (e.g. {"hours": 150, "USD": 5000})
+    balances: std::collections::HashMap<String, i64>,
 }
 
-/// Ledger transaction
+/// Ledger journal entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Transaction {
     id: String,
-    from: String,
-    to: String,
-    amount: f64,
-    currency: String,
-    memo: Option<String>,
+    author: String,
+    /// Display lines: "account: +credit / -debit currency"
+    entries: Vec<String>,
     timestamp: u64,
 }
 
@@ -99,10 +97,9 @@ struct Proposal {
     id: String,
     title: String,
     state: String,
-    votes_for: u32,
-    votes_against: u32,
-    votes_abstain: u32,
-    closes_at: Option<u64>,
+    votes_for: usize,
+    votes_against: usize,
+    votes_abstain: usize,
 }
 
 /// Trust edge
@@ -146,7 +143,7 @@ struct App {
     total_members: usize,
     total_balance: f64,
     active_proposals: usize,
-    network_peers: usize,
+    healthy_subsystems: usize,
 
     // Input mode for forms
     input_mode: InputMode,
@@ -184,7 +181,7 @@ impl App {
             total_members: 0,
             total_balance: 0.0,
             active_proposals: 0,
-            network_peers: 0,
+            healthy_subsystems: 0,
 
             input_mode: InputMode::Normal,
             input_buffer: String::new(),
@@ -331,10 +328,23 @@ impl App {
         // Try to fetch health/status first
         match self.fetch_health().await {
             Ok(health) => {
-                self.network_peers = health.network_peers;
+                // Count healthy subsystem checks
+                self.healthy_subsystems = health
+                    .checks
+                    .as_ref()
+                    .map(|c| c.values().filter(|v| v.status == "ok").count())
+                    .unwrap_or(0);
+                let version_str = if health.version.is_empty() {
+                    "?".to_string()
+                } else {
+                    health.version.clone()
+                };
                 self.status = format!(
-                    "Connected to {} | {} peers",
-                    self.gateway_url, health.network_peers
+                    "Connected to {} | v{} | {}/{} subsystems ok",
+                    self.gateway_url,
+                    version_str,
+                    self.healthy_subsystems,
+                    health.checks.as_ref().map(|c| c.len()).unwrap_or(0),
                 );
             }
             Err(e) => {
@@ -347,7 +357,12 @@ impl App {
         // Fetch members
         if let Ok(members) = self.fetch_members().await {
             self.total_members = members.len();
-            self.total_balance = members.iter().map(|m| m.balance).sum();
+            // Sum all balances across all currencies for dashboard display
+            self.total_balance = members
+                .iter()
+                .flat_map(|m| m.balances.values())
+                .map(|&v| v as f64)
+                .sum();
             self.members = members;
         }
 
@@ -369,10 +384,23 @@ impl App {
     }
 
     async fn fetch_health(&self) -> Result<HealthResponse> {
-        let url = format!("{}/v1/health", self.gateway_url);
-        let resp = self.client.get(&url).send().await?;
-        let health: HealthResponse = resp.json().await?;
-        Ok(health)
+        // Use /v1/health/detailed to get subsystem checks
+        let url = format!("{}/v1/health/detailed", self.gateway_url);
+        let resp = self.client.get(&url).send().await;
+
+        match resp {
+            Ok(r) if r.status().is_success() => {
+                let health: HealthResponse = r.json().await?;
+                Ok(health)
+            }
+            _ => {
+                // Fall back to basic health endpoint
+                let url = format!("{}/v1/health", self.gateway_url);
+                let resp = self.client.get(&url).send().await?;
+                let health: HealthResponse = resp.json().await?;
+                Ok(health)
+            }
+        }
     }
 
     fn auth_header(&self) -> Option<String> {
@@ -396,19 +424,21 @@ impl App {
         // Fetch balance for each member
         let mut members = Vec::new();
         for api_member in api_members {
-            let balance = self.fetch_balance(&api_member.did).await.unwrap_or(0.0);
+            let balances = self
+                .fetch_balance(&api_member.did)
+                .await
+                .unwrap_or_default();
             members.push(Member {
                 did: api_member.did,
                 role: api_member.role,
-                balance,
-                joined_at: None,
+                balances,
             });
         }
 
         Ok(members)
     }
 
-    async fn fetch_balance(&self, did: &str) -> Result<f64> {
+    async fn fetch_balance(&self, did: &str) -> Result<std::collections::HashMap<String, i64>> {
         let url = format!(
             "{}/v1/ledger/{}/balance/{}",
             self.gateway_url,
@@ -422,11 +452,11 @@ impl App {
 
         let resp = req.send().await?;
         if !resp.status().is_success() {
-            return Ok(0.0);
+            return Ok(std::collections::HashMap::new());
         }
 
         let balance: ApiBalance = resp.json().await?;
-        Ok(balance.balance)
+        Ok(balance.balances)
     }
 
     async fn fetch_transactions(&self) -> Result<Vec<Transaction>> {
@@ -448,14 +478,32 @@ impl App {
         let transactions = history
             .transactions
             .into_iter()
-            .map(|tx| Transaction {
-                id: tx.id,
-                from: tx.from,
-                to: tx.to,
-                amount: tx.amount,
-                currency: tx.currency,
-                memo: tx.memo,
-                timestamp: tx.timestamp,
+            .map(|tx| {
+                let entries: Vec<String> = tx
+                    .accounts
+                    .iter()
+                    .map(|acct| {
+                        let amount = if let Some(c) = acct.credit {
+                            format!("+{}", c)
+                        } else if let Some(d) = acct.debit {
+                            format!("-{}", d)
+                        } else {
+                            "0".to_string()
+                        };
+                        format!(
+                            "{}: {} {}",
+                            truncate_did(&acct.account_id),
+                            amount,
+                            acct.currency
+                        )
+                    })
+                    .collect();
+                Transaction {
+                    id: tx.id,
+                    author: tx.author,
+                    entries,
+                    timestamp: tx.timestamp,
+                }
             })
             .collect();
 
@@ -487,7 +535,6 @@ impl App {
                 votes_for: tally.for_votes,
                 votes_against: tally.against_votes,
                 votes_abstain: tally.abstain_votes,
-                closes_at: None,
             });
         }
 
@@ -514,22 +561,72 @@ impl App {
     }
 
     async fn fetch_trust(&self) -> Result<Vec<TrustRelation>> {
-        // Trust API endpoint not yet implemented in gateway
-        // Return empty for now
-        Ok(Vec::new())
+        // Need a DID to query trust edges — use first member's DID or skip
+        let did = if let Some(m) = self.members.first() {
+            &m.did
+        } else {
+            return Ok(Vec::new());
+        };
+
+        let url = format!(
+            "{}/v1/trust/{}/edges",
+            self.gateway_url,
+            urlencoding::encode(did)
+        );
+        let mut req = self.client.get(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.header("Authorization", auth);
+        }
+
+        let resp = req.send().await?;
+        if !resp.status().is_success() {
+            return Ok(Vec::new());
+        }
+
+        // Parse edge array — gateway returns [{from, to, score, labels?, ...}]
+        let edges: Vec<serde_json::Value> = resp.json().await?;
+        let relations = edges
+            .into_iter()
+            .filter_map(|edge| {
+                let target = edge.get("to")?.as_str()?.to_string();
+                let score = edge.get("score")?.as_f64()?;
+                let labels = edge
+                    .get("labels")
+                    .and_then(|l| l.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Some(TrustRelation {
+                    target,
+                    score,
+                    labels,
+                })
+            })
+            .collect();
+
+        Ok(relations)
     }
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct HealthResponse {
+    #[allow(dead_code)]
     status: String,
     #[serde(default)]
-    network_peers: usize,
+    version: String,
     #[serde(default)]
-    gossip_entries: usize,
+    checks: Option<std::collections::HashMap<String, ComponentHealth>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct ComponentHealth {
+    status: String,
     #[serde(default)]
-    ledger_entries: usize,
+    details: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -540,23 +637,37 @@ struct ApiMember {
 
 #[derive(Debug, Deserialize)]
 struct ApiBalance {
-    balance: f64,
+    #[allow(dead_code)]
+    did: Option<String>,
+    #[serde(default)]
+    balances: std::collections::HashMap<String, i64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ApiTransaction {
     id: String,
-    from: String,
-    to: String,
-    amount: f64,
-    currency: String,
-    memo: Option<String>,
+    #[serde(default)]
     timestamp: u64,
+    #[serde(default)]
+    author: String,
+    #[serde(default)]
+    accounts: Vec<ApiAccountDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiAccountDelta {
+    account_id: String,
+    currency: String,
+    debit: Option<i64>,
+    credit: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ApiHistory {
     transactions: Vec<ApiTransaction>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    pagination: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -572,11 +683,14 @@ struct ApiProposal {
 #[derive(Debug, Deserialize, Default)]
 struct ApiVoteTally {
     #[serde(default)]
-    for_votes: u32,
+    for_votes: usize,
     #[serde(default)]
-    against_votes: u32,
+    against_votes: usize,
     #[serde(default)]
-    abstain_votes: u32,
+    abstain_votes: usize,
+    #[serde(default)]
+    #[allow(dead_code)]
+    total_votes: usize,
 }
 
 fn main() -> Result<()> {
@@ -812,20 +926,20 @@ fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
     .block(Block::default().borders(Borders::ALL).title(" Proposals "));
     f.render_widget(proposals_stat, stats_chunks[2]);
 
-    // Network stat
-    let network_stat = Paragraph::new(vec![
+    // Subsystems stat
+    let subsys_stat = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            format!("{}", app.network_peers),
+            format!("{}", app.healthy_subsystems),
             Style::default()
                 .fg(Color::Magenta)
                 .add_modifier(Modifier::BOLD),
         )),
-        Line::from("network peers"),
+        Line::from("subsystems ok"),
     ])
     .alignment(ratatui::layout::Alignment::Center)
-    .block(Block::default().borders(Borders::ALL).title(" Network "));
-    f.render_widget(network_stat, stats_chunks[3]);
+    .block(Block::default().borders(Borders::ALL).title(" Health "));
+    f.render_widget(subsys_stat, stats_chunks[3]);
 
     // Recent activity
     let recent_items: Vec<ListItem> = app
@@ -833,13 +947,7 @@ fn render_dashboard(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .take(5)
         .map(|tx| {
-            let content = format!(
-                "{} -> {} : {} {}",
-                truncate_did(&tx.from),
-                truncate_did(&tx.to),
-                tx.amount,
-                tx.currency
-            );
+            let content = format!("{}: {}", truncate_did(&tx.author), tx.entries.join(" | "));
             ListItem::new(content)
         })
         .collect();
@@ -859,7 +967,21 @@ fn render_members(f: &mut Frame, app: &App, area: Rect) {
         .members
         .iter()
         .map(|m| {
-            let balance_style = if m.balance >= 0.0 {
+            // Format per-currency balances: "100 hours, 50 USD"
+            let balance_str = if m.balances.is_empty() {
+                "—".to_string()
+            } else {
+                let mut parts: Vec<String> = m
+                    .balances
+                    .iter()
+                    .map(|(cur, amt)| format!("{} {}", amt, cur))
+                    .collect();
+                parts.sort();
+                parts.join(", ")
+            };
+
+            let total: i64 = m.balances.values().sum();
+            let balance_style = if total >= 0 {
                 Style::default().fg(Color::Green)
             } else {
                 Style::default().fg(Color::Red)
@@ -868,7 +990,7 @@ fn render_members(f: &mut Frame, app: &App, area: Rect) {
             Row::new(vec![
                 Cell::from(truncate_did(&m.did)),
                 Cell::from(m.role.clone()),
-                Cell::from(format!("{:.1}", m.balance)).style(balance_style),
+                Cell::from(balance_str).style(balance_style),
             ])
         })
         .collect();
@@ -876,13 +998,13 @@ fn render_members(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
-            Constraint::Percentage(50),
-            Constraint::Percentage(25),
-            Constraint::Percentage(25),
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+            Constraint::Percentage(40),
         ],
     )
     .header(
-        Row::new(vec!["DID", "Role", "Balance"])
+        Row::new(vec!["DID", "Role", "Balances"])
             .style(Style::default().add_modifier(Modifier::BOLD))
             .bottom_margin(1),
     )
@@ -902,11 +1024,11 @@ fn render_ledger(f: &mut Frame, app: &App, area: Rect) {
         .transactions
         .iter()
         .map(|tx| {
+            let entries_str = tx.entries.join(" | ");
             Row::new(vec![
-                Cell::from(truncate_did(&tx.from)),
-                Cell::from(truncate_did(&tx.to)),
-                Cell::from(format!("{} {}", tx.amount, tx.currency)),
-                Cell::from(tx.memo.clone().unwrap_or_default()),
+                Cell::from(tx.id.chars().take(12).collect::<String>()),
+                Cell::from(truncate_did(&tx.author)),
+                Cell::from(entries_str),
             ])
         })
         .collect();
@@ -914,21 +1036,20 @@ fn render_ledger(f: &mut Frame, app: &App, area: Rect) {
     let table = Table::new(
         rows,
         [
+            Constraint::Percentage(15),
             Constraint::Percentage(25),
-            Constraint::Percentage(25),
-            Constraint::Percentage(20),
-            Constraint::Percentage(30),
+            Constraint::Percentage(60),
         ],
     )
     .header(
-        Row::new(vec!["From", "To", "Amount", "Memo"])
+        Row::new(vec!["ID", "Author", "Journal Entries"])
             .style(Style::default().add_modifier(Modifier::BOLD))
             .bottom_margin(1),
     )
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(" Transactions ({}) ", app.transactions.len())),
+            .title(format!(" Journal ({}) ", app.transactions.len())),
     )
     .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
