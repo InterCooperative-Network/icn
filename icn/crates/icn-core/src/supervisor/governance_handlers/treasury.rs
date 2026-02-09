@@ -118,6 +118,7 @@ fn validate_treasury_spend_proof(
     proof: &GovernanceProofV2,
     proposal_id: &ProposalId,
     domain_id: &str,
+    decided_at: u64,
 ) -> Result<(), String> {
     if !proof.verify_receipt() {
         return Err(format!(
@@ -176,6 +177,13 @@ fn validate_treasury_spend_proof(
             return Err(format!(
                 "Invalid GovernanceDecisionAttestation signature for treasury spend proposal {}",
                 proposal_id.0
+            ));
+        }
+
+        if attestation.timestamp != decided_at {
+            return Err(format!(
+                "GovernanceDecisionAttestation timestamp mismatch for treasury spend {}: expected {}, got {}",
+                proposal_id.0, decided_at, attestation.timestamp
             ));
         }
     }
@@ -1834,9 +1842,12 @@ impl super::GovernanceEventHandler {
                 }
             };
 
-            if let Err(reason) =
-                validate_treasury_spend_proof(&proof, &proposal_id_clone, &domain_id_clone)
-            {
+            if let Err(reason) = validate_treasury_spend_proof(
+                &proof,
+                &proposal_id_clone,
+                &domain_id_clone,
+                decided_at,
+            ) {
                 error!("❌ {}", reason);
                 let failed_op = FailedOperation::new(
                     format!("treasury:spend:proof:{}", proposal_id_clone.0),
@@ -2566,47 +2577,55 @@ mod tests {
     #[test]
     fn treasury_spend_proof_valid_passes() {
         let (proposal_id, domain_id, decided_at, proof) = build_valid_proof();
-
-        let _ = decided_at;
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
         assert!(result.is_ok(), "expected valid proof, got: {result:?}");
     }
 
     #[test]
     fn treasury_spend_proof_rejects_outcome_mismatch() {
         let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
-        let _ = decided_at;
         proof.receipt.outcome = ProofOutcome::Rejected;
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
         assert!(result.is_err());
     }
 
     #[test]
     fn treasury_spend_proof_rejects_domain_mismatch() {
         let (proposal_id, _domain_id, decided_at, proof) = build_valid_proof();
-        let _ = decided_at;
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, "coop:different-domain");
+        let result = validate_treasury_spend_proof(
+            &proof,
+            &proposal_id,
+            "coop:different-domain",
+            decided_at,
+        );
         assert!(result.is_err());
     }
 
     #[test]
     fn treasury_spend_proof_rejects_missing_attestation() {
         let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
-        let _ = decided_at;
         proof.attestations.clear();
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
         assert!(result.is_err());
     }
 
     #[test]
     fn treasury_spend_proof_rejects_bad_signature() {
         let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
-        let _ = decided_at;
         proof.attestations[0].signature = vec![0xAA; 64];
 
-        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id);
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn treasury_spend_proof_rejects_timestamp_mismatch() {
+        let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
+        proof.attestations[0].timestamp = decided_at + 1;
+
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
         assert!(result.is_err());
     }
 }

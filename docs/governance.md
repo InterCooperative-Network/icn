@@ -453,14 +453,16 @@ Treasury disbursements initiated by governance (`TreasuryProposalOperation::Spen
 **proof-gated** and **fail-closed** at execution time.
 
 Before any treasury spend mutates ledger state, the executor requires a valid
-`GovernanceProof` for the accepted proposal and verifies:
+`GovernanceProofV2` for the accepted proposal and verifies:
 
-- binding hash (`verify_binding()`)
-- signer signature (`verify_signature(...)`)
-- proposal identity (`proof.proposal_id`)
-- governance domain (`proof.domain_id`)
-- accepted outcome (`proof.outcome == accepted`)
-- decision timestamp consistency (`proof.timestamp == decided_at`)
+- canonical receipt binding (`proof.verify_receipt()`)
+- proposal identity (`proof.receipt.proposal_id`)
+- governance domain (`proof.receipt.domain_id`)
+- accepted outcome (`proof.receipt.outcome == accepted`)
+- at least one attestation is present
+- each attestation is bound to `receipt.decision_hash`
+- each signer DID resolves and each attestation signature verifies
+- decision timestamp consistency (`attestation.timestamp == decided_at`)
 
 If proof lookup or validation fails, spend execution is rejected, recorded in the
 dead-letter queue, and reported as a proposal execution failure event.

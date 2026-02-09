@@ -735,6 +735,52 @@ pub async fn get_proposal_proof(
         )));
     }
 
+    if proof.attestations.is_empty() {
+        tracing::warn!(
+            "Proof for proposal {} has no attestations — not serving",
+            proposal_id.0
+        );
+        return Err(crate::error::GatewayError::NotFound(format!(
+            "No valid proof found for proposal: {}",
+            proposal_id.0
+        )));
+    }
+
+    for attestation in &proof.attestations {
+        if attestation.decision_hash != proof.receipt.decision_hash {
+            tracing::warn!(
+                "Proof for proposal {} has mismatched attestation decision hash — not serving",
+                proposal_id.0
+            );
+            return Err(crate::error::GatewayError::NotFound(format!(
+                "No valid proof found for proposal: {}",
+                proposal_id.0
+            )));
+        }
+
+        let verifying_key = attestation
+            .signer_did
+            .parse::<Did>()
+            .and_then(|did| did.to_verifying_key())
+            .map_err(|_| {
+                crate::error::GatewayError::NotFound(format!(
+                    "No valid proof found for proposal: {}",
+                    proposal_id.0
+                ))
+            })?;
+
+        if !attestation.verify(&verifying_key) {
+            tracing::warn!(
+                "Proof for proposal {} has invalid attestation signature — not serving",
+                proposal_id.0
+            );
+            return Err(crate::error::GatewayError::NotFound(format!(
+                "No valid proof found for proposal: {}",
+                proposal_id.0
+            )));
+        }
+    }
+
     Ok(HttpResponse::Ok().json(proof))
 }
 
