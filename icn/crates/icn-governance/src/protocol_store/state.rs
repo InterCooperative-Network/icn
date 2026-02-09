@@ -236,7 +236,24 @@ impl SledParameterStore {
     /// Create a temporary in-memory store for testing
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
+        let base = std::env::var_os("ICN_TEST_TMPDIR")
+            .or_else(|| std::env::var_os("TMPDIR"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let unique = format!(
+            "icn-governance-protocol-store-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
+        let path = base.join(unique);
+        std::fs::create_dir_all(&path)
+            .map_err(|e| anyhow::anyhow!("Failed to create temp db directory {:?}: {e}", path))?;
+
         let db = sled::Config::new()
+            .path(&path)
             .temporary(true)
             .open()
             .map_err(|e| anyhow::anyhow!("Failed to open temp db: {e}"))?;

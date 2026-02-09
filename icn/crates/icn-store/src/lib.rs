@@ -602,7 +602,23 @@ impl SledStore {
 
     /// Create a temporary in-memory Sled database
     pub fn temporary() -> Result<Self> {
-        let db = sled::Config::new().temporary(true).open()?;
+        let base = std::env::var_os("ICN_TEST_TMPDIR")
+            .or_else(|| std::env::var_os("TMPDIR"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let unique = format!(
+            "icn-sled-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
+        let path = base.join(unique);
+        std::fs::create_dir_all(&path)
+            .with_context(|| format!("Failed to create temporary sled directory: {:?}", path))?;
+
+        let db = sled::Config::new().path(&path).temporary(true).open()?;
         Ok(SledStore { db })
     }
 
