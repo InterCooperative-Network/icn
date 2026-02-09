@@ -11,6 +11,11 @@ Welcome to the ICN (Intercooperative Network) documentation! This index helps yo
 - [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) - Community standards
 - [CLAUDE.md](../CLAUDE.md) - AI assistant guidance
 
+### 🤖 AI Workflow
+**Location**: `docs/ai/`
+
+- [ai/CODEX_WORKFLOW.md](ai/CODEX_WORKFLOW.md) - Codex workflow aligned with ICN agent rules and routing
+
 ### 🔐 Security Documentation
 **Location**: `docs/security/`
 
