@@ -159,31 +159,7 @@ impl NetworkHandle {
     /// temporary connection key. The peer's actual DID is learned during
     /// the Hello handshake and the connection map is updated accordingly.
     pub async fn dial_addr(&self, addr: SocketAddr) -> Result<Did> {
-        // Derive a deterministic placeholder key from the address using SHA-256.
-        // The resulting 32 bytes are used as an Ed25519 "public key" for connection
-        // tracking only — this is NOT a real key and will be replaced by the peer's
-        // actual DID after the Hello handshake.
-        use sha2::{Digest, Sha256};
-        let addr_hash = Sha256::digest(format!("bootstrap:{addr}").as_bytes());
-        let hash_bytes: [u8; 32] = addr_hash.into();
-        let temp_did = match ed25519_dalek::VerifyingKey::from_bytes(&hash_bytes) {
-            Ok(key) => Did::from_public_key(&key),
-            Err(_) => {
-                // SHA-256 output may not be a valid curve point; derive fallback
-                // candidates from the address hash so placeholder DIDs remain
-                // deterministic per address and avoid cross-address collisions.
-                let key = (0u32..=u32::MAX)
-                    .find_map(|counter| {
-                        let mut hasher = Sha256::new();
-                        hasher.update(hash_bytes);
-                        hasher.update(counter.to_be_bytes());
-                        let candidate: [u8; 32] = hasher.finalize().into();
-                        ed25519_dalek::VerifyingKey::from_bytes(&candidate).ok()
-                    })
-                    .context("failed to construct fallback verifying key for dial_addr")?;
-                Did::from_public_key(&key)
-            }
-        };
+        let temp_did = derive_placeholder_did(addr)?;
         self.dial(addr, temp_did.clone()).await?;
         Ok(temp_did)
     }
@@ -863,6 +839,34 @@ impl NetworkHandle {
     }
 }
 
+fn derive_placeholder_did(addr: SocketAddr) -> Result<Did> {
+    // Derive a deterministic placeholder key from the address using SHA-256.
+    // The resulting 32 bytes are used as an Ed25519 "public key" for connection
+    // tracking only — this is NOT a real key and will be replaced by the peer's
+    // actual DID after the Hello handshake.
+    use sha2::{Digest, Sha256};
+    let addr_hash = Sha256::digest(format!("bootstrap:{addr}").as_bytes());
+    let hash_bytes: [u8; 32] = addr_hash.into();
+    match ed25519_dalek::VerifyingKey::from_bytes(&hash_bytes) {
+        Ok(key) => Ok(Did::from_public_key(&key)),
+        Err(_) => {
+            // SHA-256 output may not be a valid curve point; derive fallback
+            // candidates from the address hash so placeholder DIDs remain
+            // deterministic per address and avoid cross-address collisions.
+            let key = (0u32..=u32::MAX)
+                .find_map(|counter| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(hash_bytes);
+                    hasher.update(counter.to_be_bytes());
+                    let candidate: [u8; 32] = hasher.finalize().into();
+                    ed25519_dalek::VerifyingKey::from_bytes(&candidate).ok()
+                })
+                .context("failed to construct fallback verifying key for dial_addr")?;
+            Ok(Did::from_public_key(&key))
+        }
+    }
+}
+
 /// Network actor state
 pub struct NetworkActor {
     discovery: Discovery,
@@ -1242,6 +1246,7 @@ impl NetworkActor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::{Digest, Sha256};
 
     #[tokio::test]
     async fn test_network_actor_start() {
@@ -1277,6 +1282,49 @@ mod tests {
 
         // Shutdown
         let _ = shutdown_tx.send(());
+    }
+
+    #[test]
+    fn test_derive_placeholder_did_is_deterministic_per_address() {
+        let a1: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let a2: SocketAddr = "127.0.0.1:8081".parse().unwrap();
+
+        let did1 = derive_placeholder_did(a1).unwrap();
+        let did1_again = derive_placeholder_did(a1).unwrap();
+        let did2 = derive_placeholder_did(a2).unwrap();
+
+        assert_eq!(
+            did1, did1_again,
+            "same address must map to same placeholder DID"
+        );
+        assert_ne!(
+            did1, did2,
+            "different addresses should map to different placeholder DIDs"
+        );
+    }
+
+    #[test]
+    fn test_derive_placeholder_did_handles_invalid_primary_key_bytes() {
+        // Find an address whose primary SHA-256 bytes are not a valid Ed25519 key,
+        // so the fallback path is exercised deterministically.
+        let mut fallback_addr: Option<SocketAddr> = None;
+        for port in 10_000u16..=65_535 {
+            let addr: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+            let digest = Sha256::digest(format!("bootstrap:{addr}").as_bytes());
+            let candidate: [u8; 32] = digest.into();
+            if ed25519_dalek::VerifyingKey::from_bytes(&candidate).is_err() {
+                fallback_addr = Some(addr);
+                break;
+            }
+        }
+
+        let addr = fallback_addr.expect("should find an address that requires fallback derivation");
+        let did = derive_placeholder_did(addr).unwrap();
+        let did_again = derive_placeholder_did(addr).unwrap();
+        assert_eq!(
+            did, did_again,
+            "fallback mapping should remain deterministic"
+        );
     }
 
     #[tokio::test]
