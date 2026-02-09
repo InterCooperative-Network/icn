@@ -39,9 +39,9 @@ impl MyActorHandle {
 ```
 
 ### Where to find examples
-- `icn-gossip/src/gossip.rs`: GossipActor
-- `icn-net/src/actor.rs`: NetworkActor
-- `icn-ledger/src/ledger.rs`: Ledger
+- `icn/crates/icn-gossip/src/gossip.rs`: GossipActor
+- `icn/crates/icn-net/src/actor.rs`: NetworkActor
+- `icn/crates/icn-ledger/src/ledger.rs`: Ledger
 
 ### Introduced in
 `path/phase-2-architecture/04-actors-and-concurrency.md` (Phase 2, Layer 04)
@@ -83,8 +83,8 @@ fn load_config(path: &Path) -> Result<Config> {
 ```
 
 ### Where to find examples
-- `icn-federation/src/error.rs`: Domain errors
-- `icn-core/src/runtime.rs`: Error propagation
+- `icn/crates/icn-federation/src/error.rs`: Domain errors
+- `icn/crates/icn-core/src/runtime.rs`: Error propagation
 
 ## Async Callbacks for Inter-Actor Communication
 
@@ -179,8 +179,8 @@ impl ConfigBuilder {
 ```
 
 ### Where to find examples
-- `icn-obs/src/otel.rs`: TracingConfig
-- `icn-core/src/config/`: Configuration builders
+- `icn/crates/icn-obs/src/otel.rs`: TracingConfig
+- `icn/crates/icn-core/src/config/`: Configuration builders
 
 ## Lifecycle State Machines
 
@@ -316,8 +316,8 @@ shutdown_tx.send(())?;
 ```
 
 ### Where to find examples
-- `icn-core/src/runtime.rs`: Shutdown channel setup
-- `icn-core/src/supervisor/init_federation.rs`: Shutdown receiver in tasks
+- `icn/crates/icn-core/src/runtime.rs`: Shutdown channel setup
+- `icn/crates/icn-core/src/supervisor/init_federation.rs`: Shutdown receiver in tasks
 
 ## Serialization with Postcard
 
@@ -353,16 +353,15 @@ The central architectural pattern: apps translate domain semantics into generic 
 
 ### Structure
 ```rust
-// In icn-kernel-api/src/authz.rs
+// In icn/crates/icn-kernel-api/src/authz.rs
 #[async_trait]
 pub trait PolicyOracle: Send + Sync {
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision;
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
 }
 
 pub struct PolicyRequest {
-    pub requester: Did,
-    pub operation: Operation,
-    pub resource: Option<ResourceId>,
+    pub core: PolicyRequestCore,
+    pub context: PolicyContext,
 }
 
 pub enum PolicyDecision {
@@ -372,15 +371,14 @@ pub enum PolicyDecision {
 
 pub struct ConstraintSet {
     pub rate_limit: Option<RateLimit>,
-    pub quota: Option<Quota>,
-    pub custom: HashMap<String, f64>,
+    pub custom: HashMap<String, ConstraintValue>,
 }
 
-// In apps/trust/src/oracle.rs
+// In icn/crates/icn-gateway/src/trust_mgr.rs
 impl PolicyOracle for TrustPolicyOracle {
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         // 1. Query domain-specific state
-        let trust_score = self.trust_graph.compute_trust(&request.requester)?;
+        let trust_score = self.trust_graph.compute_trust(request.actor(), request.actor());
         
         // 2. Translate to constraints (THIS IS THE FIREWALL BOUNDARY)
         let constraints = self.trust_score_to_constraints(trust_score);
@@ -402,10 +400,9 @@ fn trust_score_to_constraints(&self, score: f64) -> ConstraintSet {
 ```
 
 ### Where to find examples
-- `icn-kernel-api/src/authz.rs`: PolicyOracle trait definition
-- `apps/trust/src/oracle.rs`: Trust scores → rate limits
-- `apps/governance/src/oracle.rs`: Protocol parameters → quotas
-- `apps/ledger/src/oracle.rs`: Credit state → transaction limits
+- `icn/crates/icn-kernel-api/src/authz.rs`: PolicyOracle trait definition
+- `icn/crates/icn-gateway/src/trust_mgr.rs`: Trust scores → constraints
+- `icn/crates/icn-kernel-api/src/bootstrap.rs`: Oracle registry + domain routing
 
 ### Introduced in
 `path/phase-2-architecture/05-the-meaning-firewall.md` (Phase 2, Layer 05 — **KEYSTONE**)
@@ -459,8 +456,8 @@ impl Ledger {
 ```
 
 ### Where to find examples
-- `icn-ledger/src/ledger.rs`: Quarantine system (lines ~487-520, submit_entry)
-- `icn-core/src/dead_letter.rs`: DeadLetterQueue for failed operations
+- `icn/crates/icn-ledger/src/ledger.rs`: Quarantine system (submit_entry path)
+- `icn/crates/icn-core/src/dead_letter.rs`: DeadLetterQueue for failed operations
 
 ### Introduced in
 `path/phase-1-foundations/03-errors-and-tracing.md` (Phase 1, Layer 03)
@@ -479,7 +476,7 @@ Phase-aware bootstrap with atomic oracle replacement via ArcSwap.
 
 ### Structure
 ```rust
-// In icn-kernel-api/src/bootstrap.rs
+// In icn/crates/icn-kernel-api/src/bootstrap.rs
 pub struct OracleRegistry {
     oracles: Arc<DashMap<Domain, Arc<dyn PolicyOracle>>>,
     phase: Arc<ArcSwap<BootstrapPhase>>,
@@ -518,8 +515,8 @@ impl OracleRegistry {
 ```
 
 ### Where to find examples
-- `icn-kernel-api/src/bootstrap.rs`: OracleRegistry implementation
-- `icn-core/src/supervisor/mod.rs`: Oracle registration during startup
+- `icn/crates/icn-kernel-api/src/bootstrap.rs`: OracleRegistry implementation
+- `icn/crates/icn-core/src/supervisor/mod.rs`: Oracle registration during startup
 
 ### Introduced in
 `path/phase-2-architecture/05-the-meaning-firewall.md` (Phase 2, Layer 05)
@@ -602,8 +599,8 @@ if let Some(ref handle) = *gossip_handle_clone.read().await {
 ```
 
 ### Where to find examples
-- `icn-core/src/supervisor/init_gossip.rs`: Gossip handle holder
-- `icn-core/src/supervisor/init_network.rs`: Network handle holder
+- `icn/crates/icn-core/src/supervisor/init_gossip.rs`: Gossip handle holder
+- `icn/crates/icn-core/src/supervisor/init_network.rs`: Network handle holder
 
 ### Introduced in
 `path/phase-2-architecture/04-actors-and-concurrency.md` (Phase 2, Layer 04)

@@ -15,7 +15,7 @@ Trace a ledger payment flow from API request to gossip propagation, and understa
 how CCL contracts execute with capabilities.
 
 ## Prerequisites
-- Completed [Module 6: Ledger and CCL](../reference/module-06-ledger-ccl.md)
+- Completed [Module 6: Ledger and CCL](../reference/module-06-ledger-contracts.md)
 - ICN binaries built (`cargo build`)
 - Understanding of double-entry accounting basics
 
@@ -23,7 +23,7 @@ how CCL contracts execute with capabilities.
 3-4 hours
 
 ## Related Materials
-- [Module 6: Ledger and CCL](../reference/module-06-ledger-ccl.md) - Background reading
+- [Module 6: Ledger and CCL](../reference/module-06-ledger-contracts.md) - Background reading
 - [Workshop 5: Network and Gossip](./workshop-05-network-gossip.md) - How entries propagate
 - [Workshop 7: Gateway and SDK](./workshop-07-gateway-sdk.md) - API for ledger operations
 

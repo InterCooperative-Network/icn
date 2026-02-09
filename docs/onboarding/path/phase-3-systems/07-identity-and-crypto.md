@@ -12,7 +12,7 @@ ICN uses cryptography for **identity** (DIDs), **message integrity** (Ed25519 si
 
 ## What You'll Read
 
-### 1. DID Format: `icn-identity/src/lib.rs`
+### 1. DID Format: `icn/crates/icn-identity/src/lib.rs`
 
 DIDs (Decentralized Identifiers) are ICN's identity primitive:
 
@@ -34,7 +34,7 @@ impl Did {
 
 ### 2. Ed25519 Keys and Age-Encrypted Keystore
 
-**Files**: `icn-identity/src/keystore.rs`, `icn-identity/src/bundle.rs`
+**Files**: `icn/crates/icn-identity/src/keystore.rs`, `icn/crates/icn-identity/src/bundle.rs`
 
 ICN stores keys encrypted at rest using the `age` encryption format:
 
@@ -51,7 +51,7 @@ let loaded = IdentityBundle::load_encrypted(path, passphrase)?;
 
 **Keystore auto-migration**: v1 → v2 → v2.1 (adds TLS binding + X25519 keys)
 
-### 3. Post-Quantum Signing: `icn-crypto-pq/src/signature.rs`
+### 3. Post-Quantum Signing: `icn/crates/icn-crypto-pq/src/signature.rs`
 
 ICN uses **hybrid signatures** for quantum resistance:
 
@@ -66,7 +66,7 @@ pub struct HybridSignature {
 
 **Why hybrid**: Protects against future quantum computers while maintaining backwards compatibility.
 
-### 4. ReplayGuard: `icn-net/src/envelope.rs`
+### 4. ReplayGuard: `icn/crates/icn-net/src/envelope.rs`
 
 Prevents replay attacks using sequence numbers:
 
@@ -139,4 +139,4 @@ You've completed this layer when you can:
 
 → `reference/module-04-identity-trust.md` — Full identity, keystore, trust graph  
 → `reference/module-13-security-privacy.md` — Security patterns, threat model  
-→ `icn-crypto-pq/` — Post-quantum cryptography implementation
+→ `icn/crates/icn-crypto-pq/` — Post-quantum cryptography implementation

@@ -19,7 +19,7 @@ The **Meaning Firewall** is the boundary between these worlds. Understanding it 
 
 ## What You'll Read
 
-### 1. The Boundary Contract: `icn-kernel-api/src/authz.rs`
+### 1. The Boundary Contract: `icn/crates/icn-kernel-api/src/authz.rs`
 
 This file defines the **interface** between kernel and apps.
 
@@ -29,7 +29,7 @@ This file defines the **interface** between kernel and apps.
 #[async_trait]
 pub trait PolicyOracle: Send + Sync {
     /// Evaluate a policy request and return a decision.
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision;
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision;
 }
 ```
 
@@ -39,18 +39,14 @@ pub trait PolicyOracle: Send + Sync {
 
 ```rust
 pub struct PolicyRequest {
-    pub requester: Did,           // Who is requesting?
-    pub operation: Operation,      // What do they want to do?
-    pub resource: Option<ResourceId>,  // On what resource?
-    pub context: HashMap<String, String>,  // Any metadata
+    pub core: PolicyRequestCore,  // cacheable actor/action/domain tuple
+    pub context: PolicyContext,   // resource + metadata + optional capability
 }
 
-pub enum Operation {
-    ReadTrust,
-    WriteLedger,
-    SubmitProposal,
-    ExecuteTask,
-    Custom(String),
+pub struct PolicyRequestCore {
+    pub actor: Did,
+    pub action: ActionKind,
+    pub domain: Domain,
 }
 ```
 
@@ -66,9 +62,12 @@ pub enum PolicyDecision {
 
 pub struct ConstraintSet {
     pub rate_limit: Option<RateLimit>,
-    pub quota: Option<Quota>,
-    pub expiry: Option<Timestamp>,
-    pub custom: HashMap<String, f64>,
+    pub max_topics: Option<u32>,
+    pub max_message_size: Option<u64>,
+    pub max_connections: Option<u32>,
+    pub max_subscriptions: Option<u32>,
+    pub max_outstanding_requests: Option<u32>,
+    pub custom: HashMap<String, ConstraintValue>,
 }
 ```
 
@@ -94,15 +93,15 @@ From the doc comment (lines 18-24):
 
 Read these three files **in parallel** to see the pattern:
 
-#### **`apps/trust/src/oracle.rs` — Trust Scores → Rate Limits**
+#### **`icn/crates/icn-gateway/src/trust_mgr.rs` — Trust Scores → Rate Limits**
 
 ```rust
 impl PolicyOracle for TrustPolicyOracle {
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         // 1. Query domain-specific state
         let trust_score = self.trust_graph
             .read()
-            .compute_trust(&request.requester, &target)?;
+            .compute_trust(request.actor(), &target)?;
         
         // 2. Translate to constraints
         let constraints = self.trust_score_to_constraints(trust_score);
@@ -126,55 +125,32 @@ fn trust_score_to_constraints(&self, score: f64) -> ConstraintSet {
 
 **The firewall**: `trust_score_to_constraints()` is the exact point where domain meaning (trust scores) becomes kernel constraints (rate limits). The kernel never sees the trust score.
 
-#### **`apps/governance/src/oracle.rs` — Protocol Parameters → Quotas**
+#### **`icn/crates/icn-kernel-api/src/bootstrap.rs` — Domain Routing / Oracle Registry**
 
 ```rust
-impl PolicyOracle for GovernancePolicyOracle {
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision {
-        // 1. Query governance parameters
-        let param = self.params
-            .read()
-            .get_parameter("max_proposal_size")?;
-        
-        // 2. Translate to constraints
-        let constraints = ConstraintSet {
-            quota: Some(Quota {
-                max_size: param.value as usize,
-            }),
-            ..Default::default()
-        };
-        
-        // 3. Return generic decision
-        PolicyDecision::allow_with(constraints)
-    }
-}
+let decision = registry.evaluate(
+    Domain::governance(),
+    &PolicyRequest::new(actor.clone(), ActionKind::Write, Domain::governance()),
+);
 ```
 
-**The firewall**: The kernel enforces `max_size`, but has no idea it came from a governance vote. If governance changes the parameter, kernel enforcement automatically adapts.
+**The firewall**: Kernel routing is domain-aware, but decision semantics still stay in oracle implementations.
 
-#### **`apps/ledger/src/oracle.rs` — Credit State → Transaction Limits**
+#### **`icn/crates/icn-gateway/src/trust_mgr.rs` — Constraint Translation Example**
 
 ```rust
-impl PolicyOracle for LedgerPolicyOracle {
-    async fn evaluate(&self, request: PolicyRequest) -> PolicyDecision {
-        // 1. Query ledger state
-        let balance = self.ledger
-            .read()
-            .get_balance(&request.requester)?;
-        
-        let credit_limit = self.get_credit_limit(&request.requester)?;
-        
-        // 2. Translate to constraints
-        let max_amount = credit_limit - balance;
-        let constraints = ConstraintSet {
-            custom: HashMap::from([
-                ("max_transaction_amount".to_string(), max_amount as f64),
-            ]),
-            ..Default::default()
-        };
-        
-        // 3. Return generic decision
-        PolicyDecision::allow_with(constraints)
+fn trust_score_to_constraints(&self, score: f64) -> ConstraintSet {
+    ConstraintSet {
+        rate_limit: Some(RateLimit::new((score * 100.0) as u32, 25)),
+        max_connections: Some((score * 50.0) as u32),
+        ..Default::default()
+    }
+}
+
+impl PolicyOracle for TrustPolicyOracle {
+    fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
+        let trust_score = self.trust_graph.read().compute_trust(request.actor(), request.actor());
+        PolicyDecision::allow_with(self.trust_score_to_constraints(trust_score))
     }
 }
 ```
@@ -202,12 +178,13 @@ if trust_score < 0.5 {
 #### **✅ CORRECT: Oracle Translating Trust to Constraints**
 
 ```rust
-// In icn-net/src/actor.rs (CORRECT)
-let decision = self.policy_oracle.evaluate(PolicyRequest {
-    requester: peer_did,
-    operation: Operation::Custom("dial_peer".into()),
-    ..Default::default()
-}).await?;
+// In icn/crates/icn-net/src/actor.rs (CORRECT)
+let request = PolicyRequest::new(
+    peer_did.clone(),
+    ActionKind::custom("dial_peer"),
+    Domain::trust(),
+);
+let decision = self.policy_oracle.evaluate(&request);
 
 match decision {
     PolicyDecision::Allow { constraints } => {
@@ -224,7 +201,7 @@ match decision {
 
 **Why this preserves the firewall**: The kernel only sees `rate_limit` (generic). Trust policy can change without touching kernel code.
 
-### 4. Compile-Time Enforcement: `icn-core/src/meaning_firewall.rs`
+### 4. Compile-Time Enforcement: `icn/crates/icn-core/src/meaning_firewall.rs`
 
 This file contains **CI tests** that scan kernel crates for forbidden domain imports:
 
@@ -251,7 +228,7 @@ fn test_kernel_does_not_import_domain() {
 
 ### 5. The OracleRegistry: Phase-Aware Bootstrap
 
-**File**: `icn-kernel-api/src/bootstrap.rs`
+**File**: `icn/crates/icn-kernel-api/src/bootstrap.rs`
 
 The kernel needs oracles to start, but oracles depend on subsystems. The OracleRegistry solves this with **phased bootstrapping**:
 
@@ -297,17 +274,16 @@ registry.set_phase(BootstrapPhase::Running);
 
 3. **ComputeActor → PolicyOracle**: Request authorization  
    ```rust
-   let decision = self.oracle.evaluate(PolicyRequest {
-       requester: task.submitter,
-       operation: Operation::ExecuteTask,
-       context: HashMap::from([("task_type", "wasm")]),
-       ..Default::default()
-   }).await?;
+   let request = PolicyRequest::with_context(
+       PolicyRequestCore::new(task.submitter.clone(), ActionKind::Execute, Domain::trust()),
+       PolicyContext::new().with_metadata("task_type", "wasm"),
+   );
+   let decision = self.oracle.evaluate(&request);
    ```
 
 4. **TrustPolicyOracle**: Query trust graph  
    ```rust
-   let trust_score = self.trust_graph.compute_trust(&requester)?;
+   let trust_score = self.trust_graph.compute_trust(request.actor(), request.actor());
    ```
 
 5. **TrustPolicyOracle → Kernel**: Translate to constraints  
@@ -328,7 +304,7 @@ registry.set_phase(BootstrapPhase::Running);
    ```rust
    match decision {
        PolicyDecision::Allow { constraints } => {
-           self.rate_limiter.check(&requester, &constraints.rate_limit)?;
+           self.rate_limiter.check(request.actor(), &constraints.rate_limit)?;
            let max_cpu = constraints.custom.get("max_cpu_ms").unwrap();
            self.execute_task(task, *max_cpu as u64).await?;
        }
@@ -393,5 +369,5 @@ You've completed this layer when you can:
 
 → `reference/module-02-architecture-overview.md` — Full architecture with diagrams  
 → `docs/architecture/KERNEL_APP_SEPARATION.md` — Detailed firewall examples and anti-patterns  
-→ `icn-kernel-api/src/authz.rs` — Source of truth for the PolicyOracle interface  
-→ `icn-kernel-api/src/bootstrap.rs` — OracleRegistry implementation
+→ `icn/crates/icn-kernel-api/src/authz.rs` — Source of truth for the PolicyOracle interface  
+→ `icn/crates/icn-kernel-api/src/bootstrap.rs` — OracleRegistry implementation

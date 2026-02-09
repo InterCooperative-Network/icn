@@ -3,6 +3,12 @@
 ## Goal
 Prove the Meaning Firewall boundary by building kernel, domain, and oracle crates.
 
+> Note: Code snippets in this lab are intentionally simplified for learning.
+> When mapping back to ICN, use `icn/crates/icn-kernel-api/src/authz.rs` as
+> the source of truth (`PolicyRequestCore`, `PolicyContext`, sync
+> `PolicyOracle::evaluate(&PolicyRequest) -> PolicyDecision`, optional async
+> override).
+
 ## Structure
 ```
 lab-04-firewall-oracle/
@@ -154,7 +160,12 @@ This lab proves ICN's central design principle: **apps translate meaning into co
 
 If you understand this lab, you understand ICN's architecture.
 
+## Mapping to ICN
+- Lab `PolicyOracle::evaluate(&str)` maps to ICN `evaluate(&PolicyRequest)`.
+- Lab `ConstraintSet { rate_limit, quota }` maps to ICN `ConstraintSet` in `authz.rs`.
+- Lab `domain` crate maps to app/domain logic that translates semantics into kernel constraints.
+
 ## Resources
-- `icn-kernel-api/src/authz.rs`
-- `apps/trust/src/oracle.rs`
+- `icn/crates/icn-kernel-api/src/authz.rs`
+- `icn/crates/icn-gateway/src/trust_mgr.rs`
 - `docs/architecture/KERNEL_APP_SEPARATION.md`
