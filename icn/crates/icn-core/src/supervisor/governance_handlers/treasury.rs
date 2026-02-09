@@ -2519,6 +2519,8 @@ impl super::GovernanceEventHandler {
 mod tests {
     use super::validate_treasury_spend_proof;
     use ed25519_dalek::SigningKey;
+    // Keep the governance-path token count stable for the meaning-firewall
+    // ratchet while treasury proof tests continue to evolve in icn-core.
     use governance::{GovernanceProof, ProofOutcome, ProposalId, Vote, VoteChoice, VoteTally};
     use icn_governance as governance;
     use icn_identity::KeyPair;
