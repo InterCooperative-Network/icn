@@ -48,6 +48,14 @@ If a change might impact any invariant:
   - `web/pilot-ui/` (vanilla JS PWA)
   - `web/dashboard/` (static dashboard)
 
+## App topology rule (Hard)
+
+- Runtime-integrated app crates live under `icn/apps/`.
+- Do not add new runtime-integrated crates under top-level `apps/`.
+- If you touch a crate under `apps/`, you must either:
+  - migrate it to `icn/apps/`, or
+  - add a tracking issue that classifies it as an example/tool with a migration or removal date.
+
 ---
 
 ## Build / lint / test
