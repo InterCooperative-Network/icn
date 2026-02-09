@@ -12,7 +12,7 @@ Cooperatives need to change rules without breaking trust. ICN's governance syste
 
 ## What You'll Read
 
-### 1. Proposal Lifecycle: `icn-governance/src/proposal.rs`
+### 1. Proposal Lifecycle: `icn/crates/icn-governance/src/proposal.rs`
 
 ```rust
 pub enum ProposalState {
@@ -29,9 +29,9 @@ pub enum ProposalState {
 - Proposed → Terminated (vote fails or expires)
 - Active → Terminated (revoked by governance)
 
-**File**: `icn-governance/src/lifecycle.rs`
+**File**: `icn/crates/icn-governance/src/proposal.rs`
 
-### 2. Governance Proof: `icn-governance/src/proof.rs`
+### 2. Governance Proof: `icn/crates/icn-governance/src/proof.rs`
 
 Votes and outcomes are cryptographically verifiable:
 ```rust
@@ -43,7 +43,7 @@ pub struct GovernanceProof {
 }
 ```
 
-### 3. CCL Execution with Fuel Limits: `icn-ccl/src/interpreter.rs`
+### 3. CCL Execution with Fuel Limits: `icn/crates/icn-ccl/src/interpreter.rs`
 
 Contracts have bounded execution:
 ```rust
@@ -74,7 +74,7 @@ impl Interpreter {
 
 ### 4. Capability-Based Permissions
 
-**File**: `icn-ccl/src/capability.rs`
+**File**: `icn/crates/icn-ccl/src/types.rs`
 
 ```rust
 pub enum Capability {
@@ -87,7 +87,7 @@ pub enum Capability {
 
 Contracts declare required capabilities; runtime checks before execution.
 
-### 5. ProtocolParameterStore: `icn-governance/src/params.rs`
+### 5. ProtocolParameterStore: `icn/crates/icn-governance/src/protocol_store/state.rs`
 
 Parameters changed via governance:
 ```rust

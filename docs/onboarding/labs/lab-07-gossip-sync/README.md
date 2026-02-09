@@ -12,6 +12,10 @@ pub struct VectorClock {
 }
 
 impl VectorClock {
+    pub fn get(&self, node_id: &str) -> u64 {
+        *self.clocks.get(node_id).unwrap_or(&0)
+    }
+
     pub fn increment(&mut self, node_id: &str) {
         *self.clocks.entry(node_id.to_string()).or_insert(0) += 1;
     }
@@ -201,5 +205,5 @@ fn test_partition_healing() {
 
 ## Resources
 - `icn-gossip/src/vector_clock.rs`
-- `icn-gossip/src/gossip.rs` (anti-entropy logic)
+- `icn/crates/icn-gossip/src/gossip.rs` (anti-entropy logic)
 - [Vector Clock Wikipedia](https://en.wikipedia.org/wiki/Vector_clock)

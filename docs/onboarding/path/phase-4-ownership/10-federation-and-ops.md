@@ -12,7 +12,7 @@ Running ICN in production requires understanding **federation** (inter-cooperati
 
 ## What You'll Read
 
-### 1. Federation Agreement Lifecycle: `icn-federation/src/agreement.rs`
+### 1. Federation Agreement Lifecycle: `icn/crates/icn-federation/src/agreement/types.rs`
 
 Cooperatives form federation agreements:
 ```rust
@@ -25,9 +25,9 @@ pub enum AgreementState {
 }
 ```
 
-**File**: `icn-federation/src/lifecycle.rs`
+**File**: `icn/crates/icn-federation/src/agreement/manager.rs`
 
-### 2. Clearing and Netting: `icn-federation/src/clearing.rs`
+### 2. Clearing and Netting: `icn/crates/icn-federation/src/clearing.rs`
 
 Inter-cooperative credit settlement:
 - **Clearing**: Offsetting mutual debts
@@ -35,7 +35,7 @@ Inter-cooperative credit settlement:
 
 ### 3. Configuration Layering
 
-**Files**: `icn/bins/icnd/src/config.rs`, `icn-core/src/config.rs`
+**Files**: `icn/bins/icnd/src/config.rs`, `icn/crates/icn-core/src/config.rs`
 
 ```
 Default → File → Environment → CLI → Runtime
@@ -50,7 +50,7 @@ Production Kubernetes manifests:
 - ConfigMap for configuration
 - Secret for keystore passphrase
 
-### 5. Monitoring: `icn-obs/src/metrics.rs`
+### 5. Monitoring: `icn/crates/icn-obs/src/metrics.rs`
 
 Prometheus metrics exported at `/metrics`:
 - `gossip_entries_total`

@@ -14,7 +14,7 @@ ICN's ledger enforces double-entry accounting, credit limits, and fork detection
 
 ## What You'll Read
 
-### 1. The Ledger Validation Chain: `icn-ledger/src/ledger.rs`
+### 1. The Ledger Validation Chain: `icn/crates/icn-ledger/src/ledger.rs`
 
 **Function**: `validate_entry()` (lines ~487-520)
 
@@ -107,7 +107,7 @@ pub fn submit_entry(&mut self, entry: JournalEntry) -> Result<(), LedgerError> {
 
 ### 3. The Ledger Struct Composition
 
-**File**: `icn-ledger/src/ledger.rs` (struct definition, ~lines 50-80)
+**File**: `icn/crates/icn-ledger/src/ledger.rs` (struct definition, ~lines 50-80)
 
 ```rust
 pub struct Ledger {
@@ -129,7 +129,7 @@ pub struct Ledger {
 
 ### 4. Test Example: Dynamic Limit Integration
 
-**File**: `icn-ledger/tests/dynamic_limits_integration.rs`
+**File**: `icn/crates/icn-ledger/tests/dynamic_limits_integration.rs`
 
 **Test**: `test_credit_limit_enforcement_with_dynamic_manager`
 
@@ -251,5 +251,5 @@ You've completed this layer when you can:
 ## Deep Reference
 
 → `reference/module-06-ledger-contracts.md` — Full ledger design, Merkle-DAG, sync protocol  
-→ `icn-ledger/src/ledger.rs` — Source code for validation and quarantine  
-→ `icn-ledger/tests/dynamic_limits_integration.rs` — Example integration tests
+→ `icn/crates/icn-ledger/src/ledger.rs` — Source code for validation and quarantine  
+→ `icn/crates/icn-ledger/tests/dynamic_limits_integration.rs` — Example integration tests

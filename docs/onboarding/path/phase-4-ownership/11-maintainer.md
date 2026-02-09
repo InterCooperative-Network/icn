@@ -36,9 +36,9 @@ Maintainers make architectural decisions, review boundary-crossing PRs, and ment
 ### 3. Hot Path Analysis
 
 **Files to profile**:
-- `icn-gossip/src/gossip.rs` (message processing loop)
-- `icn-ledger/src/ledger.rs` (validation chain)
-- `icn-net/src/actor.rs` (network I/O)
+- `icn/crates/icn-gossip/src/gossip.rs` (message processing loop)
+- `icn/crates/icn-ledger/src/ledger.rs` (validation chain)
+- `icn/crates/icn-net/src/actor/mod.rs` (network I/O)
 
 **Tools**: `cargo flamegraph`, `perf`, `tokio-console`
 

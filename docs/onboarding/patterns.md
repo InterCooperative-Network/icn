@@ -40,7 +40,7 @@ impl MyActorHandle {
 
 ### Where to find examples
 - `icn/crates/icn-gossip/src/gossip.rs`: GossipActor
-- `icn/crates/icn-net/src/actor.rs`: NetworkActor
+- `icn/crates/icn-net/src/actor/mod.rs`: NetworkActor
 - `icn/crates/icn-ledger/src/ledger.rs`: Ledger
 
 ### Introduced in
@@ -109,8 +109,8 @@ impl MyActor {
 ```
 
 ### Where to find examples
-- `icn-gossip/src/gossip.rs`: Send callbacks
-- `icn-federation/src/gossip.rs`: GossipSendCallback
+- `icn/crates/icn-gossip/src/gossip.rs`: Send callbacks
+- `icn/crates/icn-federation/src/gossip.rs`: GossipSendCallback
 
 ## Store Abstraction for Persistence
 
@@ -143,7 +143,7 @@ fn make_key(id: &str) -> Vec<u8> {
 
 ### Where to find examples
 - `icn-store/src/lib.rs`: Store trait
-- `icn-federation/src/agreement/store.rs`: Namespaced storage
+- `icn/crates/icn-federation/src/agreement/store.rs`: Namespaced storage
 
 ## Builder Pattern for Complex Configuration
 
@@ -211,8 +211,8 @@ impl MyEntity {
 ```
 
 ### Where to find examples
-- `icn-federation/src/agreement/types.rs`: AgreementStatus
-- `icn-governance/src/proposal.rs`: ProposalStatus
+- `icn/crates/icn-federation/src/agreement/types.rs`: AgreementStatus
+- `icn/crates/icn-governance/src/proposal.rs`: ProposalStatus
 
 ## Metrics Integration
 
@@ -249,7 +249,7 @@ pub fn my_histogram_observe(value: f64) {
 
 ### Where to find examples
 - `icn-obs/src/metrics/`: All metric modules
-- `icn-federation/src/metrics.rs`: Federation metrics
+- `icn/crates/icn-federation/src/metrics.rs`: Federation metrics
 
 ## Trust-Gated Operations
 
@@ -343,7 +343,7 @@ let msg: Message = postcard::from_bytes(&bytes)?;
 
 ### Where to find examples
 - `icn-gossip/src/message.rs`: Gossip message encoding
-- `icn-federation/src/agreement/types.rs`: Agreement serialization
+- `icn/crates/icn-federation/src/agreement/types.rs`: Agreement serialization
 
 ---
 
@@ -558,8 +558,8 @@ impl Ledger {
 ```
 
 ### Where to find examples
-- `icn-ledger/src/ledger.rs`: `validate_entry()` function (lines ~487-520)
-- `icn-ledger/tests/dynamic_limits_integration.rs`: Tests proving invariants
+- `icn/crates/icn-ledger/src/ledger.rs`: `validate_entry()` function (lines ~487-520)
+- `icn/crates/icn-ledger/tests/dynamic_limits_integration.rs`: Tests proving invariants
 
 ### Introduced in
 `path/phase-2-architecture/06-persistence-and-ledger.md` (Phase 2, Layer 06)
@@ -666,8 +666,8 @@ impl Ledger {
 ```
 
 ### Where to find examples
-- `icn-ledger/src/ledger.rs`: Quarantine system
-- `icn-ledger/tests/dynamic_limits_integration.rs`: Quarantine tests
+- `icn/crates/icn-ledger/src/ledger.rs`: Quarantine system
+- `icn/crates/icn-ledger/tests/dynamic_limits_integration.rs`: Quarantine tests
 
 ### Introduced in
 `path/phase-2-architecture/06-persistence-and-ledger.md` (Phase 2, Layer 06)
