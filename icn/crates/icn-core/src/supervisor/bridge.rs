@@ -5,44 +5,61 @@
 //! - DNS resolution for peer addresses
 //! - End-to-end envelope encryption for gossip messages
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use icn_identity::Did;
 use std::net::SocketAddr;
 use tracing::debug;
 
-/// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@HOST:PORT
-/// Returns (DID, SocketAddr) on success
+/// Parsed bootstrap peer — either with a known DID or address-only
+/// (DID learned from QUIC/DID-TLS handshake).
+#[derive(Debug, Clone)]
+pub enum BootstrapPeer {
+    /// Full peer with known DID: `icn://did:icn:PUBKEY@HOST:PORT`
+    KnownDid { did: Did, addr: SocketAddr },
+    /// Address-only hint — DID learned from handshake: `icn://HOST:PORT`
+    AddrOnly { addr: SocketAddr },
+}
+
+/// Parse bootstrap peer URL.
 ///
-/// Supports both IP addresses and DNS hostnames. DNS resolution is performed
-/// asynchronously when needed.
-pub async fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
+/// Supported formats:
+/// - `icn://did:icn:PUBKEY@HOST:PORT` — verified peer (DID known)
+/// - `icn://HOST:PORT` — bootstrap hint (DID learned from handshake)
+///
+/// Supports both IP addresses and DNS hostnames.
+pub async fn parse_bootstrap_peer(url: &str) -> Result<BootstrapPeer> {
     // Check for icn:// prefix
-    let url = url
+    let body = url
         .strip_prefix("icn://")
         .context("Bootstrap peer URL must start with 'icn://'")?;
 
-    // Split on @ to get DID and address
-    let parts: Vec<&str> = url.split('@').collect();
-    if parts.len() != 2 {
-        bail!("Invalid bootstrap peer format, expected icn://DID@HOST:PORT");
-    }
+    // Check if it contains @ (DID@ADDR format)
+    if let Some(at_pos) = body.find('@') {
+        let did_str = &body[..at_pos];
+        let addr_str = &body[at_pos + 1..];
 
-    let did_str = parts[0];
-    let addr_str = parts[1];
+        // Parse DID
+        let did: Did = serde_json::from_value(serde_json::Value::String(did_str.to_string()))
+            .context("Failed to parse DID")?;
 
-    // Parse DID
-    let did: Did = serde_json::from_value(serde_json::Value::String(did_str.to_string()))
-        .context("Failed to parse DID")?;
+        // Resolve address
+        let addr = if let Ok(sock_addr) = addr_str.parse::<SocketAddr>() {
+            sock_addr
+        } else {
+            resolve_address(addr_str).await?
+        };
 
-    // Try to parse as direct IP:PORT first (fast path)
-    let addr = if let Ok(sock_addr) = addr_str.parse::<SocketAddr>() {
-        sock_addr
+        Ok(BootstrapPeer::KnownDid { did, addr })
     } else {
-        // Fall back to DNS resolution for hostname:port
-        resolve_address(addr_str).await?
-    };
+        // No @ — address-only bootstrap hint
+        let addr = if let Ok(sock_addr) = body.parse::<SocketAddr>() {
+            sock_addr
+        } else {
+            resolve_address(body).await?
+        };
 
-    Ok((did, addr))
+        Ok(BootstrapPeer::AddrOnly { addr })
+    }
 }
 
 /// Resolve a hostname:port string to a SocketAddr using DNS lookup.
@@ -184,9 +201,13 @@ mod tests {
         let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok());
 
-        let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), TEST_ALICE_DID);
-        assert_eq!(addr.to_string(), "203.0.113.50:7777");
+        match result.unwrap() {
+            BootstrapPeer::KnownDid { did, addr } => {
+                assert_eq!(did.as_str(), TEST_ALICE_DID);
+                assert_eq!(addr.to_string(), "203.0.113.50:7777");
+            }
+            other => panic!("Expected KnownDid, got: {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -195,9 +216,13 @@ mod tests {
         let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok());
 
-        let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), TEST_BOB_DID);
-        assert_eq!(addr.to_string(), "192.168.1.100:7777");
+        match result.unwrap() {
+            BootstrapPeer::KnownDid { did, addr } => {
+                assert_eq!(did.as_str(), TEST_BOB_DID);
+                assert_eq!(addr.to_string(), "192.168.1.100:7777");
+            }
+            other => panic!("Expected KnownDid, got: {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -212,14 +237,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_parse_bootstrap_peer_missing_at() {
-        let url = format!("icn://{TEST_ALICE_DID}_203.0.113.50:7777");
-        let result = parse_bootstrap_peer(&url).await;
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("expected icn://DID@HOST:PORT"));
+    async fn test_parse_bootstrap_peer_addr_only() {
+        // No @ sign means addr-only format
+        let url = "icn://203.0.113.50:7777";
+        let result = parse_bootstrap_peer(url).await;
+        assert!(result.is_ok());
+
+        match result.unwrap() {
+            BootstrapPeer::AddrOnly { addr } => {
+                assert_eq!(addr.to_string(), "203.0.113.50:7777");
+            }
+            other => panic!("Expected AddrOnly, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_addr_only_hostname() {
+        let url = "icn://localhost:7777";
+        let result = parse_bootstrap_peer(url).await;
+        assert!(result.is_ok(), "Failed to resolve localhost: {result:?}");
+
+        match result.unwrap() {
+            BootstrapPeer::AddrOnly { addr } => {
+                assert!(addr.ip().is_loopback());
+                assert_eq!(addr.port(), 7777);
+            }
+            other => panic!("Expected AddrOnly, got: {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -229,15 +273,18 @@ mod tests {
         let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok(), "Failed to resolve localhost: {result:?}");
 
-        let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), TEST_ALICE_DID);
-        // localhost typically resolves to 127.0.0.1 or ::1
-        assert!(
-            addr.ip().is_loopback(),
-            "Expected loopback address, got: {}",
-            addr.ip()
-        );
-        assert_eq!(addr.port(), 7777);
+        match result.unwrap() {
+            BootstrapPeer::KnownDid { did, addr } => {
+                assert_eq!(did.as_str(), TEST_ALICE_DID);
+                assert!(
+                    addr.ip().is_loopback(),
+                    "Expected loopback address, got: {}",
+                    addr.ip()
+                );
+                assert_eq!(addr.port(), 7777);
+            }
+            other => panic!("Expected KnownDid, got: {other:?}"),
+        }
     }
 
     #[tokio::test]
@@ -259,10 +306,14 @@ mod tests {
         let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok(), "Failed to parse IPv6 address: {result:?}");
 
-        let (did, addr) = result.unwrap();
-        assert_eq!(did.as_str(), TEST_ALICE_DID);
-        assert!(addr.ip().is_loopback());
-        assert_eq!(addr.port(), 7777);
+        match result.unwrap() {
+            BootstrapPeer::KnownDid { did, addr } => {
+                assert_eq!(did.as_str(), TEST_ALICE_DID);
+                assert!(addr.ip().is_loopback());
+                assert_eq!(addr.port(), 7777);
+            }
+            other => panic!("Expected KnownDid, got: {other:?}"),
+        }
     }
 
     #[tokio::test]

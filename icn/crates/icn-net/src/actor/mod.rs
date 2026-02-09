@@ -153,6 +153,34 @@ impl NetworkHandle {
         rx.await.context("Response channel closed")?
     }
 
+    /// Dial a peer by address only (DID learned from Hello handshake).
+    ///
+    /// Uses a deterministic placeholder DID derived from the address as a
+    /// temporary connection key. The peer's actual DID is learned during
+    /// the Hello handshake and the connection map is updated accordingly.
+    pub async fn dial_addr(&self, addr: SocketAddr) -> Result<Did> {
+        // Derive a deterministic placeholder key from the address using SHA-256.
+        // The resulting 32 bytes are used as an Ed25519 "public key" for connection
+        // tracking only — this is NOT a real key and will be replaced by the peer's
+        // actual DID after the Hello handshake.
+        use sha2::{Digest, Sha256};
+        let addr_hash = Sha256::digest(format!("bootstrap:{addr}").as_bytes());
+        let hash_bytes: [u8; 32] = addr_hash.into();
+        let temp_did = match ed25519_dalek::VerifyingKey::from_bytes(&hash_bytes) {
+            Ok(key) => Did::from_public_key(&key),
+            Err(_) => {
+                // SHA-256 output may not be a valid curve point; use addr string as-is
+                // This creates a DID that passes structural validation
+                let fallback = [1u8; 32];
+                let key = ed25519_dalek::VerifyingKey::from_bytes(&fallback)
+                    .expect("non-zero bytes should produce valid key");
+                Did::from_public_key(&key)
+            }
+        };
+        self.dial(addr, temp_did.clone()).await?;
+        Ok(temp_did)
+    }
+
     /// Send a network message to a specific peer
     #[instrument(skip(self, message), fields(recipient = %did))]
     pub async fn send_message(&self, did: Did, message: NetworkMessage) -> Result<()> {

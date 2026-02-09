@@ -35,6 +35,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /build/target/release/icnd /usr/local/bin/
 COPY --from=builder /build/target/release/icnctl /usr/local/bin/
 
+# Copy devnet entrypoint script
+COPY deploy/devnet/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Create data directory
 RUN mkdir -p /root/.icn
 
