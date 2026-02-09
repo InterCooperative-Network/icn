@@ -13,7 +13,7 @@ Connect governance concepts to the implementation and understand how CCL
 enforces cooperative policy decisions.
 
 ## Prerequisites
-- Completed [Module 14: Governance and CCL](../modules/module-14-governance-ccl-deep-dive.md)
+- Completed [Module 14: Governance and CCL](../reference/module-14-governance-ccl-deep-dive.md)
 - Familiarity with Module 6 (Ledger and Contracts)
 
 ## Estimated time

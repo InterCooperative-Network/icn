@@ -15,7 +15,7 @@ Deploy ICN locally using Docker or native binaries, verify health endpoints,
 explore Prometheus metrics, and understand logging and tracing.
 
 ## Prerequisites
-- Completed [Module 9: Operations](../modules/module-09-ops.md)
+- Completed [Module 9: Operations](../reference/module-09-ops.md)
 - Docker installed (for container deployment) or Rust toolchain (for native)
 - curl and jq installed
 
@@ -23,7 +23,7 @@ explore Prometheus metrics, and understand logging and tracing.
 2-3 hours
 
 ## Related Materials
-- [Module 9: Operations](../modules/module-09-ops.md) - Background reading
+- [Module 9: Operations](../reference/module-09-ops.md) - Background reading
 - [HOMELAB_DEPLOYMENT.md](../../HOMELAB_DEPLOYMENT.md) - K3s production deployment
 - [production-hardening.md](../../production-hardening.md) - Security hardening
 

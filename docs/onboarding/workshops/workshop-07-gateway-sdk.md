@@ -15,7 +15,7 @@ Authenticate against the ICN gateway API, understand the challenge-response flow
 and use the TypeScript SDK to interact with the ledger.
 
 ## Prerequisites
-- Completed [Module 7: Gateway and SDK](../modules/module-07-gateway-sdk.md)
+- Completed [Module 7: Gateway and SDK](../reference/module-07-gateway-sdk.md)
 - ICN daemon running (`icnd`)
 - Node.js 18+ installed (for SDK exercises)
 
@@ -23,7 +23,7 @@ and use the TypeScript SDK to interact with the ledger.
 2-3 hours
 
 ## Related Materials
-- [Module 7: Gateway and SDK](../modules/module-07-gateway-sdk.md) - Background reading
+- [Module 7: Gateway and SDK](../reference/module-07-gateway-sdk.md) - Background reading
 - [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Ledger operations
 - [TypeScript SDK README](../../sdk/typescript/README.md) - SDK reference (if available)
 

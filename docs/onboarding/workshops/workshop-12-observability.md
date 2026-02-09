@@ -13,7 +13,7 @@ Build a mental model of how ICN observes itself and how operators diagnose
 issues using metrics, tracing, and logs.
 
 ## Prerequisites
-- Completed [Module 12: Observability](../modules/module-12-observability.md)
+- Completed [Module 12: Observability](../reference/module-12-observability.md)
 - Familiarity with Module 9 (Operations)
 
 ## Estimated time

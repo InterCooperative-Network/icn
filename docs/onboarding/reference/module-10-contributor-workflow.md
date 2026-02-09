@@ -720,7 +720,7 @@ Update documentation when you:
 |------|----------|
 | Architecture | `docs/ARCHITECTURE.md` |
 | API reference | Code doc comments + OpenAPI |
-| Onboarding | `docs/onboarding/modules/` |
+| Onboarding | `docs/onboarding/reference/` |
 | Deployment | `deploy/README.md`, `docs/HOMELAB_DEPLOYMENT.md` |
 | Security | `docs/security/`, `docs/production-hardening.md` |
 | Changelog | `CHANGELOG.md` |
@@ -734,7 +734,7 @@ If your change affects concepts taught in onboarding:
 grep -r "your_feature" docs/onboarding/
 
 # 2. Update affected modules
-edit docs/onboarding/modules/module-XX-topic.md
+edit docs/onboarding/reference/module-XX-topic.md
 
 # 3. Follow the update process
 cat docs/onboarding/update-process.md

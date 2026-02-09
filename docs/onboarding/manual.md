@@ -90,7 +90,7 @@ Layering isolates concerns and keeps reasoning local:
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-02-architecture-overview.md`
+- `docs/onboarding/reference/module-02-architecture-overview.md`
 - `docs/ARCHITECTURE.md`
 - `docs/architecture/ARCHITECTURE_MAP.md`
 
@@ -127,7 +127,7 @@ Identity and trust turn anonymous peers into accountable collaborators.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-04-identity-trust.md`
+- `docs/onboarding/reference/module-04-identity-trust.md`
 - `icn/crates/icn-identity/`
 - `icn/crates/icn-trust/`
 
@@ -164,7 +164,7 @@ ICN favors eventual consistency with strong identity and trust guarantees.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-05-network-gossip.md`
+- `docs/onboarding/reference/module-05-network-gossip.md`
 - `icn/crates/icn-net/`
 - `icn/crates/icn-gossip/`
 
@@ -195,7 +195,7 @@ The ledger encodes cooperative economics; contracts encode cooperative rules.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-06-ledger-contracts.md`
+- `docs/onboarding/reference/module-06-ledger-contracts.md`
 - `icn/crates/icn-ledger/`
 - `icn/crates/icn-ccl/`
 
@@ -221,7 +221,7 @@ Governance is how communities change rules without breaking trust.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-14-governance-ccl-deep-dive.md`
+- `docs/onboarding/reference/module-14-governance-ccl-deep-dive.md`
 - `icn/crates/icn-governance/`
 - `docs/governance-primitives.md`
 
@@ -249,8 +249,8 @@ These layers provide application access and user interfaces.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-07-gateway-sdk.md`
-- `docs/onboarding/modules/module-08-web-ui.md`
+- `docs/onboarding/reference/module-07-gateway-sdk.md`
+- `docs/onboarding/reference/module-08-web-ui.md`
 - `icn/crates/icn-gateway/`
 - `sdk/typescript/`
 - `web/pilot-ui/`
@@ -282,8 +282,8 @@ ICN must be observable and secure under real-world conditions.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-12-observability.md`
-- `docs/onboarding/modules/module-13-security-privacy.md`
+- `docs/onboarding/reference/module-12-observability.md`
+- `docs/onboarding/reference/module-13-security-privacy.md`
 - `icn/crates/icn-obs/`
 - `icn/crates/icn-security/`
 - `icn/crates/icn-privacy/`
@@ -314,8 +314,8 @@ ICN is designed to run in production and across cooperative boundaries.
 
 ### Explore the Code
 
-- `docs/onboarding/modules/module-09-ops-deploy.md`
-- `docs/onboarding/modules/module-11-federation.md`
+- `docs/onboarding/reference/module-09-ops-deploy.md`
+- `docs/onboarding/reference/module-11-federation.md`
 - `icn/crates/icn-federation/`
 - `deploy/`
 
@@ -323,8 +323,8 @@ ICN is designed to run in production and across cooperative boundaries.
 
 If you are new to the codebase or Rust, use these modules as references:
 
-- `docs/onboarding/modules/module-00-setup.md`
-- `docs/onboarding/modules/module-01-rust-fundamentals.md`
+- `docs/onboarding/reference/module-00-setup.md`
+- `docs/onboarding/reference/module-01-rust-fundamentals.md`
 
 ## Glossary (Abbreviated)
 
