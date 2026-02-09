@@ -1,3 +1,10 @@
+---
+name: icn-orchestrator
+description: Route and decompose ICN work across subsystems with explicit invariants, task boundaries, verification commands, and merge order.
+metadata:
+  short-description: ICN task router
+---
+
 # ICN Orchestrator Skill (Codex)
 
 Use this skill when a request may touch more than one ICN subsystem.

@@ -1,3 +1,10 @@
+---
+name: icn-shipping
+description: Prepare ICN branches for merge with required checks, doc/spec sync, clean git hygiene, and high-quality PR metadata.
+metadata:
+  short-description: ICN ship checklist
+---
+
 # ICN Shipping Skill (Codex)
 
 Use this skill when preparing a branch for merge.
