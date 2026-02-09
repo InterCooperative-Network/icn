@@ -68,5 +68,9 @@ reqwest.workspace = true
 # Enable test-util for time mocking in integration tests
 tokio = { version = "1.49", features = ["test-util"] }
 
+[features]
+default = []
+wasm = ["icn-compute/wasm"]
+
 [lints]
 workspace = true

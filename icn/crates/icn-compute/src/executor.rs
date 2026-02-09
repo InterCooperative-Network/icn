@@ -55,6 +55,9 @@ pub struct LocalExecutor {
     capabilities: Vec<ExecutorCapability>,
     /// Optional contract resolver for CclRef resolution
     contract_resolver: Option<ContractResolverCallback>,
+    /// Optional WASM executor for WasmRef/WasmInline tasks
+    #[cfg(feature = "wasm")]
+    wasm_executor: Option<Arc<crate::wasm_executor::WasmExecutor>>,
 }
 
 impl LocalExecutor {
@@ -63,12 +66,24 @@ impl LocalExecutor {
         Self {
             capabilities: vec![ExecutorCapability::Ccl],
             contract_resolver: None,
+            #[cfg(feature = "wasm")]
+            wasm_executor: None,
         }
     }
 
     /// Set the contract resolver callback for CclRef resolution
     pub fn set_contract_resolver(&mut self, resolver: ContractResolverCallback) {
         self.contract_resolver = Some(resolver);
+    }
+
+    /// Set the WASM executor for WasmRef/WasmInline tasks
+    #[cfg(feature = "wasm")]
+    pub fn set_wasm_executor(&mut self, executor: Arc<crate::wasm_executor::WasmExecutor>) {
+        // Add Wasm capability when executor is set
+        if !self.capabilities.contains(&ExecutorCapability::Wasm) {
+            self.capabilities.push(ExecutorCapability::Wasm);
+        }
+        self.wasm_executor = Some(executor);
     }
 
     /// Execute a CCL contract with a specific rule
@@ -337,7 +352,21 @@ impl Executor for LocalExecutor {
                 }
             }
             TaskCode::WasmRef(_) | TaskCode::WasmInline(_) => {
-                ExecutionOutcome::Failed("WASM not yet supported".into())
+                #[cfg(feature = "wasm")]
+                {
+                    if let Some(ref wasm_exec) = self.wasm_executor {
+                        return wasm_exec.execute(task, ctx);
+                    }
+                    ExecutionOutcome::Failed(
+                        "WASM executor not configured. Registry may not be initialized.".into(),
+                    )
+                }
+                #[cfg(not(feature = "wasm"))]
+                {
+                    ExecutionOutcome::Failed(
+                        "WASM support not enabled. Rebuild with --features wasm".into(),
+                    )
+                }
             }
         }
     }
