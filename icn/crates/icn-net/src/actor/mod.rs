@@ -169,11 +169,15 @@ impl NetworkHandle {
         let temp_did = match ed25519_dalek::VerifyingKey::from_bytes(&hash_bytes) {
             Ok(key) => Did::from_public_key(&key),
             Err(_) => {
-                // SHA-256 output may not be a valid curve point; use addr string as-is
-                // This creates a DID that passes structural validation
-                let fallback = [1u8; 32];
-                let key = ed25519_dalek::VerifyingKey::from_bytes(&fallback)
-                    .expect("non-zero bytes should produce valid key");
+                // SHA-256 output may not be a valid curve point; deterministically
+                // search a small fallback keyspace for a valid Ed25519 key.
+                let mut fallback = [0u8; 32];
+                let key = (1u8..=u8::MAX)
+                    .find_map(|i| {
+                        fallback[0] = i;
+                        ed25519_dalek::VerifyingKey::from_bytes(&fallback).ok()
+                    })
+                    .context("failed to construct fallback verifying key for dial_addr")?;
                 Did::from_public_key(&key)
             }
         };

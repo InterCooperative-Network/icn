@@ -9,7 +9,7 @@ use tracing::{debug, error, info, warn};
 
 use super::DeadLetterQueue;
 use crate::dead_letter::{FailedOperation, FailureType};
-use icn_governance::ProposalId;
+use icn_governance::{GovernanceProof, ProofOutcome, ProposalId};
 use icn_identity::Did;
 
 /// Validate that an amount is positive, handling DLQ and metrics on failure.
@@ -110,6 +110,72 @@ pub(super) fn validate_currency_match(
     true
 }
 
+/// Validate governance proof for treasury spend execution.
+///
+/// The spend is authorized only when the proof is cryptographically valid and
+/// matches the exact accepted proposal outcome in the expected domain/time.
+fn validate_treasury_spend_proof(
+    proof: &GovernanceProof,
+    proposal_id: &ProposalId,
+    domain_id: &str,
+    decided_at: u64,
+) -> Result<(), String> {
+    if !proof.verify_binding() {
+        return Err(format!(
+            "Invalid GovernanceProof binding for treasury spend proposal {}",
+            proposal_id.0
+        ));
+    }
+
+    if proof.proposal_id != proposal_id.0 {
+        return Err(format!(
+            "GovernanceProof proposal_id mismatch for treasury spend: expected {}, got {}",
+            proposal_id.0, proof.proposal_id
+        ));
+    }
+
+    if proof.domain_id != domain_id {
+        return Err(format!(
+            "GovernanceProof domain_id mismatch for treasury spend {}: expected {}, got {}",
+            proposal_id.0, domain_id, proof.domain_id
+        ));
+    }
+
+    if proof.outcome != ProofOutcome::Accepted {
+        return Err(format!(
+            "GovernanceProof outcome must be accepted for treasury spend {} (got: {})",
+            proposal_id.0, proof.outcome
+        ));
+    }
+
+    if proof.timestamp != decided_at {
+        return Err(format!(
+            "GovernanceProof timestamp mismatch for treasury spend {}: expected {}, got {}",
+            proposal_id.0, decided_at, proof.timestamp
+        ));
+    }
+
+    let verifying_key = proof
+        .signer_did
+        .parse::<Did>()
+        .and_then(|did| did.to_verifying_key())
+        .map_err(|e| {
+            format!(
+                "Unable to resolve GovernanceProof signer DID '{}' for treasury spend {}: {}",
+                proof.signer_did, proposal_id.0, e
+            )
+        })?;
+
+    if !proof.verify_signature(&verifying_key) {
+        return Err(format!(
+            "Invalid GovernanceProof signature for treasury spend proposal {}",
+            proposal_id.0
+        ));
+    }
+
+    Ok(())
+}
+
 impl super::GovernanceEventHandler {
     /// Handle a treasury proposal
     pub(super) fn handle_treasury_proposal(
@@ -117,6 +183,7 @@ impl super::GovernanceEventHandler {
         proposal_id: ProposalId,
         operation: icn_governance::TreasuryProposalOperation,
         decided_at: u64,
+        domain_id: String,
     ) {
         use icn_governance::TreasuryProposalOperation;
 
@@ -232,7 +299,15 @@ impl super::GovernanceEventHandler {
                 memo,
                 nonce,
             } => {
-                self.handle_treasury_spend(proposal_id, amount, recipient, memo, nonce, decided_at);
+                self.handle_treasury_spend(
+                    proposal_id,
+                    amount,
+                    recipient,
+                    memo,
+                    nonce,
+                    decided_at,
+                    domain_id,
+                );
             }
         }
     }
@@ -1566,6 +1641,7 @@ impl super::GovernanceEventHandler {
         memo: String,
         nonce: u64,
         decided_at: u64,
+        domain_id: String,
     ) {
         info!(
             "🏦 Executing treasury spend for proposal {}: {} to {} ({})",
@@ -1643,9 +1719,114 @@ impl super::GovernanceEventHandler {
         let recipient_clone = recipient.clone();
         let memo_clone = memo.clone();
         let coop_store = self.coop_store.clone();
+        let gov_handle = self.gov_handle.clone();
+        let event_bus = self.event_bus.clone();
+        let domain_id_clone = domain_id.clone();
 
         tokio::spawn(async move {
             use icn_ledger::treasury::TreasuryOperation;
+
+            // --- Governance proof gate (fail-closed) ---
+            let proof = match gov_handle.get_proof(&proposal_id_clone).await {
+                Ok(Some(proof)) => proof,
+                Ok(None) => {
+                    let reason = format!(
+                        "Missing GovernanceProof for treasury spend proposal {}",
+                        proposal_id_clone.0
+                    );
+                    error!("❌ {}", reason);
+
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:spend:proof:{}", proposal_id_clone.0),
+                        FailureType::GovernanceExecutionFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id_clone.0,
+                            "domain_id": domain_id_clone.clone(),
+                            "error": "missing_proof",
+                        }),
+                        reason.clone(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    if let Some(bus) = event_bus.as_ref() {
+                        bus.emit(crate::events::SystemEvent::ProposalExecutionFailed {
+                            proposal_id: proposal_id_clone.0.clone(),
+                            proposal_type: "treasury_spend".to_string(),
+                            error: reason,
+                            failed_at: icn_time::current_timestamp_secs(),
+                        })
+                        .await;
+                    }
+                    return;
+                }
+                Err(e) => {
+                    let reason = format!(
+                        "Failed to fetch GovernanceProof for treasury spend proposal {}: {}",
+                        proposal_id_clone.0, e
+                    );
+                    error!("❌ {}", reason);
+
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:spend:proof:{}", proposal_id_clone.0),
+                        FailureType::GovernanceExecutionFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id_clone.0,
+                            "domain_id": domain_id_clone.clone(),
+                            "error": "proof_fetch_failed",
+                        }),
+                        reason.clone(),
+                    );
+                    if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                    if let Some(bus) = event_bus.as_ref() {
+                        bus.emit(crate::events::SystemEvent::ProposalExecutionFailed {
+                            proposal_id: proposal_id_clone.0.clone(),
+                            proposal_type: "treasury_spend".to_string(),
+                            error: reason,
+                            failed_at: icn_time::current_timestamp_secs(),
+                        })
+                        .await;
+                    }
+                    return;
+                }
+            };
+
+            if let Err(reason) = validate_treasury_spend_proof(
+                &proof,
+                &proposal_id_clone,
+                &domain_id_clone,
+                decided_at,
+            ) {
+                error!("❌ {}", reason);
+                let failed_op = FailedOperation::new(
+                    format!("treasury:spend:proof:{}", proposal_id_clone.0),
+                    FailureType::GovernanceExecutionFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id_clone.0,
+                        "domain_id": domain_id_clone.clone(),
+                        "error": "proof_validation_failed",
+                    }),
+                    reason.clone(),
+                );
+                if let Err(dlq_err) = dlq_clone.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_spend");
+                if let Some(bus) = event_bus.as_ref() {
+                    bus.emit(crate::events::SystemEvent::ProposalExecutionFailed {
+                        proposal_id: proposal_id_clone.0.clone(),
+                        proposal_type: "treasury_spend".to_string(),
+                        error: reason,
+                        failed_at: icn_time::current_timestamp_secs(),
+                    })
+                    .await;
+                }
+                return;
+            }
 
             // --- Treasury nonce check (double-spend guard) ---
             //
@@ -2331,5 +2512,88 @@ impl super::GovernanceEventHandler {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_treasury_spend_proof;
+    use ed25519_dalek::SigningKey;
+    use icn_governance::{GovernanceProof, ProofOutcome, ProposalId, Vote, VoteChoice, VoteTally};
+    use icn_identity::KeyPair;
+
+    fn build_valid_proof() -> (ProposalId, String, u64, GovernanceProof) {
+        let signer = KeyPair::generate().unwrap();
+        let voter = KeyPair::generate().unwrap();
+
+        let proposal_id = ProposalId::new("treasury-spend-proposal-1");
+        let domain_id = "coop:test-coop".to_string();
+        let decided_at = 1_735_680_000;
+
+        let vote = Vote::new(proposal_id.clone(), voter.did().clone(), VoteChoice::For);
+        let tally = VoteTally::new(1, 0, 0);
+
+        let mut proof = GovernanceProof::new(
+            proposal_id.0.clone(),
+            domain_id.clone(),
+            ProofOutcome::Accepted,
+            tally,
+            &[vote],
+            decided_at,
+            signer.did().to_string(),
+        );
+
+        let signing_key = SigningKey::from_bytes(&signer.to_signing_key_bytes());
+        proof.sign(&signing_key);
+
+        (proposal_id, domain_id, decided_at, proof)
+    }
+
+    #[test]
+    fn treasury_spend_proof_valid_passes() {
+        let (proposal_id, domain_id, decided_at, proof) = build_valid_proof();
+
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        assert!(result.is_ok(), "expected valid proof, got: {result:?}");
+    }
+
+    #[test]
+    fn treasury_spend_proof_rejects_outcome_mismatch() {
+        let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
+        proof.outcome = ProofOutcome::Rejected;
+
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn treasury_spend_proof_rejects_domain_mismatch() {
+        let (proposal_id, _domain_id, decided_at, proof) = build_valid_proof();
+
+        let result = validate_treasury_spend_proof(
+            &proof,
+            &proposal_id,
+            "coop:different-domain",
+            decided_at,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn treasury_spend_proof_rejects_timestamp_mismatch() {
+        let (proposal_id, domain_id, decided_at, proof) = build_valid_proof();
+
+        let result =
+            validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at + 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn treasury_spend_proof_rejects_bad_signature() {
+        let (proposal_id, domain_id, decided_at, mut proof) = build_valid_proof();
+        proof.signature = vec![0xAA; 64];
+
+        let result = validate_treasury_spend_proof(&proof, &proposal_id, &domain_id, decided_at);
+        assert!(result.is_err());
     }
 }

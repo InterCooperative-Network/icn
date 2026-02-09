@@ -269,7 +269,7 @@ impl GovernanceEventHandler {
                 );
             }
             ProposalPayload::Treasury { operation } => {
-                self.handle_treasury_proposal(proposal_id, operation, decided_at);
+                self.handle_treasury_proposal(proposal_id, operation, decided_at, domain_id);
             }
             ProposalPayload::ProtocolChange { proposal } => {
                 self.handle_protocol_change(proposal_id, proposal);
