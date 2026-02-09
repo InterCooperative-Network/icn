@@ -532,6 +532,25 @@ async fn test_locality_aware_placement_scoring() {
         .score_task(&request, "submitter", &node_d, 0.4, &locality_d, &scope_ctx)
         .unwrap();
 
+    // Average scores across multiple samples to smooth random jitter and
+    // keep assertions deterministic in CI.
+    let samples = 64usize;
+    let avg_score = |node: &NodeState, trust: f64, locality: &LocalityContext| -> f64 {
+        let total: f64 = (0..samples)
+            .map(|_| {
+                policy
+                    .score_task(&request, "submitter", node, trust, locality, &scope_ctx)
+                    .expect("score_task should succeed")
+                    .score
+            })
+            .sum();
+        total / samples as f64
+    };
+    let avg_a = avg_score(&node_a, 0.8, &locality_a);
+    let avg_b = avg_score(&node_b, 0.6, &locality_b);
+    let avg_c = avg_score(&node_c, 0.6, &locality_c);
+    let avg_d = avg_score(&node_d, 0.4, &locality_d);
+
     tracing::info!("=== Phase 16C Locality-Aware Placement Scoring ===");
     tracing::info!(
         "Executor A (trust=0.8, no locality): score = {:.4}",
@@ -548,6 +567,14 @@ async fn test_locality_aware_placement_scoring() {
     tracing::info!(
         "Executor D (trust=0.4, RTT=15ms + 5/5 blobs): score = {:.4}",
         offer_d.score
+    );
+    tracing::info!(
+        "Averaged over {} samples: A={:.4}, B={:.4}, C={:.4}, D={:.4}",
+        samples,
+        avg_a,
+        avg_b,
+        avg_c,
+        avg_d
     );
 
     // Analysis: With scope-aware weights:
@@ -569,14 +596,11 @@ async fn test_locality_aware_placement_scoring() {
 
     // Verify that locality factors make a significant difference
     // Executor B (good RTT) should beat A (higher trust but no locality)
-    assert!(
-        offer_b.score + 0.03 > offer_a.score,
-        "Good RTT should compensate for lower trust"
-    );
+    assert!(avg_b > avg_a, "Good RTT should compensate for lower trust");
 
     // Executor C (good data locality) should beat A
     assert!(
-        offer_c.score + 0.03 > offer_a.score,
+        avg_c > avg_a,
         "Good data locality should compensate for lower trust"
     );
 
@@ -585,7 +609,7 @@ async fn test_locality_aware_placement_scoring() {
     // A has 0.8 trust (0.20 contribution) but gets 0.0 from locality
     // Net: D gets ~0.10 more points from locality than A gets from higher trust
     assert!(
-        offer_d.score + 0.05 > offer_a.score,
+        avg_d > avg_a + 0.04,
         "Combined RTT + data locality should beat high trust alone"
     );
 

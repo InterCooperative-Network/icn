@@ -155,6 +155,7 @@ fn validate_treasury_spend_proof(
         ));
     }
 
+    let mut has_matching_decided_at = false;
     for attestation in &proof.attestations {
         if attestation.decision_hash != proof.receipt.decision_hash {
             return Err(format!(
@@ -179,13 +180,14 @@ fn validate_treasury_spend_proof(
                 proposal_id.0
             ));
         }
+        has_matching_decided_at |= attestation.timestamp == decided_at;
+    }
 
-        if attestation.timestamp != decided_at {
-            return Err(format!(
-                "GovernanceDecisionAttestation timestamp mismatch for treasury spend {}: expected {}, got {}",
-                proposal_id.0, decided_at, attestation.timestamp
-            ));
-        }
+    if !has_matching_decided_at {
+        return Err(format!(
+            "No GovernanceDecisionAttestation timestamp matches decided_at {} for treasury spend {}",
+            decided_at, proposal_id.0
+        ));
     }
 
     Ok(())

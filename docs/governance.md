@@ -458,11 +458,11 @@ Before any treasury spend mutates ledger state, the executor requires a valid
 - canonical receipt binding (`proof.verify_receipt()`)
 - proposal identity (`proof.receipt.proposal_id`)
 - governance domain (`proof.receipt.domain_id`)
-- accepted outcome (`proof.receipt.outcome == accepted`)
+- accepted outcome (`proof.receipt.outcome == ProofOutcome::Accepted`)
 - at least one attestation is present
 - each attestation is bound to `receipt.decision_hash`
 - each signer DID resolves and each attestation signature verifies
-- decision timestamp consistency (`attestation.timestamp == decided_at`)
+- decision timestamp consistency (at least one attestation has `timestamp == decided_at`)
 
 If proof lookup or validation fails, spend execution is rejected, recorded in the
 dead-letter queue, and reported as a proposal execution failure event.

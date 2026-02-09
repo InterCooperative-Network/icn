@@ -233,7 +233,9 @@ impl SledParameterStore {
         Ok(Self { db })
     }
 
-    /// Create a temporary in-memory store for testing
+    /// Create a temporary on-disk store for testing.
+    ///
+    /// The database path is created under `ICN_TEST_TMPDIR`, `TMPDIR`, or `/tmp`.
     #[cfg(test)]
     pub fn temporary() -> Result<Self> {
         let base = std::env::var_os("ICN_TEST_TMPDIR")
