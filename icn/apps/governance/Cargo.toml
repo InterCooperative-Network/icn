@@ -37,6 +37,7 @@ icn-time = { path = "../../crates/icn-time" }
 # Cryptography (for GovernanceProof signing)
 ed25519-dalek.workspace = true
 hex = "0.4"
+blake3 = "1.5"
 
 # Error handling
 anyhow = "1.0"

@@ -37,6 +37,7 @@ pub mod bootstrap;
 pub mod comms;
 pub mod compute;
 pub mod coord;
+pub mod effects;
 pub mod error;
 pub mod events;
 pub mod governance;
@@ -65,11 +66,15 @@ pub use bootstrap::{
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
 pub use coord::Coordination;
+pub use effects::{
+    ControlEffect, DisputeEffect, EffectResult, FederationEffect, KernelEffect, MembershipEffect,
+    ProtocolEffect, ResourceEffect, SdisEffect, TreasuryEffect,
+};
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use governance::{
-    DecisionReceiptId, ExecutionOutcome, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
-    TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+    DecisionReceiptId, DefaultEffectExecutor, EffectExecutor, ExecutionOutcome, GovernanceExecutor,
+    ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
 };
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{

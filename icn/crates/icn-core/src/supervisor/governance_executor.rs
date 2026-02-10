@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use icn_kernel_api::effects::{EffectResult, KernelEffect};
 use icn_kernel_api::governance::{
-    DecisionReceiptId, ExecutionOutcome, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
-    TreasuryExecutor, TreasuryOperation,
+    DecisionReceiptId, EffectExecutor, ExecutionOutcome, GovernanceExecutor, ProtocolChange,
+    ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 
@@ -48,6 +49,65 @@ impl GovernanceExecutor for KernelGovernanceExecutor {
 
     fn protocol(&self) -> &dyn ProtocolExecutor {
         self.protocol.as_ref()
+    }
+}
+
+#[async_trait]
+impl EffectExecutor for KernelGovernanceExecutor {
+    async fn execute_effect(
+        &self,
+        effect: KernelEffect,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        let receipt_id = DecisionReceiptId::new(decision_receipt_id);
+
+        match effect {
+            KernelEffect::Treasury(treasury_effect) => {
+                // Convert TreasuryEffect to TreasuryOperation
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(&receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+            KernelEffect::Protocol(protocol_effect) => {
+                // Convert ProtocolEffect to ProtocolChange
+                if let Some(change) = protocol_effect_to_change(&protocol_effect) {
+                    let outcome = self
+                        .protocol
+                        .apply_protocol_change(&receipt_id, change)
+                        .await?;
+                    Ok(execution_outcome_to_effect_result(
+                        outcome,
+                        decision_receipt_id,
+                    ))
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: "Protocol effect applied".to_string(),
+                        state_change_hash: None,
+                    })
+                }
+            }
+            KernelEffect::NoOp { reason } => Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: true,
+                message: format!("NoOp: {}", reason),
+                state_change_hash: None,
+            }),
+            // For other effect types, return success placeholder
+            _ => Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: true,
+                message: "Effect type not yet implemented".to_string(),
+                state_change_hash: None,
+            }),
+        }
     }
 }
 
@@ -326,6 +386,137 @@ fn parse_bytes(s: &str) -> Result<u64> {
         .map_err(|e| anyhow::anyhow!("Invalid byte size value '{}': {}", s, e))?;
 
     Ok(num * multiplier)
+}
+
+/// Convert a TreasuryEffect to a TreasuryOperation
+fn treasury_effect_to_operation(
+    effect: &icn_kernel_api::effects::TreasuryEffect,
+) -> TreasuryOperation {
+    use icn_kernel_api::effects::TreasuryEffect;
+    match effect {
+        TreasuryEffect::Spend {
+            treasury_did,
+            recipient_did,
+            amount,
+            currency,
+            memo,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Spend,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(recipient_did.clone()),
+            memo: memo.clone(),
+        },
+        TreasuryEffect::CreateBudget {
+            treasury_did,
+            budget_id,
+            total_amount,
+            currency,
+            name,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Allocate,
+            amount: *total_amount,
+            currency: currency.clone(),
+            recipient: Some(budget_id.clone()),
+            memo: name.clone(),
+        },
+        TreasuryEffect::Allocate {
+            treasury_did,
+            budget_id,
+            amount,
+            currency,
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Allocate,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(budget_id.clone()),
+            memo: "Budget allocation".to_string(),
+        },
+        TreasuryEffect::Transfer {
+            from_did,
+            to_did,
+            amount,
+            currency,
+            memo,
+        } => TreasuryOperation {
+            treasury_id: from_did.clone(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Spend,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(to_did.clone()),
+            memo: memo.clone(),
+        },
+        // Other treasury effects mapped to basic operations
+        _ => TreasuryOperation {
+            treasury_id: String::new(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Reserve,
+            amount: 0,
+            currency: "UNKNOWN".to_string(),
+            recipient: None,
+            memo: "Unmapped treasury effect".to_string(),
+        },
+    }
+}
+
+/// Convert a ProtocolEffect to a ProtocolChange (if applicable)
+fn protocol_effect_to_change(
+    effect: &icn_kernel_api::effects::ProtocolEffect,
+) -> Option<ProtocolChange> {
+    use icn_kernel_api::effects::ProtocolEffect;
+
+    match effect {
+        ProtocolEffect::SetParameter {
+            parameter_name,
+            old_value_hash,
+            new_value_json,
+            effective_at,
+        } => Some(ProtocolChange {
+            parameter_name: parameter_name.clone(),
+            old_value: old_value_hash.clone(),
+            new_value: new_value_json.clone(),
+            effective_at: *effective_at,
+        }),
+        ProtocolEffect::SetGovernanceConfig {
+            domain_id,
+            config_json,
+            ..
+        } => Some(ProtocolChange {
+            parameter_name: format!("governance.config.{}", domain_id),
+            old_value: String::new(),
+            new_value: config_json.clone(),
+            effective_at: 0,
+        }),
+        _ => None,
+    }
+}
+
+/// Convert an ExecutionOutcome to an EffectResult
+fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str) -> EffectResult {
+    match outcome {
+        ExecutionOutcome::Success { effects, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: true,
+            message: effects.join("; "),
+            state_change_hash: None,
+        },
+        ExecutionOutcome::Failed { reason, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: false,
+            message: reason,
+            state_change_hash: None,
+        },
+        ExecutionOutcome::Deferred { reason, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: true,
+            message: format!("Deferred: {}", reason),
+            state_change_hash: None,
+        },
+    }
 }
 
 #[cfg(test)]

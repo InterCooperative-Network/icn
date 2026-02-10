@@ -36,8 +36,15 @@ pub mod handlers;
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::{
-    Allocation, AllocationReceipt, DisburseParams, ExecutionCallback as HandlerCallback,
-    FederationHandler, ProposalExecutionContext, ProposalType, ProtocolHandler, TreasuryHandler,
+    translate_payload_to_effects, Allocation, AllocationReceipt, DisburseParams,
+    ExecutionCallback as HandlerCallback, FederationHandler, ProposalExecutionContext,
+    ProposalType, ProtocolHandler, TreasuryHandler,
+};
+
+// Re-export kernel effect types for kernel/app boundary
+pub use icn_kernel_api::effects::{
+    ControlEffect, EffectResult, FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect,
+    TreasuryEffect,
 };
 
 // Re-export kernel governance traits for convenience

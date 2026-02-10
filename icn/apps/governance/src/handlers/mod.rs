@@ -19,9 +19,9 @@ mod protocol;
 mod treasury;
 
 pub use execution::{
-    DecisionReceiptId, ExecutionCallback, ExecutionOutcome, GovernanceExecutor,
-    ProposalExecutionContext, ProposalType, ProtocolChange, ProtocolExecutor, TreasuryExecutor,
-    TreasuryOperation, TreasuryOperationType,
+    translate_payload_to_effects, DecisionReceiptId, ExecutionCallback, ExecutionOutcome,
+    GovernanceExecutor, ProposalExecutionContext, ProposalType, ProtocolChange, ProtocolExecutor,
+    TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
 };
 pub use federation::FederationHandler;
 pub use protocol::ProtocolHandler;

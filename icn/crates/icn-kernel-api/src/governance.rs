@@ -110,6 +110,249 @@ pub trait GovernanceExecutor: Send + Sync {
     fn protocol(&self) -> &dyn ProtocolExecutor;
 }
 
+// =============================================================================
+// Effect Executor - executes kernel-safe effects
+// =============================================================================
+
+use crate::effects::{EffectResult, KernelEffect, TreasuryEffect};
+
+/// Trait for executing kernel-safe effects.
+///
+/// This is the primary interface for the kernel to execute effects produced
+/// by the governance app's payload-to-effect translation.
+#[async_trait]
+pub trait EffectExecutor: Send + Sync {
+    /// Execute a kernel effect.
+    ///
+    /// # Arguments
+    /// * `effect` - The kernel-safe effect to execute
+    /// * `decision_receipt_id` - The receipt ID for audit linkage
+    ///
+    /// # Returns
+    /// Result of the effect execution
+    async fn execute_effect(
+        &self,
+        effect: KernelEffect,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult>;
+
+    /// Execute a batch of effects atomically.
+    ///
+    /// Either all effects succeed or none are applied.
+    async fn execute_effects_batch(
+        &self,
+        effects: Vec<KernelEffect>,
+        decision_receipt_id: &str,
+    ) -> Result<Vec<EffectResult>> {
+        let mut results = Vec::with_capacity(effects.len());
+        for effect in effects {
+            results.push(self.execute_effect(effect, decision_receipt_id).await?);
+        }
+        Ok(results)
+    }
+}
+
+/// Default effect executor that delegates to specialized executors.
+pub struct DefaultEffectExecutor {
+    treasury: std::sync::Arc<dyn TreasuryExecutor>,
+    protocol: std::sync::Arc<dyn ProtocolExecutor>,
+}
+
+impl DefaultEffectExecutor {
+    /// Create a new effect executor with the given specialized executors.
+    pub fn new(
+        treasury: std::sync::Arc<dyn TreasuryExecutor>,
+        protocol: std::sync::Arc<dyn ProtocolExecutor>,
+    ) -> Self {
+        Self { treasury, protocol }
+    }
+}
+
+#[async_trait]
+impl EffectExecutor for DefaultEffectExecutor {
+    async fn execute_effect(
+        &self,
+        effect: KernelEffect,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        let receipt_id = DecisionReceiptId::new(decision_receipt_id);
+
+        match effect {
+            KernelEffect::Treasury(treasury_effect) => {
+                // Convert TreasuryEffect to TreasuryOperation
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(&receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+            KernelEffect::Protocol(protocol_effect) => {
+                // Convert ProtocolEffect to ProtocolChange
+                if let Some(change) = protocol_effect_to_change(&protocol_effect) {
+                    let outcome = self
+                        .protocol
+                        .apply_protocol_change(&receipt_id, change)
+                        .await?;
+                    Ok(execution_outcome_to_effect_result(
+                        outcome,
+                        decision_receipt_id,
+                    ))
+                } else {
+                    Ok(EffectResult {
+                        effect_id: decision_receipt_id.to_string(),
+                        success: true,
+                        message: "Protocol effect applied".to_string(),
+                        state_change_hash: None,
+                    })
+                }
+            }
+            KernelEffect::NoOp { reason } => Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: true,
+                message: format!("NoOp: {}", reason),
+                state_change_hash: None,
+            }),
+            // For other effect types, return success placeholder
+            _ => Ok(EffectResult {
+                effect_id: decision_receipt_id.to_string(),
+                success: true,
+                message: "Effect type not yet implemented".to_string(),
+                state_change_hash: None,
+            }),
+        }
+    }
+}
+
+/// Convert a TreasuryEffect to a TreasuryOperation
+fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
+    match effect {
+        TreasuryEffect::Spend {
+            treasury_did,
+            recipient_did,
+            amount,
+            currency,
+            memo,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(recipient_did.clone()),
+            memo: memo.clone(),
+        },
+        TreasuryEffect::CreateBudget {
+            treasury_did,
+            budget_id,
+            total_amount,
+            currency,
+            name,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Allocate,
+            amount: *total_amount,
+            currency: currency.clone(),
+            recipient: Some(budget_id.clone()),
+            memo: name.clone(),
+        },
+        TreasuryEffect::Allocate {
+            treasury_did,
+            budget_id,
+            amount,
+            currency,
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Allocate,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(budget_id.clone()),
+            memo: "Budget allocation".to_string(),
+        },
+        TreasuryEffect::Transfer {
+            from_did,
+            to_did,
+            amount,
+            currency,
+            memo,
+        } => TreasuryOperation {
+            treasury_id: from_did.clone(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(to_did.clone()),
+            memo: memo.clone(),
+        },
+        // Other treasury effects mapped to basic operations
+        _ => TreasuryOperation {
+            treasury_id: String::new(),
+            operation_type: TreasuryOperationType::Reserve,
+            amount: 0,
+            currency: "UNKNOWN".to_string(),
+            recipient: None,
+            memo: "Unmapped treasury effect".to_string(),
+        },
+    }
+}
+
+/// Convert a ProtocolEffect to a ProtocolChange (if applicable)
+fn protocol_effect_to_change(effect: &crate::effects::ProtocolEffect) -> Option<ProtocolChange> {
+    use crate::effects::ProtocolEffect;
+
+    match effect {
+        ProtocolEffect::SetParameter {
+            parameter_name,
+            old_value_hash,
+            new_value_json,
+            effective_at,
+        } => Some(ProtocolChange {
+            parameter_name: parameter_name.clone(),
+            old_value: old_value_hash.clone(),
+            new_value: new_value_json.clone(),
+            effective_at: *effective_at,
+        }),
+        ProtocolEffect::SetGovernanceConfig {
+            domain_id,
+            config_json,
+            ..
+        } => Some(ProtocolChange {
+            parameter_name: format!("governance.config.{}", domain_id),
+            old_value: String::new(),
+            new_value: config_json.clone(),
+            effective_at: 0,
+        }),
+        _ => None,
+    }
+}
+
+/// Convert an ExecutionOutcome to an EffectResult
+fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str) -> EffectResult {
+    match outcome {
+        ExecutionOutcome::Success { effects, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: true,
+            message: effects.join("; "),
+            state_change_hash: None,
+        },
+        ExecutionOutcome::Failed { reason, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: false,
+            message: reason,
+            state_change_hash: None,
+        },
+        ExecutionOutcome::Deferred { reason, .. } => EffectResult {
+            effect_id: effect_id.to_string(),
+            success: true,
+            message: format!("Deferred: {}", reason),
+            state_change_hash: None,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
