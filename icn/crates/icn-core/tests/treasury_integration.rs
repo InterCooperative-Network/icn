@@ -1364,6 +1364,21 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
             "Ledger entry must carry decision_hash from executor path"
         );
 
+        // Print the pilot chain for demo visibility
+        println!();
+        println!("╔══════════════════════════════════════════════════════════════════╗");
+        println!("║              ICN PILOT PROVENANCE CHAIN VERIFIED                 ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!("║ decision_receipt_id: {:<43} ║", decision_receipt_id);
+        println!("║ decision_hash:       {:<43} ║", &decision_hash[..43.min(decision_hash.len())]);
+        println!("║ ledger_entry_hash:   {:<43} ║", &entry_hash_hex[..43.min(entry_hash_hex.len())]);
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!("║ Ledger Entry Provenance Fields:                                  ║");
+        println!("║   decision_receipt_id: ✅ MATCHES                                ║");
+        println!("║   decision_hash:       ✅ MATCHES                                ║");
+        println!("╚══════════════════════════════════════════════════════════════════╝");
+        println!();
+
         info!(
             entry_hash = %entry_hash_hex,
             decision_receipt_id = %decision_receipt_id,
