@@ -384,6 +384,7 @@ mod tests {
             currency: "ICN".to_string(),
             memo: "Test payment".to_string(),
             decision_receipt_id: "test-receipt-001".to_string(),
+            decision_hash: "sha256:abc123".to_string(),
         })];
 
         // Execute through dispatcher with pre-translated effects
@@ -446,6 +447,7 @@ mod tests {
                     currency: "ICN".to_string(),
                     memo: "test".to_string(),
                     decision_receipt_id: "r1".to_string(),
+                    decision_hash: "sha256:test".to_string(),
                 }
             )),
             "treasury"
@@ -455,6 +457,83 @@ mod tests {
                 reason: "test".to_string()
             }),
             "noop"
+        );
+    }
+
+    /// End-to-end integration test proving Treasury Spend flows through the
+    /// effect path with proper provenance linkage.
+    ///
+    /// This test verifies:
+    /// 1. TreasuryEffect::Spend can be created and wrapped in KernelEffect
+    /// 2. EffectDispatcher correctly routes to KernelGovernanceExecutor
+    /// 3. Execution succeeds with appropriate result message
+    /// 4. effect_id in result matches decision_receipt_id (provenance linkage)
+    #[tokio::test]
+    async fn test_treasury_spend_end_to_end_provenance() {
+        // Known test values
+        let treasury_did = "did:icn:treasury:coop-alpha-main";
+        let recipient_did = "did:icn:member:alice-dev-fund";
+        let amount: i64 = 2500;
+        let currency = "HOURS";
+        let decision_receipt_id = "gov:proposal:2024-001:receipt:abc123";
+
+        // Step 1: Create a TreasuryEffect::Spend with known values
+        let treasury_effect = TreasuryEffect::Spend {
+            treasury_did: treasury_did.to_string(),
+            recipient_did: recipient_did.to_string(),
+            amount,
+            currency: currency.to_string(),
+            memo: "Development grant for Q1".to_string(),
+            decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: "sha256:governance-decision-2024-001".to_string(),
+        };
+
+        // Step 2: Wrap in KernelEffect::Treasury
+        let kernel_effect = KernelEffect::Treasury(treasury_effect);
+
+        // Step 3: Create an EffectDispatcher with a KernelGovernanceExecutor
+        let param_store = Arc::new(MockParamStore::new());
+        let executor = Arc::new(KernelGovernanceExecutor::new(param_store));
+        let dispatcher = EffectDispatcher::new(executor);
+
+        // Step 4: Execute effects with the decision_receipt_id
+        let results = dispatcher
+            .execute_effects(vec![kernel_effect], decision_receipt_id)
+            .await
+            .expect("execution should succeed");
+
+        // Step 5: Assert result is success
+        assert_eq!(results.len(), 1, "Expected exactly one result");
+        let result = &results[0];
+        assert!(
+            result.success,
+            "Treasury spend should succeed, got: {}",
+            result.message
+        );
+
+        // Step 6: Assert result message contains expected operation description
+        assert!(
+            result.message.contains("Spend"),
+            "Message should describe Spend operation, got: {}",
+            result.message
+        );
+        assert!(
+            result.message.contains(&amount.to_string()),
+            "Message should contain amount {}, got: {}",
+            amount,
+            result.message
+        );
+        assert!(
+            result.message.contains(currency),
+            "Message should contain currency {}, got: {}",
+            currency,
+            result.message
+        );
+
+        // Step 7: Assert effect_id matches decision_receipt_id (provenance linkage)
+        assert_eq!(
+            result.effect_id, decision_receipt_id,
+            "effect_id must match decision_receipt_id for provenance tracking"
         );
     }
 }

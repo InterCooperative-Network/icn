@@ -66,7 +66,10 @@ pub enum TreasuryEffect {
         amount: i64,
         currency: String,
         memo: String,
+        /// Links back to governance decision receipt
         decision_receipt_id: String,
+        /// Canonical content hash for verification
+        decision_hash: String,
     },
     /// Allocate funds to a budget category
     Allocate {
@@ -335,6 +338,7 @@ mod tests {
             currency: "HOURS".into(),
             memo: "Tool purchase".into(),
             decision_receipt_id: "receipt-456".into(),
+            decision_hash: "abc123".into(),
         };
 
         let json = serde_json::to_string(&effect).unwrap();
@@ -357,6 +361,7 @@ mod tests {
             currency: "USD".into(),
             memo: "test".into(),
             decision_receipt_id: "r1".into(),
+            decision_hash: "hash1".into(),
         });
 
         let json = serde_json::to_string(&effect).unwrap();
@@ -389,6 +394,7 @@ mod tests {
             currency: String::new(),
             memo: String::new(),
             decision_receipt_id: String::new(),
+            decision_hash: String::new(),
         };
     }
 }

@@ -293,6 +293,7 @@ fn translate_treasury_operation(
             currency: currency.clone(),
             memo: purpose.clone(),
             decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: "pending".to_string(), // Wired when full context available
         })],
 
         TreasuryProposalOperation::CreateBudget {

@@ -1650,6 +1650,8 @@ impl super::GovernanceEventHandler {
     /// The nonce is checked atomically via `CoopStore::check_and_increment_treasury_nonce`
     /// before the ledger transfer to prevent double-spend from concurrent
     /// proposal execution.
+    ///
+    /// Set `ICN_USE_EFFECT_PATH_TREASURY=1` to skip this legacy handler and use the effect path.
     fn handle_treasury_spend(
         &self,
         proposal_id: ProposalId,
@@ -1660,6 +1662,15 @@ impl super::GovernanceEventHandler {
         decided_at: u64,
         domain_id: String,
     ) {
+        // Feature gate: skip legacy handler if effect path is enabled
+        if std::env::var("ICN_USE_EFFECT_PATH_TREASURY").is_ok() {
+            info!(
+                "Treasury spend proposal {} routed to effect path, skipping legacy handler",
+                proposal_id.0
+            );
+            return;
+        }
+
         info!(
             "🏦 Executing treasury spend for proposal {}: {} to {} ({})",
             proposal_id.0, amount, recipient, memo
