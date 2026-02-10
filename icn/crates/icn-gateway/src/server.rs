@@ -698,6 +698,10 @@ impl GatewayServer {
             notification_queue.clone(),
         ));
 
+        // Create decision registry (in-memory store for meetings and decisions)
+        let decision_registry = Arc::new(api::registry::DecisionRegistry::new());
+        info!("Decision registry initialized");
+
         // Create recurring payment store
         let recurring_payment_store =
             crate::api::recurring_payments::RecurringPaymentStore::new(db.clone());
@@ -919,6 +923,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(service_discovery_manager.clone()))
                 // Listings manager for cooperative exchange
                 .app_data(web::Data::new(listings_manager.clone()))
+                // Decision registry for governance meetings and decisions
+                .app_data(web::Data::new(decision_registry.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -1286,6 +1292,16 @@ impl GatewayServer {
                         .service(
                             web::scope("")
                                 .configure(api::communities::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Decision Registry endpoints (auth + rate limiting)
+                        // Governance meetings and decisions indexing
+                        .service(
+                            web::scope("/registry")
+                                .configure(api::registry::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

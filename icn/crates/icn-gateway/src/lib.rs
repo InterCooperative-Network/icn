@@ -100,3 +100,9 @@ pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 pub use websocket::ServerMessage;
+
+// Re-export registry types for decision/meeting management
+pub use api::registry::{
+    DecisionEffect, DecisionFilter, DecisionIndexEntry, DecisionRegistry, DecisionStatus,
+    DecisionTrace, Meeting,
+};
