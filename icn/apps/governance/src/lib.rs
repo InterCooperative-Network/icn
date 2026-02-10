@@ -32,6 +32,7 @@
 pub mod actor;
 pub mod executor;
 pub mod handlers;
+pub mod registry;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
@@ -40,6 +41,9 @@ pub use handlers::{
     ExecutionCallback as HandlerCallback, FederationHandler, ProposalExecutionContext,
     ProposalType, ProtocolHandler, TreasuryHandler,
 };
+
+// Re-export registry types for decision/meeting management
+pub use registry::{DecisionFilter, DecisionIndexEntry, DecisionRegistry, DecisionStatus, Meeting};
 
 // Re-export kernel effect types for kernel/app boundary
 pub use icn_kernel_api::effects::{

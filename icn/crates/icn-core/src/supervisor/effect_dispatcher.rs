@@ -460,6 +460,103 @@ mod tests {
         );
     }
 
+    /// End-to-end integration test proving Protocol Change flows through the
+    /// effect path with proper provenance linkage.
+    ///
+    /// This test verifies:
+    /// 1. ProtocolEffect::SetParameter can be created and wrapped in KernelEffect
+    /// 2. EffectDispatcher correctly routes to KernelGovernanceExecutor
+    /// 3. Execution succeeds with appropriate result message
+    /// 4. effect_id in result matches decision_receipt_id (provenance linkage)
+    /// 5. Parameter value is actually updated in the store
+    #[tokio::test]
+    async fn test_protocol_change_end_to_end_provenance() {
+        use icn_kernel_api::effects::ProtocolEffect;
+
+        // Known test values
+        let parameter_name = "governance.voting_period";
+        let old_value = "86400"; // 1 day in seconds
+        let new_value = "172800"; // 2 days in seconds
+        let decision_receipt_id = "gov:proposal:2024-002:receipt:def456";
+
+        // Step 1: Set up the parameter store with the initial value
+        let param_store = Arc::new(MockParamStore::new());
+        let initial_param = ProtocolParameter::new(
+            parameter_name,
+            parameter_name,
+            "Voting period duration in seconds",
+            ParameterValue::Integer(86400),
+        );
+        param_store
+            .set(initial_param, None, None)
+            .expect("should set initial param");
+
+        // Step 2: Create a ProtocolEffect::SetParameter with known values
+        let protocol_effect = ProtocolEffect::SetParameter {
+            parameter_name: parameter_name.to_string(),
+            old_value_hash: old_value.to_string(),
+            new_value_json: new_value.to_string(),
+            effective_at: 0,
+        };
+
+        // Step 3: Wrap in KernelEffect::Protocol
+        let kernel_effect = KernelEffect::Protocol(protocol_effect);
+
+        // Step 4: Create an EffectDispatcher with a KernelGovernanceExecutor
+        let executor = Arc::new(KernelGovernanceExecutor::new(param_store.clone()));
+        let dispatcher = EffectDispatcher::new(executor);
+
+        // Step 5: Execute effects with the decision_receipt_id
+        let results = dispatcher
+            .execute_effects(vec![kernel_effect], decision_receipt_id)
+            .await
+            .expect("execution should succeed");
+
+        // Step 6: Assert result is success
+        assert_eq!(results.len(), 1, "Expected exactly one result");
+        let result = &results[0];
+        assert!(
+            result.success,
+            "Protocol change should succeed, got: {}",
+            result.message
+        );
+
+        // Step 7: Assert result message contains expected operation description
+        assert!(
+            result.message.contains("Changed"),
+            "Message should describe change operation, got: {}",
+            result.message
+        );
+        assert!(
+            result.message.contains(parameter_name),
+            "Message should contain parameter name {}, got: {}",
+            parameter_name,
+            result.message
+        );
+
+        // Step 8: Assert effect_id matches decision_receipt_id (provenance linkage)
+        assert_eq!(
+            result.effect_id, decision_receipt_id,
+            "effect_id must match decision_receipt_id for provenance tracking"
+        );
+
+        // Step 9: Verify the parameter was actually updated in the store
+        let updated_param = param_store
+            .get(parameter_name)
+            .expect("should get param")
+            .expect("param should exist");
+        assert_eq!(
+            updated_param.value,
+            ParameterValue::Integer(172800),
+            "Parameter value should be updated to new value"
+        );
+        assert_eq!(
+            updated_param.updated_by,
+            Some(decision_receipt_id.to_string()),
+            "updated_by should reference the decision receipt"
+        );
+    }
+
     /// End-to-end integration test proving Treasury Spend flows through the
     /// effect path with proper provenance linkage.
     ///

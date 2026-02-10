@@ -71,6 +71,15 @@ impl super::GovernanceEventHandler {
         proposal_id: ProposalId,
         proposal: icn_governance::ProtocolChangeProposal,
     ) {
+        // Check if effect path is enabled - if so, skip legacy handler
+        if std::env::var("ICN_USE_EFFECT_PATH_PROTOCOL").is_ok() {
+            info!(
+                "Protocol proposal {} routed to effect path, skipping legacy handler",
+                proposal_id.0
+            );
+            return;
+        }
+
         let proposal_id_str = proposal_id.0.clone();
 
         // Check if this is a delayed execution
