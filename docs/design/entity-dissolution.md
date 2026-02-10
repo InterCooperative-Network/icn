@@ -289,6 +289,6 @@ Potential future additions:
 ## Related Documentation
 
 - **Entity Lifecycle**: See [../ARCHITECTURE.md](../ARCHITECTURE.md) for entity status transitions
-- **Governance System**: See `docs/governance-primitives.md` for proposal workflows
+- **Governance System**: See [governance primitives](./governance/governance-primitives.md) for proposal workflows
 - **Audit System**: See `icn/crates/icn-gateway/src/entity_audit.rs` for audit implementation
 - **API Reference**: See `docs/api/openapi.generated.yaml` for full API specs
