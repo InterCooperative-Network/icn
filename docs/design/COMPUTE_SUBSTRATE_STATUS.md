@@ -23,8 +23,8 @@ Identity → Standing → Governance → Allocations → Workloads → Receipts 
 | E3 | #1130 | Deterministic vs Advisory | ✅ Done | Advisory tasks cannot mutate ledger state |
 | E4 | #1131 | Storage Specification | ✅ Done | `StorageClass`, `DataLocality` enums in icn-kernel-api |
 | E5 | #1132 | Cell Operator Boundary | ✅ Done | `cell_operator()` method, single-operator-per-cell docs |
-| E6 | #1133 | Individual Node Ownership | 🚧 Pending | Personal node topology, wallet-root identity |
-| E7 | #1134 | Commons Compute Governance | 🚧 Pending | Pool admission, abuse handling, compensation |
+| E6 | #1133 | Individual Node Ownership | ✅ Done | `OperatorMode` enum (Organization/Individual) |
+| E7 | #1134 | Commons Compute Governance | ✅ Done | `CharterPriority`, `CommonsPoolPolicy` |
 
 ### A-Track: Architecture (Kernel/App Separation)
 
@@ -48,8 +48,8 @@ Identity → Standing → Governance → Allocations → Workloads → Receipts 
 | ID | Issue | Title | Status |
 |----|-------|-------|--------|
 | C1 | #1142 | Backup Validation | ✅ Audited |
-| C2 | #1143 | Health Check Suite | 🚧 Pending |
-| C3 | #1144 | NAT Traversal | 🚧 Pending |
+| C2 | #1143 | Health Check Suite | ✅ Done |
+| C3 | #1144 | NAT Traversal | ✅ Done |
 
 ### D-Track: Demo/Integration
 
