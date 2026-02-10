@@ -565,6 +565,19 @@ mod tests {
     /// 2. EffectDispatcher correctly routes to KernelGovernanceExecutor
     /// 3. Execution succeeds with appropriate result message
     /// 4. effect_id in result matches decision_receipt_id (provenance linkage)
+    ///
+    /// NOTE: This test uses a placeholder treasury executor that logs but doesn't
+    /// write to the ledger. The full provenance chain (decision → effect → ledger
+    /// entry with decision_hash) is proven separately:
+    /// - icn-ledger/src/entry.rs: test_entry_with_decision_provenance
+    /// - JournalEntry now carries decision_receipt_id + decision_hash
+    ///
+    /// TODO: When treasury executor is wired to real ledger, add assertion:
+    /// ```ignore
+    /// let ledger_entry = ledger.get_entry(result.ledger_entry_id).await?;
+    /// assert_eq!(ledger_entry.decision_receipt_id, Some(decision_receipt_id));
+    /// assert_eq!(ledger_entry.decision_hash, Some(decision_hash));
+    /// ```
     #[tokio::test]
     async fn test_treasury_spend_end_to_end_provenance() {
         // Known test values
