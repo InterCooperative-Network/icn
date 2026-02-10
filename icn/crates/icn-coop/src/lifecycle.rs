@@ -4,6 +4,27 @@ use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
 use tracing::{debug, info, warn};
 
+/// Derive a deterministic treasury anchor from coop ID.
+///
+/// The anchor is a 16-byte value derived from the coop ID using BLAKE3.
+/// This ensures the same coop ID always produces the same treasury anchor.
+pub fn derive_treasury_anchor(coop_id: &str) -> [u8; 16] {
+    let hash = blake3::hash(format!("icn:treasury:{}", coop_id).as_bytes());
+    let mut anchor = [0u8; 16];
+    anchor.copy_from_slice(&hash.as_bytes()[..16]);
+    anchor
+}
+
+/// Derive a deterministic treasury DID from coop ID.
+///
+/// Returns a DID in the format `did:icn:treasury:<base58-encoded-anchor>`.
+/// This DID uniquely identifies the cooperative's treasury account.
+pub fn derive_treasury_did(coop_id: &str) -> String {
+    let anchor = derive_treasury_anchor(coop_id);
+    let encoded = bs58::encode(&anchor).into_string();
+    format!("did:icn:treasury:{}", encoded)
+}
+
 pub struct LifecycleManager {
     // Handles will be added when actor system is wired up
 }
@@ -22,7 +43,11 @@ pub enum LifecycleEvent {
     /// Charter ratified (all founders signed)
     CharterRatified { coop_id: String },
     /// Cooperative activated (charter ratified + min members met)
-    Activated { coop_id: String },
+    Activated {
+        coop_id: String,
+        treasury_did: String,
+        treasury_id: String,
+    },
     /// Cooperative suspended
     Suspended { coop_id: String, reason: String },
     /// Cooperative resumed from suspension
@@ -77,7 +102,7 @@ impl LifecycleManager {
         &self,
         mut coop: Cooperative,
         charter_hash: String,
-    ) -> Result<Cooperative> {
+    ) -> Result<(Cooperative, String)> {
         if !coop.can_transition_to(&CoopStatus::Active) {
             return Err(CoopError::InvalidStateTransition(format!(
                 "Cannot activate from {:?}",
@@ -85,13 +110,22 @@ impl LifecycleManager {
             )));
         }
 
-        info!("Activating cooperative: {}", coop.id);
+        // Derive treasury DID deterministically from coop ID
+        let treasury_did = derive_treasury_did(&coop.id);
+        let treasury_id = format!("treasury:{}", coop.id);
+
+        info!(
+            coop_id = %coop.id,
+            treasury_did = %treasury_did,
+            treasury_id = %treasury_id,
+            "Activating cooperative with treasury"
+        );
 
         coop.status = CoopStatus::Active;
         coop.charter_hash = Some(charter_hash);
         coop.updated_at = Utc::now();
 
-        Ok(coop)
+        Ok((coop, treasury_id))
     }
 
     pub async fn suspend(&self, mut coop: Cooperative, reason: String) -> Result<Cooperative> {
@@ -634,5 +668,51 @@ mod tests {
             Some("A worker cooperative for software development".to_string())
         );
         assert_eq!(coop.currency, Some("hours".to_string()));
+    }
+
+    #[test]
+    fn test_derive_treasury_anchor_deterministic() {
+        let coop_id = "test-coop-123";
+        let anchor1 = derive_treasury_anchor(coop_id);
+        let anchor2 = derive_treasury_anchor(coop_id);
+        assert_eq!(anchor1, anchor2);
+        assert_eq!(anchor1.len(), 16);
+    }
+
+    #[test]
+    fn test_derive_treasury_anchor_unique_per_coop() {
+        let anchor1 = derive_treasury_anchor("coop-a");
+        let anchor2 = derive_treasury_anchor("coop-b");
+        assert_ne!(anchor1, anchor2);
+    }
+
+    #[test]
+    fn test_derive_treasury_did_format() {
+        let coop_id = "my-coop";
+        let did = derive_treasury_did(coop_id);
+        assert!(did.starts_with("did:icn:treasury:"));
+        // Verify it's deterministic
+        let did2 = derive_treasury_did(coop_id);
+        assert_eq!(did, did2);
+    }
+
+    #[tokio::test]
+    async fn test_activation_creates_treasury() {
+        let manager = LifecycleManager::new();
+
+        let mut coop = Cooperative::new("Treasury Test Coop".to_string(), CoopType::Worker);
+        // Put coop in Forming state with charter ratified so it can be activated
+        coop.status = CoopStatus::Forming;
+        coop.charter_ratified = true;
+
+        let charter_hash = "abc123".to_string();
+        let (activated_coop, treasury_id) = manager.activate(coop, charter_hash).await.unwrap();
+
+        assert_eq!(activated_coop.status, CoopStatus::Active);
+        assert_eq!(treasury_id, format!("treasury:{}", activated_coop.id));
+
+        // Verify treasury DID is deterministic
+        let expected_did = derive_treasury_did(&activated_coop.id);
+        assert!(expected_did.starts_with("did:icn:treasury:"));
     }
 }

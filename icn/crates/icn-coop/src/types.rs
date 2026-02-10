@@ -391,6 +391,24 @@ pub enum MemberStatus {
     Removed,
 }
 
+impl From<MemberStatus> for icn_entity::UnifiedMembershipStatus {
+    fn from(status: MemberStatus) -> Self {
+        match status {
+            MemberStatus::Pending => Self::Pending,
+            MemberStatus::Active => Self::Active,
+            MemberStatus::Suspended => Self::Suspended,
+            MemberStatus::Inactive => Self::Suspended, // Map inactive to suspended
+            MemberStatus::Removed => Self::Terminated,
+        }
+    }
+}
+
+impl From<&MemberStatus> for icn_entity::UnifiedMembershipStatus {
+    fn from(status: &MemberStatus) -> Self {
+        (*status).into()
+    }
+}
+
 /// Application to join a cooperative
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MembershipApplication {
@@ -1063,5 +1081,47 @@ mod tests {
         // The cooperative only has the string, not the keypair
         assert_eq!(coop.treasury_did, Some(did));
         // There is no method on Cooperative to retrieve a keypair
+    }
+
+    // ========================================
+    // MemberStatus to UnifiedMembershipStatus Tests
+    // ========================================
+
+    #[test]
+    fn test_member_status_to_unified_pending() {
+        let unified: icn_entity::UnifiedMembershipStatus = MemberStatus::Pending.into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Pending);
+    }
+
+    #[test]
+    fn test_member_status_to_unified_active() {
+        let unified: icn_entity::UnifiedMembershipStatus = MemberStatus::Active.into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Active);
+    }
+
+    #[test]
+    fn test_member_status_to_unified_suspended() {
+        let unified: icn_entity::UnifiedMembershipStatus = MemberStatus::Suspended.into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Suspended);
+    }
+
+    #[test]
+    fn test_member_status_to_unified_inactive() {
+        // Inactive maps to Suspended in unified model
+        let unified: icn_entity::UnifiedMembershipStatus = MemberStatus::Inactive.into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Suspended);
+    }
+
+    #[test]
+    fn test_member_status_to_unified_removed() {
+        let unified: icn_entity::UnifiedMembershipStatus = MemberStatus::Removed.into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Terminated);
+    }
+
+    #[test]
+    fn test_member_status_reference_conversion() {
+        let status = MemberStatus::Active;
+        let unified: icn_entity::UnifiedMembershipStatus = (&status).into();
+        assert_eq!(unified, icn_entity::UnifiedMembershipStatus::Active);
     }
 }

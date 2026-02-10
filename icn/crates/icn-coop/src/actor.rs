@@ -5,6 +5,7 @@ use crate::{
 use icn_gossip::GossipActor;
 use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
+use icn_ledger::TreasuryManager;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{debug, info, warn};
@@ -15,12 +16,17 @@ pub const COOP_TOPIC: &str = "coop:updates";
 /// Handle type for gossip actor
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
 
+/// Handle type for treasury manager (shared with governance handlers)
+pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
+
 pub struct CoopActor {
     rx: mpsc::Receiver<CoopMessage>,
     store: CoopStore,
     lifecycle: LifecycleManager,
     membership: MembershipManager,
     gossip: Option<GossipHandle>,
+    /// Optional treasury manager for registering treasury accounts in the ledger
+    treasury_manager: Option<TreasuryManagerHandle>,
 }
 
 pub enum CoopMessage {
@@ -109,10 +115,25 @@ pub enum CoopMessage {
         coop_id: String,
         reply: oneshot::Sender<Result<(Cooperative, Vec<LifecycleEvent>)>>,
     },
+    /// Create a treasury for a cooperative
+    CreateTreasury {
+        coop_id: String,
+        /// Reply channel for the created treasury ID
+        reply: oneshot::Sender<Result<String>>,
+    },
 }
 
 impl CoopActor {
     pub fn spawn(store: CoopStore, gossip: Option<GossipHandle>) -> mpsc::Sender<CoopMessage> {
+        Self::spawn_with_treasury(store, gossip, None)
+    }
+
+    /// Spawn actor with optional treasury manager for ledger integration
+    pub fn spawn_with_treasury(
+        store: CoopStore,
+        gossip: Option<GossipHandle>,
+        treasury_manager: Option<TreasuryManagerHandle>,
+    ) -> mpsc::Sender<CoopMessage> {
         let (tx, rx) = mpsc::channel(100);
 
         let lifecycle = LifecycleManager::new();
@@ -124,6 +145,7 @@ impl CoopActor {
             lifecycle,
             membership,
             gossip,
+            treasury_manager,
         };
 
         tokio::spawn(async move {
@@ -260,6 +282,10 @@ impl CoopActor {
                         .await;
                     let _ = reply.send(result);
                 }
+                CoopMessage::CreateTreasury { coop_id, reply } => {
+                    let result = self.handle_create_treasury(&coop_id).await;
+                    let _ = reply.send(result);
+                }
             }
         }
 
@@ -302,8 +328,14 @@ impl CoopActor {
         charter_hash: String,
     ) -> Result<Cooperative> {
         let coop = self.store.get_cooperative(&coop_id)?;
-        let coop = self.lifecycle.activate(coop, charter_hash).await?;
+        let (coop, treasury_id) = self.lifecycle.activate(coop, charter_hash).await?;
         self.store.save_cooperative(&coop)?;
+
+        tracing::info!(
+            coop_id = %coop.id,
+            treasury_id = %treasury_id,
+            "Cooperative activated with treasury"
+        );
 
         self.announce_coop_update(&coop).await;
 
@@ -405,6 +437,77 @@ impl CoopActor {
         self.announce_coop_update(&coop).await;
 
         Ok(coop)
+    }
+
+    async fn handle_create_treasury(&mut self, coop_id: &str) -> Result<String> {
+        // Verify coop exists
+        let mut coop = self.store.get_cooperative(coop_id)?;
+
+        // Check if treasury already exists
+        if coop.treasury_did.is_some() {
+            return Err(crate::CoopError::Governance(format!(
+                "Cooperative {} already has a treasury",
+                coop_id
+            )));
+        }
+
+        // Create treasury with derived DID
+        let treasury_did_str = crate::lifecycle::derive_treasury_did(coop_id);
+        let treasury_id = format!("treasury:{}", coop_id);
+
+        // Assign treasury to cooperative
+        coop.assign_treasury(treasury_did_str.clone())
+            .map_err(crate::CoopError::Governance)?;
+
+        // Register treasury account in ledger if treasury manager is available
+        if let Some(ref treasury_mgr) = self.treasury_manager {
+            // Create a DID from the treasury anchor for ledger registration
+            let anchor = crate::lifecycle::derive_treasury_anchor(coop_id);
+            let mut anchor_32 = [0u8; 32];
+            anchor_32[..16].copy_from_slice(&anchor);
+            let treasury_did = Did::from_anchor_id(&anchor_32);
+
+            // Get the founder DID as the creator (first member of the coop)
+            let created_by = self
+                .store
+                .list_members(coop_id)
+                .ok()
+                .and_then(|members| members.first().map(|m| m.did.clone()))
+                .unwrap_or_else(|| treasury_did.clone());
+
+            let mut treasury_guard = treasury_mgr.write().await;
+            treasury_guard
+                .register_treasury(
+                    treasury_did.clone(),
+                    coop_id.to_string(),
+                    "HOURS".to_string(), // Default cooperative currency
+                    created_by,
+                    Some(format!("Treasury for cooperative {}", coop_id)),
+                )
+                .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
+
+            tracing::info!(
+                coop_id,
+                treasury_id = %treasury_id,
+                treasury_did = %treasury_did,
+                "Created treasury account in ledger for cooperative"
+            );
+        }
+
+        // Save updated cooperative
+        self.store.save_cooperative(&coop)?;
+
+        tracing::info!(
+            coop_id,
+            treasury_id = %treasury_id,
+            treasury_did = %treasury_did_str,
+            "Created treasury for cooperative"
+        );
+
+        // Announce to network
+        self.announce_coop_update(&coop).await;
+
+        Ok(treasury_id)
     }
 
     async fn announce_coop_update(&self, coop: &Cooperative) {
@@ -1316,5 +1419,200 @@ mod tests {
             2,
             "Upsert should produce exactly 1 member entry"
         );
+    }
+
+    // === Treasury creation tests ===
+
+    #[tokio::test]
+    async fn test_create_treasury_success() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        // Create a cooperative first
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Treasury Test Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Create treasury for the cooperative
+        let treasury_id = handle.create_treasury(coop.id.clone()).await.unwrap();
+
+        // Verify treasury ID format
+        assert_eq!(treasury_id, format!("treasury:{}", coop.id));
+
+        // Verify the cooperative now has a treasury DID
+        let updated_coop = handle.get_cooperative(coop.id).await.unwrap();
+        assert!(updated_coop.treasury_did.is_some());
+        assert!(updated_coop
+            .treasury_did
+            .unwrap()
+            .starts_with("did:icn:treasury:"));
+    }
+
+    #[tokio::test]
+    async fn test_create_treasury_rejects_duplicate() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        // Create a cooperative
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Dup Treasury Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Create treasury - first time should succeed
+        let result = handle.create_treasury(coop.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Create treasury again - should fail
+        let result = handle.create_treasury(coop.id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_create_treasury_nonexistent_coop() {
+        let handle = spawn_test_actor();
+
+        // Try to create treasury for a non-existent cooperative
+        let result = handle
+            .create_treasury("nonexistent-coop-id".to_string())
+            .await;
+        assert!(result.is_err());
+    }
+
+    // === Treasury-Ledger integration tests (B1.3) ===
+
+    fn spawn_test_actor_with_treasury() -> (CoopHandle, TreasuryManagerHandle) {
+        let store = create_test_store();
+        let treasury_mgr = Arc::new(RwLock::new(icn_ledger::TreasuryManager::new()));
+        let tx = CoopActor::spawn_with_treasury(store, None, Some(treasury_mgr.clone()));
+        (CoopHandle::new(tx), treasury_mgr)
+    }
+
+    #[tokio::test]
+    async fn test_create_treasury_registers_in_ledger() {
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury();
+        let founder = create_test_did();
+
+        // Create a cooperative
+        let coop = handle
+            .create_cooperative(
+                Some("ledger-test-coop".to_string()),
+                "Ledger Treasury Test Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Create treasury for the cooperative
+        let treasury_id = handle.create_treasury(coop.id.clone()).await.unwrap();
+        assert_eq!(treasury_id, format!("treasury:{}", coop.id));
+
+        // Verify treasury was registered in the TreasuryManager
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop.id);
+        assert!(
+            treasury.is_some(),
+            "Treasury should be registered in ledger"
+        );
+
+        let treasury = treasury.unwrap();
+        assert_eq!(treasury.coop_id, coop.id);
+        assert_eq!(treasury.currency, "HOURS");
+        assert!(treasury.is_active);
+    }
+
+    #[tokio::test]
+    async fn test_treasury_account_shows_zero_balance() {
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury();
+        let founder = create_test_did();
+
+        // Create cooperative and treasury
+        let coop = handle
+            .create_cooperative(
+                Some("zero-balance-coop".to_string()),
+                "Zero Balance Coop".to_string(),
+                CoopType::Consumer,
+                founder,
+            )
+            .await
+            .unwrap();
+        handle.create_treasury(coop.id.clone()).await.unwrap();
+
+        // Verify treasury exists and has zero initial state (no budgets spent)
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop.id).unwrap();
+
+        // Treasury accounts start with no budgets
+        let budgets = guard.list_budgets(&treasury.treasury_did);
+        assert!(budgets.is_empty(), "New treasury should have no budgets");
+    }
+
+    #[tokio::test]
+    async fn test_treasury_metadata_contains_coop_id() {
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury();
+        let founder = create_test_did();
+
+        // Create cooperative with specific ID
+        let coop = handle
+            .create_cooperative(
+                Some("metadata-test-coop".to_string()),
+                "Metadata Test Coop".to_string(),
+                CoopType::Platform,
+                founder,
+            )
+            .await
+            .unwrap();
+        handle.create_treasury(coop.id.clone()).await.unwrap();
+
+        // Verify treasury metadata
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop.id).unwrap();
+
+        assert_eq!(treasury.coop_id, "metadata-test-coop");
+        assert!(
+            treasury.description.is_some(),
+            "Treasury should have description"
+        );
+        assert!(
+            treasury.description.as_ref().unwrap().contains(&coop.id),
+            "Description should contain coop ID"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_treasury_works_without_ledger_manager() {
+        // Test that treasury creation still works when no TreasuryManager is provided
+        let handle = spawn_test_actor(); // Uses spawn() without treasury manager
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                Some("no-ledger-coop".to_string()),
+                "No Ledger Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Treasury creation should succeed (just no ledger registration)
+        let treasury_id = handle.create_treasury(coop.id.clone()).await.unwrap();
+        assert_eq!(treasury_id, format!("treasury:{}", coop.id));
+
+        // Verify the coop has a treasury DID assigned
+        let updated_coop = handle.get_cooperative(coop.id).await.unwrap();
+        assert!(updated_coop.treasury_did.is_some());
     }
 }

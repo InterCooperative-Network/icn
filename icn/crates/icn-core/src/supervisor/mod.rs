@@ -12,6 +12,7 @@
 pub mod actors;
 pub mod background_tasks;
 pub mod bridge;
+pub mod governance_executor;
 pub mod governance_handlers;
 pub mod init_bootstrap;
 pub mod init_community;
@@ -43,6 +44,7 @@ use crate::config::Config;
 use crate::runtime::ShutdownTx;
 
 pub use actors::BootstrapHandles;
+pub use governance_executor::KernelGovernanceExecutor;
 
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {

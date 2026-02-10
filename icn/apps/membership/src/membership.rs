@@ -10,6 +10,7 @@ use std::collections::HashMap;
 /// Re-export membership types from icn-entity
 pub use icn_entity::membership::{
     Membership as EntityMembership, MembershipCapability, MembershipRole, MembershipStatus,
+    UnifiedMembershipStatus,
 };
 
 /// Generic membership trait that all membership types implement
@@ -579,5 +580,63 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, MembershipError::InvalidCriteria(_)));
+    }
+
+    // ========================================
+    // UnifiedMembershipStatus Integration Tests
+    // ========================================
+
+    #[test]
+    fn test_unified_status_reexport() {
+        // Verify UnifiedMembershipStatus is properly re-exported
+        let status = UnifiedMembershipStatus::default();
+        assert_eq!(status, UnifiedMembershipStatus::Applicant);
+    }
+
+    #[test]
+    fn test_unified_status_lifecycle() {
+        use UnifiedMembershipStatus::*;
+
+        // Test the full lifecycle path
+        let mut status = Applicant;
+        assert!(!status.is_active());
+        assert!(!status.can_participate());
+
+        // Approve application
+        assert!(status.can_transition_to(&Pending));
+        status = Pending;
+
+        // Complete onboarding
+        assert!(status.can_transition_to(&Active));
+        status = Active;
+        assert!(status.is_active());
+        assert!(status.can_participate());
+
+        // Temporarily suspend
+        assert!(status.can_transition_to(&Suspended));
+        status = Suspended;
+        assert!(!status.is_active());
+
+        // Reactivate
+        assert!(status.can_transition_to(&Active));
+        status = Active;
+
+        // Terminate
+        assert!(status.can_transition_to(&Terminated));
+        status = Terminated;
+        assert!(status.is_terminal());
+
+        // Cannot transition out of terminal
+        assert!(!status.can_transition_to(&Active));
+    }
+
+    #[test]
+    fn test_unified_status_conversion_from_membership_status() {
+        // Test that legacy MembershipStatus converts correctly
+        let active: UnifiedMembershipStatus = MembershipStatus::Active.into();
+        assert_eq!(active, UnifiedMembershipStatus::Active);
+
+        let removed: UnifiedMembershipStatus = MembershipStatus::Removed.into();
+        assert_eq!(removed, UnifiedMembershipStatus::Terminated);
     }
 }

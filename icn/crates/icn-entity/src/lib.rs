@@ -97,6 +97,8 @@ pub use labor_exchange::{
     CreditRouting, LaborAssignment, LaborNeed, LaborPool, PoolRegistration, RoutingMode,
 };
 pub use lifecycle::{EntityLifecycle, LifecycleEvent};
-pub use membership::{Membership, MembershipCapability, MembershipRole, MembershipStatus};
+pub use membership::{
+    Membership, MembershipCapability, MembershipRole, MembershipStatus, UnifiedMembershipStatus,
+};
 pub use registry::{EntityRegistry, EntityRegistryHandle, InMemoryRegistry};
 pub use sled_registry::SledEntityRegistry;

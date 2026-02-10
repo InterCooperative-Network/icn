@@ -39,6 +39,7 @@ pub mod compute;
 pub mod coord;
 pub mod error;
 pub mod events;
+pub mod governance;
 pub mod identity;
 pub mod naming;
 pub mod proofs;
@@ -66,6 +67,10 @@ pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyCla
 pub use coord::Coordination;
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
+pub use governance::{
+    DecisionReceiptId, ExecutionOutcome, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
+    TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+};
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{
     Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,

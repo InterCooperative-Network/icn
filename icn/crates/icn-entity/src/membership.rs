@@ -504,6 +504,139 @@ impl fmt::Display for MembershipStatus {
 }
 
 // ============================================================================
+// UnifiedMembershipStatus
+// ============================================================================
+
+/// Unified membership lifecycle status across all entity types.
+///
+/// This ensures consistent status handling whether the member is
+/// an individual, cooperative, community, or federation.
+///
+/// # State Machine
+///
+/// ```text
+/// Applicant ──> Pending ──> Active ──> Suspended ──> Terminated
+///     │            │          │            │
+///     └────────────┴──────────┴────────────┴──────> Terminated
+/// ```
+///
+/// # Example
+///
+/// ```rust
+/// use icn_entity::membership::UnifiedMembershipStatus;
+///
+/// let status = UnifiedMembershipStatus::Applicant;
+/// assert!(!status.is_active());
+/// assert!(status.can_transition_to(&UnifiedMembershipStatus::Pending));
+/// assert!(!status.is_terminal());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnifiedMembershipStatus {
+    /// Initial application submitted, pending review
+    Applicant,
+    /// Application approved, awaiting final activation
+    Pending,
+    /// Full active member with all rights
+    Active,
+    /// Temporarily suspended (can be reactivated)
+    Suspended,
+    /// Permanently terminated (cannot be reactivated)
+    Terminated,
+}
+
+impl UnifiedMembershipStatus {
+    /// Check if member has active rights
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    /// Check if member can participate (vote, propose, etc.)
+    pub fn can_participate(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    /// Check if status is terminal (no transitions possible)
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Terminated)
+    }
+
+    /// Valid status transitions based on membership lifecycle
+    ///
+    /// # Transition Rules
+    ///
+    /// - `Applicant` → `Pending` (application approved) or `Terminated` (rejected)
+    /// - `Pending` → `Active` (onboarding complete) or `Terminated` (withdrawn)
+    /// - `Active` → `Suspended` (temporary hold) or `Terminated` (voluntary/involuntary exit)
+    /// - `Suspended` → `Active` (reactivated) or `Terminated` (final removal)
+    /// - `Terminated` → (none - terminal state)
+    pub fn can_transition_to(&self, target: &Self) -> bool {
+        match (self, target) {
+            // Applicant can become Pending or Terminated
+            (Self::Applicant, Self::Pending) => true,
+            (Self::Applicant, Self::Terminated) => true,
+            // Pending can become Active or Terminated
+            (Self::Pending, Self::Active) => true,
+            (Self::Pending, Self::Terminated) => true,
+            // Active can become Suspended or Terminated
+            (Self::Active, Self::Suspended) => true,
+            (Self::Active, Self::Terminated) => true,
+            // Suspended can become Active or Terminated
+            (Self::Suspended, Self::Active) => true,
+            (Self::Suspended, Self::Terminated) => true,
+            // All other transitions invalid
+            _ => false,
+        }
+    }
+
+    /// Convert from the legacy MembershipStatus enum
+    ///
+    /// This provides backward compatibility with existing code that uses
+    /// the original `MembershipStatus` enum.
+    pub fn from_legacy(status: &MembershipStatus) -> Self {
+        match status {
+            MembershipStatus::Pending => Self::Pending,
+            MembershipStatus::Active => Self::Active,
+            MembershipStatus::Suspended => Self::Suspended,
+            MembershipStatus::Inactive => Self::Suspended, // Map inactive to suspended
+            MembershipStatus::Resigned => Self::Terminated,
+            MembershipStatus::Removed => Self::Terminated,
+            MembershipStatus::Expelled => Self::Terminated,
+        }
+    }
+}
+
+impl Default for UnifiedMembershipStatus {
+    fn default() -> Self {
+        Self::Applicant
+    }
+}
+
+impl fmt::Display for UnifiedMembershipStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Applicant => write!(f, "Applicant"),
+            Self::Pending => write!(f, "Pending"),
+            Self::Active => write!(f, "Active"),
+            Self::Suspended => write!(f, "Suspended"),
+            Self::Terminated => write!(f, "Terminated"),
+        }
+    }
+}
+
+impl From<MembershipStatus> for UnifiedMembershipStatus {
+    fn from(status: MembershipStatus) -> Self {
+        Self::from_legacy(&status)
+    }
+}
+
+impl From<&MembershipStatus> for UnifiedMembershipStatus {
+    fn from(status: &MembershipStatus) -> Self {
+        Self::from_legacy(status)
+    }
+}
+
+// ============================================================================
 // MembershipCapability
 // ============================================================================
 
@@ -970,5 +1103,194 @@ mod tests {
         assert!(parsed.assignments.is_empty());
         assert!(parsed.labor_shares.is_empty());
         assert!(parsed.is_primary);
+    }
+
+    // ========================================
+    // UnifiedMembershipStatus Tests
+    // ========================================
+
+    #[test]
+    fn test_unified_status_default() {
+        let status = UnifiedMembershipStatus::default();
+        assert_eq!(status, UnifiedMembershipStatus::Applicant);
+    }
+
+    #[test]
+    fn test_unified_status_is_active() {
+        assert!(!UnifiedMembershipStatus::Applicant.is_active());
+        assert!(!UnifiedMembershipStatus::Pending.is_active());
+        assert!(UnifiedMembershipStatus::Active.is_active());
+        assert!(!UnifiedMembershipStatus::Suspended.is_active());
+        assert!(!UnifiedMembershipStatus::Terminated.is_active());
+    }
+
+    #[test]
+    fn test_unified_status_can_participate() {
+        assert!(!UnifiedMembershipStatus::Applicant.can_participate());
+        assert!(!UnifiedMembershipStatus::Pending.can_participate());
+        assert!(UnifiedMembershipStatus::Active.can_participate());
+        assert!(!UnifiedMembershipStatus::Suspended.can_participate());
+        assert!(!UnifiedMembershipStatus::Terminated.can_participate());
+    }
+
+    #[test]
+    fn test_unified_status_is_terminal() {
+        assert!(!UnifiedMembershipStatus::Applicant.is_terminal());
+        assert!(!UnifiedMembershipStatus::Pending.is_terminal());
+        assert!(!UnifiedMembershipStatus::Active.is_terminal());
+        assert!(!UnifiedMembershipStatus::Suspended.is_terminal());
+        assert!(UnifiedMembershipStatus::Terminated.is_terminal());
+    }
+
+    #[test]
+    fn test_unified_status_transitions_from_applicant() {
+        let applicant = UnifiedMembershipStatus::Applicant;
+
+        // Valid transitions
+        assert!(applicant.can_transition_to(&UnifiedMembershipStatus::Pending));
+        assert!(applicant.can_transition_to(&UnifiedMembershipStatus::Terminated));
+
+        // Invalid transitions
+        assert!(!applicant.can_transition_to(&UnifiedMembershipStatus::Applicant));
+        assert!(!applicant.can_transition_to(&UnifiedMembershipStatus::Active));
+        assert!(!applicant.can_transition_to(&UnifiedMembershipStatus::Suspended));
+    }
+
+    #[test]
+    fn test_unified_status_transitions_from_pending() {
+        let pending = UnifiedMembershipStatus::Pending;
+
+        // Valid transitions
+        assert!(pending.can_transition_to(&UnifiedMembershipStatus::Active));
+        assert!(pending.can_transition_to(&UnifiedMembershipStatus::Terminated));
+
+        // Invalid transitions
+        assert!(!pending.can_transition_to(&UnifiedMembershipStatus::Applicant));
+        assert!(!pending.can_transition_to(&UnifiedMembershipStatus::Pending));
+        assert!(!pending.can_transition_to(&UnifiedMembershipStatus::Suspended));
+    }
+
+    #[test]
+    fn test_unified_status_transitions_from_active() {
+        let active = UnifiedMembershipStatus::Active;
+
+        // Valid transitions
+        assert!(active.can_transition_to(&UnifiedMembershipStatus::Suspended));
+        assert!(active.can_transition_to(&UnifiedMembershipStatus::Terminated));
+
+        // Invalid transitions
+        assert!(!active.can_transition_to(&UnifiedMembershipStatus::Applicant));
+        assert!(!active.can_transition_to(&UnifiedMembershipStatus::Pending));
+        assert!(!active.can_transition_to(&UnifiedMembershipStatus::Active));
+    }
+
+    #[test]
+    fn test_unified_status_transitions_from_suspended() {
+        let suspended = UnifiedMembershipStatus::Suspended;
+
+        // Valid transitions
+        assert!(suspended.can_transition_to(&UnifiedMembershipStatus::Active));
+        assert!(suspended.can_transition_to(&UnifiedMembershipStatus::Terminated));
+
+        // Invalid transitions
+        assert!(!suspended.can_transition_to(&UnifiedMembershipStatus::Applicant));
+        assert!(!suspended.can_transition_to(&UnifiedMembershipStatus::Pending));
+        assert!(!suspended.can_transition_to(&UnifiedMembershipStatus::Suspended));
+    }
+
+    #[test]
+    fn test_unified_status_transitions_from_terminated() {
+        let terminated = UnifiedMembershipStatus::Terminated;
+
+        // No valid transitions from terminal state
+        assert!(!terminated.can_transition_to(&UnifiedMembershipStatus::Applicant));
+        assert!(!terminated.can_transition_to(&UnifiedMembershipStatus::Pending));
+        assert!(!terminated.can_transition_to(&UnifiedMembershipStatus::Active));
+        assert!(!terminated.can_transition_to(&UnifiedMembershipStatus::Suspended));
+        assert!(!terminated.can_transition_to(&UnifiedMembershipStatus::Terminated));
+    }
+
+    #[test]
+    fn test_unified_status_from_legacy_membership_status() {
+        // Test conversion from MembershipStatus
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Pending),
+            UnifiedMembershipStatus::Pending
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Active),
+            UnifiedMembershipStatus::Active
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Suspended),
+            UnifiedMembershipStatus::Suspended
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Inactive),
+            UnifiedMembershipStatus::Suspended
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Resigned),
+            UnifiedMembershipStatus::Terminated
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Removed),
+            UnifiedMembershipStatus::Terminated
+        );
+        assert_eq!(
+            UnifiedMembershipStatus::from(MembershipStatus::Expelled),
+            UnifiedMembershipStatus::Terminated
+        );
+    }
+
+    #[test]
+    fn test_unified_status_from_legacy_reference() {
+        // Test conversion from &MembershipStatus
+        let active = MembershipStatus::Active;
+        assert_eq!(
+            UnifiedMembershipStatus::from(&active),
+            UnifiedMembershipStatus::Active
+        );
+    }
+
+    #[test]
+    fn test_unified_status_display() {
+        assert_eq!(UnifiedMembershipStatus::Applicant.to_string(), "Applicant");
+        assert_eq!(UnifiedMembershipStatus::Pending.to_string(), "Pending");
+        assert_eq!(UnifiedMembershipStatus::Active.to_string(), "Active");
+        assert_eq!(UnifiedMembershipStatus::Suspended.to_string(), "Suspended");
+        assert_eq!(
+            UnifiedMembershipStatus::Terminated.to_string(),
+            "Terminated"
+        );
+    }
+
+    #[test]
+    fn test_unified_status_serialization() {
+        let status = UnifiedMembershipStatus::Active;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, r#""active""#);
+
+        let parsed: UnifiedMembershipStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, UnifiedMembershipStatus::Active);
+    }
+
+    #[test]
+    fn test_unified_status_all_variants_serialize() {
+        let variants = [
+            (UnifiedMembershipStatus::Applicant, r#""applicant""#),
+            (UnifiedMembershipStatus::Pending, r#""pending""#),
+            (UnifiedMembershipStatus::Active, r#""active""#),
+            (UnifiedMembershipStatus::Suspended, r#""suspended""#),
+            (UnifiedMembershipStatus::Terminated, r#""terminated""#),
+        ];
+
+        for (status, expected) in variants {
+            let json = serde_json::to_string(&status).unwrap();
+            assert_eq!(json, expected, "Failed for {:?}", status);
+
+            let parsed: UnifiedMembershipStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, status);
+        }
     }
 }

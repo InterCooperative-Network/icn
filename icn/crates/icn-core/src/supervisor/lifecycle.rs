@@ -337,9 +337,14 @@ async fn spawn_actors_with_identity(
     icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
     icn_obs::metrics::supervisor::actor_active_set("ledger", true);
 
-    // Initialize cooperative services
-    let coop_services =
-        super::init_coop::init_coop_services(config, gossip_handle.clone(), did.clone()).await?;
+    // Initialize cooperative services with treasury manager for ledger integration
+    let coop_services = super::init_coop::init_coop_services_with_treasury(
+        config,
+        gossip_handle.clone(),
+        did.clone(),
+        Some(treasury_manager_handle.clone()),
+    )
+    .await?;
     icn_obs::metrics::supervisor::actor_spawned_inc("coop");
     icn_obs::metrics::supervisor::actor_active_set("coop", true);
     let coop_handle = coop_services.coop_handle.clone();

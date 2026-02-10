@@ -282,20 +282,20 @@ mod tests {
     ///
     /// Target state: 0 after ledger extraction completes (#914).
     ///
-    /// Current state (2026-02-07):
-    /// - governance_handlers.rs: 19 (treasury types, dispute types, ledger types)
-    /// - treasury.rs: 2 (TreasuryOperation, ApprovalType — added for pilot treasury governance)
-    /// - lifecycle.rs: 5 (raw_handle extractions, fn signatures)
+    /// Current state (2026-02-10):
+    /// - governance_handlers/mod.rs: 4 (DisputeManager, TreasuryManager, ContentHash, DisputeOutcome)
+    /// - governance_handlers/treasury.rs: 21 (treasury types, JournalEntryBuilder, BudgetStatus)
+    /// - lifecycle.rs: 1 (ledger_handle fn signature)
     /// - init_compute.rs: 2 (LedgerHandle alias, JournalEntryBuilder)
     /// - init_notifications.rs: 1 (LedgerHandle alias)
-    /// - init_rpc.rs: 2 (Ledger, DisputeManager imports)
+    /// - init_rpc.rs: 1 (Ledger, DisputeManager imports)
     /// - config/ledger.rs: 1 (doc comment reference)
-    /// - actors.rs: 1 (CoreActorHandles LedgerHandle type)
+    /// - actors.rs: 3 (CoreActorHandles: ledger, dispute_manager, treasury_manager)
     ///
-    /// The 2 treasury.rs references are tracked for extraction in #914.
+    /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        let expected: usize = 30;
+        let expected: usize = 31;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(
