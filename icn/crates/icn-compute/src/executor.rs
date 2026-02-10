@@ -480,6 +480,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 
@@ -571,6 +574,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -602,6 +608,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());

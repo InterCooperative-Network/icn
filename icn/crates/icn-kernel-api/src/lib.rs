@@ -46,6 +46,7 @@ pub mod protocol_params;
 pub mod scope;
 pub mod services;
 pub mod state;
+pub mod storage;
 pub mod time;
 pub mod types;
 pub mod version;
@@ -76,7 +77,11 @@ pub use services::{
     SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
     TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
-pub use state::{BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy};
+pub use state::{
+    BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,
+    StateKey, StateOp, StateScope, StateValue,
+};
+pub use storage::{DataLocality, StorageClass, StorageValidationError};
 pub use time::TimeService;
 pub use version::Version;
 

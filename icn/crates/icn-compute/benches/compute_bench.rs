@@ -44,6 +44,8 @@ fn create_test_task(id: u8) -> ComputeTask {
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     }
 }
 

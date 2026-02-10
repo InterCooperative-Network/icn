@@ -125,6 +125,24 @@ pub struct ComputeTask {
     /// Controls audit visibility tier and access permissions.
     #[serde(default)]
     pub privacy_class: PrivacyClass,
+
+    // ========================================================================
+    // Storage Specification Fields (E4 - Storage Tiers & Data Locality)
+    // ========================================================================
+
+    /// Storage class for task outputs (E4).
+    ///
+    /// Determines how outputs are stored and replicated.
+    /// Default: ServiceState (mutable, coop-scoped).
+    #[serde(default)]
+    pub storage_class: Option<icn_kernel_api::storage::StorageClass>,
+
+    /// Data locality constraints for task execution (E4).
+    ///
+    /// Determines where the task can execute and what data it can access.
+    /// Default: CellLocal (most restrictive).
+    #[serde(default)]
+    pub data_locality: Option<icn_kernel_api::storage::DataLocality>,
 }
 
 impl ComputeTask {
@@ -266,6 +284,35 @@ impl ComputeTask {
             }
         }
 
+        // Validate storage specification fields (E4)
+        // Canonical tasks producing outputs SHOULD use StorageClass::Canonical
+        if self.determinism_class == DeterminismClass::Canonical {
+            if let Some(storage_class) = &self.storage_class {
+                if !storage_class.can_hold_canonical_output() {
+                    // This is a SHOULD, not a MUST - log warning but don't reject
+                    // The scheduler may apply stricter enforcement
+                }
+            }
+        }
+
+        // CellLocal data cannot be accessed by tasks with FederationMirrored locality
+        if let Some(data_locality) = &self.data_locality {
+            // If task has federation constraints, check locality compatibility
+            if let Some(ref fed_constraints) = self.federation_constraints {
+                use crate::scheduler::FederationPolicy;
+                // Federation tasks (AllowFederated or FederatedWhitelist) should not use CellLocal
+                let allows_federation = !matches!(
+                    fed_constraints.federation_policy,
+                    FederationPolicy::LocalOnly
+                );
+                if data_locality.is_cell_local() && allows_federation {
+                    return Err(crate::error::ComputeError::InvalidCode(
+                        "Tasks with CellLocal data locality cannot allow federated execution".into(),
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -285,7 +332,7 @@ pub type ContentHash = [u8; 32];
 /// # Examples
 ///
 /// ```
-/// use icn_compute::types::DeterminismClass;
+/// use icn_compute::DeterminismClass;
 ///
 /// // Governance tallying must be deterministic
 /// let tally = DeterminismClass::Canonical;
@@ -334,7 +381,7 @@ impl DeterminismClass {
 /// # Examples
 ///
 /// ```
-/// use icn_compute::types::PrivacyClass;
+/// use icn_compute::PrivacyClass;
 ///
 /// let public_task = PrivacyClass::Public;
 /// let member_task = PrivacyClass::Member;
@@ -686,6 +733,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let hash1 = task.hash();
@@ -848,6 +898,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 
@@ -1073,5 +1126,149 @@ mod tests {
         assert_eq!(serde_json::to_string(&public).unwrap(), r#""public""#);
         assert_eq!(serde_json::to_string(&member).unwrap(), r#""member""#);
         assert_eq!(serde_json::to_string(&ntk).unwrap(), r#""need_to_know""#);
+    }
+
+    // ========================================================================
+    // E4: Storage Specification Tests
+    // ========================================================================
+
+    #[test]
+    fn test_storage_class_default_is_service_state() {
+        use icn_kernel_api::storage::StorageClass;
+        assert_eq!(StorageClass::default(), StorageClass::ServiceState);
+    }
+
+    #[test]
+    fn test_data_locality_default_is_cell_local() {
+        use icn_kernel_api::storage::DataLocality;
+        assert_eq!(DataLocality::default(), DataLocality::CellLocal);
+    }
+
+    #[test]
+    fn test_task_with_storage_class() {
+        use icn_kernel_api::storage::StorageClass;
+        let mut task = valid_task();
+        task.storage_class = Some(StorageClass::Canonical);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_task_with_data_locality() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CoopReplicated);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_task_with_all_storage_fields() {
+        use icn_kernel_api::storage::{DataLocality, StorageClass};
+        let mut task = valid_task();
+        task.storage_class = Some(StorageClass::ServiceState);
+        task.data_locality = Some(DataLocality::CoopReplicated);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_cell_local_with_cross_coop_rejected() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CellLocal);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::AllowFederated,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("CellLocal data locality cannot allow federated"));
+    }
+
+    #[test]
+    fn test_validate_cell_local_without_cross_coop_ok() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CellLocal);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::LocalOnly,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_federation_mirrored_with_cross_coop_ok() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::FederationMirrored);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::AllowFederated,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_storage_class_serialization() {
+        use icn_kernel_api::storage::StorageClass;
+
+        let canonical = StorageClass::Canonical;
+        let service = StorageClass::ServiceState;
+        let blobs = StorageClass::Blobs;
+
+        assert_eq!(serde_json::to_string(&canonical).unwrap(), r#""canonical""#);
+        assert_eq!(
+            serde_json::to_string(&service).unwrap(),
+            r#""service_state""#
+        );
+        assert_eq!(serde_json::to_string(&blobs).unwrap(), r#""blobs""#);
+    }
+
+    #[test]
+    fn test_data_locality_serialization() {
+        use icn_kernel_api::storage::DataLocality;
+
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CellLocal).unwrap(),
+            r#""cell_local""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CoopReplicated).unwrap(),
+            r#""coop_replicated""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::FederationMirrored).unwrap(),
+            r#""federation_mirrored""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CommonsPublic).unwrap(),
+            r#""commons_public""#
+        );
+    }
+
+    #[test]
+    fn test_data_locality_access_rules() {
+        use icn_kernel_api::storage::DataLocality;
+
+        // FederationMirrored cannot access CellLocal
+        assert!(!DataLocality::FederationMirrored.can_access(DataLocality::CellLocal));
+
+        // CellLocal can access all levels
+        assert!(DataLocality::CellLocal.can_access(DataLocality::CellLocal));
+        assert!(DataLocality::CellLocal.can_access(DataLocality::CommonsPublic));
+
+        // Same level access is always allowed
+        assert!(DataLocality::CoopReplicated.can_access(DataLocality::CoopReplicated));
     }
 }

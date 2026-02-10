@@ -93,6 +93,8 @@ async fn test_compute_events_to_websocket() {
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     let task_hash = handle
@@ -208,6 +210,8 @@ async fn test_multiple_subscribers_receive_events() {
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     handle
@@ -327,6 +331,8 @@ async fn test_events_have_sequence_numbers() {
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     handle

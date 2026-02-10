@@ -141,6 +141,9 @@ impl ComputeService {
             policy_hash: None, // TODO: Add to API params
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         // Submit the task

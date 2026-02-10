@@ -703,6 +703,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 
@@ -1300,6 +1303,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let decision5 = manager

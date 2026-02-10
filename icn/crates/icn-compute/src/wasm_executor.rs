@@ -614,6 +614,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -665,6 +668,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -734,6 +740,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -803,6 +812,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -847,6 +859,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -889,6 +904,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -934,6 +952,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -994,6 +1015,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -1058,6 +1082,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -1111,6 +1138,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -1192,6 +1222,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {
@@ -1268,6 +1301,9 @@ mod tests {
             policy_hash: None,
             determinism_class: DeterminismClass::default(),
             privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let mut ctx = ExecutionContext {

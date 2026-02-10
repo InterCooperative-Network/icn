@@ -48,6 +48,9 @@ fn make_task(id: &str, submitter: &str) -> ComputeTask {
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        // E4: Storage specification fields
+        storage_class: None,
+        data_locality: None,
     }
 }
 
@@ -1510,6 +1513,9 @@ fn make_wasm_ref_task(id: &str, submitter: &str, wasm_hash: [u8; 32]) -> Compute
         policy_hash: None,
         determinism_class: DeterminismClass::default(),
         privacy_class: PrivacyClass::default(),
+        // E4: Storage specification fields
+        storage_class: None,
+        data_locality: None,
     }
 }
 

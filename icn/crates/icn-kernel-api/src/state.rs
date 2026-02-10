@@ -439,6 +439,387 @@ pub trait AppState: Send + Sync {
     fn blob(&self, name: &str) -> Option<std::sync::Arc<dyn Blob>>;
 }
 
+// ============================================================================
+// State Generalization (A1)
+// ============================================================================
+//
+// These types provide a generic state access layer that apps use to interact
+// with scoped storage. The kernel provides storage mechanics without knowing
+// what apps store. Domain-specific schemas (governance, ledger, coop) belong
+// in apps, not here.
+//
+// See: GitHub Issue #1135, relates to #858
+
+/// Generic key for state access.
+///
+/// Keys are hierarchical, using `/` as a separator. The kernel treats keys as
+/// opaque byte sequences; apps define key schemas.
+///
+/// # Key Format Convention
+///
+/// Apps should use namespaced keys to avoid collisions:
+/// - `/<app>/<entity>/<id>` for entity records
+/// - `/<app>/<entity>/<id>/<attr>` for entity attributes
+/// - `/<app>/meta/<name>` for metadata
+///
+/// # Examples
+///
+/// ```
+/// use icn_kernel_api::state::StateKey;
+///
+/// let key = StateKey::new("/ledger/accounts/alice");
+/// assert_eq!(key.as_str(), "/ledger/accounts/alice");
+///
+/// let prefixed = StateKey::with_prefix("ledger", "accounts/alice");
+/// assert_eq!(prefixed.as_str(), "/ledger/accounts/alice");
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct StateKey(String);
+
+impl StateKey {
+    /// Create a new state key from a string.
+    ///
+    /// Keys should start with `/` for consistency, but this is not enforced.
+    pub fn new(key: impl Into<String>) -> Self {
+        Self(key.into())
+    }
+
+    /// Create a key with a prefix (adds leading `/`).
+    ///
+    /// Useful for constructing namespaced keys.
+    pub fn with_prefix(prefix: &str, suffix: &str) -> Self {
+        Self(format!("/{prefix}/{suffix}"))
+    }
+
+    /// Get the key as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Get the key as bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
+    /// Check if this key starts with the given prefix.
+    pub fn starts_with(&self, prefix: &str) -> bool {
+        self.0.starts_with(prefix)
+    }
+}
+
+impl std::fmt::Display for StateKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<String> for StateKey {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for StateKey {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+/// Generic value wrapper for state storage.
+///
+/// Values are opaque byte sequences. The kernel does not interpret value
+/// contents; apps define their own serialization formats.
+///
+/// # Serialization
+///
+/// Apps are responsible for serializing domain types to bytes. Recommended:
+/// - Use `bincode` for compact binary encoding
+/// - Use `serde_json` when human-readability is needed
+/// - Include version prefixes for schema evolution
+///
+/// # Examples
+///
+/// ```
+/// use icn_kernel_api::state::StateValue;
+///
+/// let value = StateValue::new(vec![1, 2, 3, 4]);
+/// assert_eq!(value.as_bytes().len(), 4);
+///
+/// // From string (for simple cases)
+/// let text = StateValue::from_string("hello");
+/// assert_eq!(text.as_bytes(), b"hello");
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StateValue(Vec<u8>);
+
+impl StateValue {
+    /// Create a new state value from bytes.
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    /// Create a state value from a string slice.
+    pub fn from_string(s: &str) -> Self {
+        Self(s.as_bytes().to_vec())
+    }
+
+    /// Get the value as bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// Consume and return the inner bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    /// Check if the value is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Get the length of the value in bytes.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<Vec<u8>> for StateValue {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
+
+impl From<&[u8]> for StateValue {
+    fn from(bytes: &[u8]) -> Self {
+        Self(bytes.to_vec())
+    }
+}
+
+/// State operation types for generic state access.
+///
+/// These operations represent the fundamental CRUD operations on state.
+/// The kernel implements these operations; apps compose them into
+/// higher-level domain operations.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StateOp {
+    /// Get a value by key.
+    Get { key: StateKey },
+
+    /// Put a value at a key (upsert semantics).
+    Put { key: StateKey, value: StateValue },
+
+    /// Delete a value by key.
+    Delete { key: StateKey },
+
+    /// List keys with a prefix.
+    List { prefix: String },
+}
+
+impl StateOp {
+    /// Create a Get operation.
+    pub fn get(key: impl Into<StateKey>) -> Self {
+        Self::Get { key: key.into() }
+    }
+
+    /// Create a Put operation.
+    pub fn put(key: impl Into<StateKey>, value: impl Into<StateValue>) -> Self {
+        Self::Put {
+            key: key.into(),
+            value: value.into(),
+        }
+    }
+
+    /// Create a Delete operation.
+    pub fn delete(key: impl Into<StateKey>) -> Self {
+        Self::Delete { key: key.into() }
+    }
+
+    /// Create a List operation.
+    pub fn list(prefix: impl Into<String>) -> Self {
+        Self::List {
+            prefix: prefix.into(),
+        }
+    }
+}
+
+/// Scope for state access.
+///
+/// State is scoped to control visibility and replication. The kernel uses
+/// scopes for access control and data placement decisions without
+/// understanding the domain semantics of what's stored.
+///
+/// # Scope Hierarchy
+///
+/// - `Cell`: Local to the HA cluster (fastest, most private)
+/// - `Coop`: Shared within a cooperative (replicated within org)
+/// - `Federation`: Shared across federated cooperatives
+/// - `Commons`: Public, shared with all reachable nodes
+///
+/// # Access Rules
+///
+/// By default:
+/// - Writers can only write to their own scope or narrower
+/// - Readers can read from their scope or wider (with appropriate caps)
+/// - Cross-scope writes require explicit capability grants
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum StateScope {
+    /// Local to the cell (HA cluster) - not replicated outside.
+    #[default]
+    Cell = 0,
+    /// Shared within the cooperative.
+    Coop = 1,
+    /// Shared across federated cooperatives.
+    Federation = 2,
+    /// Public commons - globally visible.
+    Commons = 3,
+}
+
+impl StateScope {
+    /// Convert to the corresponding ScopeLevel.
+    ///
+    /// Maps state scopes to the general scope hierarchy used elsewhere.
+    pub fn to_scope_level(&self) -> ScopeLevel {
+        match self {
+            StateScope::Cell => ScopeLevel::Cell,
+            StateScope::Coop => ScopeLevel::Org,
+            StateScope::Federation => ScopeLevel::Federation,
+            StateScope::Commons => ScopeLevel::Commons,
+        }
+    }
+
+    /// Create from a ScopeLevel.
+    ///
+    /// Maps the general scope hierarchy to state scopes.
+    /// `Local` maps to `Cell` (narrowest state scope).
+    pub fn from_scope_level(level: ScopeLevel) -> Self {
+        match level {
+            ScopeLevel::Local | ScopeLevel::Cell => StateScope::Cell,
+            ScopeLevel::Org => StateScope::Coop,
+            ScopeLevel::Federation => StateScope::Federation,
+            ScopeLevel::Commons => StateScope::Commons,
+        }
+    }
+
+    /// Check if this scope includes another scope.
+    ///
+    /// Wider scopes include narrower ones.
+    pub fn includes(&self, other: StateScope) -> bool {
+        *self >= other
+    }
+}
+
+impl std::fmt::Display for StateScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StateScope::Cell => write!(f, "cell"),
+            StateScope::Coop => write!(f, "coop"),
+            StateScope::Federation => write!(f, "federation"),
+            StateScope::Commons => write!(f, "commons"),
+        }
+    }
+}
+
+// ============================================================================
+// StateBackend Trait
+// ============================================================================
+
+/// Generic state backend interface for scoped key-value storage.
+///
+/// This trait provides a uniform interface for state access across different
+/// scopes. Implementations handle the actual storage, replication, and
+/// consistency guarantees.
+///
+/// # Design Principles
+///
+/// 1. **Scope-aware**: All operations are scoped. The kernel routes requests
+///    to appropriate storage backends based on scope.
+///
+/// 2. **Opaque values**: The backend treats keys and values as opaque bytes.
+///    Domain semantics (schemas, validation) belong in apps.
+///
+/// 3. **Async-first**: Operations are async to support networked storage
+///    and replication without blocking.
+///
+/// 4. **Error handling**: Errors are returned as `StateError` variants.
+///    Apps decide how to handle errors (retry, fallback, propagate).
+///
+/// # Implementation Notes
+///
+/// Implementors should:
+/// - Respect scope boundaries (don't leak data across scopes)
+/// - Handle concurrent access safely
+/// - Provide appropriate durability guarantees per scope
+/// - Emit metrics for observability
+///
+/// # Examples
+///
+/// ```ignore
+/// use icn_kernel_api::state::{StateBackend, StateScope, StateKey, StateValue};
+///
+/// async fn example(backend: &dyn StateBackend) -> Result<(), StateError> {
+///     // Store a value in coop scope
+///     let key = StateKey::new("/accounts/alice/balance");
+///     let value = StateValue::new(100i64.to_le_bytes().to_vec());
+///     backend.put(StateScope::Coop, key.clone(), value).await?;
+///
+///     // Read it back
+///     if let Some(stored) = backend.get(StateScope::Coop, &key).await? {
+///         println!("Balance: {} bytes", stored.len());
+///     }
+///
+///     Ok(())
+/// }
+/// ```
+#[async_trait::async_trait]
+pub trait StateBackend: Send + Sync {
+    /// Get a value by key within a scope.
+    ///
+    /// Returns `None` if the key doesn't exist.
+    async fn get(&self, scope: StateScope, key: &StateKey) -> Result<Option<StateValue>, StateError>;
+
+    /// Put a value at a key within a scope.
+    ///
+    /// This is an upsert operation: creates if not exists, updates if exists.
+    async fn put(&self, scope: StateScope, key: StateKey, value: StateValue) -> Result<(), StateError>;
+
+    /// Delete a value by key within a scope.
+    ///
+    /// Returns `Ok(())` even if the key didn't exist (idempotent).
+    async fn delete(&self, scope: StateScope, key: &StateKey) -> Result<(), StateError>;
+
+    /// List keys with a prefix within a scope.
+    ///
+    /// Returns all keys that start with the given prefix.
+    /// Order is implementation-defined but should be consistent.
+    async fn list(&self, scope: StateScope, prefix: &str) -> Result<Vec<StateKey>, StateError>;
+
+    /// Check if a key exists within a scope.
+    ///
+    /// Default implementation uses `get`, but backends may override
+    /// for efficiency.
+    async fn exists(&self, scope: StateScope, key: &StateKey) -> Result<bool, StateError> {
+        Ok(self.get(scope, key).await?.is_some())
+    }
+
+    /// Get multiple values in one call.
+    ///
+    /// Returns a vector of optional values, one per key in the same order.
+    /// Default implementation calls `get` for each key, but backends may
+    /// override for efficiency.
+    async fn get_batch(
+        &self,
+        scope: StateScope,
+        keys: &[StateKey],
+    ) -> Result<Vec<Option<StateValue>>, StateError> {
+        let mut results = Vec::with_capacity(keys.len());
+        for key in keys {
+            results.push(self.get(scope, key).await?);
+        }
+        Ok(results)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -654,5 +1035,184 @@ mod tests {
         let json = serde_json::to_string(&obj).unwrap();
         let parsed: ObjectReplication = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, obj);
+    }
+
+    // ========================================================================
+    // State Generalization (A1) Tests
+    // ========================================================================
+
+    #[test]
+    fn test_state_key_new() {
+        let key = StateKey::new("/ledger/accounts/alice");
+        assert_eq!(key.as_str(), "/ledger/accounts/alice");
+        assert_eq!(key.to_string(), "/ledger/accounts/alice");
+    }
+
+    #[test]
+    fn test_state_key_with_prefix() {
+        let key = StateKey::with_prefix("ledger", "accounts/alice");
+        assert_eq!(key.as_str(), "/ledger/accounts/alice");
+    }
+
+    #[test]
+    fn test_state_key_starts_with() {
+        let key = StateKey::new("/ledger/accounts/alice");
+        assert!(key.starts_with("/ledger"));
+        assert!(key.starts_with("/ledger/accounts"));
+        assert!(!key.starts_with("/governance"));
+    }
+
+    #[test]
+    fn test_state_key_as_bytes() {
+        let key = StateKey::new("/test");
+        assert_eq!(key.as_bytes(), b"/test");
+    }
+
+    #[test]
+    fn test_state_key_from() {
+        let key1: StateKey = String::from("/test").into();
+        let key2: StateKey = "/test".into();
+        assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn test_state_key_serde() {
+        let key = StateKey::new("/ledger/accounts/alice");
+        let json = serde_json::to_string(&key).unwrap();
+        let parsed: StateKey = serde_json::from_str(&json).unwrap();
+        assert_eq!(key, parsed);
+    }
+
+    #[test]
+    fn test_state_value_new() {
+        let value = StateValue::new(vec![1, 2, 3, 4]);
+        assert_eq!(value.as_bytes(), &[1, 2, 3, 4]);
+        assert_eq!(value.len(), 4);
+        assert!(!value.is_empty());
+    }
+
+    #[test]
+    fn test_state_value_from_string() {
+        let value = StateValue::from_string("hello");
+        assert_eq!(value.as_bytes(), b"hello");
+    }
+
+    #[test]
+    fn test_state_value_into_bytes() {
+        let value = StateValue::new(vec![1, 2, 3]);
+        let bytes = value.into_bytes();
+        assert_eq!(bytes, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_state_value_empty() {
+        let empty = StateValue::new(vec![]);
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+    }
+
+    #[test]
+    fn test_state_value_from() {
+        let v1: StateValue = vec![1, 2, 3].into();
+        let v2: StateValue = [1u8, 2, 3].as_slice().into();
+        assert_eq!(v1, v2);
+    }
+
+    #[test]
+    fn test_state_value_serde() {
+        let value = StateValue::new(vec![1, 2, 3, 4]);
+        let json = serde_json::to_string(&value).unwrap();
+        let parsed: StateValue = serde_json::from_str(&json).unwrap();
+        assert_eq!(value, parsed);
+    }
+
+    #[test]
+    fn test_state_op_constructors() {
+        let get = StateOp::get("/key");
+        assert!(matches!(get, StateOp::Get { key } if key.as_str() == "/key"));
+
+        let put = StateOp::put("/key", vec![1, 2, 3]);
+        assert!(matches!(put, StateOp::Put { key, value } if key.as_str() == "/key" && value.len() == 3));
+
+        let delete = StateOp::delete("/key");
+        assert!(matches!(delete, StateOp::Delete { key } if key.as_str() == "/key"));
+
+        let list = StateOp::list("/prefix");
+        assert!(matches!(list, StateOp::List { prefix } if prefix == "/prefix"));
+    }
+
+    #[test]
+    fn test_state_op_serde() {
+        let ops = vec![
+            StateOp::get("/test"),
+            StateOp::put("/test", vec![1, 2]),
+            StateOp::delete("/test"),
+            StateOp::list("/prefix"),
+        ];
+
+        for op in ops {
+            let json = serde_json::to_string(&op).unwrap();
+            let parsed: StateOp = serde_json::from_str(&json).unwrap();
+            assert_eq!(op, parsed);
+        }
+    }
+
+    #[test]
+    fn test_state_scope_ordering() {
+        assert!(StateScope::Cell < StateScope::Coop);
+        assert!(StateScope::Coop < StateScope::Federation);
+        assert!(StateScope::Federation < StateScope::Commons);
+    }
+
+    #[test]
+    fn test_state_scope_includes() {
+        assert!(StateScope::Commons.includes(StateScope::Cell));
+        assert!(StateScope::Commons.includes(StateScope::Coop));
+        assert!(StateScope::Coop.includes(StateScope::Coop));
+        assert!(!StateScope::Cell.includes(StateScope::Coop));
+    }
+
+    #[test]
+    fn test_state_scope_display() {
+        assert_eq!(StateScope::Cell.to_string(), "cell");
+        assert_eq!(StateScope::Coop.to_string(), "coop");
+        assert_eq!(StateScope::Federation.to_string(), "federation");
+        assert_eq!(StateScope::Commons.to_string(), "commons");
+    }
+
+    #[test]
+    fn test_state_scope_default() {
+        assert_eq!(StateScope::default(), StateScope::Cell);
+    }
+
+    #[test]
+    fn test_state_scope_to_scope_level() {
+        assert_eq!(StateScope::Cell.to_scope_level(), ScopeLevel::Cell);
+        assert_eq!(StateScope::Coop.to_scope_level(), ScopeLevel::Org);
+        assert_eq!(StateScope::Federation.to_scope_level(), ScopeLevel::Federation);
+        assert_eq!(StateScope::Commons.to_scope_level(), ScopeLevel::Commons);
+    }
+
+    #[test]
+    fn test_state_scope_from_scope_level() {
+        assert_eq!(StateScope::from_scope_level(ScopeLevel::Local), StateScope::Cell);
+        assert_eq!(StateScope::from_scope_level(ScopeLevel::Cell), StateScope::Cell);
+        assert_eq!(StateScope::from_scope_level(ScopeLevel::Org), StateScope::Coop);
+        assert_eq!(StateScope::from_scope_level(ScopeLevel::Federation), StateScope::Federation);
+        assert_eq!(StateScope::from_scope_level(ScopeLevel::Commons), StateScope::Commons);
+    }
+
+    #[test]
+    fn test_state_scope_serde() {
+        for scope in [
+            StateScope::Cell,
+            StateScope::Coop,
+            StateScope::Federation,
+            StateScope::Commons,
+        ] {
+            let json = serde_json::to_string(&scope).unwrap();
+            let parsed: StateScope = serde_json::from_str(&json).unwrap();
+            assert_eq!(scope, parsed);
+        }
     }
 }
