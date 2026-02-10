@@ -1,9 +1,13 @@
 //! Core types for Cooperative Contract Language (CCL)
 
 use icn_identity::Did;
+use icn_kernel_api::compute::DeterminismClass;
 use icn_ledger::ContentHash;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+
+/// Re-export DeterminismClass for convenience
+pub use icn_kernel_api::compute::DeterminismClass as WorkloadDeterminismClass;
 
 /// Capability granted to a contract
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -342,6 +346,13 @@ pub struct ExecutionContext {
 
     /// Contract participants
     pub participants: Vec<Did>,
+
+    /// Workload determinism classification (E3).
+    ///
+    /// Canonical workloads can mutate state (ledger, governance, trust).
+    /// Advisory workloads cannot mutate state - their outputs are suggestions only.
+    /// Default is Canonical for backward compatibility.
+    pub determinism_class: DeterminismClass,
 }
 
 impl ExecutionContext {
@@ -360,6 +371,27 @@ impl ExecutionContext {
             fuel_limit: fuel,
             capabilities,
             participants,
+            determinism_class: DeterminismClass::Canonical,
+        }
+    }
+
+    /// Create a new execution context with explicit determinism class.
+    pub fn with_determinism_class(
+        caller: Did,
+        timestamp: u64,
+        fuel: u64,
+        capabilities: Vec<Capability>,
+        participants: Vec<Did>,
+        determinism_class: DeterminismClass,
+    ) -> Self {
+        ExecutionContext {
+            caller,
+            timestamp,
+            fuel,
+            fuel_limit: fuel,
+            capabilities,
+            participants,
+            determinism_class,
         }
     }
 
@@ -383,6 +415,14 @@ impl ExecutionContext {
     /// Check if capability is granted
     pub fn has_capability(&self, cap: &Capability) -> bool {
         self.capabilities.contains(cap)
+    }
+
+    /// Returns true if this context allows state mutations (E3 enforcement).
+    ///
+    /// Only Canonical workloads can mutate ledger, governance, or trust state.
+    #[inline]
+    pub fn can_mutate_state(&self) -> bool {
+        self.determinism_class.can_mutate_state()
     }
 }
 
