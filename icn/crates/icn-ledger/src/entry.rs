@@ -12,6 +12,8 @@ pub struct JournalEntryBuilder {
     accounts: Vec<AccountDelta>,
     parents: Vec<ContentHash>,
     nonce: Option<[u8; 32]>,
+    decision_receipt_id: Option<String>,
+    decision_hash: Option<String>,
 }
 
 impl JournalEntryBuilder {
@@ -23,6 +25,8 @@ impl JournalEntryBuilder {
             accounts: Vec::new(),
             parents: Vec::new(),
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         }
     }
 
@@ -68,6 +72,24 @@ impl JournalEntryBuilder {
         self
     }
 
+    /// Set the governance decision provenance.
+    ///
+    /// Links this ledger entry to the governance decision that authorized it.
+    /// Both fields should be set together for complete provenance.
+    ///
+    /// # Arguments
+    /// * `receipt_id` - Node-local decision receipt ID (e.g., "gov:proposal:2024-001:receipt:abc")
+    /// * `hash` - Canonical decision hash (cross-node anchor, e.g., "sha256:abc123...")
+    pub fn with_decision_provenance(
+        mut self,
+        receipt_id: impl Into<String>,
+        hash: impl Into<String>,
+    ) -> Self {
+        self.decision_receipt_id = Some(receipt_id.into());
+        self.decision_hash = Some(hash.into());
+        self
+    }
+
     /// Build and validate the journal entry
     pub fn build(self) -> Result<JournalEntry> {
         // Validate double-entry invariant: Σ debits == Σ credits per currency
@@ -89,6 +111,8 @@ impl JournalEntryBuilder {
             parents: self.parents,
             signature: None, // Will be set by caller
             nonce: self.nonce,
+            decision_receipt_id: self.decision_receipt_id,
+            decision_hash: self.decision_hash,
         };
 
         // Compute the content hash

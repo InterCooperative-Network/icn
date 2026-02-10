@@ -4495,6 +4495,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let current_time = icn_time::current_timestamp_secs();

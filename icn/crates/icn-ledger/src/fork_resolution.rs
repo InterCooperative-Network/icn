@@ -439,6 +439,8 @@ mod tests {
             parents,
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         }
     }
 

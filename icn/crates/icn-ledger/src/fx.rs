@@ -824,6 +824,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         PreparedFxTransfer {

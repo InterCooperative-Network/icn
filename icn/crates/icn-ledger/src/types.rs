@@ -77,6 +77,27 @@ pub struct JournalEntry {
     /// omitting `None` would change the canonical JSON representation
     /// and thus the content hash, breaking deduplication.
     pub nonce: Option<[u8; 32]>,
+
+    // =========================================================================
+    // PROVENANCE FIELDS (Pilot-grade invariant: governance → ledger traceability)
+    // =========================================================================
+
+    /// Governance decision receipt ID that authorized this entry.
+    ///
+    /// Links this ledger entry back to the governance decision that caused it.
+    /// This is the node-local identifier for the decision receipt.
+    ///
+    /// Example: `"gov:proposal:2024-001:receipt:abc123"`
+    pub decision_receipt_id: Option<String>,
+
+    /// Canonical decision hash (cross-node equality anchor).
+    ///
+    /// This is the cryptographic hash of the canonical decision content,
+    /// ensuring that any node can verify this ledger entry was authorized
+    /// by the same decision, regardless of receipt ID format.
+    ///
+    /// Example: `"sha256:abc123def456..."`
+    pub decision_hash: Option<String>,
 }
 
 /// Delta for a single account in a journal entry

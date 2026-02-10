@@ -26,6 +26,7 @@ impl Default for DecisionStatus {
 
 /// A cooperative meeting record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Meeting {
     /// Unique meeting identifier, e.g., "mtg-2026-02-10-summit".
     pub meeting_id: String,
@@ -47,6 +48,7 @@ pub struct Meeting {
 /// and `decision_hash` link back to the immutable canonical receipt, while the
 /// other fields provide searchable metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DecisionIndexEntry {
     /// Primary key, links to canonical receipt.
     pub decision_receipt_id: String,

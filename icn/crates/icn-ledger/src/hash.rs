@@ -84,6 +84,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let mut entry2 = entry1.clone();
@@ -111,6 +113,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let mut entry2 = entry1.clone();
@@ -142,6 +146,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: Some([0xAA; 32]),
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let mut entry2 = entry1.clone();
@@ -173,6 +179,8 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: Some([0xAA; 32]),
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let mut entry_without = entry_with.clone();

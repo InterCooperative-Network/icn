@@ -243,6 +243,8 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
@@ -277,6 +279,8 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
@@ -334,6 +338,8 @@ async fn test_spending_below_threshold_allowed() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
