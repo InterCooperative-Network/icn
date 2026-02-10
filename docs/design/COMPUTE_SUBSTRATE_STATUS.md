@@ -2,7 +2,7 @@
 
 **Created**: 2026-02-10  
 **Last Updated**: 2026-02-10  
-**PR**: #1148 (E1-E5, A1 storage/state foundations)
+**PR**: #1148 (E1-E7, A1-A4, B1, C1-C3 complete)
 
 ## Overview
 
@@ -14,7 +14,7 @@ Identity → Standing → Governance → Allocations → Workloads → Receipts 
 
 ## Completed Work
 
-### E-Track: Execution Layer
+### E-Track: Execution Layer (COMPLETE ✅)
 
 | ID | Issue | Title | Status | Key Changes |
 |----|-------|-------|--------|-------------|
@@ -26,24 +26,24 @@ Identity → Standing → Governance → Allocations → Workloads → Receipts 
 | E6 | #1133 | Individual Node Ownership | ✅ Done | `OperatorMode` enum (Organization/Individual) |
 | E7 | #1134 | Commons Compute Governance | ✅ Done | `CharterPriority`, `CommonsPoolPolicy` |
 
-### A-Track: Architecture (Kernel/App Separation)
+### A-Track: Architecture (Kernel/App Separation) (COMPLETE ✅)
 
 | ID | Issue | Title | Status | Key Changes |
 |----|-------|-------|--------|-------------|
 | A1 | #1135 | State Generalization | ✅ Done | `state.rs` with Log/Blob/KV service traits, `ReplicationPolicy` |
-| A2 | #1136 | Governance Extraction | 🚧 Pending | Move GovernanceActor to apps/governance |
-| A3 | #1137 | Membership Consolidation | 🚧 Pending | Merge entity/coop/community |
-| A4 | #1138 | Kernel Cleanup | ✅ Audited | 17 init files identified for extraction |
+| A2 | #1136 | Governance Extraction | ✅ Done | Handler infra in apps/governance, executor traits in icn-kernel-api |
+| A3 | #1137 | Membership Consolidation | ✅ Done | Federation nesting, treasury DID derivation, unified status |
+| A4 | #1138 | Kernel Cleanup | ✅ Audited | 17 init files identified, kernel_surface.toml updated |
 
-### B-Track: Business Layer
+### B-Track: Business Layer (B1 COMPLETE ✅)
 
-| ID | Issue | Title | Status |
-|----|-------|-------|--------|
-| B1 | #1139 | Treasury Integration | 🚧 Pending |
-| B2 | #1140 | Asset Type Definitions | 🚧 Pending |
-| B3 | #1141 | Receipt Workflows | 🚧 Pending |
+| ID | Issue | Title | Status | Key Changes |
+|----|-------|-------|--------|-------------|
+| B1 | #1139 | Treasury Integration | ✅ Done | CreateTreasury message, auto-DID, ledger wiring, disbursement |
+| B2 | #1140 | Asset Type Definitions | 🚧 Pending | Blocked on CanonicalReceipt intervention |
+| B3 | #1141 | Receipt Workflows | 🚧 Pending | Blocked on CanonicalReceipt + SettlementIntent |
 
-### C-Track: Connectivity/Operations
+### C-Track: Connectivity/Operations (COMPLETE ✅)
 
 | ID | Issue | Title | Status |
 |----|-------|-------|--------|
@@ -57,6 +57,45 @@ Identity → Standing → Governance → Allocations → Workloads → Receipts 
 |----|-------|-------|--------|
 | D1 | #1145 | E2E Integration Tests | 🚧 Pending |
 | D2 | #1147 | Tool Library Demo | 🚧 Pending |
+
+## ⚠️ Required Architectural Interventions
+
+**Before B2/B3, these consolidations must happen:**
+
+### INT-1: CanonicalReceipt Trait (CRITICAL)
+
+Receipt types proliferating independently risks parallel audit systems.
+
+```rust
+pub trait CanonicalReceipt {
+    fn receipt_id(&self) -> ReceiptId;
+    fn scope(&self) -> ScopeLevel;
+    fn created_at(&self) -> u64;
+    fn subject_hash(&self) -> ContentHash;
+    fn parent_receipts(&self) -> Vec<ReceiptId>;
+    fn verify(&self) -> Result<()>;
+}
+```
+
+All receipts (Decision, Allocation, Execution) implement this trait.
+
+### INT-2: SettlementIntent Pattern (CRITICAL)
+
+- Rename `SettlementHook` → `SettlementIntent` (declarative)
+- LedgerOracle consumes intent (executes)
+- Execution NEVER directly mutates ledger
+
+### INT-3: Governance Firewall Enforcement
+
+apps/governance may:
+- ✅ Produce receipts
+- ✅ Emit policy deltas
+- ✅ Call executors via trait
+
+apps/governance may NOT:
+- ❌ Import ledger internals
+- ❌ Mutate ledger state directly
+- ❌ Bypass ProposalExecutor boundary
 
 ## New Types Added
 
