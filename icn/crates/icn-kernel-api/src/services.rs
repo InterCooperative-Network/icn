@@ -625,6 +625,19 @@ pub enum LedgerEvent {
 /// share identity, state, and capacity. The kernel treats `CellId` as
 /// an opaque identifier and `ScopeLevel` as an ordered integer.
 ///
+/// # Operator Boundary Rule (E5)
+///
+/// **A cell is operated by exactly one entity** — a cooperative, community,
+/// federation, or individual. Mixed-operator cells are forbidden because:
+///
+/// - Trust within a cell is implicit (nodes share keys, state, workloads)
+/// - Cross-entity clustering belongs at federation scope, not cell scope
+/// - Mixed operators would break the security boundary (any node can act as the cell)
+///
+/// The `operator_entity` method returns the single entity that operates all
+/// nodes in this cell. Cell formation must validate that all joining nodes
+/// share the same operator entity ID.
+///
 /// Apps implement this trait to provide cell lifecycle management with
 /// their own organizational semantics.
 pub trait CellService: Send + Sync {
@@ -659,6 +672,26 @@ pub trait CellService: Send + Sync {
     /// Returns the narrowest scope that contains both the local node and
     /// the peer. If the peer is completely unknown, returns `Commons`.
     fn peer_scope(&self, did: &Did) -> ScopeLevel;
+
+    /// Get the operator entity for a cell (E5: Operator Boundary).
+    ///
+    /// Returns the DID or entity identifier of the single entity that
+    /// operates this cell. All nodes in a cell MUST share the same operator.
+    ///
+    /// # Cell Formation Validation
+    ///
+    /// When a node attempts to join a cell, the following must hold:
+    /// - `node.operator_entity == cell.operator_entity()`
+    ///
+    /// Implementations should reject cell join attempts that would violate
+    /// the single-operator rule.
+    ///
+    /// Returns `None` if the cell is unknown or operator is not set.
+    fn cell_operator(&self, cell_id: &CellId) -> Option<Did> {
+        // Default: not implemented (for backward compatibility)
+        let _ = cell_id;
+        None
+    }
 }
 
 // ============================================================================

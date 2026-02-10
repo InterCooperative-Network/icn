@@ -668,6 +668,7 @@ pub struct UsageRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{DeterminismClass, PrivacyClass};
 
     fn make_test_did() -> Did {
         let keypair = icn_identity::KeyPair::generate().unwrap();
@@ -675,7 +676,9 @@ mod tests {
     }
 
     fn make_test_task(priority: TaskPriority) -> ComputeTask {
-        use crate::types::{ExecutorCapability, FuelLimit, TaskCode};
+        use crate::types::{
+            DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode,
+        };
 
         ComputeTask {
             id: "test-task".into(),
@@ -696,6 +699,11 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
         }
     }
 
@@ -1080,7 +1088,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_policy_lifecycle_integration() {
-        use crate::types::{FuelLimit, TaskCode};
+        use crate::types::{DeterminismClass, FuelLimit, PrivacyClass, TaskCode};
 
         // Setup: Create PolicyManager with UsageTracker
         let tracker = Arc::new(UsageTracker::new());
@@ -1289,6 +1297,10 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
         };
 
         let decision5 = manager
