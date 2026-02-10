@@ -1,10 +1,10 @@
 # SDIS + Steward System Status
 **Date:** 2025-12-12  
-**Status:** DEPLOYED & FUNCTIONAL ✅
+**Status:** ✅ Infrastructure Deployed, ⚠️ Steward System Pending
 
 ## Overview
 
-The Secure Distributed Identity System (SDIS) is **fully deployed and operational** on the ICN K3s cluster. This document provides the current status, what works, what's in progress, and next steps.
+The Secure Distributed Identity System (SDIS) has its **infrastructure deployed** on the ICN K3s cluster. API endpoints are live, but **end-to-end enrollment requires the Steward system**, which is not yet implemented (see [SDIS_DEPLOYMENT_STATUS.md](SDIS_DEPLOYMENT_STATUS.md) for details). This document provides the current status, what works, what's in progress, and next steps.
 
 ---
 
@@ -83,7 +83,7 @@ $ curl http://10.8.10.40:30080/v1/sdis/health
 
 - ✅ `SDIS_API_GUIDE.md` - Complete API documentation
 - ✅ `SDIS_STEWARD_ROADMAP.md` - System architecture
-- ✅ `docs/sdis-architecture.md` - Technical details
+- ✅ `SDIS_SYSTEM.md` - Technical design
 
 ---
 
@@ -396,13 +396,13 @@ icn/crates/
 │   └── qr.rs                     # QR generation
 │
 ├── icn-identity/                 # Identity system
-│   ├── keystore_v4.rs            # SDIS keystore
+│   ├── keystore.rs               # Age-encrypted keystore
 │   ├── anchor.rs                 # Anchor devices
 │   └── recovery.rs               # Recovery codes
 │
 └── icn-trust/                    # Trust graph
-    ├── graph.rs                  # Trust computation
-    └── vouch.rs                  # Steward vouching
+    ├── sybil.rs                  # Sybil detection & vouching
+    └── computation.rs            # Trust computation
 ```
 
 ### Frontend (JavaScript)
@@ -498,8 +498,9 @@ kubectl exec -it -n icn $POD -- icnctl auth token \
 
 - [SDIS API Guide](SDIS_API_GUIDE.md) - Complete API documentation
 - [SDIS Steward Roadmap](SDIS_STEWARD_ROADMAP.md) - System architecture
-- [Deployment Guide](deploy/k8s/README.md) - K8s deployment
-- [Architecture Doc](docs/ARCHITECTURE.md) - Overall ICN architecture
+- [SDIS Deployment Status](SDIS_DEPLOYMENT_STATUS.md) - Deployment and steward status
+- [Deployment Guide](../../deploy/k8s/README.md) - K8s deployment
+- [Architecture Doc](../ARCHITECTURE.md) - Overall ICN architecture
 
 ---
 
