@@ -905,4 +905,4 @@ pub trait GovernanceOps: Send + Sync {
 
 **External Context:**
 - [ROADMAP.md](../ROADMAP.md) - Phase 13 objectives and next steps
-- [econ-modeling.md](econ-modeling.md) - Economic safety mechanisms (Phase 12)
+- [../economics/econ-modeling.md](../economics/econ-modeling.md) - Economic safety mechanisms (Phase 12)

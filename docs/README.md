@@ -2,16 +2,83 @@
 
 This directory contains comprehensive documentation for the ICN project.
 
-## Structure
+**→ Start here: [Documentation Index (INDEX.md)](INDEX.md)** - Complete navigation to all documentation.
+
+## Quick Links
+
+- **[Getting Started](GETTING_STARTED.md)** - Quick start for new developers
+- **[Architecture Overview](ARCHITECTURE.md)** - System architecture (comprehensive)
+- **[Developer Guides](guides/developer/README.md)** - Development guides
+- **[Operations Guides](guides/operations/README.md)** - Deployment and ops
+- **[Security Documentation](security/FINAL_SECURITY_STATUS.md)** - Security overview
+- **[Current Status](status/PROJECT_STATE_2026-02-09.md)** - Project state snapshot
+
+## Directory Structure
 
 ```
 docs/
-├── ARCHITECTURE.md          # Comprehensive architectural design document
-├── dev-journal/             # Development journal entries (chronological)
-│   └── 2025-11-10-*.md     # Daily/milestone entries
-├── decisions/               # Architecture Decision Records (ADRs)
-│   └── NNN-title.md        # Individual decisions with context
-└── README.md               # This file
+├── INDEX.md                    # 📋 Complete documentation index (START HERE)
+├── README.md                   # This file
+├── ARCHITECTURE.md             # Comprehensive architecture (160KB+)
+├── GETTING_STARTED.md          # Quick start guide
+├── PHASE_HISTORY.md            # Development phase history
+├── STATE.md                    # Current project state
+├── TODO.md                     # Active work items
+├── glossary.md                 # Terminology definitions
+│
+├── architecture/               # 🏗️ Architecture & design decisions
+├── design/                     # 📐 Feature designs & proposals
+│   ├── economics/             # Economic system design
+│   ├── governance/            # Governance system design
+│   └── sdis/                  # SDIS design docs
+├── spec/                       # 📜 Formal specifications
+│
+├── reference/                  # 📖 Technical references
+│   ├── api/                   # API documentation
+│   └── config/                # Configuration references
+│
+├── guides/                     # 📚 User & developer guides
+│   ├── developer/             # Development guides
+│   ├── operations/            # Operations guides
+│   └── user/                  # End-user guides
+│
+├── development/                # 🛠️ Development resources
+│   ├── sprints/               # Sprint planning & tracking
+│   └── testing/               # Testing documentation
+│
+├── security/                   # 🔒 Security & threat models
+├── sdis/                       # 🆔 SDIS documentation
+│
+├── internal/                   # 🔬 Internal planning
+│   ├── pilots/                # Pilot program docs
+│   └── status/                # Status tracking
+├── status/                     # 📊 Current status reports
+│
+├── onboarding/                 # 🎓 Contributor onboarding
+├── adr/                        # 📝 Architecture Decision Records
+├── templates/                  # 📄 Documentation templates
+├── vision/                     # 🌟 Vision documents
+│
+├── deployment/                 # 🚀 Deployment configs
+├── operations/                 # 🔧 Operational procedures
+├── ops/                        # 📟 Runbooks & procedures
+├── performance/                # ⚡ Performance docs
+├── observability/              # 📈 Metrics & monitoring
+├── mobile/                     # 📱 Mobile app docs
+│
+├── archive/                    # 📦 Historical documentation
+│   └── 2025/                  # Year-based archives
+│
+├── api/                        # Legacy API docs
+├── ci/                         # CI/CD documentation
+├── demo/                       # Demo session notes
+├── examples/                   # Examples & policies
+├── features/                   # Feature-specific docs
+├── migration-guides/           # Migration guides
+├── phases/                     # Phase planning docs
+├── pilots/                     # Pilot documentation
+├── sprints/                    # Sprint documentation
+└── testing/                    # Testing guides
 ```
 
 ## Documentation Types

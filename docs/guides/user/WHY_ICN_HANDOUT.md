@@ -129,7 +129,7 @@ ICN is the infrastructure layer that makes this possible.
 | **Documentation** | `docs/` directory |
 | **Quick Start** | `docs/GETTING_STARTED.md` |
 | **Full Manual** | `docs/manual/ICN_USER_MANUAL.md` |
-| **Architecture** | `docs/ARCHITECTURE.md` |
+| **Architecture** | [ARCHITECTURE.md](../../ARCHITECTURE.md) |
 | **GitHub** | github.com/InterCooperative-Network/icn |
 
 ---

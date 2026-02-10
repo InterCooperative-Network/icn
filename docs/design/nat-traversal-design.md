@@ -349,7 +349,7 @@ icn_network_relay_bytes_total{direction="in|out"} - Relay traffic volume
 ## Documentation Updates
 
 - [ ] `docs/deployment-guide.md`: Add NAT traversal configuration
-- [ ] `docs/ARCHITECTURE.md`: Document NAT traversal architecture
+- [ ] [../ARCHITECTURE.md](../ARCHITECTURE.md): Document NAT traversal architecture
 - [ ] `README.md`: Update with NAT traversal capabilities
 
 ## Future Enhancements (Post-MVC)

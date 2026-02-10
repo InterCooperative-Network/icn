@@ -1023,7 +1023,7 @@ icnctl gossip stats
 
 - **Deployment Guide**: [deployment-guide.md](deployment-guide.md)
 - **Incident Response**: [incident-response.md](incident-response.md)
-- **Architecture**: [ARCHITECTURE.md](../ARCHITECTURE.md)
+- **Architecture**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
 - **Changelog**: [CHANGELOG.md](../CHANGELOG.md)
 - **Roadmap**: [ROADMAP.md](../ROADMAP.md)
 

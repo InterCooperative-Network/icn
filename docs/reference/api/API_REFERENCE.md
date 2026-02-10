@@ -307,8 +307,8 @@ Many operations require minimum trust scores:
 ## Documentation
 
 - Full OpenAPI spec: `docs/openapi.yaml`
-- Architecture: `docs/ARCHITECTURE.md`
-- Getting Started: `docs/GETTING_STARTED.md`
+- Architecture: [../../ARCHITECTURE.md](../../ARCHITECTURE.md)
+- Getting Started: [../../GETTING_STARTED.md](../../GETTING_STARTED.md)
 - SDK Docs: `sdk/typescript/README.md`
 
 ## Support
