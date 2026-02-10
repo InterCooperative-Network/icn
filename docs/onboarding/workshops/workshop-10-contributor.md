@@ -85,10 +85,10 @@ You're making changes to the following areas. Decide which tests to run:
 
 | Change | Minimum Test Command |
 |--------|---------------------|
-| Bug fix in `icn-ledger/src/ledger.rs` | ? |
+| Bug fix in `icn/crates/icn-ledger/src/ledger.rs` | ? |
 | New endpoint in `icn-gateway/src/api/` | ? |
-| Change to `icn-trust/src/types.rs` | ? |
-| Modify `icn-core/src/supervisor/mod.rs` | ? |
+| Change to `icn/crates/icn-trust/src/types.rs` | ? |
+| Modify `icn/crates/icn-core/src/supervisor/mod.rs` | ? |
 
 ### Hints
 - Unit tests: `cargo test -p <crate> --lib`

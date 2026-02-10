@@ -15,7 +15,7 @@ Understand how messages flow from the transport layer through the gossip protoco
 including topic subscriptions, vector clocks, and anti-entropy synchronization.
 
 ## Prerequisites
-- Completed [Module 5: Networking](../modules/module-05-network.md)
+- Completed [Module 5: Networking](../reference/module-05-network-gossip.md)
 - ICN binaries built (`cargo build`)
 - Two terminal windows available
 
@@ -23,7 +23,7 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.
 2-3 hours
 
 ## Related Materials
-- [Module 5: Networking](../modules/module-05-network.md) - Background reading
+- [Module 5: Networking](../reference/module-05-network-gossip.md) - Background reading
 - [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Uses gossip for ledger sync
 - [CLAUDE.md Gossip Protocol](../../CLAUDE.md) - Protocol reference
 

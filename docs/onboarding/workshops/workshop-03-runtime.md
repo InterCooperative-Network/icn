@@ -15,14 +15,14 @@ Trace the daemon startup path, understand actor initialization order, and explor
 how the supervisor manages the actor lifecycle.
 
 ## Prerequisites
-- Completed [Module 3: Runtime Architecture](../modules/module-03-runtime.md)
+- Completed [Module 3: Runtime Architecture](../reference/module-03-runtime-actors.md)
 - ICN binaries built (`cargo build`)
 
 ## Estimated time
 2-3 hours
 
 ## Related Materials
-- [Module 3: Runtime Architecture](../modules/module-03-runtime.md) - Background reading
+- [Module 3: Runtime Architecture](../reference/module-03-runtime-actors.md) - Background reading
 - [Workshop 4: Identity and Trust](./workshop-04-identity-trust.md) - Next workshop
 - [CLAUDE.md Architecture Section](../../CLAUDE.md) - Actor communication patterns
 

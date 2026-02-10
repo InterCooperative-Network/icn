@@ -19,7 +19,7 @@ implementing features that involve peer communication.
 - Module 3 (Runtime & Actors)
 
 ## Key Reading
-- `icn/crates/icn-net/src/actor.rs` - NetworkActor implementation
+- `icn/crates/icn-net/src/actor/mod.rs` - NetworkActor implementation
 - `icn/crates/icn-gossip/src/gossip.rs` - GossipActor implementation
 - `docs/ARCHITECTURE.md` - Sections 3 and 6
 

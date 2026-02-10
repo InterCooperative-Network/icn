@@ -892,7 +892,7 @@ sequenceDiagram
    and decay per hop is 0.5, what is Alice's transitive trust of Carol?
 
 5. **Actor Communication**: Find a callback definition in the codebase
-   (`icn-core/src/supervisor/`) and explain what two actors it connects.
+   (`icn/crates/icn-core/src/supervisor/`) and explain what two actors it connects.
 
 ---
 

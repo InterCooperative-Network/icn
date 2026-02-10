@@ -13,7 +13,7 @@ Understand how ICN enforces authenticity, integrity, and confidentiality through
 layered security and privacy mechanisms.
 
 ## Prerequisites
-- Completed [Module 13: Security and Privacy](../modules/module-13-security-privacy.md)
+- Completed [Module 13: Security and Privacy](../reference/module-13-security-privacy.md)
 - Familiarity with Module 4 (Identity) and Module 5 (Network)
 
 ## Estimated time
