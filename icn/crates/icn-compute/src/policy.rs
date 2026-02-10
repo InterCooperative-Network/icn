@@ -668,7 +668,6 @@ pub struct UsageRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{DeterminismClass, PrivacyClass};
 
     fn make_test_did() -> Did {
         let keypair = icn_identity::KeyPair::generate().unwrap();

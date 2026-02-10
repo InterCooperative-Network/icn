@@ -8,8 +8,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use icn_compute::{
-    ComputeTask, ExecutorCapability, FuelLimit, NodeCapacity, NodeState, PlacementOffer,
-    ResourceProfile, TaskCode, TaskId, TaskPriority,
+    ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, NodeCapacity, NodeState,
+    PlacementOffer, PrivacyClass, ResourceProfile, TaskCode, TaskId, TaskPriority,
 };
 use icn_identity::Did;
 use std::collections::HashMap;
@@ -40,6 +40,10 @@ fn create_test_task(id: u8) -> ComputeTask {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
     }
 }
 
