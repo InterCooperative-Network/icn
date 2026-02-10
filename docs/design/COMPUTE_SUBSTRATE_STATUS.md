@@ -162,9 +162,44 @@ B1 (Treasury) ─┐                                       │
 B2 (Assets)   ─┼─→ B3 (Receipts) ─────────────────────┘
 ```
 
+## Sprint Plan
+
+### Sprint 1: Parallel Foundations (3-4 days)
+All tasks can run simultaneously - no dependencies between them.
+
+| Task | Issue | Effort | Key Implementation |
+|------|-------|--------|-------------------|
+| **E6** | #1133 | 1-2d | `OperatorMode` enum, personal node config |
+| **E7** | #1134 | 2d | Cost validation in scheduler, charter priorities |
+| **C2** | #1143 | 1d | Enhanced `/v1/health`, K8s probes, `icnctl preflight` |
+| **C3** | #1144 | 2-3d | STUN client, TURN fallback, NAT config section |
+
+### Sprint 2: Governance & Membership (4-5 days)
+Sequential chain - must complete in order.
+
+| Task | Issue | Effort | Depends On | Key Implementation |
+|------|-------|--------|------------|-------------------|
+| **A2** | #1136 | 3-4d | A1 ✅ | Extract GovernanceActor to `apps/governance/` |
+| **A3** | #1137 | 3-4d | A2 | Merge entity/coop/community to `apps/membership/` |
+| **B1** | #1139 | 2d | A3 | Auto-create treasury on coop formation |
+
+### Sprint 3: Economics & Assets (3-4 days)
+
+| Task | Issue | Effort | Depends On | Key Implementation |
+|------|-------|--------|------------|-------------------|
+| **B2** | #1140 | 2d | B1 | `AssetType` enum, `AssetMetadata` in ledger |
+| **B3** | #1141 | 2d | A2, B1, E2 ✅ | `AllocationReceipt` with provenance chain |
+
+### Sprint 4: Integration & Demo (3-4 days)
+
+| Task | Issue | Effort | Depends On | Key Implementation |
+|------|-------|--------|------------|-------------------|
+| **D1** | #1145 | 2d | A3, B1, B2 | `vertical_slice_integration.rs` - full scenario |
+| **D2** | #1146 | 1-2d | D1 | Demo script, `icnctl demo run tool-library` |
+
 ## How to Continue
 
-1. **Pick an unblocked task** from the tables above
+1. **Pick an unblocked task** from Sprint 1 (all parallel) or check dependencies
 2. **Check the GitHub issue** for full context
 3. **Run tests** after implementation:
    ```bash
