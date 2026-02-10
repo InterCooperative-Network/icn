@@ -193,12 +193,20 @@ mod tests {
         assert!(DecisionFilter::new().matches(&entry));
 
         // Coop filter
-        assert!(DecisionFilter::new().with_coop_id("coop-alpha").matches(&entry));
-        assert!(!DecisionFilter::new().with_coop_id("coop-beta").matches(&entry));
+        assert!(DecisionFilter::new()
+            .with_coop_id("coop-alpha")
+            .matches(&entry));
+        assert!(!DecisionFilter::new()
+            .with_coop_id("coop-beta")
+            .matches(&entry));
 
         // Meeting filter
-        assert!(DecisionFilter::new().with_meeting_id("mtg-2026-01").matches(&entry));
-        assert!(!DecisionFilter::new().with_meeting_id("mtg-2026-02").matches(&entry));
+        assert!(DecisionFilter::new()
+            .with_meeting_id("mtg-2026-01")
+            .matches(&entry));
+        assert!(!DecisionFilter::new()
+            .with_meeting_id("mtg-2026-02")
+            .matches(&entry));
 
         // Tag filter
         assert!(DecisionFilter::new().with_tag("budget").matches(&entry));
@@ -211,8 +219,12 @@ mod tests {
         assert!(!DecisionFilter::new().before(1699999999).matches(&entry));
 
         // Proposal type filter
-        assert!(DecisionFilter::new().with_proposal_type("treasury_spend").matches(&entry));
-        assert!(!DecisionFilter::new().with_proposal_type("text").matches(&entry));
+        assert!(DecisionFilter::new()
+            .with_proposal_type("treasury_spend")
+            .matches(&entry));
+        assert!(!DecisionFilter::new()
+            .with_proposal_type("text")
+            .matches(&entry));
 
         // Combined filters
         assert!(DecisionFilter::new()

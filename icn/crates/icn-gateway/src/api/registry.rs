@@ -11,6 +11,7 @@
 //! - `GET /v1/registry/meetings?coop_id=...` - List meetings for a coop
 //!
 //! ### Decisions
+//! - `POST /v1/registry/decisions` - Index a decision
 //! - `GET /v1/registry/decisions?coop_id=...&meeting_id=...&tag=...` - List decisions
 //! - `GET /v1/registry/decisions/{id}` - Get decision details
 //! - `GET /v1/registry/decisions/{id}/trace` - Get decision trace/provenance
@@ -351,6 +352,80 @@ pub struct PaginationInfo {
     pub has_more: bool,
 }
 
+/// Request to index a decision.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexDecisionRequest {
+    /// Cooperative DID that owns this decision.
+    pub coop_id: String,
+    /// Optional meeting association.
+    #[serde(default)]
+    pub meeting_id: Option<String>,
+    /// Human-readable summary/title.
+    pub title: String,
+    /// Searchable tags, e.g., ["budget", "approved"].
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Status of the decision.
+    #[serde(default)]
+    pub status: DecisionStatus,
+    /// Type of proposal, e.g., "text", "treasury_spend".
+    #[serde(default = "default_proposal_type")]
+    pub proposal_type: String,
+    /// If this decision triggered a treasury action, the effect details.
+    #[serde(default)]
+    pub treasury_effect: Option<TreasuryEffectDetails>,
+}
+
+fn default_proposal_type() -> String {
+    "text".to_string()
+}
+
+/// Treasury effect details for creating decisions.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreasuryEffectDetails {
+    /// Amount of credits.
+    pub amount: i64,
+    /// Source account (e.g., "treasury:coop-xyz").
+    pub from: String,
+    /// Destination account (e.g., a DID or account identifier).
+    pub to: String,
+    /// Currency type.
+    #[serde(default = "default_currency")]
+    pub currency: String,
+}
+
+fn default_currency() -> String {
+    "credits".to_string()
+}
+
+/// Response for indexing a decision.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexDecisionResponse {
+    /// The generated receipt ID (primary key).
+    pub decision_receipt_id: String,
+    /// The canonical hash.
+    pub decision_hash: String,
+    /// Cooperative DID.
+    pub coop_id: String,
+    /// Meeting ID if associated.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meeting_id: Option<String>,
+    /// Title of the decision.
+    pub title: String,
+    /// Status of the decision.
+    pub status: DecisionStatus,
+    /// Proposal type.
+    pub proposal_type: String,
+    /// Treasury effect ID if created.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub treasury_effect_id: Option<String>,
+    /// Creation timestamp.
+    pub created_at: u64,
+}
+
 // ============================================================================
 // Handlers
 // ============================================================================
@@ -451,6 +526,88 @@ pub async fn list_meetings(
             offset,
             has_more,
         },
+    }))
+}
+
+/// POST /registry/decisions - Index a new decision
+#[post("/decisions")]
+pub async fn index_decision_endpoint(
+    http_req: HttpRequest,
+    registry: web::Data<Arc<DecisionRegistry>>,
+    req: web::Json<IndexDecisionRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    // Validate title length
+    if req.title.is_empty() || req.title.len() > 256 {
+        return Err(GatewayError::BadRequest(
+            "Title must be 1-256 characters".to_string(),
+        ));
+    }
+
+    // Validate coop_id format (basic DID check)
+    if !req.coop_id.starts_with("did:") {
+        return Err(GatewayError::BadRequest(
+            "coop_id must be a valid DID".to_string(),
+        ));
+    }
+
+    // Generate IDs
+    let now = icn_time::current_timestamp_secs();
+    let receipt_id = format!("receipt-{}", &uuid::Uuid::new_v4().to_string()[..12]);
+
+    // Generate canonical hash from content
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    req.coop_id.hash(&mut hasher);
+    req.title.hash(&mut hasher);
+    now.hash(&mut hasher);
+    let decision_hash = format!("{:016x}", hasher.finish());
+
+    // Handle treasury effect if present
+    let treasury_effect_id = req
+        .treasury_effect
+        .as_ref()
+        .map(|_| format!("effect-{}", &uuid::Uuid::new_v4().to_string()[..8]));
+
+    let entry = DecisionIndexEntry {
+        decision_receipt_id: receipt_id.clone(),
+        decision_hash: decision_hash.clone(),
+        coop_id: req.coop_id.clone(),
+        meeting_id: req.meeting_id.clone(),
+        title: req.title.clone(),
+        tags: req.tags.clone(),
+        status: req.status,
+        created_at: now,
+        proposal_type: req.proposal_type.clone(),
+        treasury_effect_id: treasury_effect_id.clone(),
+    };
+
+    registry.index_decision(entry)?;
+
+    tracing::info!(
+        receipt_id = %receipt_id,
+        coop_id = %req.coop_id,
+        title = %req.title,
+        proposal_type = %req.proposal_type,
+        creator = %claims.sub,
+        "Indexed decision"
+    );
+
+    Ok(HttpResponse::Created().json(IndexDecisionResponse {
+        decision_receipt_id: receipt_id,
+        decision_hash,
+        coop_id: req.coop_id.clone(),
+        meeting_id: req.meeting_id.clone(),
+        title: req.title.clone(),
+        status: req.status,
+        proposal_type: req.proposal_type.clone(),
+        treasury_effect_id,
+        created_at: now,
     }))
 }
 
@@ -565,6 +722,7 @@ pub async fn get_decision_trace(
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(create_meeting)
         .service(list_meetings)
+        .service(index_decision_endpoint)
         .service(list_decisions)
         .service(get_decision)
         .service(get_decision_trace);
@@ -624,7 +782,7 @@ mod tests {
         };
 
         assert!(registry.add_meeting(meeting.clone()).is_ok());
-        
+
         // Duplicate should fail
         assert!(registry.add_meeting(meeting).is_err());
     }
@@ -642,7 +800,10 @@ mod tests {
         let registry = create_test_registry();
         let decision = registry.get_decision("receipt-001");
         assert!(decision.is_some());
-        assert_eq!(decision.as_ref().map(|d| d.title.as_str()), Some("Approve budget"));
+        assert_eq!(
+            decision.as_ref().map(|d| d.title.as_str()),
+            Some("Approve budget")
+        );
     }
 
     #[test]
@@ -713,5 +874,54 @@ mod tests {
         assert!(json.contains("decisionHash"));
         assert!(json.contains("parentReceipts"));
         assert!(json.contains("ledgerEntryId"));
+    }
+
+    #[test]
+    fn test_index_decision_request_deserialization() {
+        let json = r#"{
+            "coopId": "did:icn:test123",
+            "meetingId": "mtg-2026-02-10",
+            "title": "Approve venue deposit",
+            "tags": ["budget", "approved"],
+            "status": "approved",
+            "proposalType": "treasury_spend",
+            "treasuryEffect": {
+                "amount": 200,
+                "from": "treasury:did:icn:test123",
+                "to": "did:icn:venue-account",
+                "currency": "credits"
+            }
+        }"#;
+
+        let req: IndexDecisionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.coop_id, "did:icn:test123");
+        assert_eq!(req.title, "Approve venue deposit");
+        assert_eq!(req.proposal_type, "treasury_spend");
+        assert!(req.treasury_effect.is_some());
+
+        let effect = req.treasury_effect.unwrap();
+        assert_eq!(effect.amount, 200);
+        assert_eq!(effect.from, "treasury:did:icn:test123");
+        assert_eq!(effect.to, "did:icn:venue-account");
+    }
+
+    #[test]
+    fn test_index_decision_response_serialization() {
+        let resp = IndexDecisionResponse {
+            decision_receipt_id: "receipt-abc123".to_string(),
+            decision_hash: "hash123".to_string(),
+            coop_id: "did:icn:test".to_string(),
+            meeting_id: Some("mtg-001".to_string()),
+            title: "Test decision".to_string(),
+            status: DecisionStatus::Approved,
+            proposal_type: "text".to_string(),
+            treasury_effect_id: None,
+            created_at: 1700000000,
+        };
+
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("decisionReceiptId"));
+        assert!(json.contains("decisionHash"));
+        assert!(!json.contains("treasuryEffectId")); // None fields should be skipped
     }
 }

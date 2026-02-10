@@ -41,10 +41,7 @@ impl DecisionRegistry {
             .map_err(|_| anyhow!("failed to acquire meetings write lock"))?;
 
         if meetings.contains_key(&meeting.meeting_id) {
-            return Err(anyhow!(
-                "meeting already exists: {}",
-                meeting.meeting_id
-            ));
+            return Err(anyhow!("meeting already exists: {}", meeting.meeting_id));
         }
 
         meetings.insert(meeting.meeting_id.clone(), meeting);
@@ -340,8 +337,7 @@ mod tests {
 
         registry.index_decision(entry).unwrap();
 
-        let decisions =
-            registry.list_decisions(DecisionFilter::new().with_meeting_id("mtg-001"));
+        let decisions = registry.list_decisions(DecisionFilter::new().with_meeting_id("mtg-001"));
         assert_eq!(decisions.len(), 1);
         assert_eq!(decisions[0].decision_receipt_id, "receipt-001");
     }
