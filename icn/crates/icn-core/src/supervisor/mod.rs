@@ -46,6 +46,7 @@ use crate::runtime::ShutdownTx;
 
 pub use actors::BootstrapHandles;
 pub use governance_executor::KernelGovernanceExecutor;
+pub use governance_executor::KernelTreasuryExecutor;
 
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {

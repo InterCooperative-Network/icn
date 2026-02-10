@@ -258,6 +258,43 @@ mod tests {
         }
     }
 
+    /// Pinned count of ALL `icn_governance::` references (imports + inline) in icn-gateway.
+    ///
+    /// This ratchet captures both `use icn_governance::` import statements AND
+    /// inline qualified paths like `icn_governance::ProposalPayload`. Together with
+    /// `strict_governance_import_violations`, this prevents governance surface from
+    /// growing even if developers avoid adding `use` statements.
+    ///
+    /// Target state: 0 after gateway governance extraction (Phase 4).
+    ///
+    /// Current state (2026-02-10):
+    /// - api/governance.rs: 54 (proposal handlers, membership, voting)
+    /// - governance_mgr.rs: 5 (manager implementation)
+    /// - commons_store.rs: 5 (commons governance)
+    /// - commons_mgr.rs: 3 (commons manager)
+    /// - Other scattered: 10 (entity, treasury, steward, constitutional)
+    #[test]
+    fn strict_gateway_governance_total_refs() {
+        let expected: usize = 77;
+        let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-gateway has {actual} `icn_governance::` references \
+             (expected at most {expected}). \
+             Do not add new governance references to icn-gateway — \
+             extract to gateway DTOs or use kernel-api types instead."
+        );
+
+        if actual < expected {
+            panic!(
+                "✅ PROGRESS: icn-gateway now has only {actual} `icn_governance::` \
+                 references (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_gateway_governance_total_refs()."
+            );
+        }
+    }
+
     // ===================================================================
     // ICN-CORE DOMAIN DEPENDENCY RATCHETS
     //

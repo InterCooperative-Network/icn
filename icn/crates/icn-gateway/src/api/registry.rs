@@ -91,6 +91,10 @@ pub struct DecisionIndexEntry {
     /// If this decision triggered a treasury action, the effect ID.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treasury_effect_id: Option<String>,
+    /// Actual ledger entry hash if a ledger entry was created.
+    /// Only set when we have verified the effect produced a real entry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ledger_entry_hash: Option<String>,
 }
 
 /// Decision trace showing provenance and effects.
@@ -103,11 +107,28 @@ pub struct DecisionTrace {
     pub parent_receipts: Vec<String>,
     /// Effects triggered by this decision.
     pub effects: Vec<DecisionEffect>,
-    /// If this decision triggered a ledger entry.
+    /// Actual ledger entry hash if the effect created a ledger entry.
+    /// Only present when we have verified the entry exists in the ledger.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ledger_entry_id: Option<String>,
+    pub ledger_entry_hash: Option<String>,
     /// Provenance chain (ordered list of related decisions).
     pub provenance_chain: Vec<String>,
+    /// Resolution status for trace sections.
+    pub resolution: TraceResolution,
+}
+
+/// Tracks what portions of a trace are resolved vs unresolved.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceResolution {
+    /// Whether the decision was found in the registry.
+    pub decision_resolved: bool,
+    /// Whether the receipt is available (linked to canonical store).
+    pub receipt_resolved: bool,
+    /// Whether the effect result is available.
+    pub effect_resolved: bool,
+    /// Whether the ledger entry was verified.
+    pub ledger_entry_resolved: bool,
 }
 
 /// An effect triggered by a decision.
@@ -119,6 +140,9 @@ pub struct DecisionEffect {
     pub effect_type: String,
     /// Details about the effect.
     pub details: serde_json::Value,
+    /// Whether the effect result has been resolved from canonical stores.
+    #[serde(default)]
+    pub resolved: bool,
 }
 
 // ============================================================================
@@ -375,6 +399,10 @@ pub struct IndexDecisionRequest {
     /// If this decision triggered a treasury action, the effect details.
     #[serde(default)]
     pub treasury_effect: Option<TreasuryEffectDetails>,
+    /// Actual ledger entry hash if the effect created a verified entry.
+    /// Only provided when the caller has verified the ledger entry exists.
+    #[serde(default)]
+    pub ledger_entry_hash: Option<String>,
 }
 
 fn default_proposal_type() -> String {
@@ -422,6 +450,9 @@ pub struct IndexDecisionResponse {
     /// Treasury effect ID if created.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treasury_effect_id: Option<String>,
+    /// Actual ledger entry hash if provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ledger_entry_hash: Option<String>,
     /// Creation timestamp.
     pub created_at: u64,
 }
@@ -585,6 +616,7 @@ pub async fn index_decision_endpoint(
         created_at: now,
         proposal_type: req.proposal_type.clone(),
         treasury_effect_id: treasury_effect_id.clone(),
+        ledger_entry_hash: req.ledger_entry_hash.clone(),
     };
 
     registry.index_decision(entry)?;
@@ -595,6 +627,7 @@ pub async fn index_decision_endpoint(
         title = %req.title,
         proposal_type = %req.proposal_type,
         creator = %claims.sub,
+        has_ledger_entry = req.ledger_entry_hash.is_some(),
         "Indexed decision"
     );
 
@@ -607,6 +640,7 @@ pub async fn index_decision_endpoint(
         status: req.status,
         proposal_type: req.proposal_type.clone(),
         treasury_effect_id,
+        ledger_entry_hash: req.ledger_entry_hash.clone(),
         created_at: now,
     }))
 }
@@ -690,25 +724,40 @@ pub async fn get_decision_trace(
         .get_decision(&decision_id)
         .ok_or_else(|| GatewayError::NotFound(format!("Decision not found: {}", decision_id)))?;
 
-    // Build trace from decision data
+    // Build trace from decision data - only include verified data
     let mut effects = Vec::new();
 
-    // If there's a treasury effect, include it
+    // If there's a treasury effect, include it with resolution status
+    // The effect is "resolved" only if we have a verified ledger_entry_hash
+    let has_verified_ledger_entry = decision.ledger_entry_hash.is_some();
     if let Some(ref effect_id) = decision.treasury_effect_id {
         effects.push(DecisionEffect {
             effect_type: "treasury_disbursement".to_string(),
             details: serde_json::json!({
-                "effectId": effect_id
+                "effectId": effect_id,
+                // Only include ledger_entry_hash if we have it
+                "ledgerEntryHash": decision.ledger_entry_hash.as_deref()
             }),
+            resolved: has_verified_ledger_entry,
         });
     }
 
+    // Build honest resolution status
+    let resolution = TraceResolution {
+        decision_resolved: true, // We found the decision in the registry
+        receipt_resolved: false, // TODO: implement receipt store lookup
+        effect_resolved: has_verified_ledger_entry, // Only resolved if we have verified the effect
+        ledger_entry_resolved: has_verified_ledger_entry, // Only true if we have the actual hash
+    };
+
     let trace = DecisionTrace {
         decision_hash: decision.decision_hash.clone(),
-        parent_receipts: vec![], // TODO: populate from canonical receipt graph
+        parent_receipts: vec![], // TODO: populate from canonical receipt graph when available
         effects,
-        ledger_entry_id: decision.treasury_effect_id.clone(), // treasury effect maps to ledger entry
+        // Only include ledger_entry_hash if we have a verified one - never fabricate
+        ledger_entry_hash: decision.ledger_entry_hash.clone(),
         provenance_chain: vec![decision.decision_receipt_id.clone()],
+        resolution,
     };
 
     Ok(HttpResponse::Ok().json(trace))
@@ -762,6 +811,7 @@ mod tests {
             created_at: 1800000100,
             proposal_type: "treasury_spend".to_string(),
             treasury_effect_id: Some("effect-001".to_string()),
+            ledger_entry_hash: None, // No verified ledger entry yet
         };
         registry.index_decision(decision).ok();
 
@@ -822,6 +872,7 @@ mod tests {
             created_at: 1800000200,
             proposal_type: "text".to_string(),
             treasury_effect_id: None,
+            ledger_entry_hash: None,
         };
         registry.index_decision(decision2).ok();
 
@@ -859,21 +910,89 @@ mod tests {
 
     #[test]
     fn test_decision_trace_structure() {
+        // Test trace with resolved ledger entry
         let trace = DecisionTrace {
             decision_hash: "abc123".to_string(),
             parent_receipts: vec!["parent-001".to_string()],
             effects: vec![DecisionEffect {
                 effect_type: "treasury_disbursement".to_string(),
                 details: serde_json::json!({"amount": 1000}),
+                resolved: true,
             }],
-            ledger_entry_id: Some("ledger-001".to_string()),
+            ledger_entry_hash: Some("0x1234567890abcdef".to_string()),
             provenance_chain: vec!["abc123".to_string()],
+            resolution: TraceResolution {
+                decision_resolved: true,
+                receipt_resolved: false,
+                effect_resolved: true,
+                ledger_entry_resolved: true,
+            },
         };
 
         let json = serde_json::to_string(&trace).unwrap();
         assert!(json.contains("decisionHash"));
         assert!(json.contains("parentReceipts"));
-        assert!(json.contains("ledgerEntryId"));
+        assert!(json.contains("ledgerEntryHash"));
+        assert!(json.contains("resolution"));
+        assert!(json.contains("\"resolved\":true"));
+    }
+
+    #[test]
+    fn test_decision_trace_unresolved() {
+        // Test trace without verified ledger entry - should NOT fabricate data
+        let trace = DecisionTrace {
+            decision_hash: "abc123".to_string(),
+            parent_receipts: vec![],
+            effects: vec![DecisionEffect {
+                effect_type: "treasury_disbursement".to_string(),
+                details: serde_json::json!({"effectId": "effect-001"}),
+                resolved: false,
+            }],
+            ledger_entry_hash: None, // Honestly unresolved
+            provenance_chain: vec!["abc123".to_string()],
+            resolution: TraceResolution {
+                decision_resolved: true,
+                receipt_resolved: false,
+                effect_resolved: false,
+                ledger_entry_resolved: false,
+            },
+        };
+
+        let json = serde_json::to_string(&trace).unwrap();
+        // Should NOT contain ledgerEntryHash when None (skip_serializing_if)
+        assert!(!json.contains("ledgerEntryHash"));
+        // Resolution should indicate unresolved sections
+        assert!(json.contains("\"ledgerEntryResolved\":false"));
+        assert!(json.contains("\"effectResolved\":false"));
+    }
+
+    #[test]
+    fn test_trace_with_verified_ledger_entry() {
+        // Test the trace endpoint behavior with a verified ledger entry
+        let registry = Arc::new(DecisionRegistry::new());
+
+        // Add decision WITH a verified ledger entry hash
+        let decision = DecisionIndexEntry {
+            decision_receipt_id: "receipt-verified".to_string(),
+            decision_hash: "hash-verified".to_string(),
+            coop_id: "did:icn:test-coop".to_string(),
+            meeting_id: None,
+            title: "Treasury disbursement".to_string(),
+            tags: vec!["treasury".to_string()],
+            status: DecisionStatus::Approved,
+            created_at: 1800000100,
+            proposal_type: "treasury_spend".to_string(),
+            treasury_effect_id: Some("effect-verified".to_string()),
+            ledger_entry_hash: Some("0xdeadbeef12345678".to_string()), // Real verified hash
+        };
+        registry.index_decision(decision).ok();
+
+        // Verify we can get the decision with the ledger entry hash
+        let retrieved = registry.get_decision("receipt-verified").unwrap();
+        assert_eq!(
+            retrieved.ledger_entry_hash,
+            Some("0xdeadbeef12345678".to_string())
+        );
     }
 
     #[test]
@@ -916,6 +1035,7 @@ mod tests {
             status: DecisionStatus::Approved,
             proposal_type: "text".to_string(),
             treasury_effect_id: None,
+            ledger_entry_hash: None,
             created_at: 1700000000,
         };
 
@@ -923,5 +1043,26 @@ mod tests {
         assert!(json.contains("decisionReceiptId"));
         assert!(json.contains("decisionHash"));
         assert!(!json.contains("treasuryEffectId")); // None fields should be skipped
+        assert!(!json.contains("ledgerEntryHash")); // None fields should be skipped
+    }
+
+    #[test]
+    fn test_index_decision_response_with_ledger_entry() {
+        let resp = IndexDecisionResponse {
+            decision_receipt_id: "receipt-abc123".to_string(),
+            decision_hash: "hash123".to_string(),
+            coop_id: "did:icn:test".to_string(),
+            meeting_id: None,
+            title: "Treasury decision".to_string(),
+            status: DecisionStatus::Approved,
+            proposal_type: "treasury_spend".to_string(),
+            treasury_effect_id: Some("effect-001".to_string()),
+            ledger_entry_hash: Some("0xabcdef123456".to_string()),
+            created_at: 1700000000,
+        };
+
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("ledgerEntryHash"));
+        assert!(json.contains("0xabcdef123456"));
     }
 }
