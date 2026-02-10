@@ -217,6 +217,26 @@ npm run dev  # python3 -m http.server 8080
 
 ---
 
+## Documentation organization
+
+**All documentation goes in `docs/`** - never save docs to project root (except the core files listed in CLAUDE.md).
+
+**Finding documentation:**
+- Start with `docs/INDEX.md` for comprehensive navigation
+- Use `docs/README.md` for quick overview
+- Follow the category structure in `docs/`
+
+**Where to put new docs:**
+- Architecture/design decisions → `docs/architecture/` or `docs/design/`
+- API documentation → `docs/reference/api/`
+- User/developer guides → `docs/guides/user/` or `docs/guides/developer/`
+- Security documentation → `docs/security/`
+- Historical/completed work → `docs/archive/YYYY/`
+
+**See `docs/DOCUMENTATION_MAINTENANCE.md` for complete guidelines.**
+
+---
+
 ## Custom agents
 
 This repo provides specialized Copilot agents in `.github/agents/`. The orchestrator (`icn-orchestrator`) auto-selects and routes to specialists.

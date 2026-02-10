@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICN CI Failure Triage"
+  short_description: "Triage and fix ICN CI failures fast"
+  default_prompt: "Diagnose failing CI jobs, reproduce locally, propose minimal fixes, and summarize verification."

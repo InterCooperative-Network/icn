@@ -45,21 +45,12 @@ Always produce:
 - `gateway-api`
 - `ledger-econ`
 - `governance-ccl`
-- `sdk-web`
-- `deploy-devnet`
-- `docs-spec`
-- `ci-tests`
+- `sdk-ts`
+- `sdk-react-native`
+- `web-pilot-ui`
+- `deploy-k8s`
+- `docs`
 
-## Routing Heuristics
+## Verification Reference
 
-- One subsystem only: implement directly with focused checks.
-- More than one subsystem: split into tasks with explicit boundaries.
-- API/schema changes: pair implementation task with docs/spec drift task.
-- Security-sensitive changes: add dedicated invariants/security review task.
-
-## Guardrails
-
-- No safety weakening to pass tests.
-- No protocol-path panics.
-- Preserve deterministic behavior and canonical encoding.
-- Keep workspace root assumptions correct (`icn/` for Rust commands).
+Always reference `AGENTS.md` "Change routing" for the correct commands per subsystem.
