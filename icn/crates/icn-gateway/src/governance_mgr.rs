@@ -778,11 +778,11 @@ impl GovernanceManager {
         Ok(voter_dids)
     }
 
-    /// Get the GovernanceProof for a closed proposal (if one was generated)
+    /// Get the GovernanceProofV2 for a closed proposal (if one was generated)
     pub async fn get_proof(
         &self,
         proposal_id: &ProposalId,
-    ) -> Result<Option<icn_governance::GovernanceProof>> {
+    ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         if let Some(ref handle) = self.governance_handle {
             return handle.get_proof(proposal_id).await;
         }

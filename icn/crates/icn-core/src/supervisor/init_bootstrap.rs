@@ -66,7 +66,10 @@ pub async fn dial_bootstrap_peers(
 
     for peer_url in &config.bootstrap_peers {
         match super::bridge::parse_bootstrap_peer(peer_url).await {
-            Ok(super::bridge::BootstrapPeer::KnownDid { did: peer_did, addr: peer_addr }) => {
+            Ok(super::bridge::BootstrapPeer::KnownDid {
+                did: peer_did,
+                addr: peer_addr,
+            }) => {
                 info!(
                     "Connecting to bootstrap peer: {} at {}",
                     peer_did, peer_addr
@@ -82,18 +85,21 @@ pub async fn dial_bootstrap_peers(
                 }
             }
             Ok(super::bridge::BootstrapPeer::AddrOnly { addr: peer_addr }) => {
-                info!(
-                    "Connecting to bootstrap peer (addr-only): {}",
-                    peer_addr
-                );
+                info!("Connecting to bootstrap peer (addr-only): {}", peer_addr);
                 // Dial without known DID — DID will be learned from QUIC/TLS handshake
                 match network_handle.dial_addr(peer_addr).await {
                     Ok(peer_did) => {
-                        info!("✓ Connected to bootstrap peer: {} (learned from handshake)", peer_did);
+                        info!(
+                            "✓ Connected to bootstrap peer: {} (learned from handshake)",
+                            peer_did
+                        );
                         connected_peers.push(peer_did);
                     }
                     Err(e) => {
-                        warn!("Failed to connect to bootstrap peer at {}: {}", peer_addr, e)
+                        warn!(
+                            "Failed to connect to bootstrap peer at {}: {}",
+                            peer_addr, e
+                        )
                     }
                 }
             }

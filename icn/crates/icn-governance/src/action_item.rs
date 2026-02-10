@@ -687,6 +687,23 @@ impl ActionItemStore {
 mod tests {
     use super::*;
 
+    fn open_test_sled_db() -> (sled::Db, tempfile::TempDir) {
+        let base = std::env::var_os("ICN_TEST_TMPDIR")
+            .or_else(|| std::env::var_os("TMPDIR"))
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+        let tempdir = tempfile::Builder::new()
+            .prefix("icn-governance-action-items-")
+            .tempdir_in(base)
+            .expect("Failed to create temp db directory");
+        let db = sled::Config::new()
+            .path(tempdir.path().join("sled"))
+            .temporary(true)
+            .open()
+            .expect("Failed to create temp db");
+        (db, tempdir)
+    }
+
     fn test_did() -> Did {
         // Create deterministic DID for testing
         Did::from_anchor_id(&[1; 32])
@@ -825,10 +842,7 @@ mod tests {
     #[test]
     fn test_sled_store_roundtrip() {
         // Create a temporary Sled database
-        let db = sled::Config::new()
-            .temporary(true)
-            .open()
-            .expect("Failed to create temp db");
+        let (db, _tempdir) = open_test_sled_db();
         let store = ActionItemStore::with_sled(std::sync::Arc::new(db));
         let domain = test_domain();
 
@@ -873,10 +887,7 @@ mod tests {
     #[test]
     fn test_sled_delete_all() {
         // Create a temporary Sled database
-        let db = sled::Config::new()
-            .temporary(true)
-            .open()
-            .expect("Failed to create temp db");
+        let (db, _tempdir) = open_test_sled_db();
         let store = ActionItemStore::with_sled(std::sync::Arc::new(db));
         let domain1 = test_domain();
         let domain2 = GovernanceDomainId("other-domain".to_string());

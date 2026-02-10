@@ -1230,3 +1230,64 @@ fn test_governance_proof_tamper_detection() {
     // Binding hash should now fail (fields don't match proof_hash)
     assert!(!proof.verify_binding());
 }
+
+#[test]
+fn test_governance_proof_v2_cross_node_decision_hash_stability() {
+    use icn_governance::{
+        GovernanceDecisionAttestation, GovernanceDecisionReceipt, GovernanceProofV2, ProofOutcome,
+    };
+
+    let signer_a = KeyPair::generate().unwrap();
+    let signer_b = KeyPair::generate().unwrap();
+    let voter1 = KeyPair::generate().unwrap();
+    let voter2 = KeyPair::generate().unwrap();
+    let proposal_id = ProposalId::generate();
+
+    let votes = vec![
+        Vote::new(proposal_id.clone(), voter1.did().clone(), VoteChoice::For),
+        Vote::new(
+            proposal_id.clone(),
+            voter2.did().clone(),
+            VoteChoice::Against,
+        ),
+    ];
+    let tally = VoteTally::new(1, 1, 0);
+
+    let receipt_a = GovernanceDecisionReceipt::new(
+        proposal_id.0.clone(),
+        "test-domain".to_string(),
+        ProofOutcome::Accepted,
+        tally.clone(),
+        &votes,
+    );
+    let receipt_b = GovernanceDecisionReceipt::new(
+        proposal_id.0.clone(),
+        "test-domain".to_string(),
+        ProofOutcome::Accepted,
+        tally,
+        &votes,
+    );
+    assert_eq!(receipt_a.decision_hash, receipt_b.decision_hash);
+
+    let signing_key_a = ed25519_dalek::SigningKey::from_bytes(&signer_a.to_signing_key_bytes());
+    let signing_key_b = ed25519_dalek::SigningKey::from_bytes(&signer_b.to_signing_key_bytes());
+    let attestation_a = GovernanceDecisionAttestation::sign(
+        receipt_a.decision_hash,
+        signer_a.did().to_string(),
+        1_700_000_001,
+        &signing_key_a,
+    );
+    let attestation_b = GovernanceDecisionAttestation::sign(
+        receipt_b.decision_hash,
+        signer_b.did().to_string(),
+        1_700_000_123,
+        &signing_key_b,
+    );
+    assert_ne!(attestation_a.signature, attestation_b.signature);
+
+    let proof_a = GovernanceProofV2::new(receipt_a.clone(), vec![attestation_a]);
+    let proof_b = GovernanceProofV2::new(receipt_b.clone(), vec![attestation_b]);
+    assert_eq!(proof_a, proof_b);
+    assert!(proof_a.verify_receipt());
+    assert!(proof_b.verify_receipt());
+}

@@ -147,11 +147,12 @@ pub trait GovernanceOps: Send + Sync {
     /// Useful for notifications and audit purposes.
     async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>>;
 
-    /// Get the GovernanceProof for a closed proposal
+    /// Get the GovernanceProofV2 for a closed proposal
     ///
-    /// Returns the cryptographic proof (blake3 binding hash + Ed25519 signature)
+    /// Returns the canonical decision receipt + attestation bundle
     /// generated when a proposal was closed, if one exists.
-    async fn get_proof(&self, proposal_id: &ProposalId) -> Result<Option<crate::GovernanceProof>>;
+    async fn get_proof(&self, proposal_id: &ProposalId)
+        -> Result<Option<crate::GovernanceProofV2>>;
 
     // Protocol parameter operations (Phase 20)
 

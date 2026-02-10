@@ -294,26 +294,48 @@ impl GovernanceHandle {
         self.inner.read().await.get_voter_dids(proposal_id)
     }
 
-    /// Get the GovernanceProof for a closed proposal (if one was generated)
+    /// Get the GovernanceProofV2 for a closed proposal (if one was generated)
     pub async fn get_proof(
         &self,
         proposal_id: &ProposalId,
-    ) -> Result<Option<icn_governance::GovernanceProof>> {
+    ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         let actor = self.inner.read().await;
         let proof_key = format!("governance:proof:{}", proposal_id.0);
         match actor.store.get(proof_key.as_bytes())? {
-            Some(bytes) => match serde_json::from_slice(&bytes) {
-                Ok(proof) => Ok(Some(proof)),
-                Err(err) => {
-                    // Treat invalid/malformed stored proofs as missing to avoid
-                    // poisoning the gateway call path with persistent 500 errors
-                    warn!(
-                        "Failed to deserialize GovernanceProof for {}: {}",
-                        proposal_id.0, err
-                    );
-                    Ok(None)
+            Some(bytes) => {
+                // Only return securely verifiable V2 proofs. Legacy proofs are not
+                // returned because they cannot carry canonical V2 attestations.
+                if let Ok(proof_v2) =
+                    serde_json::from_slice::<icn_governance::GovernanceProofV2>(&bytes)
+                {
+                    match validate_secure_v2_proof_for_proposal(&proof_v2, proposal_id) {
+                        Ok(()) => return Ok(Some(proof_v2)),
+                        Err(reason) => {
+                            warn!(
+                                "Ignoring invalid stored governance proof for {}: {}",
+                                proposal_id.0, reason
+                            );
+                            return Ok(None);
+                        }
+                    }
                 }
-            },
+
+                if serde_json::from_slice::<icn_governance::GovernanceProof>(&bytes).is_ok() {
+                    warn!(
+                        "Ignoring legacy governance proof for {}: missing canonical attestations",
+                        proposal_id.0
+                    );
+                    return Ok(None);
+                }
+
+                // Treat invalid/malformed stored proofs as missing to avoid poisoning
+                // the gateway call path with persistent 500 errors.
+                warn!(
+                    "Failed to deserialize governance proof for {}",
+                    proposal_id.0
+                );
+                Ok(None)
+            }
             None => Ok(None),
         }
     }
@@ -902,7 +924,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn get_proof(
         &self,
         proposal_id: &ProposalId,
-    ) -> Result<Option<icn_governance::GovernanceProof>> {
+    ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         Self::get_proof(self, proposal_id).await
     }
 
@@ -1577,7 +1599,7 @@ impl GovernanceActor {
                 self.store
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
-                // Generate GovernanceProof if signing key is available
+                // Generate GovernanceProofV2 if signing key is available
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
                     use icn_governance::ProofOutcome;
 
@@ -1587,16 +1609,21 @@ impl GovernanceActor {
                         DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
                     };
 
-                    let mut proof = icn_governance::GovernanceProof::new(
+                    let receipt = icn_governance::GovernanceDecisionReceipt::new(
                         proposal_id.0.clone(),
                         proposal.domain_id.0.clone(),
                         proof_outcome,
                         tally.clone(),
                         &votes,
-                        now,
-                        self.did.to_string(),
                     );
-                    proof.sign(signing_key);
+
+                    let attestation = icn_governance::GovernanceDecisionAttestation::sign(
+                        receipt.decision_hash,
+                        self.did.to_string(),
+                        now,
+                        signing_key,
+                    );
+                    let proof = icn_governance::GovernanceProofV2::new(receipt, vec![attestation]);
 
                     let serialized = serde_json::to_vec(&proof)?;
 
@@ -1605,9 +1632,9 @@ impl GovernanceActor {
                     self.store.put(proof_key.as_bytes(), &serialized)?;
 
                     info!(
-                        "GovernanceProof signed for proposal {} (hash: {})",
+                        "GovernanceProofV2 signed for proposal {} (decision_hash: {})",
                         proposal_id.0,
-                        hex::encode(proof.proof_hash)
+                        hex::encode(proof.receipt.decision_hash)
                     );
 
                     Some(serialized)
@@ -2457,61 +2484,87 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
             if let Some(bytes) = proof_bytes {
                 let proof_key = format!("governance:proof:{}", id.0);
 
-                // Don't overwrite a locally-generated proof with a remote one
-                if store.get(proof_key.as_bytes())?.is_some() {
-                    debug!(
-                        "Skipping remote proof for proposal {} — local proof already exists",
-                        id.0
-                    );
-                } else {
-                    // Validate remote proof before storing (untrusted gossip input)
-                    match serde_json::from_slice::<icn_governance::GovernanceProof>(&bytes) {
-                        Ok(proof) => {
-                            // Verify binding hash (tamper check)
-                            if !proof.verify_binding() {
-                                warn!(
-                                    "Rejected remote proof for proposal {} — binding hash mismatch",
+                // Validate remote proof before storing (untrusted gossip input)
+                let incoming_v2 = match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
+                    &bytes,
+                ) {
+                    Ok(proof) => match validate_secure_v2_proof_for_proposal(&proof, &id) {
+                        Ok(()) => Some(proof),
+                        Err(reason) => {
+                            warn!("Rejected remote proof for proposal {} — {}", id.0, reason);
+                            None
+                        }
+                    },
+                    Err(_) => {
+                        match serde_json::from_slice::<icn_governance::GovernanceProof>(&bytes) {
+                            Ok(legacy) => {
+                                // Legacy proofs must still verify cryptographically. We reject them
+                                // for storage because they cannot carry canonical V2 attestations.
+                                if !legacy.verify_binding() {
+                                    warn!(
+                                    "Rejected legacy remote proof for proposal {} — invalid binding",
                                     id.0
                                 );
-                            } else if proof.proposal_id != id.0 {
-                                warn!(
-                                    "Rejected remote proof — proposal_id mismatch: expected {}, got {}",
-                                    id.0, proof.proposal_id
-                                );
-                            } else {
-                                // Verify signature via DID resolution
-                                match Did::from_str(&proof.signer_did)
+                                } else {
+                                    match Did::from_str(&legacy.signer_did)
                                     .and_then(|did| did.to_verifying_key())
                                 {
-                                    Ok(vk) => {
-                                        if proof.verify_signature(&vk) {
-                                            store.put(proof_key.as_bytes(), &bytes)?;
-                                            info!(
-                                                "Stored validated governance proof from remote for proposal {}",
-                                                id.0
-                                            );
-                                        } else {
-                                            warn!(
-                                                "Rejected remote proof for proposal {} — invalid signature",
-                                                id.0
-                                            );
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!(
-                                            "Rejected remote proof for proposal {} — cannot resolve signer DID: {}",
-                                            id.0, e
-                                        );
-                                    }
+                                    Ok(vk) if legacy.verify_signature(&vk) => warn!(
+                                        "Rejected legacy remote proof for proposal {} — missing canonical attestations",
+                                        id.0
+                                    ),
+                                    Ok(_) => warn!(
+                                        "Rejected legacy remote proof for proposal {} — invalid signature",
+                                        id.0
+                                    ),
+                                    Err(e) => warn!(
+                                        "Rejected legacy remote proof for proposal {} — cannot resolve signer DID: {}",
+                                        id.0, e
+                                    ),
                                 }
+                                }
+                                None
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "Rejected remote proof for proposal {} — invalid JSON: {}",
+                                    id.0, e
+                                );
+                                None
                             }
                         }
-                        Err(e) => {
-                            warn!(
-                                "Rejected remote proof for proposal {} — invalid JSON: {}",
-                                id.0, e
-                            );
+                    }
+                };
+
+                if let Some(proof) = incoming_v2 {
+                    let should_store = match store.get(proof_key.as_bytes())? {
+                        Some(existing_bytes) => {
+                            match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
+                                &existing_bytes,
+                            ) {
+                                Ok(existing)
+                                    if validate_secure_v2_proof_for_proposal(&existing, &id)
+                                        .is_ok() =>
+                                {
+                                    debug!(
+                                        "Skipping remote proof for proposal {} — valid proof already exists",
+                                        id.0
+                                    );
+                                    false
+                                }
+                                _ => true,
+                            }
                         }
+                        None => true,
+                    };
+
+                    if should_store {
+                        let canonical_bytes = serde_json::to_vec(&proof)?;
+                        store.put(proof_key.as_bytes(), &canonical_bytes)?;
+                        info!(
+                            "Stored validated governance proof from remote for proposal {}",
+                            id.0
+                        );
                     }
                 }
             }
@@ -2573,4 +2626,36 @@ fn load_json<T: for<'a> serde::Deserialize<'a>>(
 
 fn now_seconds() -> u64 {
     icn_time::current_timestamp_secs()
+}
+
+fn validate_secure_v2_proof_for_proposal(
+    proof: &icn_governance::GovernanceProofV2,
+    proposal_id: &ProposalId,
+) -> std::result::Result<(), String> {
+    if !proof.verify_receipt() {
+        return Err("invalid decision receipt".to_string());
+    }
+    if proof.receipt.proposal_id != proposal_id.0 {
+        return Err(format!(
+            "proposal_id mismatch: expected {}, got {}",
+            proposal_id.0, proof.receipt.proposal_id
+        ));
+    }
+    if proof.attestations.is_empty() {
+        return Err("missing attestations".to_string());
+    }
+
+    for attestation in &proof.attestations {
+        if attestation.decision_hash != proof.receipt.decision_hash {
+            return Err("attestation decision_hash mismatch".to_string());
+        }
+        let vk = Did::from_str(&attestation.signer_did)
+            .and_then(|did| did.to_verifying_key())
+            .map_err(|e| format!("cannot resolve signer DID: {e}"))?;
+        if !attestation.verify(&vk) {
+            return Err("invalid attestation signature".to_string());
+        }
+    }
+
+    Ok(())
 }

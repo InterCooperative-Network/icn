@@ -9,6 +9,15 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # CI gate ratchet phases (observational | warning | blocking)
+  GATE_RATCHET_PHASE_MEANING_FIREWALL: warning
+  GATE_RATCHET_PHASE_KERNEL_DEPS: blocking
+  GATE_RATCHET_PHASE_FIREWALL_CONTRACT: warning
+  GATE_RATCHET_PHASE_COVERAGE: observational
+  GATE_RATCHET_PHASE_SDK_TESTS: warning
+  GATE_RATCHET_PHASE_A11Y: warning
+  # Scope controls for staged boundary enforcement
+  GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
 jobs:
   secrets-check:
@@ -69,15 +78,31 @@ jobs:
   meaning-firewall:
     name: Meaning Firewall Check
     runs-on: ubuntu-latest
-    # Non-blocking until Phase 2 completes (#865, #866, #867)
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
       - name: Check kernel/app separation
-        run: ./scripts/check-meaning-firewall.sh
-        # Reports violations but doesn't fail CI until Phase 2 is done
-        # After Phase 2: remove continue-on-error above to enforce
+        run: |
+          set -euo pipefail
+          if ./scripts/check-meaning-firewall.sh; then
+            echo "Meaning Firewall check passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_MEANING_FIREWALL}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Meaning Firewall violated::Meaning Firewall violations detected. Phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+          fi
+          echo "WARNING: Meaning Firewall violations detected. See docs/ci/GATE_RATCHET_PLAN.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Meaning Firewall (blocking)::Failing CI because phase=blocking and Meaning Firewall violations were detected."
+            echo "BLOCKING: failing CI due to Meaning Firewall violations"
+            exit 1
+          fi
+
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
 
   kernel-deps:
     name: Kernel Forbidden Dependencies
@@ -93,9 +118,27 @@ jobs:
       - name: Check kernel crates for forbidden deps (bash version)
         run: |
           set -euo pipefail
-          KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
+          SCOPE="${GATE_RATCHET_KERNEL_DEPS_SCOPE}"
+          case "$SCOPE" in
+            core-only)
+              KERNEL_CRATES=("icn-core")
+              ;;
+            all-kernel)
+              KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
+              ;;
+            *)
+              echo "Unknown GATE_RATCHET_KERNEL_DEPS_SCOPE: $SCOPE"
+              exit 1
+              ;;
+          esac
           FORBIDDEN=("icn-trust" "icn-governance" "icn-ledger" "icn-ccl" "icn-compute" "icn-entity" "icn-community" "icn-federation" "icn-steward")
+          PHASE="${GATE_RATCHET_PHASE_KERNEL_DEPS}"
           ALLOWLIST_FILE="../scripts/forbidden-deps-allowlist.txt"
+          violations=()
+          echo "Ratchet phase: $PHASE"
+          echo "Kernel dependency check scope: $SCOPE (${KERNEL_CRATES[*]})"
+          echo "Accepted scopes: core-only | all-kernel"
+          echo "Rollout: Wave 2 (core-only) enforcement active when scope=core-only and phase=blocking"
           if [ -f "$ALLOWLIST_FILE" ]; then
             # Read allowlist, filtering out comments and empty lines
             mapfile -t ALLOWLIST < <(grep -v '^\s*#' "$ALLOWLIST_FILE" | grep -v '^\s*$')
@@ -109,28 +152,72 @@ jobs:
                 if printf '%s\n' "${ALLOWLIST[@]}" | grep -qx "$entry"; then
                   echo "Allowed dependency (allowlist): ${entry}"
                 else
-                  echo "Forbidden dependency detected: ${entry}"
-                  exit 1
+                  violations+=("$entry")
                 fi
               fi
             done
           done
+
+          if [ "${#violations[@]}" -gt 0 ]; then
+            if [ "$PHASE" != "observational" ]; then
+              echo "::warning title=Kernel dependency boundary violated::Forbidden dependency edges detected in scope=$SCOPE phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+            fi
+            printf 'WARNING: Forbidden kernel dependency edges detected:\n'
+            printf '  - %s\n' "${violations[@]}"
+            if [ "$PHASE" != "observational" ]; then
+              for v in "${violations[@]}"; do
+                echo "::warning title=Forbidden kernel dep edge::$v"
+              done
+            fi
+            echo
+            echo "Remediation order:"
+            echo "  1) Remove the dependency from icn-core (preferred)"
+            echo "  2) Move the dependency behind a kernel API/service boundary"
+            echo "  3) If this edge is temporarily unavoidable, add a scoped entry to: $ALLOWLIST_FILE"
+            echo
+            echo "Reference: docs/ci/GATE_RATCHET_PLAN.md"
+            echo
+
+            if [ "$PHASE" = "blocking" ]; then
+              echo "::error title=Kernel dependency boundary (blocking)::Failing CI because phase=blocking and forbidden edges were found. Fix or add scoped allowlist entry."
+              echo "BLOCKING: failing CI due to forbidden kernel dependencies"
+              exit 1
+            fi
+
+            echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          fi
         working-directory: ./icn
 
   firewall-contract:
     name: Firewall Contract Enforcement
     runs-on: ubuntu-latest
-    # Non-blocking until Wave 2 completes (icn-core migrations)
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Run firewall denylist check
-        run: python3 .github/scripts/firewall_denylist.py
-        # Reports violations but doesn't fail CI until migrations complete
-        # After Wave 6: remove continue-on-error above to enforce
+        run: |
+          set -euo pipefail
+          if python3 .github/scripts/firewall_denylist.py; then
+            echo "Firewall contract check passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_FIREWALL_CONTRACT}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Firewall contract violated::Firewall contract violations detected. Phase=$PHASE. See docs/ci/GATE_RATCHET_PLAN.md"
+          fi
+          echo "WARNING: Firewall contract violations detected. See docs/ci/GATE_RATCHET_PLAN.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Firewall contract (blocking)::Failing CI because phase=blocking and firewall contract violations were detected."
+            echo "BLOCKING: failing CI due to firewall contract violations"
+            exit 1
+          fi
+
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
 
   clippy:
     name: Clippy
@@ -268,7 +355,7 @@ jobs:
       - name: Generate coverage
         run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
         working-directory: ./icn
-        continue-on-error: true  # Tarpaulin can have spurious failures even when tests pass
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}  # Tarpaulin can have spurious failures even when tests pass
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -365,7 +452,7 @@ jobs:
 
       - name: Run tests
         run: npm test
-        continue-on-error: true  # SDK tests may need gateway running
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_SDK_TESTS != 'blocking' }}  # SDK tests may need gateway running
 
   web-ui:
     name: Web UI
@@ -415,7 +502,7 @@ jobs:
       - name: Run accessibility tests
         id: a11y-tests
         run: npm run test:a11y
-        continue-on-error: true  # Don't fail build initially while fixing violations
+        continue-on-error: ${{ env.GATE_RATCHET_PHASE_A11Y != 'blocking' }}  # Don't fail build initially while fixing violations
 
       - name: Upload accessibility report
         if: always()

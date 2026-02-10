@@ -383,15 +383,19 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         let wasm_store_path = deps.store_path.join("wasm");
         match sled::open(&wasm_store_path) {
             Ok(db) => {
-                let registry = std::sync::Arc::new(
-                    icn_compute::WasmRegistry::with_store(db),
-                );
+                let registry = std::sync::Arc::new(icn_compute::WasmRegistry::with_store(db));
                 compute_actor.set_wasm_registry(registry.clone());
                 compute_actor.wire_wasm_executor(registry).await;
-                info!("WASM registry and executor wired (sled path: {:?})", wasm_store_path);
+                info!(
+                    "WASM registry and executor wired (sled path: {:?})",
+                    wasm_store_path
+                );
             }
             Err(e) => {
-                warn!("Failed to open WASM sled store at {:?}: {e}", wasm_store_path);
+                warn!(
+                    "Failed to open WASM sled store at {:?}: {e}",
+                    wasm_store_path
+                );
                 warn!("WASM execution will not be available");
             }
         }

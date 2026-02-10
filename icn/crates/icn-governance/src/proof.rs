@@ -217,6 +217,249 @@ impl GovernanceProof {
     }
 }
 
+/// Cross-node deterministic governance decision receipt.
+///
+/// Equality semantics are intentionally anchored to `decision_hash` only.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GovernanceDecisionReceipt {
+    /// ID of the proposal this receipt covers
+    pub proposal_id: String,
+    /// ID of the governance domain
+    pub domain_id: String,
+    /// Final outcome of the vote
+    pub outcome: ProofOutcome,
+    /// Aggregated vote tally
+    pub vote_tally: VoteTally,
+    /// Merkle root of sorted vote records (deterministic)
+    pub vote_hash: Hash,
+    /// blake3 canonical decision hash from receipt fields only
+    pub decision_hash: Hash,
+}
+
+impl PartialEq for GovernanceDecisionReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.decision_hash == other.decision_hash
+    }
+}
+
+impl Eq for GovernanceDecisionReceipt {}
+
+impl GovernanceDecisionReceipt {
+    /// Domain separation tag for canonical decision hashes.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:decision:v1";
+
+    /// Create a canonical receipt from proposal decision inputs.
+    pub fn new(
+        proposal_id: String,
+        domain_id: String,
+        outcome: ProofOutcome,
+        vote_tally: VoteTally,
+        votes: &[Vote],
+    ) -> Self {
+        let vote_hash = GovernanceProof::compute_vote_hash(votes);
+        let decision_hash =
+            Self::compute_decision_hash(&proposal_id, &domain_id, outcome, &vote_tally, &vote_hash);
+
+        Self {
+            proposal_id,
+            domain_id,
+            outcome,
+            vote_tally,
+            vote_hash,
+            decision_hash,
+        }
+    }
+
+    /// Convert a legacy proof into the canonical receipt model.
+    ///
+    /// Legacy node-local fields (`timestamp`, `signer_did`, `proof_hash`) are ignored.
+    pub fn from_legacy(proof: &GovernanceProof) -> Self {
+        let decision_hash = Self::compute_decision_hash(
+            &proof.proposal_id,
+            &proof.domain_id,
+            proof.outcome,
+            &proof.vote_tally,
+            &proof.vote_hash,
+        );
+
+        Self {
+            proposal_id: proof.proposal_id.clone(),
+            domain_id: proof.domain_id.clone(),
+            outcome: proof.outcome,
+            vote_tally: proof.vote_tally.clone(),
+            vote_hash: proof.vote_hash,
+            decision_hash,
+        }
+    }
+
+    /// Compute canonical bytes used for `decision_hash`.
+    ///
+    /// Keep this helper as the single source of truth for canonical decision encoding.
+    pub fn compute_decision_hash_bytes(&self) -> Vec<u8> {
+        Self::compute_decision_hash_bytes_fields(
+            &self.proposal_id,
+            &self.domain_id,
+            self.outcome,
+            &self.vote_tally,
+            &self.vote_hash,
+        )
+    }
+
+    fn compute_decision_hash_bytes_fields(
+        proposal_id: &str,
+        domain_id: &str,
+        outcome: ProofOutcome,
+        vote_tally: &VoteTally,
+        vote_hash: &Hash,
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_TAG);
+        bytes.extend_from_slice(&(proposal_id.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(proposal_id.as_bytes());
+        bytes.extend_from_slice(&(domain_id.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(domain_id.as_bytes());
+        bytes.push(outcome_ordinal(outcome));
+        bytes.extend_from_slice(&(vote_tally.for_votes as u64).to_le_bytes());
+        bytes.extend_from_slice(&(vote_tally.against_votes as u64).to_le_bytes());
+        bytes.extend_from_slice(&(vote_tally.abstain_votes as u64).to_le_bytes());
+        bytes.extend_from_slice(vote_hash);
+        bytes
+    }
+
+    /// Compute `decision_hash` from canonical receipt fields.
+    pub fn compute_decision_hash(
+        proposal_id: &str,
+        domain_id: &str,
+        outcome: ProofOutcome,
+        vote_tally: &VoteTally,
+        vote_hash: &Hash,
+    ) -> Hash {
+        let bytes = Self::compute_decision_hash_bytes_fields(
+            proposal_id,
+            domain_id,
+            outcome,
+            vote_tally,
+            vote_hash,
+        );
+        *blake3::hash(&bytes).as_bytes()
+    }
+
+    /// Verify the stored `decision_hash` against canonical receipt fields.
+    pub fn verify(&self) -> bool {
+        let recomputed = Self::compute_decision_hash(
+            &self.proposal_id,
+            &self.domain_id,
+            self.outcome,
+            &self.vote_tally,
+            &self.vote_hash,
+        );
+        self.decision_hash == recomputed
+    }
+}
+
+/// Node-local signed attestation over a canonical governance decision.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GovernanceDecisionAttestation {
+    /// Canonical decision hash being attested
+    pub decision_hash: Hash,
+    /// DID of signer node
+    pub signer_did: String,
+    /// Unix timestamp of attestation
+    pub timestamp: u64,
+    /// Ed25519 signature over canonical attestation payload
+    pub signature: SignatureBytes,
+}
+
+impl GovernanceDecisionAttestation {
+    /// Domain separation tag for attestation payloads.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:attest:v1";
+
+    fn payload_bytes(decision_hash: &Hash, signer_did: &str, timestamp: u64) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_TAG);
+        bytes.extend_from_slice(decision_hash);
+        bytes.extend_from_slice(&(signer_did.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(signer_did.as_bytes());
+        bytes.extend_from_slice(&timestamp.to_le_bytes());
+        bytes
+    }
+
+    /// Sign an attestation for a `decision_hash`.
+    pub fn sign(
+        decision_hash: Hash,
+        signer_did: String,
+        timestamp: u64,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> Self {
+        use ed25519_dalek::Signer;
+        let payload = Self::payload_bytes(&decision_hash, &signer_did, timestamp);
+        let signature = signing_key.sign(&payload).to_bytes().to_vec();
+        Self {
+            decision_hash,
+            signer_did,
+            timestamp,
+            signature,
+        }
+    }
+
+    /// Verify the attestation signature against expected verifier.
+    pub fn verify(&self, verifying_key: &ed25519_dalek::VerifyingKey) -> bool {
+        use ed25519_dalek::Verifier;
+        if self.signature.len() != 64 {
+            return false;
+        }
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(&self.signature);
+        let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+        let payload = Self::payload_bytes(&self.decision_hash, &self.signer_did, self.timestamp);
+        verifying_key.verify(&payload, &sig).is_ok()
+    }
+}
+
+/// Governance proof bundle (canonical receipt + one or more node attestations).
+///
+/// Equality semantics are intentionally anchored to `receipt.decision_hash` only.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GovernanceProofV2 {
+    pub receipt: GovernanceDecisionReceipt,
+    pub attestations: Vec<GovernanceDecisionAttestation>,
+}
+
+impl PartialEq for GovernanceProofV2 {
+    fn eq(&self, other: &Self) -> bool {
+        self.receipt.decision_hash == other.receipt.decision_hash
+    }
+}
+
+impl Eq for GovernanceProofV2 {}
+
+impl GovernanceProofV2 {
+    pub fn new(
+        receipt: GovernanceDecisionReceipt,
+        attestations: Vec<GovernanceDecisionAttestation>,
+    ) -> Self {
+        Self {
+            receipt,
+            attestations,
+        }
+    }
+
+    /// Convert from legacy proof shape.
+    ///
+    /// Legacy signatures are bound to legacy `proof_hash`; therefore attestations are
+    /// intentionally left empty for compatibility decoding without canonical attestation claims.
+    pub fn from_legacy(proof: &GovernanceProof) -> Self {
+        Self {
+            receipt: GovernanceDecisionReceipt::from_legacy(proof),
+            attestations: Vec::new(),
+        }
+    }
+
+    pub fn verify_receipt(&self) -> bool {
+        self.receipt.verify()
+    }
+}
+
 /// Map VoteChoice to a deterministic ordinal for hashing
 fn choice_ordinal(choice: VoteChoice) -> u8 {
     match choice {
@@ -527,5 +770,121 @@ mod tests {
         assert_eq!(proof, deserialized);
         assert!(deserialized.verify_binding());
         assert!(deserialized.verify_signature(&verifying_key));
+    }
+
+    #[test]
+    fn decision_hash_is_stable_across_node_local_fields() {
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+
+        let proof_a = GovernanceProof::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally.clone(),
+            &votes,
+            1700000100,
+            "did:icn:nodeA".to_string(),
+        );
+        let proof_b = GovernanceProof::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+            1800000100,
+            "did:icn:nodeB".to_string(),
+        );
+
+        let receipt_a = GovernanceDecisionReceipt::from_legacy(&proof_a);
+        let receipt_b = GovernanceDecisionReceipt::from_legacy(&proof_b);
+
+        assert_eq!(receipt_a.decision_hash, receipt_b.decision_hash);
+    }
+
+    #[test]
+    fn decision_hash_changes_when_votes_change() {
+        let mut votes1 = make_votes();
+        let mut votes2 = make_votes();
+        votes2[0].choice = VoteChoice::Against;
+
+        let receipt1 = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&votes1),
+            &votes1,
+        );
+        let receipt2 = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&votes2),
+            &votes2,
+        );
+
+        assert_ne!(receipt1.decision_hash, receipt2.decision_hash);
+        votes1.reverse();
+        let reordered = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&votes1),
+            &votes1,
+        );
+        assert_eq!(receipt1.decision_hash, reordered.decision_hash);
+    }
+
+    #[test]
+    fn attestation_signature_roundtrip() {
+        let signer = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let vk = signer.verifying_key();
+        let receipt = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&make_votes()),
+            &make_votes(),
+        );
+        let attestation = GovernanceDecisionAttestation::sign(
+            receipt.decision_hash,
+            "did:icn:node1".to_string(),
+            1700001111,
+            &signer,
+        );
+        assert!(attestation.verify(&vk));
+    }
+
+    #[test]
+    fn proof_v2_equality_uses_decision_hash_only() {
+        let votes = make_votes();
+        let receipt = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&votes),
+            &votes,
+        );
+        let signer_a = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
+        let signer_b = ed25519_dalek::SigningKey::from_bytes(&[10u8; 32]);
+        let a = GovernanceProofV2::new(
+            receipt.clone(),
+            vec![GovernanceDecisionAttestation::sign(
+                receipt.decision_hash,
+                "did:icn:a".to_string(),
+                1700000001,
+                &signer_a,
+            )],
+        );
+        let b = GovernanceProofV2::new(
+            receipt,
+            vec![GovernanceDecisionAttestation::sign(
+                a.receipt.decision_hash,
+                "did:icn:b".to_string(),
+                1700000002,
+                &signer_b,
+            )],
+        );
+        assert_eq!(a, b);
     }
 }

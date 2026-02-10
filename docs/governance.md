@@ -447,6 +447,26 @@ Phase 13 implementations:
 - **TrustMembershipResolver**: Scaffold for trust graph integration (not yet wired)
 - **CompositeMembershipResolver**: Tries multiple strategies in sequence
 
+### 5.4 Treasury Spend Proof Gate
+
+Treasury disbursements initiated by governance (`TreasuryProposalOperation::Spend`) are
+**proof-gated** and **fail-closed** at execution time.
+
+Before any treasury spend mutates ledger state, the executor requires a valid
+`GovernanceProofV2` for the accepted proposal and verifies:
+
+- canonical receipt binding (`proof.verify_receipt()`)
+- proposal identity (`proof.receipt.proposal_id`)
+- governance domain (`proof.receipt.domain_id`)
+- accepted outcome (`proof.receipt.outcome == ProofOutcome::Accepted`)
+- at least one attestation is present
+- each attestation is bound to `receipt.decision_hash`
+- each signer DID resolves and each attestation signature verifies
+- decision timestamp consistency (at least one attestation has `timestamp == decided_at`)
+
+If proof lookup or validation fails, spend execution is rejected, recorded in the
+dead-letter queue, and reported as a proposal execution failure event.
+
 ---
 
 ## 6. How Communities Evolve Their Governance
