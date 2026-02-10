@@ -1,3 +1,11 @@
+⚠️ **ARCHIVED** - This summary document from 2025 has been archived.
+
+For current information, see:
+- [STATE.md](../STATE.md) - Current project state
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+
+---
+
 # ICN Architecture Summary
 
 Quick reference for the comprehensive [ARCHITECTURE.md](./ARCHITECTURE.md).

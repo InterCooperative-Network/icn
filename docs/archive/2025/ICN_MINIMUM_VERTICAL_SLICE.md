@@ -1,3 +1,11 @@
+⚠️ **ARCHIVED** - This document is from 2025 and has been archived.
+
+For current information, see:
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+- [STATE.md](../STATE.md) - Current project state
+
+---
+
 # ICN: Minimum Vertical Slice
 
 **Last Updated**: 2026-01-23

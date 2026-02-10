@@ -1,3 +1,11 @@
+⚠️ **ARCHIVED** - This document is from 2025 and has been archived.
+
+For current information, see:
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+- [STATE.md](../STATE.md) - Current project state
+
+---
+
 # Governance→Ledger Integration: Bugs & Issues Found
 
 **Date**: 2025-01-17 (Updated: 2025-11-17)

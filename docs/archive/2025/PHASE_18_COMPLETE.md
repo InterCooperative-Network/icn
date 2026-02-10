@@ -1,3 +1,12 @@
+⚠️ **ARCHIVED** - This document is from 2025 and has been archived.
+
+For current information, see:
+- [STATE.md](../STATE.md) - Current project state
+- [PHASE_HISTORY.md](../PHASE_HISTORY.md) - Historical phase records
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+
+---
+
 # Phase 18: Pre-Pilot Hardening - COMPLETE ✅
 
 **Completion Date**: 2025-12-04

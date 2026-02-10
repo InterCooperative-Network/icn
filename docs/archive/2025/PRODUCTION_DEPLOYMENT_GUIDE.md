@@ -1,3 +1,9 @@
+⚠️ **SUPERSEDED** - This document has been superseded.
+
+See current deployment guide: [HOMELAB_DEPLOYMENT.md](../../operations/deployment/HOMELAB_DEPLOYMENT.md)
+
+---
+
 # ICN Production Deployment Guide
 
 **Version**: 1.0  

@@ -1,3 +1,12 @@
+⚠️ **ARCHIVED** - This document is from 2025 and has been archived.
+
+For current information, see:
+- [STATE.md](../STATE.md) - Current project state
+- [TODO.md](../TODO.md) - Current tasks
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+
+---
+
 # Security Hardening Session - December 18, 2025
 
 ## Summary

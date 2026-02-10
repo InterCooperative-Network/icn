@@ -1,3 +1,11 @@
+⚠️ **ARCHIVED** - This summary document from 2025 has been archived.
+
+For current information, see:
+- [STATE.md](../STATE.md) - Current project state
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current architecture
+
+---
+
 # Commons Evolution Implementation Summary
 
 **Document ID**: ICN-DEV-COMMONS-SUMMARY
