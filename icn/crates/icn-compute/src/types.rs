@@ -306,21 +306,21 @@ impl ComputeTask {
         }
 
         // CellLocal data cannot be accessed by tasks with FederationMirrored locality
-        if let Some(data_locality) = &self.data_locality {
-            // If task has federation constraints, check locality compatibility
-            if let Some(ref fed_constraints) = self.federation_constraints {
-                use crate::scheduler::FederationPolicy;
-                // Federation tasks (AllowFederated or FederatedWhitelist) should not use CellLocal
-                let allows_federation = !matches!(
-                    fed_constraints.federation_policy,
-                    FederationPolicy::LocalOnly
-                );
-                if data_locality.is_cell_local() && allows_federation {
-                    return Err(crate::error::ComputeError::InvalidCode(
-                        "Tasks with CellLocal data locality cannot allow federated execution"
-                            .into(),
-                    ));
-                }
+        // None defaults to CellLocal behavior for safety
+        let effective_locality = self
+            .data_locality
+            .unwrap_or(icn_kernel_api::storage::DataLocality::CellLocal);
+        if let Some(ref fed_constraints) = self.federation_constraints {
+            use crate::scheduler::FederationPolicy;
+            // Federation tasks (AllowFederated or FederatedWhitelist) should not use CellLocal
+            let allows_federation = !matches!(
+                fed_constraints.federation_policy,
+                FederationPolicy::LocalOnly
+            );
+            if effective_locality.is_cell_local() && allows_federation {
+                return Err(crate::error::ComputeError::InvalidCode(
+                    "Tasks with CellLocal data locality cannot allow federated execution".into(),
+                ));
             }
         }
 

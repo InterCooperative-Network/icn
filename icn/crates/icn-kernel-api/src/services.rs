@@ -673,20 +673,21 @@ pub trait CellService: Send + Sync {
     /// the peer. If the peer is completely unknown, returns `Commons`.
     fn peer_scope(&self, did: &Did) -> ScopeLevel;
 
-    /// Get the operator entity for a cell (E5: Operator Boundary).
+    /// Get the operator DID for a cell (E5: Operator Boundary).
     ///
-    /// Returns the DID or entity identifier of the single entity that
-    /// operates this cell. All nodes in a cell MUST share the same operator.
+    /// Returns the DID of the single entity that operates this cell.
+    /// All nodes in a cell MUST share the same operator DID.
     ///
     /// # Cell Formation Validation
     ///
     /// When a node attempts to join a cell, the following must hold:
-    /// - `node.operator_entity == cell.operator_entity()`
+    /// - the node's configured operator DID matches `cell.cell_operator()`
     ///
     /// Implementations should reject cell join attempts that would violate
-    /// the single-operator rule.
+    /// the single-operator rule (i.e., when `cell.cell_operator()` is set and
+    /// does not match the joining node's operator DID).
     ///
-    /// Returns `None` if the cell is unknown or operator is not set.
+    /// Returns `None` if the cell is unknown or the operator DID is not set.
     fn cell_operator(&self, cell_id: &CellId) -> Option<Did> {
         // Default: not implemented (for backward compatibility)
         let _ = cell_id;

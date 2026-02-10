@@ -521,6 +521,30 @@ impl ExecutionReceipt {
             )));
         }
 
+        // E2: Ensure dispute_id consistency between verification_result and top-level field
+        match &self.verification_result {
+            VerificationResult::Disputed { dispute_id } => {
+                // If verification_result is Disputed, top-level dispute_id should match
+                if let Some(top_level_id) = &self.dispute_id {
+                    if top_level_id != dispute_id {
+                        return Err(ComputeError::InvalidInput(
+                            "dispute_id mismatch: verification_result.dispute_id differs from top-level dispute_id".into(),
+                        ));
+                    }
+                }
+                // Note: We allow dispute_id to be None when verification_result has it
+                // (the verification_result is authoritative)
+            }
+            _ => {
+                // If not disputed, top-level dispute_id should be None
+                if self.dispute_id.is_some() {
+                    return Err(ComputeError::InvalidInput(
+                        "dispute_id is set but verification_result is not Disputed".into(),
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 
