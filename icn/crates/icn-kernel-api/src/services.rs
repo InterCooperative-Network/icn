@@ -546,6 +546,29 @@ pub trait LedgerService: Send + Sync {
     fn revoke_resource_access(&self, _req: &RevokeResourceAccessRequest) -> Result<(), String> {
         Err("Resource access revocation not supported".to_string())
     }
+
+    /// Submit a treasury entry to the ledger with decision provenance.
+    ///
+    /// This is the kernel-safe interface for treasury operations to write
+    /// ledger entries. The ledger service handles:
+    /// - Entry construction and validation
+    /// - Signature generation
+    /// - Gossip propagation
+    ///
+    /// Returns the content hash of the created entry.
+    ///
+    /// # Arguments
+    /// * `entry` - Treasury entry details (kernel-safe DTO)
+    ///
+    /// # Pilot Invariant
+    /// The resulting ledger entry MUST carry both `decision_receipt_id` and
+    /// `decision_hash` for provenance tracking.
+    fn submit_treasury_entry(
+        &self,
+        _entry: TreasuryEntryRequest,
+    ) -> Result<TreasuryEntryResult, String> {
+        Err("Treasury entry submission not supported".to_string())
+    }
 }
 
 // ============================================================================
@@ -587,6 +610,60 @@ pub struct RevokeResourceAccessRequest {
     pub resource_id: String,
     /// Reason for revocation (for audit trail)
     pub reason: String,
+}
+
+// ============================================================================
+// Treasury Entry DTOs (kernel-safe ledger interface)
+// ============================================================================
+
+/// Request to submit a treasury entry to the ledger.
+///
+/// This is a kernel-safe DTO for treasury operations. The ledger service
+/// translates this into domain-specific journal entries.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TreasuryEntryRequest {
+    /// Treasury being operated on
+    pub treasury_id: String,
+    /// Type of treasury operation
+    pub operation_type: TreasuryOperationType,
+    /// Amount being transferred
+    pub amount: i64,
+    /// Currency code
+    pub currency: String,
+    /// Recipient DID (for spend operations)
+    pub recipient: Option<String>,
+    /// Human-readable memo
+    pub memo: String,
+
+    // Provenance fields (pilot-critical)
+
+    /// Decision receipt ID that authorized this entry (node-local reference)
+    pub decision_receipt_id: String,
+    /// Canonical decision hash (cross-node equality anchor)
+    pub decision_hash: String,
+}
+
+/// Type of treasury operation (mirrors TreasuryOperationType from governance.rs)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TreasuryOperationType {
+    Spend,
+    Allocate,
+    Transfer,
+    CreateBudget,
+    DistributeSurplus,
+    RedeemShares,
+    IssueBond,
+}
+
+/// Result of a treasury entry submission.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TreasuryEntryResult {
+    /// Content hash of the created ledger entry
+    pub entry_hash: String,
+    /// The decision_receipt_id echoed back for verification
+    pub decision_receipt_id: String,
+    /// The decision_hash echoed back for verification
+    pub decision_hash: String,
 }
 
 /// Ledger events that the kernel can report

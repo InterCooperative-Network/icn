@@ -116,14 +116,21 @@ impl EffectExecutor for KernelGovernanceExecutor {
 /// Executes treasury operations (spend, allocate, reserve, release) by
 /// delegating to the kernel's ledger services.
 pub struct KernelTreasuryExecutor {
-    // TODO: Add ledger handle for actual treasury operations
-    // ledger: Arc<icn_ledger::Ledger>,
+    /// Ledger service for submitting treasury entries
+    ledger: Option<Arc<dyn icn_kernel_api::LedgerService>>,
 }
 
 impl KernelTreasuryExecutor {
-    /// Create a new treasury executor.
+    /// Create a new treasury executor without ledger (placeholder mode).
     pub fn new() -> Self {
-        Self {}
+        Self { ledger: None }
+    }
+
+    /// Create a treasury executor with ledger service (production mode).
+    pub fn with_ledger(ledger: Arc<dyn icn_kernel_api::LedgerService>) -> Self {
+        Self {
+            ledger: Some(ledger),
+        }
     }
 }
 
@@ -140,8 +147,6 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
         receipt_id: &DecisionReceiptId,
         operation: TreasuryOperation,
     ) -> Result<ExecutionOutcome> {
-        // TODO: Implement actual treasury operations via ledger
-        // For now, log and return success as a placeholder
         tracing::info!(
             receipt_id = %receipt_id,
             treasury_id = %operation.treasury_id,
@@ -150,13 +155,57 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
             currency = %operation.currency,
             recipient = ?operation.recipient,
             memo = %operation.memo,
+            decision_hash = ?operation.decision_hash,
             "Executing treasury operation"
         );
 
+        // If we have a ledger service, submit the entry
+        if let Some(ledger) = &self.ledger {
+            if let Some(decision_hash) = &operation.decision_hash {
+                let request = icn_kernel_api::TreasuryEntryRequest {
+                    treasury_id: operation.treasury_id.clone(),
+                    operation_type: convert_operation_type(operation.operation_type),
+                    amount: operation.amount,
+                    currency: operation.currency.clone(),
+                    recipient: operation.recipient.clone(),
+                    memo: operation.memo.clone(),
+                    decision_receipt_id: receipt_id.to_string(),
+                    decision_hash: decision_hash.clone(),
+                };
+
+                match ledger.submit_treasury_entry(request) {
+                    Ok(result) => {
+                        tracing::info!(
+                            entry_hash = %result.entry_hash,
+                            decision_receipt_id = %result.decision_receipt_id,
+                            decision_hash = %result.decision_hash,
+                            "Treasury entry submitted to ledger"
+                        );
+                        return Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "{:?} {} {} from treasury {} -> ledger entry {}",
+                                operation.operation_type,
+                                operation.amount,
+                                operation.currency,
+                                operation.treasury_id,
+                                result.entry_hash
+                            )],
+                        });
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to submit treasury entry to ledger");
+                        return Err(anyhow::anyhow!("Ledger submission failed: {}", e));
+                    }
+                }
+            }
+        }
+
+        // Fallback: placeholder behavior (no ledger configured)
         Ok(ExecutionOutcome::Success {
             receipt_id: receipt_id.clone(),
             effects: vec![format!(
-                "{:?} {} {} from treasury {}",
+                "{:?} {} {} from treasury {} (placeholder - no ledger)",
                 operation.operation_type,
                 operation.amount,
                 operation.currency,
@@ -169,6 +218,21 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
         // TODO: Query actual treasury balance from ledger
         tracing::debug!(treasury_id, currency, "Querying treasury balance");
         Ok(0) // Placeholder
+    }
+}
+
+/// Convert from governance TreasuryOperationType to services TreasuryOperationType
+fn convert_operation_type(
+    op: icn_kernel_api::governance::TreasuryOperationType,
+) -> icn_kernel_api::services::TreasuryOperationType {
+    use icn_kernel_api::governance::TreasuryOperationType as GovOp;
+    use icn_kernel_api::services::TreasuryOperationType as SvcOp;
+
+    match op {
+        GovOp::Spend => SvcOp::Spend,
+        GovOp::Allocate => SvcOp::Allocate,
+        GovOp::Reserve => SvcOp::Allocate, // Map Reserve to Allocate
+        GovOp::Release => SvcOp::Transfer, // Map Release to Transfer
     }
 }
 

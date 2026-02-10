@@ -295,7 +295,7 @@ mod tests {
     /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        let expected: usize = 31;
+        let expected: usize = 30;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

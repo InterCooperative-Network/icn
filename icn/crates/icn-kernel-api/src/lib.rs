@@ -84,7 +84,8 @@ pub use proofs::ArtifactReceipt;
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
-    SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
+    SecurityViolation, ServiceRegistry, TreasuryEntryRequest, TreasuryEntryResult,
+    TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
     TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
 };
 pub use state::{
