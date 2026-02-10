@@ -24,6 +24,7 @@ pub mod replication;
 pub mod resource_enforcer_actor;
 pub mod restart;
 pub mod runtime;
+pub mod services;
 pub mod storage_challenge;
 pub mod supervisor;
 pub mod trust_propagation;
