@@ -347,13 +347,28 @@ impl ProtocolExecutor for KernelProtocolExecutor {
 /// Federation executor implementation.
 ///
 /// Executes federation operations (join, leave, vouch, clearing) by
-/// delegating to federation services.
-pub struct KernelFederationExecutor;
+/// delegating to the FederationService for durable state mutations.
+pub struct KernelFederationExecutor {
+    /// Federation service for durable state operations
+    service: Option<Arc<dyn icn_kernel_api::FederationService>>,
+}
 
 impl KernelFederationExecutor {
-    /// Create a new federation executor.
+    /// Create a new federation executor (placeholder mode - no durable state).
     pub fn new() -> Self {
-        Self
+        Self { service: None }
+    }
+
+    /// Create a new federation executor with a real service.
+    pub fn with_service(service: Arc<dyn icn_kernel_api::FederationService>) -> Self {
+        Self {
+            service: Some(service),
+        }
+    }
+
+    /// Set the federation service after construction.
+    pub fn set_service(&mut self, service: Arc<dyn icn_kernel_api::FederationService>) {
+        self.service = Some(service);
     }
 }
 
@@ -377,49 +392,104 @@ impl FederationExecutor for KernelFederationExecutor {
             op_type = ?operation.operation_type,
             coop_did = %operation.coop_did,
             target_id = ?operation.target_id,
+            has_service = self.service.is_some(),
             "Executing federation operation"
         );
 
-        // TODO: Wire to actual federation services when available
-        // For now, log and return success for pilot demo
+        // If we have a real service, use it for durable state
+        if let Some(ref service) = self.service {
+            match operation.operation_type {
+                FederationOperationType::JoinFederation => {
+                    let request = icn_kernel_api::FederationJoinRequest {
+                        coop_did: operation.coop_did.clone(),
+                        coop_name: operation.coop_did.clone(), // Use DID as name for now
+                        federation_id: operation.target_id.clone().unwrap_or_default(),
+                        gateway_endpoints: vec![],
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
 
-        let effect_description = match operation.operation_type {
-            FederationOperationType::JoinFederation => {
-                format!(
-                    "Coop {} joined federation {}",
-                    operation.coop_did,
-                    operation.target_id.unwrap_or_default()
-                )
-            }
-            FederationOperationType::LeaveFederation => {
-                format!(
-                    "Coop {} left federation {}",
-                    operation.coop_did,
-                    operation.target_id.unwrap_or_default()
-                )
-            }
-            FederationOperationType::EstablishClearing => {
-                format!(
-                    "Clearing established between {} and {}",
-                    operation.coop_did,
-                    operation.target_id.unwrap_or_default()
-                )
-            }
-            FederationOperationType::VouchForCoop => {
-                format!(
-                    "Coop {} vouched for {}",
-                    operation.coop_did,
-                    operation.target_id.unwrap_or_default()
-                )
-            }
-        };
+                    let result = service.join_federation(request)?;
 
-        tracing::info!(effect = %effect_description, "Federation operation executed");
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Federation join completed with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Coop {} joined federation {} -> state_hash={}",
+                                operation.coop_did,
+                                operation.target_id.unwrap_or_default(),
+                                result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                FederationOperationType::VouchForCoop => {
+                    let request = icn_kernel_api::FederationVouchRequest {
+                        voucher_did: operation.coop_did.clone(),
+                        vouchee_did: operation.target_id.clone().unwrap_or_default(),
+                        trust_score: 0.7, // Default trust score for now
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: operation.decision_hash.clone().unwrap_or_default(),
+                    };
 
-        Ok(ExecutionOutcome::Success {
-            receipt_id: receipt_id.clone(),
-            effects: vec![effect_description],
-        })
+                    let result = service.vouch_for_cooperative(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Federation vouch completed with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Coop {} vouched for {} -> state_hash={}",
+                                operation.coop_did,
+                                operation.target_id.unwrap_or_default(),
+                                result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                // LeaveFederation and EstablishClearing not yet wired to service
+                FederationOperationType::LeaveFederation => {
+                    tracing::warn!("LeaveFederation not yet implemented with durable state");
+                    Ok(ExecutionOutcome::Failed {
+                        receipt_id: receipt_id.clone(),
+                        reason: "LeaveFederation not yet implemented".to_string(),
+                    })
+                }
+                FederationOperationType::EstablishClearing => {
+                    tracing::warn!("EstablishClearing not yet implemented with durable state");
+                    Ok(ExecutionOutcome::Failed {
+                        receipt_id: receipt_id.clone(),
+                        reason: "EstablishClearing not yet implemented".to_string(),
+                    })
+                }
+            }
+        } else {
+            // No service configured - return failure instead of lying
+            tracing::warn!(
+                "Federation executor has no service configured - cannot execute durable operation"
+            );
+            Ok(ExecutionOutcome::Failed {
+                receipt_id: receipt_id.clone(),
+                reason: "Federation service not configured".to_string(),
+            })
+        }
     }
 }
 

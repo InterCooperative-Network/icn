@@ -691,6 +691,103 @@ pub enum LedgerEvent {
 }
 
 // ============================================================================
+// Federation Service
+// ============================================================================
+
+/// Request to join a federation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationJoinRequest {
+    /// DID of the cooperative requesting to join
+    pub coop_did: String,
+    /// Name of the cooperative
+    pub coop_name: String,
+    /// ID of the federation to join (or create)
+    pub federation_id: String,
+    /// Gateway endpoints for this cooperative
+    pub gateway_endpoints: Vec<String>,
+    /// Decision receipt ID that authorized this join
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this join
+    pub decision_hash: String,
+}
+
+/// Result of a federation join operation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationJoinResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to vouch for a cooperative
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationVouchRequest {
+    /// DID of the cooperative doing the vouching
+    pub voucher_did: String,
+    /// DID of the cooperative being vouched for
+    pub vouchee_did: String,
+    /// Trust score to assign (0.0-1.0)
+    pub trust_score: f64,
+    /// Decision receipt ID that authorized this vouch
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this vouch
+    pub decision_hash: String,
+}
+
+/// Result of a vouch operation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationVouchResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Abstract federation management service.
+///
+/// The kernel uses this to register cooperatives and vouches without
+/// knowing the underlying federation semantics. Apps implement this
+/// trait to provide actual federation registry operations.
+///
+/// # Provenance Tracking
+///
+/// All federation operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+pub trait FederationService: Send + Sync {
+    /// Register a cooperative joining a federation.
+    ///
+    /// This creates a durable record that can be queried later.
+    /// Returns state_change_hash for verification.
+    fn join_federation(
+        &self,
+        request: FederationJoinRequest,
+    ) -> Result<FederationJoinResult, anyhow::Error>;
+
+    /// Record a vouch from one cooperative to another.
+    ///
+    /// This creates a durable vouch record in the registry.
+    /// Returns state_change_hash for verification.
+    fn vouch_for_cooperative(
+        &self,
+        request: FederationVouchRequest,
+    ) -> Result<FederationVouchResult, anyhow::Error>;
+
+    /// Check if a cooperative is registered in the federation.
+    fn is_registered(&self, coop_did: &str) -> bool;
+
+    /// Get provenance info for a cooperative registration.
+    ///
+    /// Returns (decision_receipt_id, decision_hash) if available.
+    fn get_registration_provenance(&self, coop_did: &str)
+        -> Option<(String, String)>;
+}
+
+// ============================================================================
 // Cell Service
 // ============================================================================
 
