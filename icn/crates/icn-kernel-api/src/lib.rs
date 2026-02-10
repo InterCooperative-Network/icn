@@ -73,8 +73,10 @@ pub use effects::{
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use governance::{
-    DecisionReceiptId, DefaultEffectExecutor, EffectExecutor, ExecutionOutcome, GovernanceExecutor,
+    DecisionReceiptId, DefaultEffectExecutor, EffectExecutor, ExecutionOutcome,
+    FederationExecutor, FederationOperation, FederationOperationType, GovernanceExecutor,
     ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+    federation_effect_to_operation,
 };
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{

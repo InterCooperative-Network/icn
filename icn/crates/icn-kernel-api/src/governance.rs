@@ -102,6 +102,40 @@ pub trait ProtocolExecutor: Send + Sync {
     async fn get_parameter(&self, name: &str) -> Result<Option<String>>;
 }
 
+// =============================================================================
+// Federation Executor
+// =============================================================================
+
+/// Federation operation types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FederationOperationType {
+    JoinFederation,
+    LeaveFederation,
+    EstablishClearing,
+    VouchForCoop,
+}
+
+/// Federation operation request from governance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FederationOperation {
+    pub operation_type: FederationOperationType,
+    pub coop_did: String,
+    pub target_id: Option<String>, // federation_id or target coop
+    pub agreement_hash: Option<String>,
+    pub decision_hash: Option<String>,
+}
+
+/// Trait for executing federation operations from governance decisions
+#[async_trait]
+pub trait FederationExecutor: Send + Sync {
+    /// Execute a federation operation based on governance decision
+    async fn execute_federation_operation(
+        &self,
+        receipt_id: &DecisionReceiptId,
+        operation: FederationOperation,
+    ) -> Result<ExecutionOutcome>;
+}
+
 /// Combined executor for all governance operations
 #[async_trait]
 pub trait GovernanceExecutor: Send + Sync {
@@ -110,13 +144,18 @@ pub trait GovernanceExecutor: Send + Sync {
 
     /// Get protocol executor
     fn protocol(&self) -> &dyn ProtocolExecutor;
+
+    /// Get federation executor (optional - returns None if federation not configured)
+    fn federation(&self) -> Option<&dyn FederationExecutor> {
+        None
+    }
 }
 
 // =============================================================================
 // Effect Executor - executes kernel-safe effects
 // =============================================================================
 
-use crate::effects::{EffectResult, KernelEffect, TreasuryEffect};
+use crate::effects::{EffectResult, FederationEffect, KernelEffect, TreasuryEffect};
 
 /// Trait for executing kernel-safe effects.
 ///
@@ -357,6 +396,54 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             success: true,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
+        },
+    }
+}
+
+/// Convert a FederationEffect to a FederationOperation
+pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOperation {
+    match effect {
+        FederationEffect::JoinFederation {
+            coop_did,
+            federation_id,
+        } => FederationOperation {
+            operation_type: FederationOperationType::JoinFederation,
+            coop_did: coop_did.clone(),
+            target_id: Some(federation_id.clone()),
+            agreement_hash: None,
+            decision_hash: None,
+        },
+        FederationEffect::LeaveFederation {
+            coop_did,
+            federation_id,
+        } => FederationOperation {
+            operation_type: FederationOperationType::LeaveFederation,
+            coop_did: coop_did.clone(),
+            target_id: Some(federation_id.clone()),
+            agreement_hash: None,
+            decision_hash: None,
+        },
+        FederationEffect::EstablishClearing {
+            coop_a_did,
+            coop_b_did,
+            agreement_hash,
+        } => FederationOperation {
+            operation_type: FederationOperationType::EstablishClearing,
+            coop_did: coop_a_did.clone(),
+            target_id: Some(coop_b_did.clone()),
+            agreement_hash: Some(agreement_hash.clone()),
+            decision_hash: None,
+        },
+        FederationEffect::VouchForCoop {
+            voucher_did,
+            vouchee_did,
+            attestation_hash,
+        } => FederationOperation {
+            operation_type: FederationOperationType::VouchForCoop,
+            coop_did: voucher_did.clone(),
+            target_id: Some(vouchee_did.clone()),
+            agreement_hash: Some(attestation_hash.clone()),
+            decision_hash: None,
         },
     }
 }

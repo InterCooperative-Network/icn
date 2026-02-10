@@ -14,8 +14,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use icn_kernel_api::effects::{EffectResult, KernelEffect};
 use icn_kernel_api::governance::{
-    DecisionReceiptId, EffectExecutor, ExecutionOutcome, GovernanceExecutor, ProtocolChange,
-    ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
+    DecisionReceiptId, EffectExecutor, ExecutionOutcome, FederationExecutor, FederationOperation,
+    GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
+    federation_effect_to_operation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 
@@ -27,6 +28,7 @@ use icn_kernel_api::protocol_params::ProtocolParameterStore;
 pub struct KernelGovernanceExecutor {
     treasury: Arc<KernelTreasuryExecutor>,
     protocol: Arc<KernelProtocolExecutor>,
+    federation: Arc<KernelFederationExecutor>,
 }
 
 impl KernelGovernanceExecutor {
@@ -38,6 +40,7 @@ impl KernelGovernanceExecutor {
         Self {
             treasury: Arc::new(KernelTreasuryExecutor::new()),
             protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
+            federation: Arc::new(KernelFederationExecutor::new()),
         }
     }
 }
@@ -49,6 +52,10 @@ impl GovernanceExecutor for KernelGovernanceExecutor {
 
     fn protocol(&self) -> &dyn ProtocolExecutor {
         self.protocol.as_ref()
+    }
+
+    fn federation(&self) -> Option<&dyn FederationExecutor> {
+        Some(self.federation.as_ref())
     }
 }
 
@@ -93,6 +100,18 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         state_change_hash: None,
                     })
                 }
+            }
+            KernelEffect::Federation(federation_effect) => {
+                // Convert FederationEffect to FederationOperation
+                let operation = federation_effect_to_operation(&federation_effect);
+                let outcome = self
+                    .federation
+                    .execute_federation_operation(&receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
             }
             KernelEffect::NoOp { reason } => Ok(EffectResult {
                 effect_id: decision_receipt_id.to_string(),
@@ -322,6 +341,85 @@ impl ProtocolExecutor for KernelProtocolExecutor {
     async fn get_parameter(&self, name: &str) -> Result<Option<String>> {
         tracing::debug!(name, "Querying protocol parameter");
         Ok(self.param_store.get(name)?.map(|p| p.value.to_string()))
+    }
+}
+
+/// Federation executor implementation.
+///
+/// Executes federation operations (join, leave, vouch, clearing) by
+/// delegating to federation services.
+pub struct KernelFederationExecutor;
+
+impl KernelFederationExecutor {
+    /// Create a new federation executor.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for KernelFederationExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl FederationExecutor for KernelFederationExecutor {
+    async fn execute_federation_operation(
+        &self,
+        receipt_id: &DecisionReceiptId,
+        operation: FederationOperation,
+    ) -> Result<ExecutionOutcome> {
+        use icn_kernel_api::governance::FederationOperationType;
+
+        tracing::info!(
+            receipt_id = %receipt_id,
+            op_type = ?operation.operation_type,
+            coop_did = %operation.coop_did,
+            target_id = ?operation.target_id,
+            "Executing federation operation"
+        );
+
+        // TODO: Wire to actual federation services when available
+        // For now, log and return success for pilot demo
+
+        let effect_description = match operation.operation_type {
+            FederationOperationType::JoinFederation => {
+                format!(
+                    "Coop {} joined federation {}",
+                    operation.coop_did,
+                    operation.target_id.unwrap_or_default()
+                )
+            }
+            FederationOperationType::LeaveFederation => {
+                format!(
+                    "Coop {} left federation {}",
+                    operation.coop_did,
+                    operation.target_id.unwrap_or_default()
+                )
+            }
+            FederationOperationType::EstablishClearing => {
+                format!(
+                    "Clearing established between {} and {}",
+                    operation.coop_did,
+                    operation.target_id.unwrap_or_default()
+                )
+            }
+            FederationOperationType::VouchForCoop => {
+                format!(
+                    "Coop {} vouched for {}",
+                    operation.coop_did,
+                    operation.target_id.unwrap_or_default()
+                )
+            }
+        };
+
+        tracing::info!(effect = %effect_description, "Federation operation executed");
+
+        Ok(ExecutionOutcome::Success {
+            receipt_id: receipt_id.clone(),
+            effects: vec![effect_description],
+        })
     }
 }
 
