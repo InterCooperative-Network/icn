@@ -94,37 +94,6 @@ pub struct ComputeTask {
     /// If None, determined automatically from estimated_value
     #[serde(default)]
     pub verification: Option<crate::result_quorum::TaskVerification>,
-
-    // ========================================================================
-    // Workload Manifest Fields (E1 - Constitution for Execution)
-    // ========================================================================
-    /// Hash of input data for deterministic verification.
-    ///
-    /// Required for Canonical tasks; allows re-execution verification.
-    /// Computed as blake3(inputs) by the submitter.
-    #[serde(default)]
-    pub inputs_hash: Option<ContentHash>,
-
-    /// Hash of the CCL policy governing this execution.
-    ///
-    /// Links execution to governance: the policy defines what this task
-    /// is allowed to do and what constraints apply to its outputs.
-    /// Required for Canonical tasks that mutate state.
-    #[serde(default)]
-    pub policy_hash: Option<ContentHash>,
-
-    /// Classification for state mutation permissions (E1).
-    ///
-    /// Canonical: outputs can mutate ledger/governance state.
-    /// Advisory: outputs are suggestions only, cannot mutate state.
-    #[serde(default)]
-    pub determinism_class: DeterminismClass,
-
-    /// Privacy classification for inputs/outputs (E1).
-    ///
-    /// Controls audit visibility tier and access permissions.
-    #[serde(default)]
-    pub privacy_class: PrivacyClass,
 }
 
 impl ComputeTask {
@@ -255,128 +224,12 @@ impl ComputeTask {
             ));
         }
 
-        // Validate workload manifest fields (E1)
-        // Canonical tasks that can mutate state have stricter requirements
-        if self.determinism_class == DeterminismClass::Canonical {
-            // Canonical tasks must have inputs_hash for verification
-            if self.inputs_hash.is_none() && !self.inputs.is_empty() {
-                return Err(crate::error::ComputeError::InvalidCode(
-                    "Canonical tasks with inputs must provide inputs_hash for verification".into(),
-                ));
-            }
-        }
-
         Ok(())
     }
 }
 
 /// Content hash for contract/WASM addressing
 pub type ContentHash = [u8; 32];
-
-// ============================================================================
-// Workload Manifest Types (E1 - Constitution for Execution)
-// ============================================================================
-
-/// Classification for whether workload outputs can mutate canonical state.
-///
-/// This is the "split the universe" rule: only Canonical workloads can
-/// mutate ledger state, governance records, or trust edges.
-///
-/// # Examples
-///
-/// ```
-/// use icn_compute::types::DeterminismClass;
-///
-/// // Governance tallying must be deterministic
-/// let tally = DeterminismClass::Canonical;
-///
-/// // ML recommendations are advisory only
-/// let forecast = DeterminismClass::Advisory;
-///
-/// assert!(tally.can_mutate_state());
-/// assert!(!forecast.can_mutate_state());
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum DeterminismClass {
-    /// Must be deterministic; outputs can mutate canonical state.
-    ///
-    /// Examples: governance tallying, budget computation, settlement/netting,
-    /// eligibility evaluation, trust edge updates.
-    #[default]
-    Canonical,
-    /// Can be probabilistic; outputs are suggestions only.
-    ///
-    /// Examples: demand forecasting, routing optimization, recommendations,
-    /// anomaly detection, predictive maintenance.
-    Advisory,
-}
-
-impl DeterminismClass {
-    /// Returns true if workloads of this class can mutate canonical state.
-    #[inline]
-    pub const fn can_mutate_state(&self) -> bool {
-        matches!(self, DeterminismClass::Canonical)
-    }
-
-    /// Returns true if workloads must produce deterministic outputs.
-    #[inline]
-    pub const fn requires_determinism(&self) -> bool {
-        matches!(self, DeterminismClass::Canonical)
-    }
-}
-
-/// Privacy classification for workload inputs and outputs.
-///
-/// Maps directly to audit visibility tiers defined in the governance model.
-/// Controls who can observe task inputs, outputs, and execution traces.
-///
-/// # Examples
-///
-/// ```
-/// use icn_compute::types::PrivacyClass;
-///
-/// let public_task = PrivacyClass::Public;
-/// let member_task = PrivacyClass::Member;
-/// let sensitive = PrivacyClass::NeedToKnow;
-///
-/// assert!(public_task.visible_to_public());
-/// assert!(!member_task.visible_to_public());
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum PrivacyClass {
-    /// Anyone can see inputs, outputs, and execution traces.
-    /// Suitable for public governance, commons computation, open data.
-    #[default]
-    Public,
-    /// Only organization/cooperative members can observe.
-    /// Suitable for internal operations, member-only services.
-    Member,
-    /// Selective disclosure via ZK proofs; only authorized parties see data.
-    /// Suitable for personal data, sensitive financial info, health records.
-    NeedToKnow,
-}
-
-impl PrivacyClass {
-    /// Returns true if data is visible to the general public.
-    #[inline]
-    pub const fn visible_to_public(&self) -> bool {
-        matches!(self, PrivacyClass::Public)
-    }
-
-    /// Returns true if membership verification is required for access.
-    #[inline]
-    pub const fn requires_membership(&self) -> bool {
-        matches!(self, PrivacyClass::Member | PrivacyClass::NeedToKnow)
-    }
-
-    /// Returns true if ZK proof verification is required for access.
-    #[inline]
-    pub const fn requires_zk_proof(&self) -> bool {
-        matches!(self, PrivacyClass::NeedToKnow)
-    }
-}
 
 /// Task code format
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -681,11 +534,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            // E1: Workload manifest fields
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let hash1 = task.hash();
@@ -843,11 +691,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            // E1: Workload manifest fields
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         }
     }
 
@@ -954,124 +797,5 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("At least one capability"));
-    }
-
-    // ========================================================================
-    // E1: Workload Manifest Tests
-    // ========================================================================
-
-    #[test]
-    fn test_determinism_class_default() {
-        assert_eq!(DeterminismClass::default(), DeterminismClass::Canonical);
-    }
-
-    #[test]
-    fn test_determinism_class_can_mutate_state() {
-        assert!(DeterminismClass::Canonical.can_mutate_state());
-        assert!(!DeterminismClass::Advisory.can_mutate_state());
-    }
-
-    #[test]
-    fn test_determinism_class_requires_determinism() {
-        assert!(DeterminismClass::Canonical.requires_determinism());
-        assert!(!DeterminismClass::Advisory.requires_determinism());
-    }
-
-    #[test]
-    fn test_privacy_class_default() {
-        assert_eq!(PrivacyClass::default(), PrivacyClass::Public);
-    }
-
-    #[test]
-    fn test_privacy_class_visibility() {
-        assert!(PrivacyClass::Public.visible_to_public());
-        assert!(!PrivacyClass::Member.visible_to_public());
-        assert!(!PrivacyClass::NeedToKnow.visible_to_public());
-    }
-
-    #[test]
-    fn test_privacy_class_requires_membership() {
-        assert!(!PrivacyClass::Public.requires_membership());
-        assert!(PrivacyClass::Member.requires_membership());
-        assert!(PrivacyClass::NeedToKnow.requires_membership());
-    }
-
-    #[test]
-    fn test_privacy_class_requires_zk_proof() {
-        assert!(!PrivacyClass::Public.requires_zk_proof());
-        assert!(!PrivacyClass::Member.requires_zk_proof());
-        assert!(PrivacyClass::NeedToKnow.requires_zk_proof());
-    }
-
-    #[test]
-    fn test_validate_canonical_task_with_inputs_requires_hash() {
-        let mut task = valid_task();
-        task.determinism_class = DeterminismClass::Canonical;
-        task.inputs = vec![1, 2, 3]; // Non-empty inputs
-        task.inputs_hash = None; // Missing hash
-
-        let result = task.validate();
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("inputs_hash for verification"));
-    }
-
-    #[test]
-    fn test_validate_canonical_task_with_inputs_and_hash_ok() {
-        let mut task = valid_task();
-        task.determinism_class = DeterminismClass::Canonical;
-        task.inputs = vec![1, 2, 3];
-        task.inputs_hash = Some(*blake3::hash(&task.inputs).as_bytes());
-
-        assert!(task.validate().is_ok());
-    }
-
-    #[test]
-    fn test_validate_advisory_task_no_hash_required() {
-        let mut task = valid_task();
-        task.determinism_class = DeterminismClass::Advisory;
-        task.inputs = vec![1, 2, 3]; // Non-empty inputs
-        task.inputs_hash = None; // No hash required for advisory
-
-        assert!(task.validate().is_ok());
-    }
-
-    #[test]
-    fn test_validate_canonical_empty_inputs_no_hash_ok() {
-        let mut task = valid_task();
-        task.determinism_class = DeterminismClass::Canonical;
-        task.inputs = vec![]; // Empty inputs
-        task.inputs_hash = None; // No hash needed for empty inputs
-
-        assert!(task.validate().is_ok());
-    }
-
-    #[test]
-    fn test_determinism_class_serialization() {
-        let canonical = DeterminismClass::Canonical;
-        let advisory = DeterminismClass::Advisory;
-
-        let canonical_json = serde_json::to_string(&canonical).unwrap();
-        let advisory_json = serde_json::to_string(&advisory).unwrap();
-
-        assert_eq!(canonical_json, r#""canonical""#);
-        assert_eq!(advisory_json, r#""advisory""#);
-
-        // Deserialize back
-        let parsed: DeterminismClass = serde_json::from_str(&canonical_json).unwrap();
-        assert_eq!(parsed, DeterminismClass::Canonical);
-    }
-
-    #[test]
-    fn test_privacy_class_serialization() {
-        let public = PrivacyClass::Public;
-        let member = PrivacyClass::Member;
-        let ntk = PrivacyClass::NeedToKnow;
-
-        assert_eq!(serde_json::to_string(&public).unwrap(), r#""public""#);
-        assert_eq!(serde_json::to_string(&member).unwrap(), r#""member""#);
-        assert_eq!(serde_json::to_string(&ntk).unwrap(), r#""need_to_know""#);
     }
 }

@@ -1,10 +1,7 @@
 use super::consensus::{outcome_to_value, results_match};
 use super::*;
 use crate::task::TaskStatus;
-use crate::types::{
-    ComputeResult, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
-    TaskCode,
-};
+use crate::types::{ComputeResult, ComputeTask, ExecutorCapability, FuelLimit, TaskCode};
 
 fn simple_ccl() -> String {
     r#"{
@@ -43,11 +40,6 @@ fn make_task(id: &str, submitter: &str) -> ComputeTask {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
-        // E1: Workload manifest fields
-        inputs_hash: None,
-        policy_hash: None,
-        determinism_class: DeterminismClass::default(),
-        privacy_class: PrivacyClass::default(),
     }
 }
 
@@ -1505,11 +1497,6 @@ fn make_wasm_ref_task(id: &str, submitter: &str, wasm_hash: [u8; 32]) -> Compute
         federation_constraints: None,
         estimated_value: None,
         verification: None,
-        // E1: Workload manifest fields
-        inputs_hash: None,
-        policy_hash: None,
-        determinism_class: DeterminismClass::default(),
-        privacy_class: PrivacyClass::default(),
     }
 }
 

@@ -328,17 +328,6 @@ impl Executor for WasmExecutor {
                     })
                     .as_secs();
 
-                // Use the task's determinism_class for CCL execution context.
-                // This propagates the E3 enforcement: Advisory tasks cannot mutate state.
-                let ccl_determinism = match task.determinism_class {
-                    crate::types::DeterminismClass::Canonical => {
-                        icn_kernel_api::compute::DeterminismClass::Canonical
-                    }
-                    crate::types::DeterminismClass::Advisory => {
-                        icn_kernel_api::compute::DeterminismClass::Advisory
-                    }
-                };
-
                 let ccl_context = icn_ccl::ExecutionContext {
                     caller: caller_did.clone(),
                     timestamp,
@@ -346,7 +335,6 @@ impl Executor for WasmExecutor {
                     fuel_limit: ctx.fuel_remaining,
                     capabilities: vec![],
                     participants: vec![caller_did],
-                    determinism_class: ccl_determinism,
                 };
 
                 let state = icn_ccl::ContractState::default();
@@ -425,16 +413,6 @@ impl Executor for WasmExecutor {
                                     })
                                     .as_secs();
 
-                                // Propagate determinism class to CCL context (E3 enforcement)
-                                let ccl_determinism = match task.determinism_class {
-                                    crate::types::DeterminismClass::Canonical => {
-                                        icn_kernel_api::compute::DeterminismClass::Canonical
-                                    }
-                                    crate::types::DeterminismClass::Advisory => {
-                                        icn_kernel_api::compute::DeterminismClass::Advisory
-                                    }
-                                };
-
                                 let ccl_context = icn_ccl::ExecutionContext {
                                     caller: caller_did.clone(),
                                     timestamp,
@@ -442,7 +420,6 @@ impl Executor for WasmExecutor {
                                     fuel_limit: ctx.fuel_remaining,
                                     capabilities: vec![],
                                     participants: vec![caller_did],
-                                    determinism_class: ccl_determinism,
                                 };
 
                                 let state = icn_ccl::ContractState::default();
@@ -554,7 +531,7 @@ impl Executor for WasmExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{DeterminismClass, FuelLimit, PrivacyClass};
+    use crate::types::FuelLimit;
 
     /// Valid test DID (proper multibase-encoded Ed25519 public key)
     /// Generated from deterministic seed [1u8; 32]
@@ -610,10 +587,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -661,10 +634,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -730,10 +699,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -799,10 +764,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -843,10 +804,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -885,10 +842,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -930,10 +883,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -990,10 +939,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1054,10 +999,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1107,10 +1048,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1188,10 +1125,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1264,10 +1197,6 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            inputs_hash: None,
-            policy_hash: None,
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         let mut ctx = ExecutionContext {

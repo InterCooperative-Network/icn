@@ -535,7 +535,6 @@ impl DisputeResolutionSystem {
         );
 
         // Create execution context for re-execution
-        // Dispute re-execution is Canonical by default - it's verifying a state-mutating operation
         let context = crate::types::ExecutionContext {
             caller: challenger.clone(),
             timestamp: icn_time::current_timestamp_secs(),
@@ -543,7 +542,6 @@ impl DisputeResolutionSystem {
             fuel_limit: 10000,
             capabilities: vec![],
             participants: vec![executor.clone(), challenger.clone()],
-            determinism_class: icn_kernel_api::compute::DeterminismClass::Canonical,
         };
 
         let state = crate::types::ContractState::new();

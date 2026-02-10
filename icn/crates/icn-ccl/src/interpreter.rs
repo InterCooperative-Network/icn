@@ -605,20 +605,8 @@ impl Interpreter {
         }
     }
 
-    /// Check WriteLedger capability and determinism class (E3 enforcement).
-    ///
-    /// Advisory workloads cannot mutate ledger state even if they have
-    /// the WriteLedger capability. This is the core "split the universe" rule.
+    /// Check WriteLedger capability
     fn check_write_ledger_capability(&self) -> Result<()> {
-        // E3: First check determinism class - Advisory workloads cannot mutate state
-        if !self.context.can_mutate_state() {
-            return Err(CclError::MissingCapability {
-                capability: "WriteLedger (blocked: advisory workloads cannot mutate state)"
-                    .to_string(),
-            });
-        }
-
-        // Then check for WriteLedger capability
         for cap in &self.context.capabilities {
             if matches!(cap, Capability::WriteLedger { .. }) {
                 return Ok(());
@@ -1136,103 +1124,5 @@ mod tests {
         let parsed: FuelConfig = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(config, parsed);
-    }
-
-    // =========================================================================
-    // E3: Determinism Class Enforcement Tests
-    // =========================================================================
-
-    #[test]
-    fn test_advisory_workload_cannot_write_ledger() {
-        use icn_kernel_api::compute::DeterminismClass;
-
-        let contract = Contract::new("test".to_string());
-        let state = ContractState::new();
-        let keypair = KeyPair::generate().unwrap();
-        let alice = KeyPair::generate().unwrap();
-        let bob = KeyPair::generate().unwrap();
-
-        // Create an Advisory context with WriteLedger capability
-        let context = ExecutionContext::with_determinism_class(
-            keypair.did().clone(),
-            1234567890,
-            10000,
-            vec![Capability::WriteLedger { accounts: vec![] }],
-            vec![],
-            DeterminismClass::Advisory,
-        );
-
-        let mut interp = Interpreter::new(contract, state, context);
-
-        // Attempt a ledger transfer - should fail even with capability
-        let stmt = Stmt::LedgerTransfer {
-            from: Expr::Literal(Value::Did(alice.did().clone())),
-            to: Expr::Literal(Value::Did(bob.did().clone())),
-            amount: Expr::Literal(Value::Int(100)),
-            currency: Expr::Literal(Value::String("credits".into())),
-        };
-
-        let result = interp.execute_stmt(&stmt);
-        assert!(
-            result.is_err(),
-            "Advisory workload should not be able to write ledger"
-        );
-
-        let err = result.unwrap_err();
-        assert!(
-            err.to_string().contains("advisory"),
-            "Error should mention advisory: {err}"
-        );
-    }
-
-    #[test]
-    fn test_canonical_workload_can_write_ledger() {
-        use icn_kernel_api::compute::DeterminismClass;
-
-        let contract = Contract::new("test".to_string());
-        let state = ContractState::new();
-        let keypair = KeyPair::generate().unwrap();
-        let alice = KeyPair::generate().unwrap();
-        let bob = KeyPair::generate().unwrap();
-
-        // Create a Canonical context with WriteLedger capability
-        let context = ExecutionContext::with_determinism_class(
-            keypair.did().clone(),
-            1234567890,
-            10000,
-            vec![Capability::WriteLedger { accounts: vec![] }],
-            vec![],
-            DeterminismClass::Canonical,
-        );
-
-        let mut interp = Interpreter::new(contract, state, context);
-
-        // Attempt a ledger transfer - should succeed
-        let stmt = Stmt::LedgerTransfer {
-            from: Expr::Literal(Value::Did(alice.did().clone())),
-            to: Expr::Literal(Value::Did(bob.did().clone())),
-            amount: Expr::Literal(Value::Int(100)),
-            currency: Expr::Literal(Value::String("credits".into())),
-        };
-
-        let result = interp.execute_stmt(&stmt);
-        // Should succeed (returns LedgerTransfer operation, not an error)
-        assert!(
-            result.is_ok(),
-            "Canonical workload should be able to write ledger: {:?}",
-            result.err()
-        );
-    }
-
-    #[test]
-    fn test_default_context_is_canonical() {
-        use icn_kernel_api::compute::DeterminismClass;
-
-        let keypair = KeyPair::generate().unwrap();
-        let context =
-            ExecutionContext::new(keypair.did().clone(), 1234567890, 10000, vec![], vec![]);
-
-        assert_eq!(context.determinism_class, DeterminismClass::Canonical);
-        assert!(context.can_mutate_state());
     }
 }

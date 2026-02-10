@@ -3,8 +3,8 @@
 use crate::error::ApiError;
 use crate::ApiContext;
 use icn_compute::{
-    ComputeHandle, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
-    ResourceProfile, TaskCode, TaskPriority, TaskStatus,
+    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, ResourceProfile, TaskCode,
+    TaskPriority, TaskStatus,
 };
 
 // ============================================================================
@@ -136,11 +136,6 @@ impl ComputeService {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
-            // E1: Workload manifest fields
-            inputs_hash: None, // TODO: Compute from inputs when provided
-            policy_hash: None, // TODO: Add to API params
-            determinism_class: DeterminismClass::default(),
-            privacy_class: PrivacyClass::default(),
         };
 
         // Submit the task
