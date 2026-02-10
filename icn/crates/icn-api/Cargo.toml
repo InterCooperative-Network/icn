@@ -26,6 +26,9 @@ tokio = { version = "1.49", features = ["sync"] }
 # Logging
 tracing = "0.1"
 
+# Hashing
+blake3 = "1.5"
+
 # Utilities
 hex = "0.4"
 base64 = "0.22"

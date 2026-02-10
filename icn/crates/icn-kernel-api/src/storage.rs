@@ -271,9 +271,7 @@ impl std::fmt::Display for DataLocality {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum StorageValidationError {
     /// Canonical task should use Canonical storage for outputs.
-    #[error(
-        "Canonical task should use StorageClass::Canonical for outputs (got {actual})"
-    )]
+    #[error("Canonical task should use StorageClass::Canonical for outputs (got {actual})")]
     CanonicalTaskNonCanonicalStorage {
         /// The actual storage class specified
         actual: StorageClass,

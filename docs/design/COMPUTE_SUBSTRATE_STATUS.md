@@ -127,15 +127,16 @@ pub struct ArtifactPointer {
 /// Verification result for execution
 pub enum VerificationResult {
     Pending,
-    Passed { witnesses: Vec<Did>, timestamp: u64 },
-    Failed { reason: String, timestamp: u64 },
+    Passed { witnesses: Vec<String> },
+    Failed { reason: String, evidence: ContentHash },
     Disputed { dispute_id: DisputeId },
 }
 
 /// Settlement hook for ledger integration
 pub struct SettlementHook {
-    pub ledger_currency: String,
-    pub amount: i64,
+    pub ledger_entry_type: String,
+    pub amount: u64,
+    pub currency: String,
     pub from_account: String,
     pub to_account: String,
 }

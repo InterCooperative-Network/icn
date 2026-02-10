@@ -662,7 +662,10 @@ impl StateOp {
 /// - Writers can only write to their own scope or narrower
 /// - Readers can read from their scope or wider (with appropriate caps)
 /// - Cross-scope writes require explicit capability grants
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum StateScope {
     /// Local to the cell (HA cluster) - not replicated outside.
     #[default]
@@ -776,12 +779,21 @@ pub trait StateBackend: Send + Sync {
     /// Get a value by key within a scope.
     ///
     /// Returns `None` if the key doesn't exist.
-    async fn get(&self, scope: StateScope, key: &StateKey) -> Result<Option<StateValue>, StateError>;
+    async fn get(
+        &self,
+        scope: StateScope,
+        key: &StateKey,
+    ) -> Result<Option<StateValue>, StateError>;
 
     /// Put a value at a key within a scope.
     ///
     /// This is an upsert operation: creates if not exists, updates if exists.
-    async fn put(&self, scope: StateScope, key: StateKey, value: StateValue) -> Result<(), StateError>;
+    async fn put(
+        &self,
+        scope: StateScope,
+        key: StateKey,
+        value: StateValue,
+    ) -> Result<(), StateError>;
 
     /// Delete a value by key within a scope.
     ///
@@ -1132,7 +1144,9 @@ mod tests {
         assert!(matches!(get, StateOp::Get { key } if key.as_str() == "/key"));
 
         let put = StateOp::put("/key", vec![1, 2, 3]);
-        assert!(matches!(put, StateOp::Put { key, value } if key.as_str() == "/key" && value.len() == 3));
+        assert!(
+            matches!(put, StateOp::Put { key, value } if key.as_str() == "/key" && value.len() == 3)
+        );
 
         let delete = StateOp::delete("/key");
         assert!(matches!(delete, StateOp::Delete { key } if key.as_str() == "/key"));
@@ -1189,17 +1203,35 @@ mod tests {
     fn test_state_scope_to_scope_level() {
         assert_eq!(StateScope::Cell.to_scope_level(), ScopeLevel::Cell);
         assert_eq!(StateScope::Coop.to_scope_level(), ScopeLevel::Org);
-        assert_eq!(StateScope::Federation.to_scope_level(), ScopeLevel::Federation);
+        assert_eq!(
+            StateScope::Federation.to_scope_level(),
+            ScopeLevel::Federation
+        );
         assert_eq!(StateScope::Commons.to_scope_level(), ScopeLevel::Commons);
     }
 
     #[test]
     fn test_state_scope_from_scope_level() {
-        assert_eq!(StateScope::from_scope_level(ScopeLevel::Local), StateScope::Cell);
-        assert_eq!(StateScope::from_scope_level(ScopeLevel::Cell), StateScope::Cell);
-        assert_eq!(StateScope::from_scope_level(ScopeLevel::Org), StateScope::Coop);
-        assert_eq!(StateScope::from_scope_level(ScopeLevel::Federation), StateScope::Federation);
-        assert_eq!(StateScope::from_scope_level(ScopeLevel::Commons), StateScope::Commons);
+        assert_eq!(
+            StateScope::from_scope_level(ScopeLevel::Local),
+            StateScope::Cell
+        );
+        assert_eq!(
+            StateScope::from_scope_level(ScopeLevel::Cell),
+            StateScope::Cell
+        );
+        assert_eq!(
+            StateScope::from_scope_level(ScopeLevel::Org),
+            StateScope::Coop
+        );
+        assert_eq!(
+            StateScope::from_scope_level(ScopeLevel::Federation),
+            StateScope::Federation
+        );
+        assert_eq!(
+            StateScope::from_scope_level(ScopeLevel::Commons),
+            StateScope::Commons
+        );
     }
 
     #[test]

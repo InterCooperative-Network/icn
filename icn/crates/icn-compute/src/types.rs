@@ -129,7 +129,6 @@ pub struct ComputeTask {
     // ========================================================================
     // Storage Specification Fields (E4 - Storage Tiers & Data Locality)
     // ========================================================================
-
     /// Storage class for task outputs (E4).
     ///
     /// Determines how outputs are stored and replicated.
@@ -282,6 +281,17 @@ impl ComputeTask {
                     "Canonical tasks with inputs must provide inputs_hash for verification".into(),
                 ));
             }
+            // Verify inputs_hash matches actual inputs when provided
+            if let Some(provided_hash) = &self.inputs_hash {
+                if !self.inputs.is_empty() {
+                    let computed_hash = *blake3::hash(&self.inputs).as_bytes();
+                    if provided_hash != &computed_hash {
+                        return Err(crate::error::ComputeError::InvalidCode(
+                            "inputs_hash does not match blake3 hash of inputs".into(),
+                        ));
+                    }
+                }
+            }
         }
 
         // Validate storage specification fields (E4)
@@ -307,7 +317,8 @@ impl ComputeTask {
                 );
                 if data_locality.is_cell_local() && allows_federation {
                     return Err(crate::error::ComputeError::InvalidCode(
-                        "Tasks with CellLocal data locality cannot allow federated execution".into(),
+                        "Tasks with CellLocal data locality cannot allow federated execution"
+                            .into(),
                     ));
                 }
             }
