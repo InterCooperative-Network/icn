@@ -373,7 +373,7 @@ mod tests {
     /// The module splits add +2 refs (each submodule needs its own `use` statement).
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 45;
+        let expected: usize = 43;
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(

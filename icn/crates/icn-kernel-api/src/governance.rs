@@ -52,6 +52,8 @@ pub struct TreasuryOperation {
     pub currency: String,
     pub recipient: Option<String>,
     pub memo: String,
+    /// Canonical decision hash for provenance (cross-node anchor)
+    pub decision_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -236,6 +238,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             amount,
             currency,
             memo,
+            decision_hash,
             ..
         } => TreasuryOperation {
             treasury_id: treasury_did.clone(),
@@ -244,6 +247,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(recipient_did.clone()),
             memo: memo.clone(),
+            decision_hash: Some(decision_hash.clone()),
         },
         TreasuryEffect::CreateBudget {
             treasury_did,
@@ -259,6 +263,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: name.clone(),
+            decision_hash: None,
         },
         TreasuryEffect::Allocate {
             treasury_did,
@@ -272,6 +277,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: "Budget allocation".to_string(),
+            decision_hash: None,
         },
         TreasuryEffect::Transfer {
             from_did,
@@ -286,6 +292,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(to_did.clone()),
             memo: memo.clone(),
+            decision_hash: None,
         },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
@@ -295,6 +302,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: "UNKNOWN".to_string(),
             recipient: None,
             memo: "Unmapped treasury effect".to_string(),
+            decision_hash: None,
         },
     }
 }
@@ -372,10 +380,12 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some("did:icn:abc123".to_string()),
             memo: "Equipment purchase".to_string(),
+            decision_hash: Some("sha256:abc123".to_string()),
         };
         let json = serde_json::to_string(&op).unwrap();
         let parsed: TreasuryOperation = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.amount, 1000);
+        assert_eq!(parsed.decision_hash, Some("sha256:abc123".to_string()));
     }
 
     #[test]

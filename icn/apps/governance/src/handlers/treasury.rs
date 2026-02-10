@@ -273,6 +273,8 @@ impl TreasuryHandler {
         // 6. If we have an executor, delegate the actual ledger operation
         if let Some(executor) = &self.executor {
             let receipt_id = DecisionReceiptId::new(&decision_receipt.proposal_id);
+            // Convert decision_hash bytes to hex string for kernel layer
+            let decision_hash_hex = hex::encode(decision_receipt.decision_hash);
             let kernel_op = KernelTreasuryOperation {
                 treasury_id: treasury_id.clone(),
                 operation_type: TreasuryOperationType::Spend,
@@ -280,6 +282,7 @@ impl TreasuryHandler {
                 currency: currency.clone(),
                 recipient: Some(recipient.clone()),
                 memo: disburse_params.memo.clone(),
+                decision_hash: Some(decision_hash_hex),
             };
 
             match executor
@@ -423,6 +426,7 @@ fn to_kernel_operation(
         currency,
         recipient,
         memo,
+        decision_hash: None, // Set by caller with actual decision hash
     }
 }
 
