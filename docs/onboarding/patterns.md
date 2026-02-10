@@ -142,7 +142,7 @@ fn make_key(id: &str) -> Vec<u8> {
 ```
 
 ### Where to find examples
-- `icn-store/src/lib.rs`: Store trait
+- `icn/crates/icn-store/src/lib.rs`: Store trait
 - `icn/crates/icn-federation/src/agreement/store.rs`: Namespaced storage
 
 ## Builder Pattern for Complex Configuration
@@ -248,7 +248,7 @@ pub fn my_histogram_observe(value: f64) {
 - Histograms for durations end with `_seconds`
 
 ### Where to find examples
-- `icn-obs/src/metrics/`: All metric modules
+- `icn/crates/icn-obs/src/metrics/`: All metric modules
 - `icn/crates/icn-federation/src/metrics.rs`: Federation metrics
 
 ## Trust-Gated Operations

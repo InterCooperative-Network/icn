@@ -179,6 +179,6 @@ fn test_multiple_entries_balance() {
 - All tests pass
 
 ## Resources
-- `icn-ledger/src/ledger.rs` (validation + quarantine)
+- `icn/crates/icn-ledger/src/ledger.rs` (validation + quarantine)
 - `icn-ledger/tests/dynamic_limits_integration.rs`
 - Double-entry accounting: [Wikipedia](https://en.wikipedia.org/wiki/Double-entry_bookkeeping)

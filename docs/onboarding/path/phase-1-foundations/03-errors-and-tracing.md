@@ -14,7 +14,7 @@ ICN makes visibility a first-class concern — errors carry structured context, 
 
 ## What You'll Read
 
-### 1. Foundation: `icn-core/src/error.rs`
+### 1. Foundation: `icn/crates/icn-core/src/error.rs`
 
 This is the simplest error pattern — `thiserror` for domain errors:
 
@@ -38,7 +38,7 @@ pub enum CoreError {
 - `#[error(transparent)]` delegates Display to the inner error
 - No `unwrap()` or `expect()` — always `Result<T, E>`
 
-### 2. Structured Errors: `icn-ledger/src/error.rs`
+### 2. Structured Errors: `icn/crates/icn-ledger/src/error.rs`
 
 Domain errors add **structured fields** for better diagnostics:
 
@@ -65,7 +65,7 @@ pub enum LedgerError {
 - Metrics can extract values (e.g., histogram of attempted amounts)
 - Logs preserve context without string parsing
 
-### 3. Source Location Tracking: `icn-ccl/src/error.rs`
+### 3. Source Location Tracking: `icn/crates/icn-ccl/src/error.rs`
 
 Contract execution errors include **source spans** (line/column) for debugging:
 
@@ -95,7 +95,7 @@ pub struct Span {
 
 **Trace this sequence**:
 
-1. **Validation**: `Ledger::validate_entry()` in `icn-ledger/src/ledger.rs:487-520`
+1. **Validation**: `Ledger::validate_entry()` in `icn/crates/icn-ledger/src/ledger.rs:487-520`
    ```rust
    if account_balance + amount < credit_limit {
        return Err(LedgerError::CreditLimitExceeded {
@@ -199,7 +199,7 @@ The `.context("...")` adds human-readable context to errors without changing the
 ### Receipt Pattern
 **Used for**: Explicit success/failure results (not "accepted" lies).
 
-The quarantine system in `icn-ledger/src/ledger.rs` is a receipt pattern:
+The quarantine system in `icn/crates/icn-ledger/src/ledger.rs` is a receipt pattern:
 - Entries that fail validation aren't silently dropped
 - They're moved to quarantine with reason
 - Callers receive explicit rejection, not false success
@@ -209,7 +209,7 @@ The quarantine system in `icn-ledger/src/ledger.rs` is a receipt pattern:
 ### Metrics Integration Pattern
 **Used for**: Prometheus metrics at key decision points.
 
-**Example** from `icn-ledger/src/ledger.rs`:
+**Example** from `icn/crates/icn-ledger/src/ledger.rs`:
 ```rust
 metrics::counter!("ledger_entries_total", 
     "status" => "submitted").increment(1);

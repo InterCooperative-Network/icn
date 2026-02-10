@@ -131,5 +131,5 @@ You've completed this layer when you can:
 ## Deep Reference
 
 → `reference/module-14-governance-ccl-deep-dive.md` — Full CCL syntax, semantics  
-→ `icn-governance/src/` — Source code for proposals, voting  
+→ `icn/crates/icn-governance/src/` — Source code for proposals, voting  
 → `docs/architecture/GOVERNANCE_STATE_MACHINE.md` — State machine diagrams

@@ -73,7 +73,7 @@ Trace these actors in order of complexity:
 - Messages: `CreateCoop`, `AddMember`, `UpdateStatus`
 - No external callbacks, pure state management
 
-#### **Level 2: ContractRegistryActor** (`icn-ccl/src/registry.rs`)
+#### **Level 2: ContractRegistryActor** (`icn/crates/icn-ccl/src/registry.rs`)
 - Stores and retrieves CCL contracts
 - State: `HashMap<ContractId, Contract>`
 - Messages: `Register`, `Get`, `List`
@@ -98,7 +98,7 @@ Trace these actors in order of complexity:
 - Callbacks: PolicyOracle for trust checks, Network for distribution
 - **Most complex**: scheduling, resource management, result aggregation
 
-#### **Level 6: NetworkActor** (`icn-net/src/actor.rs`)
+#### **Level 6: NetworkActor** (`icn/crates/icn-net/src/actor/mod.rs`)
 - QUIC transport, mDNS discovery, session management
 - State: `HashMap<Did, Connection>`, peer discovery cache
 - Messages: `Dial`, `Send`, `Disconnect`, `IncomingConnection`

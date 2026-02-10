@@ -74,6 +74,6 @@ pub async fn echo_with_timeout(
 4. `test_backpressure` — bounded mailbox applies backpressure
 
 ## Resources
-- `icn-core/src/runtime.rs` (shutdown pattern)
+- `icn/crates/icn-core/src/runtime.rs` (shutdown pattern)
 - `icn-gossip/src/gossip.rs` (actor pattern)
 - [Tokio tutorial](https://tokio.rs/tokio/tutorial)

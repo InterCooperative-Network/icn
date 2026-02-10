@@ -74,7 +74,7 @@ Complete **all four** artifacts below. Each produces a concrete deliverable.
 **What**: Demonstrate understanding of ICN's error handling and observability.
 
 **Tasks**:
-1. Locate `icn-core/src/error.rs` and explain the thiserror pattern used
+1. Locate `icn/crates/icn-core/src/error.rs` and explain the thiserror pattern used
 2. Explain the difference between `#[error("...")]` and `#[error(transparent)]`
 3. Add a new tracing span to your lab-02 workspace code
 4. Run the code, capture the tracing output, highlight the span you added

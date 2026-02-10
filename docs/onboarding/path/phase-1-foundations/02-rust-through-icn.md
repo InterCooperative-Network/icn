@@ -111,7 +111,7 @@ let config = NetworkConfig::builder()
 ### Lifecycle State Machine
 **Used for**: Tracking actor/connection state transitions.
 
-**Example**: Proposal lifecycle in `icn-governance/src/proposal.rs`
+**Example**: Proposal lifecycle in `icn/crates/icn-governance/src/proposal.rs`
 
 ```rust
 pub enum ProposalState {

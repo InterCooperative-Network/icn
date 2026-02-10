@@ -229,6 +229,6 @@ fn test_oracle_constraint_update() {
 This lab proves cooperative self-governance: communities change rules via democratic votes, and the system enforces new rules automatically via the Meaning Firewall.
 
 ## Resources
-- `icn-governance/src/proposal.rs`
-- `icn-governance/src/params.rs`
+- `icn/crates/icn-governance/src/proposal.rs`
+- `icn/crates/icn-governance/src/params.rs`
 - `apps/governance/src/oracle.rs`

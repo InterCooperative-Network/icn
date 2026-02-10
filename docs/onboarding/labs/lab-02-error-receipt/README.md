@@ -53,6 +53,6 @@ INFO core: request quarantined id="req-123"
 ```
 
 ## Resources
-- `icn-core/src/error.rs`
-- `icn-ledger/src/ledger.rs` (quarantine pattern)
+- `icn/crates/icn-core/src/error.rs`
+- `icn/crates/icn-ledger/src/ledger.rs` (quarantine pattern)
 - [tracing crate docs](https://docs.rs/tracing/)
