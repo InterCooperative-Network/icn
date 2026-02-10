@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICN Gateway OpenAPI Sync"
+  short_description: "Handle gateway API and TS type drift"
+  default_prompt: "If gateway API changes, regenerate OpenAPI and TypeScript types, validate, and report drift status."

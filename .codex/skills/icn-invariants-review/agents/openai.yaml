@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICN Invariants Review"
+  short_description: "Review changes for ICN invariant regressions"
+  default_prompt: "Review this change against ICN invariants, list risks by severity, and provide required tests/checks."

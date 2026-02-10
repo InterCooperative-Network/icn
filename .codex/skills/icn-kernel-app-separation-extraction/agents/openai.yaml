@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICN Kernel/App Separation Extraction"
+  short_description: "Reduce firewall coupling with safe seam refactors"
+  default_prompt: "Plan and apply minimal seam refactors to reduce kernel-app coupling while preserving behavior and invariants."
