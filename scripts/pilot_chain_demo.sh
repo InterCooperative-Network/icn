@@ -12,6 +12,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+LOGFILE="/tmp/icn_pilot_demo_$$.log"
+
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║         ICN PILOT: Decision → Effect → Ledger Demo               ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
@@ -26,7 +28,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo
 cargo test -p icn-core --test treasury_integration \
     test_decision_to_ledger_provenance_end_to_end \
-    -- --nocapture 2>&1 | grep -v "^running\|^test result\|Compiling\|Finished\|Running\|Downloading\|Downloaded" || true
+    -- --nocapture 2>&1 | tee "$LOGFILE"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -35,18 +37,55 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo
 cargo test -p icn-core --test treasury_integration \
     test_ledger_entry_carries_decision_provenance \
-    -- --nocapture 2>&1 | grep -v "^running\|^test result\|Compiling\|Finished\|Running\|Downloading\|Downloaded" || true
+    -- --nocapture 2>&1 | tee -a "$LOGFILE"
 
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "VERIFICATION COMPLETE"
+echo "TRIPWIRE VERIFICATION"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Machine-assertable tripwires
+FAIL=0
+
+if grep -q "ICN PILOT PROVENANCE CHAIN VERIFIED" "$LOGFILE"; then
+    echo "✅ TRIPWIRE: 'ICN PILOT PROVENANCE CHAIN VERIFIED' found"
+else
+    echo "❌ TRIPWIRE FAILED: 'ICN PILOT PROVENANCE CHAIN VERIFIED' missing"
+    FAIL=1
+fi
+
+if grep -q "PILOT_LEDGER_ENTRY_HASH=" "$LOGFILE"; then
+    HASH=$(grep "PILOT_LEDGER_ENTRY_HASH=" "$LOGFILE" | cut -d= -f2)
+    echo "✅ TRIPWIRE: Ledger entry hash = $HASH"
+else
+    echo "❌ TRIPWIRE FAILED: 'PILOT_LEDGER_ENTRY_HASH' missing"
+    FAIL=1
+fi
+
+if grep -q "✅ MATCHES" "$LOGFILE"; then
+    echo "✅ TRIPWIRE: Provenance field assertions passed"
+else
+    echo "❌ TRIPWIRE FAILED: '✅ MATCHES' not found"
+    FAIL=1
+fi
+
+if grep -q "test.*ok" "$LOGFILE"; then
+    echo "✅ TRIPWIRE: Tests passed"
+else
+    echo "❌ TRIPWIRE FAILED: No 'test.*ok' found"
+    FAIL=1
+fi
+
 echo
-echo "If both tests passed, the pilot invariant is proven:"
-echo "  DecisionReceipt → TreasuryEffect → JournalEntry with provenance"
-echo
-echo "Source of truth:"
-echo "  icn/crates/icn-core/tests/treasury_integration.rs"
-echo "    - test_decision_to_ledger_provenance_end_to_end"
-echo "    - test_ledger_entry_carries_decision_provenance"
-echo
+if [ $FAIL -eq 0 ]; then
+    echo "════════════════════════════════════════════════════════════════════"
+    echo "  PILOT INVARIANT PROVEN: All tripwires passed"
+    echo "════════════════════════════════════════════════════════════════════"
+    rm -f "$LOGFILE"
+    exit 0
+else
+    echo "════════════════════════════════════════════════════════════════════"
+    echo "  PILOT INVARIANT FAILED: See $LOGFILE for details"
+    echo "════════════════════════════════════════════════════════════════════"
+    exit 1
+fi
