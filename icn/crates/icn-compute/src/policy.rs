@@ -18,6 +18,173 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+// ============================================================================
+// Commons Compute Governance (E7 - #1134)
+// ============================================================================
+
+/// Charter-defined priority policies for commons compute.
+///
+/// Cooperatives can configure how tasks are prioritized when using shared
+/// commons compute resources. This affects scheduling order and preemption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CharterPriority {
+    /// Universal basic services get top priority.
+    /// Tasks tagged as UBS are scheduled before all others.
+    #[default]
+    UbsFirst,
+    /// Emergency tasks preempt all others.
+    /// Critical priority tasks can interrupt running lower-priority tasks.
+    EmergencyFirst,
+    /// Fair share - round-robin by member standing.
+    /// Each member gets equal scheduling opportunities based on their standing.
+    FairShare,
+    /// First-come-first-served.
+    /// Tasks are scheduled strictly in submission order.
+    Fifo,
+}
+
+impl CharterPriority {
+    /// Whether this policy allows preemption of running tasks.
+    ///
+    /// Only `EmergencyFirst` and `UbsFirst` policies support preemption,
+    /// as they prioritize certain task types over others.
+    pub fn allows_preemption(&self) -> bool {
+        matches!(self, Self::EmergencyFirst | Self::UbsFirst)
+    }
+
+    /// Human-readable description of this priority policy.
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::UbsFirst => "Universal basic services scheduled first",
+            Self::EmergencyFirst => "Emergency tasks preempt all others",
+            Self::FairShare => "Round-robin by member standing",
+            Self::Fifo => "First-come-first-served",
+        }
+    }
+}
+
+/// Governance policy for commons compute pool.
+///
+/// This policy is defined in the cooperative's charter and controls how
+/// shared compute resources are allocated among members.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommonsPoolPolicy {
+    /// Minimum standing required to submit to commons (0.0–1.0).
+    /// Members below this threshold cannot use commons compute.
+    pub min_standing: f64,
+
+    /// Priority policy from charter.
+    /// Determines how tasks are ordered for execution.
+    pub priority: CharterPriority,
+
+    /// Maximum concurrent tasks per submitter.
+    /// Prevents any single member from monopolizing resources.
+    pub max_concurrent_per_submitter: u32,
+
+    /// Whether preemption is enabled.
+    /// If true, higher-priority tasks can interrupt lower-priority ones.
+    pub preemption_enabled: bool,
+
+    /// Credit ceiling for cost validation.
+    /// Tasks whose estimated cost exceeds available credits are rejected.
+    #[serde(default)]
+    pub credit_ceiling: Option<i64>,
+}
+
+impl Default for CommonsPoolPolicy {
+    fn default() -> Self {
+        Self {
+            min_standing: 0.3,
+            priority: CharterPriority::default(),
+            max_concurrent_per_submitter: 5,
+            preemption_enabled: false,
+            credit_ceiling: None,
+        }
+    }
+}
+
+impl CommonsPoolPolicy {
+    /// Validate that a submitter has sufficient credits for a task.
+    ///
+    /// Returns `Ok(())` if the submitter has sufficient credit ceiling,
+    /// or if no ceiling is configured. Returns an error if the task's
+    /// estimated cost would exceed the submitter's available credits.
+    pub fn validate_submitter_credit(
+        &self,
+        task: &ComputeTask,
+        submitter_balance: i64,
+    ) -> Result<(), ComputeError> {
+        // If no ceiling configured, skip validation
+        let ceiling = match self.credit_ceiling {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+
+        // Estimate task cost from fuel limit and payment rate
+        let estimated_cost = Self::estimate_task_cost(task);
+
+        // Check if submitter has room under their ceiling
+        let available = ceiling.saturating_sub(submitter_balance);
+        if estimated_cost > available {
+            return Err(ComputeError::InsufficientCommonsCredits {
+                balance: submitter_balance,
+                required: estimated_cost,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Estimate the credit cost of a task.
+    ///
+    /// Uses payment_rate if specified, otherwise derives from fuel limit.
+    fn estimate_task_cost(task: &ComputeTask) -> i64 {
+        if let Some(rate) = task.payment_rate {
+            // payment_rate is credits per 1000 fuel units
+            let fuel = task.fuel_limit.0 as i64;
+            (fuel * rate as i64) / 1000
+        } else {
+            // Default: 1 credit per 1000 fuel units
+            (task.fuel_limit.0 as i64) / 1000
+        }
+    }
+
+    /// Check if a new task can preempt a running task.
+    ///
+    /// Returns `true` if preemption is enabled and the new task has
+    /// sufficiently higher priority to justify interrupting the running task.
+    pub fn can_preempt(&self, new_task: &ComputeTask, running_task: &ComputeTask) -> bool {
+        // Preemption must be enabled
+        if !self.preemption_enabled {
+            return false;
+        }
+
+        // Priority policy must allow preemption
+        if !self.priority.allows_preemption() {
+            return false;
+        }
+
+        // New task must have strictly higher priority
+        // Critical can preempt High/Normal/Low
+        // High can preempt Normal/Low
+        // etc.
+        new_task.priority > running_task.priority
+    }
+
+    /// Check if a submitter meets the minimum standing requirement.
+    pub fn check_standing(&self, standing: f64) -> Result<(), ComputeError> {
+        if standing < self.min_standing {
+            Err(ComputeError::InsufficientTrust {
+                required: self.min_standing,
+                actual: standing,
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// Cooperative scheduling policy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoopSchedulingPolicy {
@@ -1352,5 +1519,272 @@ mod tests {
                                                     // Only record_execution increments tasks_completed_this_month (test 6)
         assert_eq!(usage_over.tasks_completed_this_month, 1);
         assert_eq!(usage_over.credits_spent_this_month, 150);
+    }
+
+    // ========================================================================
+    // CharterPriority tests (E7 - #1134)
+    // ========================================================================
+
+    #[test]
+    fn test_charter_priority_serialization() {
+        // Test JSON serialization uses snake_case
+        let priority = CharterPriority::UbsFirst;
+        let json = serde_json::to_string(&priority).unwrap();
+        assert_eq!(json, r#""ubs_first""#);
+
+        let priority = CharterPriority::EmergencyFirst;
+        let json = serde_json::to_string(&priority).unwrap();
+        assert_eq!(json, r#""emergency_first""#);
+
+        let priority = CharterPriority::FairShare;
+        let json = serde_json::to_string(&priority).unwrap();
+        assert_eq!(json, r#""fair_share""#);
+
+        let priority = CharterPriority::Fifo;
+        let json = serde_json::to_string(&priority).unwrap();
+        assert_eq!(json, r#""fifo""#);
+    }
+
+    #[test]
+    fn test_charter_priority_deserialization() {
+        let priority: CharterPriority = serde_json::from_str(r#""ubs_first""#).unwrap();
+        assert_eq!(priority, CharterPriority::UbsFirst);
+
+        let priority: CharterPriority = serde_json::from_str(r#""emergency_first""#).unwrap();
+        assert_eq!(priority, CharterPriority::EmergencyFirst);
+
+        let priority: CharterPriority = serde_json::from_str(r#""fair_share""#).unwrap();
+        assert_eq!(priority, CharterPriority::FairShare);
+
+        let priority: CharterPriority = serde_json::from_str(r#""fifo""#).unwrap();
+        assert_eq!(priority, CharterPriority::Fifo);
+    }
+
+    #[test]
+    fn test_charter_priority_allows_preemption() {
+        assert!(CharterPriority::UbsFirst.allows_preemption());
+        assert!(CharterPriority::EmergencyFirst.allows_preemption());
+        assert!(!CharterPriority::FairShare.allows_preemption());
+        assert!(!CharterPriority::Fifo.allows_preemption());
+    }
+
+    #[test]
+    fn test_charter_priority_default() {
+        let priority = CharterPriority::default();
+        assert_eq!(priority, CharterPriority::UbsFirst);
+    }
+
+    #[test]
+    fn test_charter_priority_description() {
+        assert!(!CharterPriority::UbsFirst.description().is_empty());
+        assert!(!CharterPriority::EmergencyFirst.description().is_empty());
+        assert!(!CharterPriority::FairShare.description().is_empty());
+        assert!(!CharterPriority::Fifo.description().is_empty());
+    }
+
+    // ========================================================================
+    // CommonsPoolPolicy tests (E7 - #1134)
+    // ========================================================================
+
+    #[test]
+    fn test_commons_pool_policy_default() {
+        let policy = CommonsPoolPolicy::default();
+        assert!((policy.min_standing - 0.3).abs() < f64::EPSILON);
+        assert_eq!(policy.priority, CharterPriority::UbsFirst);
+        assert_eq!(policy.max_concurrent_per_submitter, 5);
+        assert!(!policy.preemption_enabled);
+        assert!(policy.credit_ceiling.is_none());
+    }
+
+    #[test]
+    fn test_commons_pool_policy_serialization() {
+        let policy = CommonsPoolPolicy {
+            min_standing: 0.5,
+            priority: CharterPriority::EmergencyFirst,
+            max_concurrent_per_submitter: 10,
+            preemption_enabled: true,
+            credit_ceiling: Some(1000),
+        };
+
+        let json = serde_json::to_string(&policy).unwrap();
+        let parsed: CommonsPoolPolicy = serde_json::from_str(&json).unwrap();
+
+        assert!((parsed.min_standing - 0.5).abs() < f64::EPSILON);
+        assert_eq!(parsed.priority, CharterPriority::EmergencyFirst);
+        assert_eq!(parsed.max_concurrent_per_submitter, 10);
+        assert!(parsed.preemption_enabled);
+        assert_eq!(parsed.credit_ceiling, Some(1000));
+    }
+
+    #[test]
+    fn test_commons_pool_policy_cost_validation_no_ceiling() {
+        let policy = CommonsPoolPolicy::default();
+        let task = make_test_task(TaskPriority::Normal);
+
+        // No ceiling configured, should always pass
+        let result = policy.validate_submitter_credit(&task, 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_commons_pool_policy_cost_validation_sufficient_credit() {
+        let policy = CommonsPoolPolicy {
+            credit_ceiling: Some(100),
+            ..Default::default()
+        };
+        let task = make_test_task(TaskPriority::Normal);
+        // Task has fuel_limit=10000, so cost = 10000/1000 = 10 credits
+        // Ceiling is 100, balance is 0, so 100-0=100 available > 10 required
+
+        let result = policy.validate_submitter_credit(&task, 0);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_commons_pool_policy_cost_validation_insufficient_credit() {
+        let policy = CommonsPoolPolicy {
+            credit_ceiling: Some(100),
+            ..Default::default()
+        };
+        let task = make_test_task(TaskPriority::Normal);
+        // Task has fuel_limit=10000, so cost = 10000/1000 = 10 credits
+        // Ceiling is 100, balance is 95, so 100-95=5 available < 10 required
+
+        let result = policy.validate_submitter_credit(&task, 95);
+        assert!(result.is_err());
+        if let Err(ComputeError::InsufficientCommonsCredits { balance, required }) = result {
+            assert_eq!(balance, 95);
+            assert_eq!(required, 10);
+        } else {
+            panic!("Expected InsufficientCommonsCredits error");
+        }
+    }
+
+    #[test]
+    fn test_commons_pool_policy_cost_with_payment_rate() {
+        use crate::types::{
+            DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode,
+        };
+
+        let policy = CommonsPoolPolicy {
+            credit_ceiling: Some(100),
+            ..Default::default()
+        };
+
+        // Task with explicit payment rate: 5 credits per 1000 fuel
+        let task = ComputeTask {
+            id: "test-task".into(),
+            submitter: make_test_did().to_string(),
+            coop_id: None,
+            code: TaskCode::Ccl(String::new()),
+            inputs: vec![],
+            fuel_limit: FuelLimit(10000), // 10000 fuel * 5/1000 = 50 credits
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: TaskPriority::Normal,
+            created_at: 0,
+            deadline: None,
+            payment_rate: Some(5), // 5 credits per 1000 fuel
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+            federation_constraints: None,
+            estimated_value: None,
+            verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            storage_class: None,
+            data_locality: None,
+        };
+
+        // With balance=60, available=40, required=50 -> should fail
+        let result = policy.validate_submitter_credit(&task, 60);
+        assert!(result.is_err());
+
+        // With balance=40, available=60, required=50 -> should pass
+        let result = policy.validate_submitter_credit(&task, 40);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_commons_pool_policy_preemption_disabled() {
+        let policy = CommonsPoolPolicy {
+            preemption_enabled: false,
+            priority: CharterPriority::EmergencyFirst,
+            ..Default::default()
+        };
+
+        let high_task = make_test_task(TaskPriority::Critical);
+        let low_task = make_test_task(TaskPriority::Low);
+
+        // Even with higher priority, preemption disabled
+        assert!(!policy.can_preempt(&high_task, &low_task));
+    }
+
+    #[test]
+    fn test_commons_pool_policy_preemption_enabled() {
+        let policy = CommonsPoolPolicy {
+            preemption_enabled: true,
+            priority: CharterPriority::EmergencyFirst,
+            ..Default::default()
+        };
+
+        let critical = make_test_task(TaskPriority::Critical);
+        let high = make_test_task(TaskPriority::High);
+        let normal = make_test_task(TaskPriority::Normal);
+        let low = make_test_task(TaskPriority::Low);
+
+        // Critical can preempt all lower priorities
+        assert!(policy.can_preempt(&critical, &high));
+        assert!(policy.can_preempt(&critical, &normal));
+        assert!(policy.can_preempt(&critical, &low));
+
+        // High can preempt normal and low
+        assert!(policy.can_preempt(&high, &normal));
+        assert!(policy.can_preempt(&high, &low));
+
+        // Cannot preempt same or higher priority
+        assert!(!policy.can_preempt(&normal, &normal));
+        assert!(!policy.can_preempt(&low, &high));
+    }
+
+    #[test]
+    fn test_commons_pool_policy_preemption_policy_disallows() {
+        // FairShare policy doesn't allow preemption
+        let policy = CommonsPoolPolicy {
+            preemption_enabled: true,
+            priority: CharterPriority::FairShare,
+            ..Default::default()
+        };
+
+        let high_task = make_test_task(TaskPriority::Critical);
+        let low_task = make_test_task(TaskPriority::Low);
+
+        // Even with preemption_enabled, policy doesn't allow it
+        assert!(!policy.can_preempt(&high_task, &low_task));
+    }
+
+    #[test]
+    fn test_commons_pool_policy_check_standing() {
+        let policy = CommonsPoolPolicy {
+            min_standing: 0.3,
+            ..Default::default()
+        };
+
+        // Sufficient standing
+        assert!(policy.check_standing(0.5).is_ok());
+        assert!(policy.check_standing(0.3).is_ok());
+
+        // Insufficient standing
+        let result = policy.check_standing(0.2);
+        assert!(result.is_err());
+        if let Err(ComputeError::InsufficientTrust { required, actual }) = result {
+            assert!((required - 0.3).abs() < f64::EPSILON);
+            assert!((actual - 0.2).abs() < f64::EPSILON);
+        } else {
+            panic!("Expected InsufficientTrust error");
+        }
     }
 }

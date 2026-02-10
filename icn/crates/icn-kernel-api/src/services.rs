@@ -11,6 +11,7 @@
 //! - The kernel enforces constraints without understanding their origin
 
 use crate::authz::PolicyOracle;
+use crate::compute::OperatorMode;
 use crate::scope::{CellId, ScopeLevel};
 use crate::types::Did;
 use std::sync::Arc;
@@ -692,6 +693,36 @@ pub trait CellService: Send + Sync {
         // Default: not implemented (for backward compatibility)
         let _ = cell_id;
         None
+    }
+
+    /// Get the operator mode for a cell (E6: Individual Node Ownership).
+    ///
+    /// Returns the operator mode of the cell, which determines whether it's
+    /// operated by an organization or an individual.
+    ///
+    /// Returns `None` if the cell is unknown or operator mode is not set.
+    fn cell_operator_mode(&self, cell_id: &CellId) -> Option<OperatorMode> {
+        // Default: not implemented (for backward compatibility)
+        let _ = cell_id;
+        None
+    }
+
+    /// Check if a node with the given operator mode can join a cell.
+    ///
+    /// This enforces the E6 operator mode compatibility rule:
+    /// - Nodes can only join cells with compatible operator modes
+    /// - Compatible means same mode variant AND same operator ID
+    ///
+    /// Returns `true` if:
+    /// - The cell has no operator mode set (backward compatibility)
+    /// - The cell's operator mode is compatible with the joining node's mode
+    ///
+    /// Returns `false` if the modes are incompatible.
+    fn can_join_cell(&self, cell_id: &CellId, node_mode: &OperatorMode) -> bool {
+        match self.cell_operator_mode(cell_id) {
+            Some(cell_mode) => cell_mode.is_compatible_with(node_mode),
+            None => true, // No mode set = backward compatible
+        }
     }
 }
 

@@ -31,8 +31,116 @@
 //! - Privileged execution for "official" apps
 //! - Any interpretation of what code does
 
-use crate::types::{Duration, JobId, LogId, LogicalTimestamp, ServiceId};
+use crate::types::{Did, Duration, JobId, LogId, LogicalTimestamp, ServiceId};
 use serde::{Deserialize, Serialize};
+
+// ============================================================================
+// Operator Mode (E6)
+// ============================================================================
+
+/// Mode of operation for a node.
+///
+/// Distinguishes between organizational nodes (operated by cooperatives,
+/// federations, etc.) and individual nodes (personal infrastructure).
+///
+/// # Individual Nodes
+///
+/// Individual nodes are operated by a person using their wallet DID as the
+/// root identity. This enables:
+/// - Personal data sovereignty (your node, your data)
+/// - Optional contribution to commons compute
+/// - Wallet-rooted identity for all operations
+///
+/// # Organizational Nodes
+///
+/// Organizational nodes are operated by entities (cooperatives, communities,
+/// federations). All organizational nodes contribute to commons compute by
+/// default.
+///
+/// # Cell Join Compatibility
+///
+/// Nodes with different operator modes cannot join the same cell. This
+/// maintains the operator boundary rule (E5) — a cell is operated by exactly
+/// one entity or individual.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatorMode {
+    /// Node operated by an organization (cooperative, federation, etc.)
+    Organization {
+        /// Entity ID of the operating organization
+        entity_id: String,
+        /// Optional parent federation
+        parent_federation: Option<String>,
+    },
+    /// Node operated by an individual (personal infrastructure)
+    Individual {
+        /// The wallet DID that owns this node
+        wallet_did: Did,
+        /// Whether this node contributes to commons compute
+        contributes_to_commons: bool,
+    },
+}
+
+impl Default for OperatorMode {
+    fn default() -> Self {
+        Self::Organization {
+            entity_id: String::new(),
+            parent_federation: None,
+        }
+    }
+}
+
+impl OperatorMode {
+    /// Check if this is an individual-operated node.
+    pub fn is_individual(&self) -> bool {
+        matches!(self, Self::Individual { .. })
+    }
+
+    /// Check if this is an organization-operated node.
+    pub fn is_organization(&self) -> bool {
+        matches!(self, Self::Organization { .. })
+    }
+
+    /// Check if this node contributes to commons compute.
+    ///
+    /// Organizations always contribute. Individuals can opt in or out.
+    pub fn contributes_to_commons(&self) -> bool {
+        match self {
+            Self::Individual {
+                contributes_to_commons,
+                ..
+            } => *contributes_to_commons,
+            Self::Organization { .. } => true, // Orgs always contribute
+        }
+    }
+
+    /// Get the operator identifier (entity_id or wallet_did as string).
+    ///
+    /// This is used for cell join compatibility checks.
+    pub fn operator_id(&self) -> &str {
+        match self {
+            Self::Organization { entity_id, .. } => entity_id,
+            Self::Individual { wallet_did, .. } => wallet_did.as_str(),
+        }
+    }
+
+    /// Check if two operator modes are compatible for cell membership.
+    ///
+    /// Nodes can only join the same cell if:
+    /// - Both are the same mode variant (both Organization or both Individual)
+    /// - Both have the same operator ID
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Organization { entity_id: a, .. }, Self::Organization { entity_id: b, .. }) => {
+                a == b
+            }
+            (Self::Individual { wallet_did: a, .. }, Self::Individual { wallet_did: b, .. }) => {
+                a == b
+            }
+            _ => false, // Mixed modes not compatible
+        }
+    }
+}
 
 // ============================================================================
 // Determinism Classification (E3)
@@ -496,5 +604,153 @@ mod tests {
             .to_string()
             .contains("Advisory workload cannot mutate state"));
         assert!(err.to_string().contains("WriteLedger"));
+    }
+
+    // ========================================================================
+    // OperatorMode tests (E6)
+    // ========================================================================
+
+    #[test]
+    fn test_operator_mode_default() {
+        let mode: OperatorMode = Default::default();
+        match mode {
+            OperatorMode::Organization {
+                entity_id,
+                parent_federation,
+            } => {
+                assert_eq!(entity_id, "");
+                assert_eq!(parent_federation, None);
+            }
+            _ => panic!("Expected Organization variant"),
+        }
+    }
+
+    #[test]
+    fn test_operator_mode_is_individual() {
+        let org = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: None,
+        };
+        assert!(!org.is_individual());
+        assert!(org.is_organization());
+
+        let individual = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: true,
+        };
+        assert!(individual.is_individual());
+        assert!(!individual.is_organization());
+    }
+
+    #[test]
+    fn test_operator_mode_contributes_to_commons() {
+        // Organizations always contribute
+        let org = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: None,
+        };
+        assert!(org.contributes_to_commons());
+
+        // Individuals can opt in
+        let ind_yes = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: true,
+        };
+        assert!(ind_yes.contributes_to_commons());
+
+        // Individuals can opt out
+        let ind_no = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: false,
+        };
+        assert!(!ind_no.contributes_to_commons());
+    }
+
+    #[test]
+    fn test_operator_mode_operator_id() {
+        let org = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: None,
+        };
+        assert_eq!(org.operator_id(), "coop-123");
+
+        let individual = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: true,
+        };
+        assert_eq!(individual.operator_id(), "did:icn:abc123");
+    }
+
+    #[test]
+    fn test_operator_mode_compatibility() {
+        let org1 = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: None,
+        };
+        let org1_clone = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: Some("fed-1".to_string()),
+        };
+        let org2 = OperatorMode::Organization {
+            entity_id: "coop-456".to_string(),
+            parent_federation: None,
+        };
+
+        // Same org entity_id = compatible
+        assert!(org1.is_compatible_with(&org1_clone));
+        // Different org entity_id = incompatible
+        assert!(!org1.is_compatible_with(&org2));
+
+        let ind1 = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: true,
+        };
+        let ind1_clone = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: false, // Different contrib setting
+        };
+        let ind2 = OperatorMode::Individual {
+            wallet_did: "did:icn:def456".into(),
+            contributes_to_commons: true,
+        };
+
+        // Same wallet DID = compatible
+        assert!(ind1.is_compatible_with(&ind1_clone));
+        // Different wallet DID = incompatible
+        assert!(!ind1.is_compatible_with(&ind2));
+
+        // Mixed modes = incompatible
+        assert!(!org1.is_compatible_with(&ind1));
+        assert!(!ind1.is_compatible_with(&org1));
+    }
+
+    #[test]
+    fn test_operator_mode_serde_organization() {
+        let org = OperatorMode::Organization {
+            entity_id: "coop-123".to_string(),
+            parent_federation: Some("fed-1".to_string()),
+        };
+        let json = serde_json::to_string(&org).unwrap();
+        assert!(json.contains(r#""organization""#));
+        assert!(json.contains(r#""entity_id":"coop-123""#));
+        assert!(json.contains(r#""parent_federation":"fed-1""#));
+
+        let parsed: OperatorMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, org);
+    }
+
+    #[test]
+    fn test_operator_mode_serde_individual() {
+        let ind = OperatorMode::Individual {
+            wallet_did: "did:icn:abc123".into(),
+            contributes_to_commons: true,
+        };
+        let json = serde_json::to_string(&ind).unwrap();
+        assert!(json.contains(r#""individual""#));
+        assert!(json.contains(r#""wallet_did":"did:icn:abc123""#));
+        assert!(json.contains(r#""contributes_to_commons":true"#));
+
+        let parsed: OperatorMode = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, ind);
     }
 }

@@ -362,6 +362,9 @@ impl GatewayServer {
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
 
+        // Initialize server start time for health check uptime reporting
+        api::health::init_start_time();
+
         // SECURITY: Validate JWT secret is configured
         if self.jwt_secret.is_empty() {
             return Err(GatewayError::InternalError(
@@ -933,6 +936,7 @@ impl GatewayServer {
                         // Public endpoints (no auth required)
                         .service(api::health::liveness)
                         .service(api::health::readiness)
+                        .service(api::health::ready)
                         .service(api::health::health)
                         .service(api::health::health_detailed)
                         .service(api::auth::challenge)

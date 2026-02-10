@@ -177,6 +177,17 @@ enum Commands {
     #[command(subcommand)]
     Api(ApiCommands),
 
+    /// Pre-deployment health checks
+    Preflight {
+        /// Gateway endpoint to check (if running)
+        #[arg(short, long)]
+        gateway: Option<String>,
+
+        /// Skip keystore check
+        #[arg(long)]
+        skip_keystore: bool,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell type
@@ -2021,6 +2032,13 @@ async fn main() -> Result<()> {
         }
 
         Commands::Api(api_cmd) => handle_api_command(api_cmd)?,
+
+        Commands::Preflight {
+            gateway,
+            skip_keystore,
+        } => {
+            handle_preflight_command(&data_dir, gateway, skip_keystore).await?;
+        }
 
         Commands::Completions { shell } => {
             let mut cmd = Args::command();
@@ -9734,4 +9752,191 @@ fn handle_api_command(cmd: ApiCommands) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Handle preflight command - pre-deployment health checks
+async fn handle_preflight_command(
+    data_dir: &Path,
+    gateway: Option<String>,
+    skip_keystore: bool,
+) -> Result<()> {
+    println!("ICN Pre-deployment Health Check");
+    println!("================================\n");
+
+    let mut all_passed = true;
+    let mut check_count = 0;
+    let mut passed_count = 0;
+
+    // Check 1: Data directory
+    check_count += 1;
+    print!("  [1] Data directory exists... ");
+    if data_dir.exists() {
+        println!("✓ PASS ({})", data_dir.display());
+        passed_count += 1;
+    } else {
+        println!("✗ FAIL (not found: {})", data_dir.display());
+        all_passed = false;
+    }
+
+    // Check 2: Keystore exists
+    if !skip_keystore {
+        check_count += 1;
+        let keystore_path = get_keystore_path(data_dir);
+        print!("  [2] Keystore exists... ");
+        if keystore_path.exists() {
+            println!("✓ PASS ({})", keystore_path.display());
+            passed_count += 1;
+
+            // Check 2b: Keystore is readable/valid format
+            check_count += 1;
+            print!("  [3] Keystore format valid... ");
+            match AgeKeyStore::open(&keystore_path) {
+                Ok(_) => {
+                    println!("✓ PASS");
+                    passed_count += 1;
+                }
+                Err(e) => {
+                    println!("✗ FAIL ({})", e);
+                    all_passed = false;
+                }
+            }
+        } else {
+            println!("✗ FAIL (not found: {})", keystore_path.display());
+            println!("      Hint: Run 'icnctl id init' to create a new identity");
+            all_passed = false;
+        }
+    } else {
+        println!("  [2] Keystore check... SKIPPED");
+    }
+
+    // Check 3: Config file (optional)
+    check_count += 1;
+    let config_path = data_dir.join("config.toml");
+    print!("  [{}] Config file... ", if skip_keystore { 2 } else { 4 });
+    if config_path.exists() {
+        // Try to parse it
+        match std::fs::read_to_string(&config_path) {
+            Ok(content) => {
+                if content.contains('[') || content.is_empty() {
+                    println!("✓ PASS ({})", config_path.display());
+                    passed_count += 1;
+                } else {
+                    println!("⚠ WARN (file exists but may be invalid)");
+                    passed_count += 1; // Still counts as pass, just a warning
+                }
+            }
+            Err(e) => {
+                println!("✗ FAIL (cannot read: {})", e);
+                all_passed = false;
+            }
+        }
+    } else {
+        println!("○ SKIP (not required, using defaults)");
+        passed_count += 1;
+    }
+
+    // Check 4: Default ports available
+    check_count += 1;
+    let check_num = if skip_keystore { 3 } else { 5 };
+    print!("  [{}] Default RPC port (5601) available... ", check_num);
+    match std::net::TcpListener::bind("127.0.0.1:5601") {
+        Ok(_) => {
+            println!("✓ PASS");
+            passed_count += 1;
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                println!("⚠ IN USE (daemon may be running)");
+                passed_count += 1; // Not a failure if daemon is running
+            } else {
+                println!("✗ FAIL ({})", e);
+                all_passed = false;
+            }
+        }
+    }
+
+    check_count += 1;
+    let check_num = if skip_keystore { 4 } else { 6 };
+    print!(
+        "  [{}] Default Gateway port (5600) available... ",
+        check_num
+    );
+    match std::net::TcpListener::bind("127.0.0.1:5600") {
+        Ok(_) => {
+            println!("✓ PASS");
+            passed_count += 1;
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                println!("⚠ IN USE (gateway may be running)");
+                passed_count += 1;
+            } else {
+                println!("✗ FAIL ({})", e);
+                all_passed = false;
+            }
+        }
+    }
+
+    // Check 5: Gateway connectivity (if URL provided or default)
+    if let Some(gateway_url) = gateway {
+        check_count += 1;
+        let check_num = if skip_keystore { 5 } else { 7 };
+        print!("  [{}] Gateway health ({})... ", check_num, gateway_url);
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .context("Failed to create HTTP client")?;
+
+        let health_url = format!("{}/v1/health", gateway_url.trim_end_matches('/'));
+        match client.get(&health_url).send().await {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    println!("✓ PASS (online)");
+                    passed_count += 1;
+
+                    // Also check readiness
+                    check_count += 1;
+                    let check_num = if skip_keystore { 6 } else { 8 };
+                    print!("  [{}] Gateway readiness... ", check_num);
+                    let ready_url = format!("{}/v1/ready", gateway_url.trim_end_matches('/'));
+                    match client.get(&ready_url).send().await {
+                        Ok(ready_resp) => {
+                            if ready_resp.status().is_success() {
+                                println!("✓ PASS");
+                                passed_count += 1;
+                            } else {
+                                println!("⚠ DEGRADED (status: {})", ready_resp.status());
+                                passed_count += 1; // Still counts, just degraded
+                            }
+                        }
+                        Err(e) => {
+                            println!("✗ FAIL ({})", e);
+                            all_passed = false;
+                        }
+                    }
+                } else {
+                    println!("⚠ DEGRADED (status: {})", resp.status());
+                    passed_count += 1;
+                }
+            }
+            Err(e) => {
+                println!("✗ FAIL ({})", e);
+                all_passed = false;
+            }
+        }
+    }
+
+    // Summary
+    println!();
+    println!("================================");
+    println!("Result: {}/{} checks passed", passed_count, check_count);
+
+    if all_passed {
+        println!("\n✓ All preflight checks passed. System is ready for deployment.");
+        Ok(())
+    } else {
+        println!("\n✗ Some preflight checks failed. Please address issues above.");
+        bail!("Preflight checks failed");
+    }
 }

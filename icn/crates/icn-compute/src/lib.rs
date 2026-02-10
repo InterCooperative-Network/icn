@@ -78,8 +78,8 @@ pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
 };
 pub use policy::{
-    CoopSchedulingPolicy, EnforcementMode, MemberQuota, PlacementConstraints, PolicyDecision,
-    PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
+    CharterPriority, CommonsPoolPolicy, CoopSchedulingPolicy, EnforcementMode, MemberQuota,
+    PlacementConstraints, PolicyDecision, PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
 };
 pub use receipt::{ExecutionReceipt, ReceiptHash, SettlementMessage, SignatureBytes};
 pub use result_quorum::{

@@ -62,7 +62,7 @@ pub use bootstrap::{
     GenesisCapabilities, OracleRegistry,
 };
 pub use comms::{PubSub, RequestResponse, Streams};
-pub use compute::{ComputeEngine, DeterminismClass, Job, PrivacyClass, Trigger};
+pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
 pub use coord::Coordination;
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
