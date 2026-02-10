@@ -79,7 +79,7 @@ The Cargo workspace is located in the `icn/` subdirectory. All build/test comman
 
 ## Documentation Structure
 
-**IMPORTANT: Never save documentation files to the project root.** All documentation (session notes, status reports, guides, etc.) must go in the appropriate `docs/` subdirectory.
+**IMPORTANT: Never save documentation files to the project root.** All documentation must go in the appropriate `docs/` subdirectory.
 
 **Project root** (only these files):
 - `README.md` - Project overview and quick start
@@ -90,18 +90,39 @@ The Cargo workspace is located in the `icn/` subdirectory. All build/test comman
 - `AGENTS.md` - Agent coding instructions
 
 **Documentation directory (`docs/`):**
-- `ARCHITECTURE.md` - System architecture and component design
+
+Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
+
+**Core Documents:**
+- `ARCHITECTURE.md` - Comprehensive system architecture (160KB+)
+- `GETTING_STARTED.md` - Quick start guide
 - `PHASE_HISTORY.md` - Completed development phases
-- `HOMELAB_DEPLOYMENT.md` - K3s deployment details
-- `glossary.md` - ICN terminology definitions
-- `production-hardening.md` - Security hardening measures
-- `trust-multi-graph-migration.md` - Multi-graph trust migration guide
-- `dev-journal/` - Development session journals and technical notes
-- `demo/` - Demo session documentation and guides
-- `security/` - Security audits, threat models, and fixes
-- `ci/` - CI/CD status reports and configurations
-- `status/` - System status reports and deployment verification
-- `performance/` - Performance benchmarks and optimization docs
+- `STATE.md` - Current project state
+- `TODO.md` - Active work items
+- `glossary.md` - Terminology definitions
+
+**Main Categories:**
+- `architecture/` - Architecture documentation, design decisions, audits
+- `design/` - Feature designs, proposals, evolution plans
+  - `design/economics/` - Economic system design
+  - `design/governance/` - Governance system design
+  - `design/sdis/` - SDIS design documentation
+- `spec/` - Formal protocol and contract specifications
+- `reference/` - Technical references
+  - `reference/api/` - REST API, WebSocket, SDK documentation
+  - `reference/config/` - Configuration files and settings
+- `guides/` - User and developer guides
+  - `guides/developer/` - Development guides
+  - `guides/operations/` - Deployment and operations
+  - `guides/user/` - End-user documentation
+- `development/` - Development resources (sprints, testing)
+- `security/` - Security documentation and threat models
+- `sdis/` - SDIS implementation documentation
+- `internal/` - Internal planning and pilot programs
+- `status/` - Current status reports
+- `archive/` - Historical documentation (organized by year)
+
+**See `docs/DOCUMENTATION_MAINTENANCE.md` for where to put new documentation.**
 
 ## Build & Test Commands
 

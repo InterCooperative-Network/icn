@@ -243,7 +243,7 @@ icnctl device add --name "My Phone" --capabilities sign
 icnctl device list
 ```
 
-See [docs/multi-device-identity-design.md](multi-device-identity-design.md) for details.
+See [Multi-Device Identity Design](design/multi-device-identity-design.md) for details.
 
 ---
 
@@ -268,7 +268,7 @@ ICN provides a **Gateway API** for building user-facing applications:
    ws.send(JSON.stringify({type: 'Auth', token: 'eyJ0eXAi...'}));
    ```
 
-See [docs/platform-layer-design.md](platform-layer-design.md) and the TypeScript SDK ([sdk/typescript/](../sdk/typescript/)).
+See [Platform Layer Design](design/platform-layer-design.md) and the TypeScript SDK ([sdk/typescript/](../sdk/typescript/)).
 
 ---
 
@@ -317,10 +317,10 @@ icnctl network status
 
 ### Learn More
 - [Architecture Overview](ARCHITECTURE.md) - How ICN works under the hood
-- [Operations Guide](operations-guide.md) - Day-to-day management
-- [Economic Safety](economic-safety.md) - Credit limits, dispute resolution
-- [Governance Primitives](governance-primitives.md) - Democratic decision-making
-- [Deployment Guide](deployment-guide.md) - Production deployment
+- [Operations Guide](guides/operations/operations-guide.md) - Day-to-day management
+- [Economic Safety](design/economics/economic-safety.md) - Credit limits, dispute resolution
+- [Governance Primitives](design/governance/governance-primitives.md) - Democratic decision-making
+- [Deployment Guide](operations/deployment/deployment-guide.md) - Production deployment
 
 ### Build on ICN
 
@@ -350,9 +350,9 @@ const result = await client.waitForTask(task.task_hash);
 ```
 
 **More Resources**:
-- [Gateway API Reference](api/openapi.yaml) - REST + WebSocket API
+- [Gateway API Reference](reference/api/API_REFERENCE.md) - REST + WebSocket API
 - [TypeScript SDK](../sdk/typescript/) - `@icn/client` npm package
-- [Platform Layer Design](platform-layer-design.md) - App architecture
+- [Platform Layer Design](design/platform-layer-design.md) - App architecture
 
 ### Get Help
 - **GitHub Issues**: https://github.com/InterCooperative-Network/icn/issues
@@ -362,7 +362,8 @@ const result = await client.waitForTask(task.task_hash);
 ### Contribute
 - [Contributing Guide](../CONTRIBUTING.md) - How to contribute
 - [Code of Conduct](../CODE_OF_CONDUCT.md) - Community standards
-- [Roadmap](../ROADMAP.md) - What's being built
+- [Phase History](PHASE_HISTORY.md) - Completed development phases
+- [Current TODO](TODO.md) - What's being built next
 
 ---
 
