@@ -869,3 +869,41 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+
+## Changes applied (Batch C2 - slice 1: code-aligned API/backend docs)
+
+1. `docs/reference/api/topic-subscriptions-api.md`
+- Updated incoming subscription handler example to match current runtime pattern in `icn-core/src/supervisor/init_network.rs`:
+  - non-blocking callback
+  - `tokio::spawn` for async work
+  - `gossip_handle.write().await` and `subscribe(...).await`
+- Removed outdated `blocking_write()` example semantics.
+
+2. `icn/bins/icnd/src/main.rs`
+- Corrected hardware-backend error guidance path to the canonical docs location:
+  - `docs/reference/config/identity-backend-configuration.md`
+
+## Verification updates (Batch C2 - slice 1)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "blocking_write\(|reference/config/identity-backend-configuration\.md" docs/reference/api/topic-subscriptions-api.md icn/bins/icnd/src/main.rs
+```
+
+Result:
+- Missing-link findings remain zero.
+- API example and daemon error guidance align with current code paths and async behavior.
+
+## Audit ledger updates (C2 slice 1)
+
+- `docs/reference/api/topic-subscriptions-api.md | icn/crates/icn-core/src/supervisor/init_network.rs | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)`
+- `icn/bins/icnd/src/main.rs | docs/reference/config/identity-backend-configuration.md | path verification + grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (C2 slice 1)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.
