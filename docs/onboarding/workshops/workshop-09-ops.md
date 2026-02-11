@@ -154,7 +154,7 @@ docker-compose logs -f
 ### Steps
 1. Check the basic health endpoint:
    ```bash
-   curl -s http://localhost:8080/health | jq
+   curl -s http://localhost:8080/v1/health | jq
    ```
 
 2. Basic health response:
@@ -165,9 +165,9 @@ docker-compose logs -f
    }
    ```
 
-3. For detailed component checks, use `/health/detailed`:
+3. For detailed component checks, use `/v1/health/detailed`:
    ```bash
-   curl -s http://localhost:8080/health/detailed | jq
+   curl -s http://localhost:8080/v1/health/detailed | jq
    ```
 
 4. Detailed health response:
@@ -190,8 +190,8 @@ grep -r "health" icn/crates/icn-gateway/src/ --include="*.rs" | head -10
 ```
 
 ### Questions to answer
-1. What components are checked in `/health/detailed`?
-2. What's the difference between `/health` and `/health/detailed`?
+1. What components are checked in `/v1/health/detailed`?
+2. What's the difference between `/v1/health` and `/v1/health/detailed`?
 3. How often should health be polled?
 
 ### Checkpoint
@@ -381,7 +381,7 @@ lsof -i :4001
 **Gateway not responding:**
 ```bash
 # Check health
-curl -v http://localhost:8080/health
+curl -v http://localhost:8080/v1/health
 
 # Check logs
 RUST_LOG=debug ./target/release/icnd --data-dir "$ICN_DATA" 2>&1 | head -50
@@ -440,7 +440,7 @@ After completing this workshop you should be able to:
 
 | Concept | Key Point |
 |---------|-----------|
-| **Health Endpoints** | `/health` (basic), `/health/detailed` (component status) |
+| **Health Endpoints** | `/v1/health` (basic), `/v1/health/detailed` (component status) |
 | **Metrics Port** | 9100 by default; Prometheus format |
 | **Gateway Port** | 8080 by default; REST + WebSocket |
 | **Network Port** | 4001 by default; QUIC/UDP |

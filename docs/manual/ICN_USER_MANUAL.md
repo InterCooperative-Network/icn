@@ -967,10 +967,10 @@ icn_fuel_consumed_total
 
 ```bash
 # API health endpoint
-curl http://localhost:8080/health
+curl http://localhost:8080/v1/health
 
 # Detailed health
-curl http://localhost:8080/health/detailed
+curl http://localhost:8080/v1/health/detailed
 ```
 
 ---
@@ -1349,12 +1349,12 @@ curl -X POST http://localhost:8080/v1/auth/challenge \
   -d '{"did": "did:icn:YOUR_DID"}'
 
 # Sign challenge and get token
-curl -X POST http://localhost:8080/v1/auth/token \
+curl -X POST http://localhost:8080/v1/auth/verify \
   -d '{"did": "did:icn:YOUR_DID", "signature": "...", "challenge": "..."}'
 
 # Use token
 curl -H "Authorization: Bearer TOKEN" \
-  http://localhost:8080/v1/ledger/balance
+  http://localhost:8080/v1/coops/YOUR_COOP_ID
 ```
 
 ### TypeScript SDK
@@ -1385,7 +1385,7 @@ const task = await client.submitTask({
 ### WebSocket Events
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws/coop:my-coop');
+const ws = new WebSocket('ws://localhost:8080/v1/ws/coop:my-coop');
 
 ws.onopen = () => {
   ws.send(JSON.stringify({ type: 'Auth', token: 'JWT_TOKEN' }));
@@ -1565,17 +1565,17 @@ max_concurrent_jobs = 10
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/v1/auth/challenge` | POST | No | Get auth challenge |
-| `/v1/auth/token` | POST | No | Exchange signature for token |
-| `/v1/identity` | GET | Yes | Current identity |
-| `/v1/ledger/balance` | GET | Yes | Account balances |
-| `/v1/ledger/transfer` | POST | Yes | Create transfer |
-| `/v1/ledger/history` | GET | Yes | Transaction history |
-| `/v1/governance/proposals` | GET | Yes | List proposals |
-| `/v1/governance/proposals` | POST | Yes | Create proposal |
+| `/v1/auth/verify` | POST | No | Exchange signature for token |
+| `/v1/identity/resolve/{did}` | GET | No | Resolve DID metadata |
+| `/v1/ledger/{coop_id}/balance/{did}` | GET | Yes | Account balances |
+| `/v1/ledger/{coop_id}/payment` | POST | Yes | Create transfer/payment |
+| `/v1/ledger/{coop_id}/history` | GET | Yes | Transaction history |
+| `/v1/gov/proposals` | GET | Yes | List proposals |
+| `/v1/gov/proposals` | POST | Yes | Create proposal |
 | `/v1/governance/vote` | POST | Yes | Cast vote |
 | `/v1/trust/score` | GET | Yes | Query trust score |
-| `/health` | GET | No | Health check |
-| `/health/detailed` | GET | No | Detailed health |
+| `/v1/health` | GET | No | Health check |
+| `/v1/health/detailed` | GET | No | Detailed health |
 
 ---
 

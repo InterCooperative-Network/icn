@@ -373,7 +373,7 @@ Execute DR if:
 4. **Validate**:
    ```bash
    # Check health
-   curl http://localhost:8080/health
+   curl http://localhost:8080/v1/health
    
    # Check logs
    sudo journalctl -u icnd -f

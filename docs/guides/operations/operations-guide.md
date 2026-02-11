@@ -48,11 +48,11 @@ icnctl id show
 icnctl status
 ```
 
-**2. Review monitoring dashboard:**
-- Navigate to `http://localhost:8080/` (or your configured monitoring port)
-- Verify status is "Healthy" (green banner)
+**2. Review health + metrics:**
+- Check `http://localhost:8080/v1/health`
+- Verify status is healthy/ok
 - Check active peer count (should be > 0 for connected nodes)
-- Review gossip topics and entries
+- Review gossip metrics and entries
 
 **3. Check metrics endpoint:**
 ```bash
@@ -161,9 +161,9 @@ git log --oneline HEAD..origin/main
 
 ## Monitoring & Health Checks
 
-### Dashboard Overview
+### Health Overview
 
-The monitoring dashboard (`http://localhost:8080/`) provides real-time visibility into:
+Use gateway health (`http://localhost:8080/v1/health`) and metrics (`http://localhost:9100/metrics`) for real-time visibility into:
 
 **Status Banner:**
 - **Healthy** (green): All systems operational
@@ -178,11 +178,11 @@ The monitoring dashboard (`http://localhost:8080/`) provides real-time visibilit
 
 ### Health Check Endpoint
 
-The `/health` endpoint returns JSON status for external monitoring:
+The `/v1/health` endpoint returns JSON status for external monitoring:
 
 ```bash
 # Check health status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # Example healthy response:
 {
@@ -367,8 +367,8 @@ sudo systemctl start icnd
 icnctl status
 journalctl -u icnd -f  # Watch logs for errors
 
-# 9. Check monitoring dashboard
-# Navigate to http://localhost:8080/ and verify status is "Healthy"
+# 9. Check health endpoint
+curl http://localhost:8080/v1/health | jq
 ```
 
 **Rollback if issues occur:**
@@ -693,7 +693,7 @@ ICN nodes automatically preserve critical runtime state across restarts, enablin
 ```bash
 # 1. Check node health before restart
 icnctl status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # 2. Check recent metrics (optional)
 curl -s http://localhost:9100/metrics | grep icn_snapshot
@@ -707,7 +707,7 @@ journalctl -u icnd --since "1 minute ago" | grep -E "(snapshot|restored)"
 
 # 5. Verify health after restart
 icnctl status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # 6. Check that subscriptions were restored
 icnctl gossip topics
@@ -891,10 +891,10 @@ curl http://localhost:9100/metrics
 curl -s http://localhost:9100/metrics | grep icn_network_connections_active
 
 # Check health status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
-# Open monitoring dashboard
-xdg-open http://localhost:8080/
+# Open metrics in browser if needed
+xdg-open http://localhost:9100/metrics
 ```
 
 ---

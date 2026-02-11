@@ -40,7 +40,7 @@ and use the TypeScript SDK to interact with the ledger.
 │             ICN Gateway                  │
 ├─────────────────────────────────────────┤
 │  /auth/challenge  │  Get auth challenge  │
-│  /auth/verify     │  Submit signed proof │
+│  /v1/auth/verify     │  Submit signed proof │
 ├─────────────────────────────────────────┤
 │  /ledger/*        │  Ledger operations   │
 │  /trust/*         │  Trust queries       │
@@ -79,7 +79,7 @@ Client                           Gateway
    │                                │
    │ Sign challenge with DID key    │
    │                                │
-   │── POST /auth/verify ──────────►│
+   │── POST /v1/auth/verify ──────────►│
    │    { did, signature }          │ Verify signature
    │                                │ Generate JWT
    │◄─── { token, expires } ────────│
@@ -126,7 +126,7 @@ pub struct VerifyRequest {
 
 2. Get a challenge:
    ```bash
-   curl -s http://localhost:8080/auth/challenge | jq
+   curl -s http://localhost:8080/v1/auth/challenge | jq
    ```
 
 3. Expected response:
@@ -140,7 +140,7 @@ pub struct VerifyRequest {
 ### Manual signing (conceptual)
 To complete auth, you would:
 1. Sign the challenge with your DID private key
-2. POST to `/auth/verify` with DID and signature
+2. POST to `/v1/auth/verify` with DID and signature
 3. Receive JWT token
 
 Note: The SDK handles this automatically.
@@ -396,7 +396,7 @@ Server sends events as JSON messages:
 ```bash
 # Rapid requests to trigger rate limit
 for i in {1..100}; do
-  curl -s http://localhost:8080/health > /dev/null
+  curl -s http://localhost:8080/v1/health > /dev/null
 done
 # Should see 429 responses eventually
 ```
@@ -419,9 +419,9 @@ After completing this workshop you should be able to:
 |---------|-----------|
 | **Auth Flow** | GET challenge → sign with DID key → POST verify → receive JWT |
 | **JWT Token** | Include as `Authorization: Bearer <token>` header |
-| **Protected Routes** | /ledger/*, /trust/*, /governance/*, /compute/* require auth |
-| **Public Routes** | /health, /metrics, /auth/* are unauthenticated |
-| **WebSocket** | Connect to /ws with JWT in query string for real-time events |
+| **Protected Routes** | `/v1/ledger/*`, `/v1/trust/*`, `/v1/gov/*` require auth |
+| **Public Routes** | `/v1/health`, `/v1/auth/*` are unauthenticated |
+| **WebSocket** | Connect to `/v1/ws/{coop_id}` for real-time events |
 | **Rate Limits** | Trust level affects limits (Isolated: 10/sec, Federated: 200/sec) |
 
 ## Try It Yourself
@@ -443,7 +443,7 @@ Create a Node.js script that:
 ```bash
 # Test different trust levels (if you can simulate them)
 # or just observe the headers:
-curl -v http://localhost:8080/health 2>&1 | grep -i rate
+curl -v http://localhost:8080/v1/health 2>&1 | grep -i rate
 ```
 
 **Challenge 4**: Error handling

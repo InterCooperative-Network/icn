@@ -1896,3 +1896,58 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C21; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C22 - active guide/manual v1 route normalization)
+
+Touched files:
+
+1. `docs/guides/operations/operations-guide.md`
+2. `docs/onboarding/workshops/workshop-07-gateway-sdk.md`
+3. `docs/onboarding/workshops/workshop-09-ops.md`
+4. `docs/manual/ICN_USER_MANUAL.md`
+5. `docs/ops/runbooks/05-troubleshooting.md`
+6. `docs/development/testing/DR_TEST_RESULTS.md`
+7. `docs/reference/api/API_REFERENCE.md`
+
+Changes:
+
+- Replaced legacy health/websocket/auth path usage in active docs:
+  - `/health` -> `/v1/health`
+  - `/health/detailed` -> `/v1/health/detailed`
+  - `ws://.../ws/...` -> `ws://.../v1/ws/...`
+  - `/v1/auth/token` -> `/v1/auth/verify`
+- Normalized workshop text/diagrams and key-takeaway tables to v1 route names.
+- Updated manual appendix endpoint table to current route shapes for auth, identity resolution, ledger, and governance path prefixes.
+- Updated operations guide wording from implied gateway-root “dashboard” to explicit health + metrics checks.
+- Added explicit snapshot caveat to `docs/reference/api/API_REFERENCE.md` that authoritative routes are in OpenAPI docs.
+
+## Verification updates (Batch C22)
+
+```bash
+rg -n "localhost:8080/health\\b|localhost:8080/health/detailed\\b|ws://localhost:8080/ws\\b|/v1/auth/token\\b|/v1/v1/" docs/guides/operations/operations-guide.md docs/onboarding/workshops/workshop-07-gateway-sdk.md docs/onboarding/workshops/workshop-09-ops.md docs/manual/ICN_USER_MANUAL.md docs/ops/runbooks/05-troubleshooting.md docs/development/testing/DR_TEST_RESULTS.md docs/reference/api/API_REFERENCE.md
+```
+
+Result: no matches in touched files.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C22)
+
+- `docs/guides/operations/operations-guide.md | icn/crates/icn-gateway/src/server.rs + docs/api/openapi.yaml | rg -n "scope\\(\"/v1\"\\)|/v1/health" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-07-gateway-sdk.md | icn/crates/icn-gateway/src/server.rs | rg -n "/v1/auth/challenge|/v1/auth/verify|/v1/ws/\\{coop_id\\}|/v1/health" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-09-ops.md | icn/crates/icn-gateway/src/api/health.rs | rg -n "/health|/health/detailed" + source review (scoped under /v1) | aligned | reviewed_on(2026-02-11)`
+- `docs/manual/ICN_USER_MANUAL.md | icn/crates/icn-gateway/src/{server.rs,models.rs} + docs/api/openapi.yaml | rg -n "/v1/auth/verify|/v1/ledger/\\{coop_id\\}/balance/\\{did\\}|/v1/gov/proposals|/v1/health" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/reference/api/API_REFERENCE.md | docs/api/openapi.yaml + docs/api/OPENAPI.md | manual review + snapshot caveat insertion | partially-aligned-with-authoritative-pointer | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C22)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C22; continue active-doc content drift cleanup.
