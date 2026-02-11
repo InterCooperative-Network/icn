@@ -13,8 +13,10 @@
 //! This is the "composition root" where real implementations are wired into
 //! kernel-safe traits.
 
+mod control_service;
 mod federation_service;
 mod ledger_service;
 
+pub use control_service::ControlServiceImpl;
 pub use federation_service::FederationServiceImpl;
 pub use ledger_service::LedgerServiceImpl;

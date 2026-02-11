@@ -901,6 +901,116 @@ pub trait CellService: Send + Sync {
 }
 
 // ============================================================================
+// Control Service (Governance Actions)
+// ============================================================================
+
+/// Request to veto a proposal
+#[derive(Debug, Clone)]
+pub struct VetoProposalRequest {
+    /// The proposal being vetoed
+    pub target_proposal_id: String,
+    /// Reason for the veto
+    pub veto_reason: String,
+    /// The governance domain where this proposal exists
+    pub domain_id: String,
+    /// The entity exercising the veto power
+    pub vetoer_did: String,
+    /// Links back to the veto proposal's governance decision
+    pub decision_receipt_id: String,
+    /// Canonical content hash for verification
+    pub decision_hash: String,
+}
+
+/// Result of vetoing a proposal
+#[derive(Debug, Clone)]
+pub struct VetoProposalResult {
+    /// Whether the veto was successful
+    pub success: bool,
+    /// Human-readable outcome message
+    pub message: String,
+    /// Hash of the state change (proposal status → Vetoed)
+    pub state_change_hash: Option<String>,
+    /// Timestamp of the veto
+    pub vetoed_at: u64,
+}
+
+/// Request to force close a proposal
+#[derive(Debug, Clone)]
+pub struct ForceCloseProposalRequest {
+    /// The proposal being force-closed
+    pub target_proposal_id: String,
+    /// Reason for force closing
+    pub close_reason: String,
+    /// The forced outcome (e.g., "Rejected", "Expired")
+    pub forced_outcome: String,
+    /// The governance domain
+    pub domain_id: String,
+    /// The entity forcing the close
+    pub closer_did: String,
+    /// Links back to the force-close proposal's governance decision
+    pub decision_receipt_id: String,
+    /// Canonical content hash for verification
+    pub decision_hash: String,
+}
+
+/// Result of force closing a proposal
+#[derive(Debug, Clone)]
+pub struct ForceCloseProposalResult {
+    /// Whether the force close was successful
+    pub success: bool,
+    /// Human-readable outcome message
+    pub message: String,
+    /// Hash of the state change (proposal status → ForceClosed)
+    pub state_change_hash: Option<String>,
+    /// The final outcome that was applied
+    pub final_outcome: String,
+    /// Timestamp of the close
+    pub closed_at: u64,
+}
+
+/// Abstract control service for governance actions.
+///
+/// The kernel uses this service to execute governance control effects
+/// (veto, force close) without knowing about the internal governance state.
+///
+/// Apps implement this trait to provide actual governance state mutations.
+///
+/// # Provenance Tracking
+///
+/// All control operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+pub trait ControlService: Send + Sync {
+    /// Veto a pending proposal.
+    ///
+    /// This transitions the target proposal to a Vetoed state.
+    /// Returns state_change_hash for verification.
+    fn veto_proposal(
+        &self,
+        request: VetoProposalRequest,
+    ) -> Result<VetoProposalResult, anyhow::Error>;
+
+    /// Force close a proposal with a specified outcome.
+    ///
+    /// This transitions the target proposal to a ForceClosed state
+    /// with the specified forced outcome.
+    /// Returns state_change_hash for verification.
+    fn force_close_proposal(
+        &self,
+        request: ForceCloseProposalRequest,
+    ) -> Result<ForceCloseProposalResult, anyhow::Error>;
+
+    /// Check if a proposal can be vetoed.
+    ///
+    /// Returns true if the proposal exists and is in a vetoable state.
+    fn can_veto(&self, target_proposal_id: &str, domain_id: &str) -> bool;
+
+    /// Check if a proposal can be force closed.
+    ///
+    /// Returns true if the proposal exists and can be force closed.
+    fn can_force_close(&self, target_proposal_id: &str, domain_id: &str) -> bool;
+}
+
+// ============================================================================
 // Service Registry
 // ============================================================================
 

@@ -7,18 +7,24 @@
 //! delegating to concrete kernel implementations:
 //! - [`KernelTreasuryExecutor`] for treasury operations
 //! - [`KernelProtocolExecutor`] for protocol parameter changes
+//! - [`KernelFederationExecutor`] for federation operations
+//! - [`KernelControlExecutor`] for governance control operations (veto, force close)
 
 use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use icn_kernel_api::effects::{EffectResult, KernelEffect};
+use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect};
 use icn_kernel_api::governance::{
     DecisionReceiptId, EffectExecutor, ExecutionOutcome, FederationExecutor, FederationOperation,
     GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
     federation_effect_to_operation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
+use icn_kernel_api::{
+    ControlService, ForceCloseProposalRequest, VetoProposalRequest,
+};
+use tracing::{info, warn};
 
 /// Adapter that implements [`GovernanceExecutor`] by delegating to kernel services.
 ///
@@ -29,6 +35,7 @@ pub struct KernelGovernanceExecutor {
     treasury: Arc<KernelTreasuryExecutor>,
     protocol: Arc<KernelProtocolExecutor>,
     federation: Arc<KernelFederationExecutor>,
+    control: Arc<KernelControlExecutor>,
 }
 
 impl KernelGovernanceExecutor {
@@ -41,7 +48,14 @@ impl KernelGovernanceExecutor {
             treasury: Arc::new(KernelTreasuryExecutor::new()),
             protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
             federation: Arc::new(KernelFederationExecutor::new()),
+            control: Arc::new(KernelControlExecutor::new()),
         }
+    }
+
+    /// Set the control service for governance control operations.
+    pub fn with_control_service(mut self, service: Arc<dyn ControlService>) -> Self {
+        self.control = Arc::new(KernelControlExecutor::with_service(service));
+        self
     }
 }
 
@@ -119,7 +133,18 @@ impl EffectExecutor for KernelGovernanceExecutor {
                 message: format!("NoOp: {}", reason),
                 state_change_hash: None,
             }),
-            // For other effect types, return success placeholder
+            KernelEffect::Control(control_effect) => {
+                // Execute control effect (veto, force close)
+                let outcome = self
+                    .control
+                    .execute_control_operation(&receipt_id, control_effect)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+            // For other effect types (Membership, Dispute, Resource, Sdis), return success placeholder
             _ => Ok(EffectResult {
                 effect_id: decision_receipt_id.to_string(),
                 success: true,
@@ -754,6 +779,161 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
         },
+    }
+}
+
+// ============================================================================
+// Control Executor
+// ============================================================================
+
+/// Control executor implementation.
+///
+/// Executes governance control operations (veto, force close) by
+/// delegating to the kernel's control service.
+pub struct KernelControlExecutor {
+    /// Control service for executing veto/force close
+    service: Option<Arc<dyn ControlService>>,
+}
+
+impl KernelControlExecutor {
+    /// Create a new control executor (placeholder mode - no service).
+    pub fn new() -> Self {
+        Self { service: None }
+    }
+
+    /// Create a new control executor with a real service.
+    pub fn with_service(service: Arc<dyn ControlService>) -> Self {
+        Self {
+            service: Some(service),
+        }
+    }
+
+    /// Execute a control operation.
+    pub async fn execute_control_operation(
+        &self,
+        receipt_id: &DecisionReceiptId,
+        effect: ControlEffect,
+    ) -> Result<ExecutionOutcome> {
+        info!(
+            receipt_id = %receipt_id,
+            effect = ?effect,
+            has_service = self.service.is_some(),
+            "Executing control operation"
+        );
+
+        // If we have a real service, use it
+        if let Some(ref service) = self.service {
+            match effect {
+                ControlEffect::VetoProposal {
+                    target_proposal_id,
+                    veto_reason,
+                } => {
+                    let request = VetoProposalRequest {
+                        target_proposal_id: target_proposal_id.clone(),
+                        veto_reason,
+                        domain_id: String::new(), // Not used in current impl
+                        vetoer_did: String::new(), // Not used in current impl
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: String::new(), // Will be computed from receipt
+                    };
+
+                    let result = service.veto_proposal(request)?;
+
+                    if result.success {
+                        info!(
+                            target_proposal = %target_proposal_id,
+                            state_change_hash = ?result.state_change_hash,
+                            "Veto completed successfully"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Vetoed proposal {} -> state_hash={}",
+                                target_proposal_id,
+                                result.state_change_hash.unwrap_or_default()
+                            )],
+                        })
+                    } else {
+                        warn!(
+                            target_proposal = %target_proposal_id,
+                            message = %result.message,
+                            "Veto failed"
+                        );
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.message,
+                        })
+                    }
+                }
+                ControlEffect::ForceCloseProposal {
+                    target_proposal_id,
+                    close_reason,
+                } => {
+                    let request = ForceCloseProposalRequest {
+                        target_proposal_id: target_proposal_id.clone(),
+                        close_reason,
+                        forced_outcome: "reject".to_string(), // Default outcome
+                        domain_id: String::new(),
+                        closer_did: String::new(),
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: String::new(),
+                    };
+
+                    let result = service.force_close_proposal(request)?;
+
+                    if result.success {
+                        info!(
+                            target_proposal = %target_proposal_id,
+                            state_change_hash = ?result.state_change_hash,
+                            "Force close completed successfully"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Force closed proposal {} as {} -> state_hash={}",
+                                target_proposal_id,
+                                result.final_outcome,
+                                result.state_change_hash.unwrap_or_default()
+                            )],
+                        })
+                    } else {
+                        warn!(
+                            target_proposal = %target_proposal_id,
+                            message = %result.message,
+                            "Force close failed"
+                        );
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.message,
+                        })
+                    }
+                }
+                ControlEffect::TextResolution { resolution_hash } => {
+                    // Text resolutions are no-ops (informational only)
+                    info!(
+                        resolution_hash = %resolution_hash,
+                        "Text resolution recorded (no state change)"
+                    );
+                    Ok(ExecutionOutcome::Success {
+                        receipt_id: receipt_id.clone(),
+                        effects: vec![format!("Text resolution: {}", resolution_hash)],
+                    })
+                }
+            }
+        } else {
+            // Placeholder mode: log and return failure
+            warn!("Control executor has no service configured - cannot execute control operation");
+            Ok(ExecutionOutcome::Failed {
+                receipt_id: receipt_id.clone(),
+                reason: "Control service not configured".to_string(),
+            })
+        }
+    }
+}
+
+impl Default for KernelControlExecutor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
