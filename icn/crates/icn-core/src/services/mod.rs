@@ -17,8 +17,13 @@ mod control_service;
 mod federation_service;
 mod ledger_service;
 mod membership_service;
+pub mod state_hash;
 
 pub use control_service::ControlServiceImpl;
 pub use federation_service::FederationServiceImpl;
 pub use ledger_service::LedgerServiceImpl;
 pub use membership_service::MembershipServiceImpl;
+pub use state_hash::{
+    compare_effect_results, compare_state_hashes, extract_state_hashes_from_outcome,
+    verify_effect_results_match, verify_state_hash_match, StateHashComparison, StateHashSet,
+};

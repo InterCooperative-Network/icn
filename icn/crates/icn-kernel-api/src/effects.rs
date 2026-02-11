@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Aggregate enum for all kernel-safe effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum KernelEffect {
     /// Treasury-related effects
@@ -46,7 +46,7 @@ pub enum KernelEffect {
 // =============================================================================
 
 /// Treasury-related effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case")]
 pub enum TreasuryEffect {
     /// Create a budget allocation
@@ -122,7 +122,7 @@ pub enum TreasuryEffect {
 // =============================================================================
 
 /// Membership-related effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum MembershipEffect {
     /// Add a new member
@@ -164,7 +164,7 @@ pub enum MembershipEffect {
 // =============================================================================
 
 /// Protocol parameter effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "change_type", rename_all = "snake_case")]
 pub enum ProtocolEffect {
     /// Change a protocol parameter
@@ -199,7 +199,7 @@ pub enum ProtocolEffect {
 // =============================================================================
 
 /// Governance control effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "control_type", rename_all = "snake_case")]
 pub enum ControlEffect {
     /// Veto a pending proposal
@@ -221,7 +221,7 @@ pub enum ControlEffect {
 // =============================================================================
 
 /// Federation-related effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "federation_action", rename_all = "snake_case")]
 pub enum FederationEffect {
     /// Join a federation
@@ -253,7 +253,7 @@ pub enum FederationEffect {
 // =============================================================================
 
 /// Dispute resolution effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "dispute_action", rename_all = "snake_case")]
 pub enum DisputeEffect {
     /// Resolve a dispute
@@ -275,7 +275,7 @@ pub enum DisputeEffect {
 // =============================================================================
 
 /// Resource access effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "resource_action", rename_all = "snake_case")]
 pub enum ResourceEffect {
     /// Grant resource access
@@ -296,7 +296,7 @@ pub enum ResourceEffect {
 // =============================================================================
 
 /// SDIS (Sovereign Digital Identity System) effects
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "sdis_action", rename_all = "snake_case")]
 pub enum SdisEffect {
     /// Approve steward for enrollment ceremonies
@@ -313,7 +313,7 @@ pub enum SdisEffect {
 // =============================================================================
 
 /// Result of executing a kernel effect
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EffectResult {
     /// The effect that was executed
     pub effect_id: String,
@@ -400,5 +400,260 @@ mod tests {
             decision_receipt_id: String::new(),
             decision_hash: String::new(),
         };
+    }
+
+    // =========================================================================
+    // Serialization roundtrip tests for cross-node transport (Stage 7)
+    // =========================================================================
+    //
+    // NOTE: KernelEffect and sub-effects use internally tagged enums
+    // (#[serde(tag = "...")]) which are incompatible with bincode.
+    // Cross-node transport uses JSON for effects, which supports tagged enums
+    // and provides human-readable wire format for debugging.
+
+    /// Helper to test JSON roundtrip with equality assertion
+    fn assert_json_roundtrip<T>(original: &T)
+    where
+        T: Serialize + for<'de> Deserialize<'de> + std::fmt::Debug + PartialEq,
+    {
+        let json = serde_json::to_string(original).expect("serialize to JSON");
+        let recovered: T = serde_json::from_str(&json).expect("deserialize from JSON");
+        assert_eq!(original, &recovered, "JSON roundtrip failed");
+    }
+
+    /// Helper to test bincode roundtrip with equality assertion
+    /// NOTE: Only works for types without serde(tag) attributes
+    fn assert_bincode_roundtrip<T>(original: &T)
+    where
+        T: Serialize + for<'de> Deserialize<'de> + std::fmt::Debug + PartialEq,
+    {
+        let bytes = bincode::serialize(original).expect("serialize to bincode");
+        let recovered: T = bincode::deserialize(&bytes).expect("deserialize from bincode");
+        assert_eq!(original, &recovered, "bincode roundtrip failed");
+    }
+
+    #[test]
+    fn test_serialize_kernel_effect_roundtrip_json() {
+        // Tests all KernelEffect variants serialize/deserialize via JSON
+        let effects = vec![
+            KernelEffect::Treasury(TreasuryEffect::Spend {
+                treasury_did: "did:icn:treasury123".into(),
+                recipient_did: "did:icn:alice".into(),
+                amount: 100,
+                currency: "HOURS".into(),
+                memo: "Tool purchase".into(),
+                decision_receipt_id: "receipt-456".into(),
+                decision_hash: "abc123".into(),
+            }),
+            KernelEffect::Treasury(TreasuryEffect::CreateBudget {
+                treasury_did: "did:icn:treasury".into(),
+                budget_id: "budget-2024".into(),
+                total_amount: 50000,
+                currency: "USD".into(),
+                name: "Operations Q4".into(),
+                validity_start: 1700000000,
+                validity_end: 1710000000,
+                decision_receipt_id: "r1".into(),
+                decision_hash: "h1".into(),
+            }),
+            KernelEffect::Treasury(TreasuryEffect::DistributeSurplus {
+                treasury_did: "did:icn:treasury".into(),
+                total_amount: 10000,
+                currency: "HOURS".into(),
+                distributions: vec![
+                    ("did:icn:alice".into(), 3000),
+                    ("did:icn:bob".into(), 4000),
+                    ("did:icn:carol".into(), 3000),
+                ],
+            }),
+            KernelEffect::Membership(MembershipEffect::AddMember {
+                entity_id: "coop-1".into(),
+                member_did: "did:icn:bob".into(),
+                role: "worker".into(),
+                tier: "standard".into(),
+            }),
+            KernelEffect::Membership(MembershipEffect::UpdateMember {
+                entity_id: "coop-1".into(),
+                member_did: "did:icn:bob".into(),
+                new_role: Some("coordinator".into()),
+                new_tier: None,
+            }),
+            KernelEffect::Membership(MembershipEffect::FreezeMember {
+                entity_id: "coop-1".into(),
+                member_did: "did:icn:carol".into(),
+                reason: "Policy violation".into(),
+                duration_secs: Some(86400),
+            }),
+            KernelEffect::Protocol(ProtocolEffect::SetParameter {
+                parameter_name: "voting_period".into(),
+                old_value_hash: "oldhash".into(),
+                new_value_json: r#"{"days":7}"#.into(),
+                effective_at: 1700000000,
+            }),
+            KernelEffect::Protocol(ProtocolEffect::Upgrade {
+                version: "1.2.0".into(),
+                upgrade_hash: "upgradehash".into(),
+                activation_height: 100000,
+            }),
+            KernelEffect::Control(ControlEffect::VetoProposal {
+                target_proposal_id: "prop-123".into(),
+                veto_reason: "Insufficient quorum".into(),
+            }),
+            KernelEffect::Control(ControlEffect::TextResolution {
+                resolution_hash: "reshash".into(),
+            }),
+            KernelEffect::Federation(FederationEffect::JoinFederation {
+                coop_did: "did:icn:coop1".into(),
+                federation_id: "fed-regional".into(),
+            }),
+            KernelEffect::Federation(FederationEffect::VouchForCoop {
+                voucher_did: "did:icn:coop1".into(),
+                vouchee_did: "did:icn:coop2".into(),
+                attestation_hash: "atthash".into(),
+            }),
+            KernelEffect::NoOp {
+                reason: "Text proposal only".into(),
+            },
+        ];
+
+        for effect in &effects {
+            assert_json_roundtrip(effect);
+        }
+    }
+
+    #[test]
+    fn test_serialize_effect_result_roundtrip() {
+        // EffectResult has no tag attribute, so bincode works
+        let results = vec![
+            EffectResult {
+                effect_id: "eff-1".into(),
+                success: true,
+                message: "Budget created successfully".into(),
+                state_change_hash: Some("statehash123".into()),
+            },
+            EffectResult {
+                effect_id: "eff-2".into(),
+                success: false,
+                message: "Insufficient funds".into(),
+                state_change_hash: None,
+            },
+        ];
+
+        for result in &results {
+            assert_json_roundtrip(result);
+            assert_bincode_roundtrip(result);
+        }
+    }
+
+    #[test]
+    fn test_serialize_all_treasury_variants_roundtrip() {
+        // JSON-only due to serde(tag) on TreasuryEffect
+        let variants = vec![
+            TreasuryEffect::CreateBudget {
+                treasury_did: "did:icn:t1".into(),
+                budget_id: "b1".into(),
+                total_amount: 1000,
+                currency: "USD".into(),
+                name: "Test".into(),
+                validity_start: 0,
+                validity_end: 1,
+                decision_receipt_id: "r1".into(),
+                decision_hash: "h1".into(),
+            },
+            TreasuryEffect::Spend {
+                treasury_did: "did:icn:t1".into(),
+                recipient_did: "did:icn:r1".into(),
+                amount: 100,
+                currency: "USD".into(),
+                memo: "test".into(),
+                decision_receipt_id: "r1".into(),
+                decision_hash: "h1".into(),
+            },
+            TreasuryEffect::Allocate {
+                treasury_did: "did:icn:t1".into(),
+                budget_id: "b1".into(),
+                amount: 500,
+                currency: "USD".into(),
+            },
+            TreasuryEffect::Transfer {
+                from_did: "did:icn:a".into(),
+                to_did: "did:icn:b".into(),
+                amount: 200,
+                currency: "USD".into(),
+                memo: "xfer".into(),
+            },
+            TreasuryEffect::DistributeSurplus {
+                treasury_did: "did:icn:t1".into(),
+                total_amount: 1000,
+                currency: "USD".into(),
+                distributions: vec![("did:icn:m1".into(), 500), ("did:icn:m2".into(), 500)],
+            },
+            TreasuryEffect::RedeemShares {
+                treasury_did: "did:icn:t1".into(),
+                member_did: "did:icn:m1".into(),
+                share_count: 10,
+                payout_amount: 1000,
+                currency: "USD".into(),
+            },
+            TreasuryEffect::IssueBond {
+                treasury_did: "did:icn:t1".into(),
+                bond_id: "bond-1".into(),
+                principal: 10000,
+                interest_rate_bps: 500,
+                maturity_date: 1750000000,
+                currency: "USD".into(),
+            },
+        ];
+
+        for variant in &variants {
+            assert_json_roundtrip(variant);
+        }
+    }
+
+    #[test]
+    fn test_serialize_all_membership_variants_roundtrip() {
+        // JSON-only due to serde(tag) on MembershipEffect
+        let variants = vec![
+            MembershipEffect::AddMember {
+                entity_id: "e1".into(),
+                member_did: "did:icn:m1".into(),
+                role: "worker".into(),
+                tier: "standard".into(),
+            },
+            MembershipEffect::RemoveMember {
+                entity_id: "e1".into(),
+                member_did: "did:icn:m1".into(),
+                reason: "Voluntary exit".into(),
+            },
+            MembershipEffect::UpdateMember {
+                entity_id: "e1".into(),
+                member_did: "did:icn:m1".into(),
+                new_role: Some("lead".into()),
+                new_tier: Some("premium".into()),
+            },
+            MembershipEffect::FreezeMember {
+                entity_id: "e1".into(),
+                member_did: "did:icn:m1".into(),
+                reason: "Investigation".into(),
+                duration_secs: Some(3600),
+            },
+            MembershipEffect::UnfreezeMember {
+                entity_id: "e1".into(),
+                member_did: "did:icn:m1".into(),
+            },
+        ];
+
+        for variant in &variants {
+            assert_json_roundtrip(variant);
+        }
+    }
+
+    #[test]
+    fn test_serialize_decision_receipt_id_roundtrip() {
+        use crate::governance::DecisionReceiptId;
+
+        let id = DecisionReceiptId::new("gov:proposal:2024-pilot:receipt:test-001");
+        assert_json_roundtrip(&id);
+        assert_bincode_roundtrip(&id);
     }
 }

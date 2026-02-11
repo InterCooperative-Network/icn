@@ -887,4 +887,31 @@ mod tests {
         );
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn governance_decision_receipt_serde_roundtrip() {
+        let votes = make_votes();
+        let receipt = GovernanceDecisionReceipt::new(
+            "prop-stage7-test".to_string(),
+            "coop:test-coop".to_string(),
+            ProofOutcome::Accepted,
+            make_tally(&votes),
+            &votes,
+        );
+
+        // Test JSON roundtrip
+        let json = serde_json::to_string(&receipt).expect("serialize to JSON");
+        let recovered: GovernanceDecisionReceipt =
+            serde_json::from_str(&json).expect("deserialize from JSON");
+
+        // Verify all fields match (using decision_hash for equality per PartialEq impl)
+        assert_eq!(receipt, recovered);
+        // Also verify individual fields for comprehensive coverage
+        assert_eq!(receipt.proposal_id, recovered.proposal_id);
+        assert_eq!(receipt.domain_id, recovered.domain_id);
+        assert_eq!(receipt.outcome, recovered.outcome);
+        assert_eq!(receipt.vote_tally, recovered.vote_tally);
+        assert_eq!(receipt.vote_hash, recovered.vote_hash);
+        assert_eq!(receipt.decision_hash, recovered.decision_hash);
+    }
 }
