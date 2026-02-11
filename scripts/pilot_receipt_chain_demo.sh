@@ -7,9 +7,9 @@
 # It runs both the determinism tests AND queries the gateway API
 # to show the chain in action.
 #
-# Usage: ./scripts/pilot_receipt_chain_demo.sh [--gateway URL]
+# Usage: ./scripts/pilot_receipt_chain_demo.sh [GATEWAY_URL]
 #
-# If --gateway is omitted, assumes http://localhost:8080
+# If URL is omitted, assumes http://localhost:8080
 
 set -euo pipefail
 
