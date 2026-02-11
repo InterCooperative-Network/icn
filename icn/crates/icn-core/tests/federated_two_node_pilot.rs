@@ -25,18 +25,19 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
+use icn_coop::CoopStore;
 use icn_core::services::{
-    compare_effect_results, FederationServiceImpl, LedgerServiceImpl, MembershipServiceImpl,
+    FederationServiceImpl, LedgerServiceImpl, MembershipServiceImpl, compare_effect_results,
 };
 use icn_core::supervisor::governance_executor::{
     KernelFederationExecutor, KernelMembershipExecutor, KernelProtocolExecutor,
     KernelTreasuryExecutor,
 };
-use icn_coop::CoopStore;
-use icn_federation::types::{CooperativeInfo, FederationPolicy};
 use icn_federation::CooperativeRegistry;
+use icn_federation::types::{CooperativeInfo, FederationPolicy};
 use icn_governance::protocol_store::state::InMemoryParameterStore;
 use icn_identity::Did;
+use icn_kernel_api::MembershipService;
 use icn_kernel_api::authz::AllowAllOracle;
 use icn_kernel_api::effects::{
     FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect, TreasuryEffect,
@@ -45,7 +46,6 @@ use icn_kernel_api::governance::{
     DecisionReceiptId, FederationExecutor, ProtocolExecutor, TreasuryExecutor,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
-use icn_kernel_api::MembershipService;
 use icn_ledger::Ledger;
 use icn_store::SledStore;
 
@@ -82,10 +82,7 @@ fn print_verification_banner(test_name: &str, hash_a: &str, hash_b: &str, matche
     let status = if matched { "✅ MATCH" } else { "❌ MISMATCH" };
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!(
-        "║   TWO-NODE FEDERATION PROOF: {:<35} ║",
-        test_name
-    );
+    println!("║   TWO-NODE FEDERATION PROOF: {:<35} ║", test_name);
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!("║ Node A Hash: {:<52} ║", &hash_a[..hash_a.len().min(52)]);
     println!("║ Node B Hash: {:<52} ║", &hash_b[..hash_b.len().min(52)]);
@@ -176,7 +173,10 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
 
     // === Serialize effect for transport ===
     let effect_json = serde_json::to_string(&effect)?;
-    info!(effect_json_len = effect_json.len(), "Effect serialized for transport");
+    info!(
+        effect_json_len = effect_json.len(),
+        "Effect serialized for transport"
+    );
 
     // === Node B Setup (completely independent!) ===
     info!("Setting up Node B...");
@@ -220,7 +220,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
     info!("Node B treasury spend completed");
 
     // === ASSERT DETERMINISM (semantic equivalence) ===
-    
+
     // 1. Both executions succeeded
     assert!(success_a && success_b, "Both nodes should succeed");
 
@@ -231,10 +231,18 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
     // 3. Verify the effect serialization roundtrip worked
     let effect_roundtrip: TreasuryEffect = serde_json::from_str(&effect_json)?;
     match effect_roundtrip {
-        TreasuryEffect::Spend { amount: amt, currency: cur, decision_hash: hash, .. } => {
+        TreasuryEffect::Spend {
+            amount: amt,
+            currency: cur,
+            decision_hash: hash,
+            ..
+        } => {
             assert_eq!(amt, amount, "Amount should match after roundtrip");
             assert_eq!(cur, currency, "Currency should match after roundtrip");
-            assert_eq!(hash, decision_hash, "Decision hash should match after roundtrip");
+            assert_eq!(
+                hash, decision_hash,
+                "Decision hash should match after roundtrip"
+            );
         }
         _ => panic!("Effect should be Spend variant"),
     }
@@ -244,8 +252,14 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║   TWO-NODE FEDERATION PROOF: Treasury::Spend                     ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ Decision Hash:     {} ║", &decision_hash[..decision_hash.len().min(40)]);
-    println!("║ Amount:            {:<47} ║", format!("{} {}", amount, currency));
+    println!(
+        "║ Decision Hash:     {} ║",
+        &decision_hash[..decision_hash.len().min(40)]
+    );
+    println!(
+        "║ Amount:            {:<47} ║",
+        format!("{} {}", amount, currency)
+    );
     println!("║ Node A:            ✅ SUCCESS + LEDGER ENTRY                       ║");
     println!("║ Node B:            ✅ SUCCESS + LEDGER ENTRY                       ║");
     println!("║ Effect Roundtrip:  ✅ DETERMINISTIC                                 ║");
@@ -299,8 +313,7 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
 
     let hash_a = match &outcome_a {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_a".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_a".to_string())
         }
         _ => panic!("Node A execution failed: {:?}", outcome_a),
     };
@@ -336,8 +349,7 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
 
     let hash_b = match &outcome_b {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_b".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_b".to_string())
         }
         _ => panic!("Node B execution failed: {:?}", outcome_b),
     };
@@ -422,8 +434,7 @@ async fn test_two_node_federation_join_determinism() -> Result<()> {
 
     let hash_a = match &outcome_a {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_a".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_a".to_string())
         }
         _ => panic!("Node A execution failed: {:?}", outcome_a),
     };
@@ -468,8 +479,7 @@ async fn test_two_node_federation_join_determinism() -> Result<()> {
 
     let hash_b = match &outcome_b {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_b".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_b".to_string())
         }
         _ => panic!("Node B execution failed: {:?}", outcome_b),
     };
@@ -538,7 +548,7 @@ async fn test_two_node_protocol_set_param_determinism() -> Result<()> {
     // old_value must match ParameterValue::Duration(604800).to_string() which is "7d"
     let change = icn_kernel_api::governance::ProtocolChange {
         parameter_name: "governance.voting_period".to_string(),
-        old_value: "7d".to_string(), // 7 days (matches Duration Display)
+        old_value: "7d".to_string(),  // 7 days (matches Duration Display)
         new_value: "14d".to_string(), // 14 days
         effective_at,
     };
@@ -565,8 +575,7 @@ async fn test_two_node_protocol_set_param_determinism() -> Result<()> {
 
     let hash_a = match &outcome_a {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_a".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_a".to_string())
         }
         other => panic!("Node A execution failed: {:?}", other),
     };
@@ -613,8 +622,7 @@ async fn test_two_node_protocol_set_param_determinism() -> Result<()> {
 
     let hash_b = match &outcome_b {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
-            extract_state_hash_from_effects(effects)
-                .unwrap_or_else(|| "no_hash_b".to_string())
+            extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_b".to_string())
         }
         other => panic!("Node B execution failed: {:?}", other),
     };
@@ -664,7 +672,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
 
     // Create a batch of effects representing a complex governance decision
     let member_did = generate_test_did();
-    
+
     let effects = vec![
         KernelEffect::Membership(MembershipEffect::AddMember {
             entity_id: "coop-batch-test".to_string(),
@@ -696,7 +704,9 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             KernelEffect::Membership(m) => {
                 let executor = KernelMembershipExecutor::with_service(membership_service_a.clone());
                 let receipt = DecisionReceiptId::new("batch:001");
-                let outcome = executor.execute_membership_operation(&receipt, m.clone()).await?;
+                let outcome = executor
+                    .execute_membership_operation(&receipt, m.clone())
+                    .await?;
                 match outcome {
                     icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
                         icn_kernel_api::effects::EffectResult {
@@ -709,14 +719,12 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                     _ => panic!("Batch effect failed on Node A"),
                 }
             }
-            KernelEffect::NoOp { reason } => {
-                icn_kernel_api::effects::EffectResult {
-                    effect_id: "batch_noop".to_string(),
-                    success: true,
-                    message: reason.clone(),
-                    state_change_hash: None,
-                }
-            }
+            KernelEffect::NoOp { reason } => icn_kernel_api::effects::EffectResult {
+                effect_id: "batch_noop".to_string(),
+                success: true,
+                message: reason.clone(),
+                state_change_hash: None,
+            },
             _ => panic!("Unexpected effect type in batch"),
         };
         results_a.push(result);
@@ -741,7 +749,9 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             KernelEffect::Membership(m) => {
                 let executor = KernelMembershipExecutor::with_service(membership_service_b.clone());
                 let receipt = DecisionReceiptId::new("batch:001");
-                let outcome = executor.execute_membership_operation(&receipt, m.clone()).await?;
+                let outcome = executor
+                    .execute_membership_operation(&receipt, m.clone())
+                    .await?;
                 match outcome {
                     icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
                         icn_kernel_api::effects::EffectResult {
@@ -754,14 +764,12 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                     _ => panic!("Batch effect failed on Node B"),
                 }
             }
-            KernelEffect::NoOp { reason } => {
-                icn_kernel_api::effects::EffectResult {
-                    effect_id: "batch_noop".to_string(),
-                    success: true,
-                    message: reason.clone(),
-                    state_change_hash: None,
-                }
-            }
+            KernelEffect::NoOp { reason } => icn_kernel_api::effects::EffectResult {
+                effect_id: "batch_noop".to_string(),
+                success: true,
+                message: reason.clone(),
+                state_change_hash: None,
+            },
             _ => panic!("Unexpected effect type in batch"),
         };
         results_b.push(result);
@@ -784,7 +792,11 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
     );
     println!(
         "║ Match Status:     {:<47} ║",
-        if comparison.matches { "✅ ALL MATCH" } else { "❌ MISMATCH" }
+        if comparison.matches {
+            "✅ ALL MATCH"
+        } else {
+            "❌ MISMATCH"
+        }
     );
     if !comparison.differences.is_empty() {
         println!("║ Differences:      {:<47} ║", comparison.differences.len());
@@ -801,4 +813,211 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
 
     info!("✅ Effect batch determinism verified");
     Ok(())
+}
+
+// =============================================================================
+// Two-Node Federation Reload Durability Test
+// =============================================================================
+
+/// Test that BOTH nodes' state survives independent restart and hashes still match.
+///
+/// This test proves:
+/// 1. Node A state survives restart
+/// 2. Node B state survives restart
+/// 3. Reloaded state hashes still match between nodes
+///
+/// This validates that durable storage is deterministic and that state can be
+/// recovered independently on each node with identical results.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_node_federation_reload_durability() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing Two-Node Federation Reload Durability ===");
+
+    // === Common decision parameters ===
+    let member_did = generate_test_did();
+    let entity_id = "coop-reload-pilot".to_string();
+    let decision_receipt_id = DecisionReceiptId::new("gov:membership:add:reload:001");
+
+    // Create the effect
+    let effect = MembershipEffect::AddMember {
+        entity_id: entity_id.clone(),
+        member_did: member_did.to_string(),
+        role: "Worker".to_string(),
+        tier: "Standard".to_string(),
+    };
+
+    // === Create persistent tempdirs for both nodes ===
+    let temp_a = tempfile::tempdir()?;
+    let temp_b = tempfile::tempdir()?;
+    let path_a = temp_a.path().to_path_buf();
+    let path_b = temp_b.path().to_path_buf();
+
+    let hash_a: String;
+    let hash_b: String;
+
+    // === Phase 1: Execute on both nodes ===
+    info!("Phase 1: Execute effect on both nodes...");
+    {
+        // Node A setup and execution
+        let db_a = sled::open(&path_a)?;
+        let coop_store_a = Arc::new(CoopStore::new(Arc::new(db_a)));
+        let membership_service_a = Arc::new(MembershipServiceImpl::new(coop_store_a.clone()));
+        let executor_a = KernelMembershipExecutor::with_service(membership_service_a.clone());
+
+        let outcome_a = executor_a
+            .execute_membership_operation(&decision_receipt_id, effect.clone())
+            .await?;
+
+        hash_a = match &outcome_a {
+            icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
+                extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_a".to_string())
+            }
+            _ => panic!("Node A execution failed: {:?}", outcome_a),
+        };
+
+        info!(hash_a = %hash_a, "Node A initial execution completed");
+
+        // Verify member exists on Node A
+        assert!(
+            membership_service_a.is_member(&entity_id, &member_did.to_string()),
+            "Member should exist on Node A after initial execution"
+        );
+
+        // Node B setup and execution (same effect, same receipt_id for determinism)
+        let db_b = sled::open(&path_b)?;
+        let coop_store_b = Arc::new(CoopStore::new(Arc::new(db_b)));
+        let membership_service_b = Arc::new(MembershipServiceImpl::new(coop_store_b.clone()));
+        let executor_b = KernelMembershipExecutor::with_service(membership_service_b.clone());
+
+        let outcome_b = executor_b
+            .execute_membership_operation(&decision_receipt_id, effect.clone())
+            .await?;
+
+        hash_b = match &outcome_b {
+            icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
+                extract_state_hash_from_effects(effects).unwrap_or_else(|| "no_hash_b".to_string())
+            }
+            _ => panic!("Node B execution failed: {:?}", outcome_b),
+        };
+
+        info!(hash_b = %hash_b, "Node B initial execution completed");
+
+        // Verify member exists on Node B
+        assert!(
+            membership_service_b.is_member(&entity_id, &member_did.to_string()),
+            "Member should exist on Node B after initial execution"
+        );
+
+        // Assert initial hashes match
+        assert_eq!(
+            hash_a, hash_b,
+            "Initial execution hashes must match across nodes"
+        );
+
+        info!("Phase 1 complete: Both nodes executed, hashes match");
+        // Stores drop here, flushing to disk
+    }
+
+    // === Phase 2: Reopen both stores independently and verify state ===
+    info!("Phase 2: Reopen stores and verify state survived...");
+    {
+        // Reopen Node A
+        let db_a = sled::open(&path_a)?;
+        let coop_store_a = Arc::new(CoopStore::new(Arc::new(db_a)));
+        let membership_service_a = Arc::new(MembershipServiceImpl::new(coop_store_a.clone()));
+
+        // Query reloaded state on Node A
+        let member_exists_a = membership_service_a.is_member(&entity_id, &member_did.to_string());
+        assert!(member_exists_a, "Member must survive Node A restart");
+
+        // Get member details to verify state integrity
+        let member_a = coop_store_a.get_member(&entity_id, &member_did)?;
+        let reloaded_hash_a =
+            compute_member_state_hash(&member_a, &decision_receipt_id.to_string());
+
+        info!(reloaded_hash_a = %reloaded_hash_a, "Node A reloaded state verified");
+
+        // Reopen Node B
+        let db_b = sled::open(&path_b)?;
+        let coop_store_b = Arc::new(CoopStore::new(Arc::new(db_b)));
+        let membership_service_b = Arc::new(MembershipServiceImpl::new(coop_store_b.clone()));
+
+        // Query reloaded state on Node B
+        let member_exists_b = membership_service_b.is_member(&entity_id, &member_did.to_string());
+        assert!(member_exists_b, "Member must survive Node B restart");
+
+        // Get member details to verify state integrity
+        let member_b = coop_store_b.get_member(&entity_id, &member_did)?;
+        let reloaded_hash_b =
+            compute_member_state_hash(&member_b, &decision_receipt_id.to_string());
+
+        info!(reloaded_hash_b = %reloaded_hash_b, "Node B reloaded state verified");
+
+        // === ASSERT RELOAD DETERMINISM ===
+        assert_eq!(
+            reloaded_hash_a, reloaded_hash_b,
+            "Reloaded state hashes must match between nodes.\n\
+             Node A hash: {}\n\
+             Node B hash: {}",
+            reloaded_hash_a, reloaded_hash_b
+        );
+
+        // Print verification banner
+        println!();
+        println!("╔══════════════════════════════════════════════════════════════════╗");
+        println!("║   TWO-NODE FEDERATION RELOAD PROOF VERIFIED                      ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!(
+            "║ Initial Hash A:     {:<44} ║",
+            &hash_a[..hash_a.len().min(44)]
+        );
+        println!(
+            "║ Initial Hash B:     {:<44} ║",
+            &hash_b[..hash_b.len().min(44)]
+        );
+        println!("║ Initial Match:      ✅ MATCH                                      ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!(
+            "║ Reloaded Hash A:    {:<44} ║",
+            &reloaded_hash_a[..reloaded_hash_a.len().min(44)]
+        );
+        println!(
+            "║ Reloaded Hash B:    {:<44} ║",
+            &reloaded_hash_b[..reloaded_hash_b.len().min(44)]
+        );
+        println!("║ Reload Match:       ✅ MATCH                                      ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!("║ Node A Durability:  ✅ VERIFIED                                   ║");
+        println!("║ Node B Durability:  ✅ VERIFIED                                   ║");
+        println!("║ Cross-Node Match:   ✅ VERIFIED                                   ║");
+        println!("╚══════════════════════════════════════════════════════════════════╝");
+        println!();
+    }
+
+    info!("✅ Two-node federation reload durability verified");
+    Ok(())
+}
+
+/// Compute a deterministic hash from stored member state.
+/// This allows verifying that reloaded state is identical across nodes.
+fn compute_member_state_hash(member: &icn_coop::Member, decision_receipt_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"member_reload:");
+    hasher.update(member.coop_id.as_bytes());
+    hasher.update(b":");
+    hasher.update(member.did.to_string().as_bytes());
+    hasher.update(b":");
+    hasher.update(format!("{:?}", member.role).as_bytes());
+    hasher.update(b":");
+    hasher.update(format!("{:?}", member.status).as_bytes());
+    hasher.update(b":");
+    hasher.update(decision_receipt_id.as_bytes());
+    let hash = hasher.finalize();
+    hex::encode(&hash[..20])
 }
