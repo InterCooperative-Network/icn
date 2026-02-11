@@ -1951,3 +1951,54 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C22; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C23 - SDIS API guide route-shape correction)
+
+1. `docs/sdis/SDIS_API_GUIDE.md`
+
+Changes:
+
+- Updated anchor management section from legacy `/v1/sdis/anchors*` routes to current wired anchor routes:
+  - `GET /v1/sdis/anchor/{anchor_id}/devices`
+  - `POST /v1/sdis/anchor/devices/add`
+  - `GET /v1/sdis/anchor/{anchor_id}`
+  - `POST /v1/sdis/anchor/rotate-keys`
+- Updated recovery section from `/v1/sdis/recovery/initiate` and top-level `/v1/sdis/recovery/complete` to current wired paths:
+  - `POST /v1/sdis/recovery/start`
+  - `GET /v1/sdis/recovery/{recovery_id}`
+  - `POST /v1/sdis/recovery/{recovery_id}/complete`
+- Realigned request/response examples to the current request structs (`anchor_id`, `device_pubkey`, `verification_data`, `new_keybundle`, optional `recovery_share`).
+- Updated integration flow shorthand to match `anchor/*` and `recovery/start` naming.
+
+## Verification updates (Batch C23)
+
+```bash
+rg -n "/v1/sdis/anchors\\b|/v1/sdis/anchors/|/v1/sdis/recovery/initiate\\b|/v1/sdis/recovery/complete\\b|/v1/sdis/recover" docs/sdis/SDIS_API_GUIDE.md
+```
+
+Result: no legacy anchors/recover/initiate path forms remain.
+
+```bash
+rg -n "/v1/sdis/anchor/|/v1/sdis/recovery/start|/v1/sdis/recovery/\\{recovery_id\\}/complete" docs/sdis/SDIS_API_GUIDE.md
+```
+
+Result: current anchor and recovery route shapes present.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C23)
+
+- `docs/sdis/SDIS_API_GUIDE.md | icn/crates/icn-gateway/src/api/sdis/{anchor.rs,recovery.rs} + icn/crates/icn-gateway/src/server.rs | rg -n "scope\\(\"/anchor\"\\)|scope\\(\"/recovery\"\\)|configure\\(api::sdis::anchor::configure\\)|configure\\(api::sdis::recovery::configure\\)" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C23)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C23; continue active-doc content drift cleanup.
