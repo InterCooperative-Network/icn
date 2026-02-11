@@ -416,7 +416,7 @@ pub struct AgeKeyStore { /* ... */ }
 pub struct HsmKeyStore { /* ... */ }  // Future
 ```
 
-**Storage path:** `$ICN_DATA_DIR/identity/keypair.age`
+**Storage path:** `{data_dir}/identity.age` (for Linux defaults, typically `~/.local/share/icn/identity.age`)
 
 ---
 
@@ -1103,7 +1103,7 @@ TXT records:
   did=did:icn:z...
   version=0.1.0
   capabilities=ledger,contracts
-  port=4433
+  port=7777
 ```
 
 **Rendezvous (WAN):**
@@ -2664,18 +2664,15 @@ ENTRYPOINT ["icnd"]
 
 ### 10.2 Configuration
 
-**Config file:** `$ICN_DATA_DIR/config.toml`
+**Config file:** `--config /path/to/config.toml` (or runtime defaults when omitted)
 
 **Example configuration:**
 
 ```toml
-[node]
 data_dir = "/var/lib/icn"
-log_level = "info"
 
 [network]
-bind_addr = "0.0.0.0:4433"
-max_connections = 500
+listen_addr = "0.0.0.0:7777"
 
 [compute]
 enabled = true
@@ -2697,11 +2694,10 @@ jwt_secret = "your-secret-here"
 token_expiry_hours = 24
 ```
 
-**Environment variable overrides:**
+**Runtime overrides:**
 
-- `ICN_DATA_DIR` - Override data directory
-- `ICN_LOG_LEVEL` - Override log level (trace, debug, info, warn, error)
-- `ICN_GATEWAY_JWT_SECRET` - Override JWT secret
+- `--data-dir` and `--log-level` CLI flags
+- `ICN_GATEWAY_JWT_SECRET` for gateway JWT secret
 
 **Trust thresholds:**
 

@@ -154,7 +154,7 @@ P2P coordination layer with:
 KeyPair::generate() 
   → DID (did:icn:<base58-pubkey>)
   → Age-encrypt with passphrase
-  → Save to $ICN_DATA_DIR/identity/keypair.age
+  → Save to {data_dir}/identity.age
   → Startup: Unlock keystore → Spawn actors
 ```
 

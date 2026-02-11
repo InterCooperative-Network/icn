@@ -292,7 +292,7 @@ User runs: icnctl id init --device-name "Laptop"
    - authentication = ["device-1"]
    - recovery = None (default, can configure later)
 5. Create keystore v3
-6. Encrypt and save to ~/.icn/keystore.age
+6. Encrypt and save to {data_dir}/identity.age
 ```
 
 **Output**: User has a working identity, ready to add more devices.

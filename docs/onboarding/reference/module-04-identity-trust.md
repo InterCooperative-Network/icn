@@ -98,7 +98,7 @@ The **keystore** securely stores private keys:
 │                      KEYSTORE                            │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  ~/.icn/keystore.age                                    │
+│  {data_dir}/identity.age                                │
 │                                                         │
 │  ┌─────────────────────────────────────────────────┐   │
 │  │  Encrypted with Age (passphrase or YubiKey)     │   │
@@ -138,7 +138,7 @@ pub trait KeyStore: Send + Sync {
 **Lifecycle stages:**
 
 1. **Creation**: `icnctl id init` generates keypair, encrypts with Age
-2. **Storage**: Written to `~/.icn/keystore.age`
+2. **Storage**: Written to `{data_dir}/identity.age`
 3. **Unlock**: At daemon startup, passphrase decrypts keys
 4. **Usage**: IdentityBundle available for signing, TLS, etc.
 5. **Lock**: On shutdown or explicit lock, keys cleared from memory
@@ -621,7 +621,7 @@ flowchart TB
         Init[icnctl id init]
         Gen[Generate Ed25519 keypair]
         Enc[Encrypt with Age]
-        Save[Save to ~/.icn/keystore.age]
+        Save[Save to {data_dir}/identity.age]
     end
 
     subgraph Runtime

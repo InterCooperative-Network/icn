@@ -1225,3 +1225,49 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C6; continue with next active-doc drift slice.
+## Changes applied (Batch C7 - architecture/onboarding identity and network defaults)
+
+1. `docs/ARCHITECTURE.md`
+- Replaced stale keystore path examples (`.../identity/keypair.age`) with current `{data_dir}/identity.age` semantics.
+- Updated mDNS/peer port example from `4433` to default `7777`.
+- Updated config guidance from `$ICN_DATA_DIR/config.toml` + outdated `[node]/bind_addr` example to current `data_dir`, `[network].listen_addr`, and explicit `--config` usage.
+- Replaced unsupported env override claims (`ICN_DATA_DIR`, `ICN_LOG_LEVEL`) with runtime-correct CLI override guidance.
+
+2. `docs/architecture/ARCHITECTURE_INDEX.md`
+- Updated identity-save flow path to `{data_dir}/identity.age`.
+
+3. `docs/onboarding/reference/module-04-identity-trust.md`
+- Replaced `~/.icn/keystore.age` references with `{data_dir}/identity.age` in architecture diagram, lifecycle notes, and identity flow.
+
+4. `docs/design/multi-device-identity-design.md`
+- Updated keystore save path reference to `{data_dir}/identity.age`.
+
+## Verification updates (Batch C7)
+
+```bash
+rg -n "keypair.age|keystore.age|port=4433|bind_addr = \"0.0.0.0:4433\"|ICN_DATA_DIR|ICN_LOG_LEVEL" docs/ARCHITECTURE.md docs/architecture/ARCHITECTURE_INDEX.md docs/onboarding/reference/module-04-identity-trust.md docs/design/multi-device-identity-design.md
+```
+
+Result: stale runtime/default references removed from the edited docs.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C7)
+
+- `docs/ARCHITECTURE.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n "data_dir|keystore_path|listen_addr|--config|--log-level" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/architecture/ARCHITECTURE_INDEX.md | icn/crates/icn-core/src/config/mod.rs | rg -n "identity.age|keystore_path" | aligned | reviewed_on(2026-02-11)`
+- `docs/onboarding/reference/module-04-identity-trust.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnctl/src/main.rs:get_keystore_path | rg -n "identity.age|get_keystore_path" | aligned | reviewed_on(2026-02-11)`
+- `docs/design/multi-device-identity-design.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnctl/src/main.rs:get_keystore_path | rg -n "identity.age|get_keystore_path" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C7)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C7; continue active-doc drift cleanup.
