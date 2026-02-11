@@ -24,8 +24,8 @@ explore Prometheus metrics, and understand logging and tracing.
 
 ## Related Materials
 - [Module 9: Operations](../reference/module-09-ops-deploy.md) - Background reading
-- [HOMELAB_DEPLOYMENT.md](../../HOMELAB_DEPLOYMENT.md) - K3s production deployment
-- [production-hardening.md](../../production-hardening.md) - Security hardening
+- [HOMELAB_DEPLOYMENT.md](../../operations/deployment/HOMELAB_DEPLOYMENT.md) - K3s production deployment
+- [production-hardening.md](../../security/production-hardening.md) - Security hardening
 
 ## Part 1: Deployment Options
 

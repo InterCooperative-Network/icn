@@ -25,7 +25,7 @@ including topic subscriptions, vector clocks, and anti-entropy synchronization.
 ## Related Materials
 - [Module 5: Networking](../reference/module-05-network-gossip.md) - Background reading
 - [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Uses gossip for ledger sync
-- [CLAUDE.md Gossip Protocol](../../CLAUDE.md) - Protocol reference
+- [CLAUDE.md Gossip Protocol](../../../CLAUDE.md) - Protocol reference
 
 ## Part 1: Network Actor Structure
 

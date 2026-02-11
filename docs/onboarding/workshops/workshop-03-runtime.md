@@ -24,7 +24,7 @@ how the supervisor manages the actor lifecycle.
 ## Related Materials
 - [Module 3: Runtime Architecture](../reference/module-03-runtime-actors.md) - Background reading
 - [Workshop 4: Identity and Trust](./workshop-04-identity-trust.md) - Next workshop
-- [CLAUDE.md Architecture Section](../../CLAUDE.md) - Actor communication patterns
+- [CLAUDE.md Architecture Section](../../../CLAUDE.md) - Actor communication patterns
 
 ## Part 1: Startup Path Walkthrough
 

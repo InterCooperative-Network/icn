@@ -121,6 +121,6 @@ sum(rate(icn_storage_operations_total[5m])) by (operation)
 
 ## See Also
 
-- [Distributed Tracing](distributed-tracing.md)
+- [Distributed Tracing](../operations/deployment/distributed-tracing.md)
 - [Tail-Based Sampling](tail-based-sampling.md)
-- [Production Hardening](../production-hardening.md)
+- [Production Hardening](../security/production-hardening.md)

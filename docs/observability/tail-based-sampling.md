@@ -294,6 +294,6 @@ Tail-based sampling buffers traces in memory:
 
 ## Related Documentation
 
-- [Production Hardening Guide](../production-hardening.md) - Security configuration
+- [Production Hardening Guide](../security/production-hardening.md) - Security configuration
 - [ICN Architecture](../ARCHITECTURE.md) - Architecture overview
 - [OpenTelemetry Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)

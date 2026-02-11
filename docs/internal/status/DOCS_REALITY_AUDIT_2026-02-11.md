@@ -560,3 +560,74 @@ Result: no missing-link matches for targeted files.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 10: security/observability/onboarding)
+
+1. `docs/security/production-hardening.md`
+- Fixed crate source paths to `../../icn/...` from `docs/security/` depth.
+- Updated moved module references:
+  - `icn-core/src/supervisor/mod.rs`
+  - `icn-net/src/actor/mod.rs`
+- Fixed architecture/API references:
+  - `../ARCHITECTURE.md`
+  - `../reference/api/topic-subscriptions-api.md`
+- Context normalization: converted test-count claim to historical snapshot wording with explicit date.
+
+2. `docs/security/SECRET_MANAGEMENT.md`
+- Fixed cross-doc references:
+  - `production-hardening.md`
+  - `../operations/deployment/incident-response.md`
+  - `../archive/2025/KUBERNETES_DEPLOYMENT.md`
+- Context normalization: labeled Kubernetes deployment link as archived (2025).
+
+3. `docs/security/threat-model.md`
+- Fixed incident response and architecture links:
+  - `../operations/deployment/incident-response.md`
+  - `../ARCHITECTURE.md`
+
+4. `docs/observability/storage-metrics.md`
+- Fixed distributed tracing and security hardening references:
+  - `../operations/deployment/distributed-tracing.md`
+  - `../security/production-hardening.md`
+
+5. `docs/observability/tail-based-sampling.md`
+- Fixed security hardening reference to `../security/production-hardening.md`.
+
+6. Onboarding workshops:
+- `docs/onboarding/workshops/workshop-03-runtime.md`: `../../../CLAUDE.md`
+- `docs/onboarding/workshops/workshop-05-network-gossip.md`: `../../../CLAUDE.md`
+- `docs/onboarding/workshops/workshop-07-gateway-sdk.md`: `../../../sdk/typescript/README.md`
+- `docs/onboarding/workshops/workshop-09-ops.md`:
+  - `../../operations/deployment/HOMELAB_DEPLOYMENT.md`
+  - `../../security/production-hardening.md`
+
+## Verification updates (Batch A4 - slice 10)
+
+```bash
+for f in docs/security/SECRET_MANAGEMENT.md docs/security/production-hardening.md docs/security/threat-model.md docs/observability/storage-metrics.md docs/observability/tail-based-sampling.md docs/onboarding/workshops/workshop-03-runtime.md docs/onboarding/workshops/workshop-05-network-gossip.md docs/onboarding/workshops/workshop-07-gateway-sdk.md docs/onboarding/workshops/workshop-09-ops.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted files.
+
+## Audit ledger updates (slice 10)
+
+- `docs/security/production-hardening.md | icn/crates/{icn-net,icn-core,icn-ledger,icn-gossip}, docs/ARCHITECTURE.md, docs/reference/api/topic-subscriptions-api.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/security/SECRET_MANAGEMENT.md | docs/security/production-hardening.md, docs/operations/deployment/incident-response.md, docs/archive/2025/KUBERNETES_DEPLOYMENT.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/security/threat-model.md | docs/operations/deployment/incident-response.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/observability/storage-metrics.md | docs/operations/deployment/distributed-tracing.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/observability/tail-based-sampling.md | docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-03-runtime.md | CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-05-network-gossip.md | CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-07-gateway-sdk.md | sdk/typescript/README.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/onboarding/workshops/workshop-09-ops.md | docs/operations/deployment/HOMELAB_DEPLOYMENT.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 10)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.

@@ -25,7 +25,7 @@ and use the TypeScript SDK to interact with the ledger.
 ## Related Materials
 - [Module 7: Gateway and SDK](../reference/module-07-gateway-sdk.md) - Background reading
 - [Workshop 6: Ledger and Contracts](./workshop-06-ledger-contracts.md) - Ledger operations
-- [TypeScript SDK README](../../sdk/typescript/README.md) - SDK reference (if available)
+- [TypeScript SDK README](../../../sdk/typescript/README.md) - SDK reference (if available)
 
 ## Part 1: Gateway Architecture
 

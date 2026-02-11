@@ -273,6 +273,6 @@ icnctl id rotate --reason compromised
 
 ## See Also
 
-- [Production Hardening Guide](../production-hardening.md)
-- [Kubernetes Deployment](../KUBERNETES_DEPLOYMENT.md)
-- [Incident Response](../incident-response.md)
+- [Production Hardening Guide](production-hardening.md)
+- [Kubernetes Deployment (Archived 2025)](../archive/2025/KUBERNETES_DEPLOYMENT.md)
+- [Incident Response](../operations/deployment/incident-response.md)
