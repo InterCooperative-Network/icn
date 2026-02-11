@@ -214,9 +214,9 @@ Store backups:
 
 ### Monitor Your Node
 
-1. **Web Dashboard**:
-   ```
-   Open http://localhost:8080 in your browser
+1. **Gateway Health Endpoint**:
+   ```bash
+   curl http://localhost:8080/v1/health
    ```
 
 2. **Prometheus Metrics**:
@@ -226,7 +226,7 @@ Store backups:
 
 3. **Health Check**:
    ```bash
-   curl http://localhost:8080/health
+   curl http://localhost:8080/v1/health
    icnctl network status
    ```
 
@@ -265,7 +265,7 @@ ICN provides a **Gateway API** for building user-facing applications:
 
 3. **WebSocket for real-time updates**:
    ```javascript
-   const ws = new WebSocket('ws://localhost:8080/ws/my-coop');
+   const ws = new WebSocket('ws://localhost:8080/v1/ws/my-coop');
    ws.send(JSON.stringify({type: 'Auth', token: 'eyJ0eXAi...'}));
    ```
 

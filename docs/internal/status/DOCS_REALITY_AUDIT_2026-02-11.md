@@ -1815,3 +1815,40 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C19; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C20 - getting-started gateway endpoint correction)
+
+1. `docs/GETTING_STARTED.md`
+
+Changes:
+
+- Replaced legacy gateway health path `/health` with `/v1/health`.
+- Replaced legacy WebSocket path `/ws/{coop_id}` with `/v1/ws/{coop_id}`.
+- Clarified monitoring wording from "Web Dashboard" to explicit "Gateway Health Endpoint" to avoid implying a UI at gateway root.
+
+## Verification updates (Batch C20)
+
+```bash
+rg -n "/health\\b|/v1/health|ws://localhost:8080/ws|/v1/ws/" docs/GETTING_STARTED.md
+```
+
+Result: only `/v1/health` and `/v1/ws/{coop_id}` variants remain.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C20)
+
+- `docs/GETTING_STARTED.md | docs/api/openapi.yaml + icn/crates/icn-gateway/src/server.rs | rg -n "/v1/health|/v1/ws/\\{coop_id\\}|scope\\(\"/v1\"\\)" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C20)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C20; continue active-doc content drift cleanup.
