@@ -16,46 +16,50 @@ ICN uses TOML configuration files for all node settings. This guide covers confi
 
 ### Default Locations
 
-1. **Command-line specified**: `icnd --config /path/to/icn.toml`
-2. **Home directory**: `~/.icn/icn.toml`
-3. **System-wide**: `/etc/icn/icn.toml`
-4. **Current directory**: `./icn.toml`
+`icnd` uses one of two modes:
+1. **Command-line specified config**: `icnd --config /path/to/config.toml`
+2. **Built-in defaults**: if `--config` is not provided, `icnd` starts from `Config::default()` and applies CLI/env overrides.
 
-ICN searches in this order and uses the first file found.
+Note: there is no automatic multi-path config file search order in current `icnd`.
 
 ### Example Configuration
 
-See `config/icn.toml.example` for a fully documented example with all available options.
+See `icn/config/icn.toml.example` for a fully documented example with available options.
 
 ---
 
 ## Configuration Validation
 
-### JSON Schema
+### Runtime Validation (Primary)
 
-A JSON Schema is provided for validation: `config/icn-config.schema.json`
+Use `icnd --validate-config` (same validation logic used at startup):
 
-### Validation Tool
+```bash
+# Validate a specific config file
+icnd --config /path/to/config.toml --validate-config
+```
 
-Use the provided Python script to validate configurations:
+### Validation Tool (Optional/Legacy)
+
+`scripts/validate-config.py` can be used if you provide a compatible JSON schema:
 
 ```bash
 # Install dependencies
 pip install jsonschema toml
 
-# Validate configuration
-python3 scripts/validate-config.py config/icn.toml
+# Validate configuration (requires --schema path)
+python3 scripts/validate-config.py --schema /path/to/icn-config.schema.json /path/to/config.toml
 
 # Validate with verbose output
-python3 scripts/validate-config.py --verbose config/icn.toml
+python3 scripts/validate-config.py --verbose --schema /path/to/icn-config.schema.json /path/to/config.toml
 
 # Validate JSON configuration
-python3 scripts/validate-config.py --format json config/icn.json
+python3 scripts/validate-config.py --format json --schema /path/to/icn-config.schema.json /path/to/config.json
 ```
 
 ### IDE Integration
 
-Configure your IDE to validate TOML files:
+If you maintain a local JSON schema, configure your IDE to validate TOML files:
 
 **VS Code** (`settings.json`):
 ```json
@@ -69,7 +73,7 @@ Configure your IDE to validate TOML files:
 **IntelliJ/PyCharm**:
 1. Settings → Languages & Frameworks → Schemas and DTDs
 2. Add JSON Schema → File
-3. Select `config/icn-config.schema.json`
+ 3. Select your local schema file (for example `icn-config.schema.json`)
 4. Add file pattern: `**/icn*.toml`
 
 ---
@@ -457,9 +461,9 @@ ICN follows semantic versioning. Configuration changes:
 
 When upgrading ICN:
 
-1. **Backup configuration**: `cp icn.toml icn.toml.backup`
+1. **Backup configuration**: `cp config.toml config.toml.backup`
 2. **Review CHANGELOG**: Check for config changes
-3. **Validate**: `python3 scripts/validate-config.py icn.toml`
+3. **Validate**: `icnd --config /path/to/config.toml --validate-config`
 4. **Test**: Run with `--dry-run` if available
 5. **Monitor**: Watch logs after upgrade
 
@@ -472,13 +476,13 @@ When upgrading ICN:
 **Symptom**: ICN uses default values instead of config
 
 **Solutions**:
-1. Check file path: `icnd --config /path/to/icn.toml`
-2. Verify file permissions: `ls -l icn.toml`
+1. Check file path: `icnd --config /path/to/config.toml`
+2. Verify file permissions: `ls -l /path/to/config.toml`
 3. Enable debug logging: `ICN_LOG_LEVEL=debug icnd`
 
 ### Validation Fails
 
-**Symptom**: `validate-config.py` reports errors
+**Symptom**: `icnd --validate-config` reports errors
 
 **Solutions**:
 1. Check for typos in section names
@@ -520,7 +524,7 @@ When upgrading ICN:
 
 ```bash
 # Add to CI pipeline
-python3 scripts/validate-config.py config/*.toml
+icnd --config /path/to/config.toml --validate-config
 ```
 
 ### 3. Monitoring
@@ -552,7 +556,7 @@ Test configuration changes:
 
 ## Appendix: Full Configuration Reference
 
-See `config/icn.toml.example` for complete reference with all options documented.
+See `icn/config/icn.toml.example` for complete reference with all options documented.
 
 ---
 

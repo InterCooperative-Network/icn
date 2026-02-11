@@ -952,3 +952,45 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+
+## Changes applied (Batch C2 - slice 2: config/runtime docs vs icnd behavior)
+
+1. `docs/reference/config/CONFIGURATION.md`
+- Corrected config loading behavior to match `icnd`:
+  - no multi-path auto-search order
+  - `--config` explicit path or runtime defaults (`Config::default()`)
+- Corrected example config reference path to `icn/config/icn.toml.example`.
+- Reframed validation guidance to prefer `icnd --validate-config` (runtime-native validation).
+- Reworked `validate-config.py` usage examples to require explicit `--schema` path (optional/legacy path).
+- Updated troubleshooting/migration snippets from hardcoded `icn.toml` assumptions to generic `config.toml` paths.
+- Clarified IDE schema section as optional/local schema workflow.
+
+2. `docs/reference/config/identity-backend-configuration.md`
+- Replaced hardcoded `icn.toml` assumption with generic `--config` file wording.
+- Corrected default keystore location semantics to `{data_dir}/identity.age` and typical Linux default `~/.local/share/icn/identity.age`.
+- Updated runtime selection and `--validate-config` examples to match current daemon behavior.
+
+## Verification updates (Batch C2 - slice 2)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "Config::default\(\)|--validate-config|identity\.age|icn\.toml|searches in this order" docs/reference/config/CONFIGURATION.md docs/reference/config/identity-backend-configuration.md icn/bins/icnd/src/main.rs
+```
+
+Result:
+- Missing-link findings remain zero.
+- Config/runtime documentation now aligns with current `icnd` load and validation behavior.
+
+## Audit ledger updates (C2 slice 2)
+
+- `docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs + icn/config/icn.toml.example + scripts/validate-config.py | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)`
+- `docs/reference/config/identity-backend-configuration.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/identity.rs | doc_reality_scan + semantic grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (C2 slice 2)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.
