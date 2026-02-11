@@ -1431,7 +1431,8 @@ mod tests {
     #[test]
     fn test_from_settlement_intent_basic() {
         let intent = make_test_intent();
-        let request = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main");
+        let request =
+            TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main").unwrap();
 
         assert_eq!(request.treasury_id, "treasury-main");
         assert_eq!(request.amount, 1000);
@@ -1444,7 +1445,8 @@ mod tests {
     #[test]
     fn test_from_settlement_intent_decision_hash_preserved() {
         let intent = make_test_intent();
-        let request = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main");
+        let request =
+            TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main").unwrap();
 
         // Verify decision hash is correctly hex-encoded
         let expected_hex = hex::encode([42u8; 32]);
@@ -1455,7 +1457,7 @@ mod tests {
     fn test_from_settlement_intent_asset_type_mapping() {
         // Fungible → Spend
         let intent = SettlementIntent::new("d1", [1u8; 32], "a", "b", 100, "credits");
-        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t");
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
         assert_eq!(req.operation_type, TreasuryOperationType::Spend);
 
         // Service → Spend
@@ -1464,7 +1466,7 @@ mod tests {
                 duration_secs: Some(3600),
             },
         );
-        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t");
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
         assert_eq!(req.operation_type, TreasuryOperationType::Spend);
 
         // Claim → IssueBond
@@ -1474,7 +1476,7 @@ mod tests {
                 conditions: None,
             },
         );
-        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t");
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
         assert_eq!(req.operation_type, TreasuryOperationType::IssueBond);
 
         // Depreciating → Allocate
@@ -1485,7 +1487,7 @@ mod tests {
                 },
             },
         );
-        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t");
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
         assert_eq!(req.operation_type, TreasuryOperationType::Allocate);
     }
 
