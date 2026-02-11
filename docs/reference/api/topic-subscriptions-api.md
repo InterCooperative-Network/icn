@@ -386,7 +386,7 @@ The subscription system exports Prometheus metrics:
 
 ```bash
 # View all subscription metrics
-curl http://localhost:9090/metrics | grep icn_gossip_subscribe
+curl http://localhost:9100/metrics | grep icn_gossip_subscribe
 
 # Example output:
 # icn_gossip_subscriptions_total 15

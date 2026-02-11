@@ -196,7 +196,7 @@ rate(icn_replication_offers_received_total[5m])
 
 **Via Prometheus:**
 ```bash
-curl http://localhost:9090/metrics | grep icn_replication
+curl http://localhost:9100/metrics | grep icn_replication
 ```
 
 **Via Logs:**
@@ -438,7 +438,7 @@ Health check cycle (every 60 seconds):
 For operational questions or issues:
 - GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
 - Development sessions: `docs/development/sessions/` (detailed implementation notes)
-- Metrics dashboard: `http://localhost:9090/metrics` (Prometheus)
+- Metrics dashboard: `http://localhost:9100/metrics` (Prometheus)
 
 ---
 

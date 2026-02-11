@@ -250,10 +250,10 @@ groups:
 icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
 
 # Backup includes:
-# - Identity keystore (~/.icn/keystore.age)
-# - Persistent store (~/.icn/store/)
-# - Configuration (~/.icn/config.toml)
-# - Device documents (~/.icn/devices/)
+# - Identity keystore ({data_dir}/identity.age)
+# - Persistent store ({data_dir}/store/)
+# - Configuration ({data_dir}/config.toml or related runtime config)
+# - Device documents ({data_dir}/devices/)
 ```
 
 **Emergency backup (before risky operations):**
@@ -914,17 +914,17 @@ journalctl -u icnd -n 50
 
 # Common issues:
 # 1. Port already in use
-sudo netstat -tulpn | grep 4433
+sudo netstat -ulnp | grep 7777
 
 # 2. Keystore file missing or corrupted
-ls -la ~/.icn/keystore.age
+ls -la ~/.icn/identity.age
 
 # 3. Permissions issue
 ls -la ~/.icn/
 ```
 
 **Solutions:**
-1. **Port conflict**: Change port in `~/.icn/config.toml` or kill conflicting process
+1. **Port conflict**: Change `network.listen_addr` in your daemon config (or kill conflicting process)
 2. **Missing keystore**: Restore from backup or run `icnctl id init`
 3. **Permissions**: Fix with `chown -R icn:icn ~/.icn/`
 
@@ -940,7 +940,7 @@ ls -la ~/.icn/
 icnctl status
 
 # Check firewall
-sudo iptables -L -n | grep 4433
+sudo iptables -L -n | grep 7777
 
 # Check if port is accessible
 sudo netstat -tulpn | grep icnd
@@ -948,7 +948,7 @@ sudo netstat -tulpn | grep icnd
 
 **Solutions:**
 1. **mDNS not working**: Manually dial peers with `icnctl peers connect <did> <address>`
-2. **Firewall blocking**: Open UDP port 4433: `sudo ufw allow 4433/udp`
+2. **Firewall blocking**: Open UDP port 7777: `sudo ufw allow 7777/udp`
 3. **Wrong network interface**: Check `bind_addr` in config
 4. **TLS certificate issue**: Check logs for certificate verification errors
 

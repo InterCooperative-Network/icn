@@ -1120,3 +1120,53 @@ Result: no broken relative links; only expected historical marker reports remain
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C4; continue active-doc drift reduction.
+## Changes applied (Batch C5 - active operations/API defaults)
+
+1. `docs/guides/operations/troubleshooting.md`
+- Updated QUIC troubleshooting examples from stale `5600` to default `7777/udp`.
+- Adjusted in-pod socket checks to UDP (`ss -ulnp`) and UDP probe example (`nc -zvu`).
+
+2. `docs/guides/operations/replication-operations.md`
+- Updated metrics endpoint examples from `:9090/metrics` to `:9100/metrics`.
+
+3. `docs/guides/operations/operations-guide.md`
+- Updated backup content examples to current keystore naming (`identity.age`) and `{data_dir}` semantics.
+- Updated port conflict example from `4433` to `7777`.
+- Removed hard-coded config-path assumption in remediation text.
+
+4. `docs/reference/api/topic-subscriptions-api.md`
+- Updated metrics query endpoint from `:9090/metrics` to `:9100/metrics`.
+
+5. `docs/operations/deployment/incident-response.md`
+- Updated QUIC firewall verification from `5600` to `7777`.
+
+## Verification updates (Batch C5)
+
+```bash
+rg -n "\b5600\b|\b4433\b|:9090/metrics|keystore.age" docs/guides/operations/troubleshooting.md docs/guides/operations/replication-operations.md docs/guides/operations/operations-guide.md docs/reference/api/topic-subscriptions-api.md docs/operations/deployment/incident-response.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C5)
+
+- `docs/guides/operations/troubleshooting.md | icn/crates/icn-core/src/config/mod.rs (listen_addr default) | rg -n "listen_addr|7777" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/guides/operations/replication-operations.md | icn/crates/icn-core/src/config/mod.rs (observability.metrics_port default) | rg -n "metrics_port|9100" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/guides/operations/operations-guide.md | icn/bins/icnctl/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "identity.age|store|listen_addr" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/reference/api/topic-subscriptions-api.md | icn/crates/icn-core/src/config/mod.rs (metrics_port default) | rg -n "metrics_port|9100" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/operations/deployment/incident-response.md | icn/crates/icn-core/src/config/mod.rs (listen_addr default) | rg -n "listen_addr|7777" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C5)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C5; continue through remaining active doc drift.

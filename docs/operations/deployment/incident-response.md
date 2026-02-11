@@ -628,8 +628,8 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 2. **Check firewall rules**:
    ```bash
-   # Verify QUIC port is open (default: 5600)
-   sudo iptables -L -n | grep 5600
+   # Verify QUIC port is open (default: 7777/udp)
+   sudo iptables -L -n | grep 7777
 
    # Verify mDNS port is open (5353)
    sudo iptables -L -n | grep 5353
