@@ -54,6 +54,7 @@ pub mod notifications;
 pub mod openapi;
 pub mod pagination;
 pub mod rate_limit;
+pub mod receipt_store;
 pub mod security;
 pub mod server;
 pub mod service_discovery_mgr;
@@ -78,6 +79,7 @@ pub use events::{
 };
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 pub use ledger_events::LedgerEventBridge;
+pub use receipt_store::ReceiptStore;
 pub use listings_mgr::{
     InMemoryListingsStore, Listing, ListingCategory, ListingFilter, ListingId, ListingInterest,
     ListingStatus, ListingType, ListingVisibility, ListingsManager,
