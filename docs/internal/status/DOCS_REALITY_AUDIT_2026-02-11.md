@@ -1769,3 +1769,49 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C18; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C19 - deployment full-stack endpoint drift correction)
+
+1. `docs/deployment/FULL_STACK_DEPLOY.md`
+
+Changes:
+
+- Added historical snapshot banner with current truth sources.
+- Replaced stale gateway checks:
+  - `/health` -> `/v1/health`
+  - removed nonexistent `/api/v1/whoami`; replaced with `/v1/auth/challenge` example
+  - `/ws` -> `/v1/ws/{coop_id}`
+- Replaced stale `/api/v1/*` examples with current v1 paths:
+  - ledger transaction example -> `POST /v1/ledger/{coop_id}/payment`
+  - governance examples -> `POST /v1/gov/proposals`, `POST /v1/gov/proposals/{id}/vote`
+- Updated request body shapes to match current models:
+  - proposal payload uses tagged `{"type":"text","body":"..."}`
+  - vote uses `choice` + optional `comment`.
+- Replaced trust-example hardcoding with OpenAPI-discovery check (`/api-docs/openapi.json`) to avoid asserting non-authoritative trust paths.
+
+## Verification updates (Batch C19)
+
+```bash
+rg -n "/api/v1/|http://localhost:8080/health\\b|ws://localhost:8080/ws\\b|/api-docs/openapi.json|/v1/gov/proposals|/v1/ledger/.+/payment|/v1/auth/challenge|/v1/ws/" docs/deployment/FULL_STACK_DEPLOY.md
+```
+
+Result: stale `/api/v1/*`, `/health`, and `/ws` forms removed from this file; current v1 forms present.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C19)
+
+- `docs/deployment/FULL_STACK_DEPLOY.md | icn/crates/icn-gateway/src/server.rs + icn/crates/icn-gateway/src/models.rs + docs/api/openapi.yaml | rg -n "scope\\(\"/v1\"\\)|scope\\(\"/ledger\"\\)|scope\\(\"/gov\"\\)|/v1/ws/\\{coop_id\\}|CreateProposalRequest|CastVoteRequest" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C19)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C19; continue active-doc content drift cleanup.
