@@ -99,8 +99,10 @@ fn test_economic_chain_canonical_hash_determinism() {
         .add_intent(intent_a2.clone());
 
     // Step 4: Convert to TreasuryEntryRequest
-    let request_a1 = TreasuryEntryRequest::from_settlement_intent(&intent_a1, "treasury-main");
-    let request_a2 = TreasuryEntryRequest::from_settlement_intent(&intent_a2, "treasury-main");
+    let request_a1 =
+        TreasuryEntryRequest::from_settlement_intent(&intent_a1, "treasury-main").unwrap();
+    let request_a2 =
+        TreasuryEntryRequest::from_settlement_intent(&intent_a2, "treasury-main").unwrap();
 
     // === Node B: Construct same economic chain independently ===
     println!("║ Node B: Constructing economic chain (same inputs)...             ║");
@@ -142,8 +144,10 @@ fn test_economic_chain_canonical_hash_determinism() {
         .add_intent(intent_b2.clone());
 
     // Step 4: Convert to TreasuryEntryRequest
-    let request_b1 = TreasuryEntryRequest::from_settlement_intent(&intent_b1, "treasury-main");
-    let request_b2 = TreasuryEntryRequest::from_settlement_intent(&intent_b2, "treasury-main");
+    let request_b1 =
+        TreasuryEntryRequest::from_settlement_intent(&intent_b1, "treasury-main").unwrap();
+    let request_b2 =
+        TreasuryEntryRequest::from_settlement_intent(&intent_b2, "treasury-main").unwrap();
 
     // === Verify Chain Determinism ===
     println!("╠══════════════════════════════════════════════════════════════════╣");
@@ -307,7 +311,8 @@ fn test_provenance_chain_integrity() {
         &intent,
         "treasury-main",
         &allocation_hash,
-    );
+    )
+    .unwrap();
 
     // Verify chain integrity
 

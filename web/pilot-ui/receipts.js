@@ -8,6 +8,14 @@
 (function() {
     'use strict';
 
+    // HTML escape function to prevent XSS
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
     // DOM elements
     const elements = {
         decisionHashInput: null,
@@ -167,10 +175,11 @@
 
         const allocations = chainData.allocations || [];
         const intents = chainData.intents || [];
-        const entries = ledgerData.entries || [];
+        // Ledger API returns transactions, not entries
+        const transactions = ledgerData.transactions || [];
 
         // Update status badge
-        const totalItems = allocations.length + intents.length + entries.length;
+        const totalItems = allocations.length + intents.length + transactions.length;
         if (totalItems > 0) {
             elements.chainStatus.textContent = `${totalItems} items found`;
             elements.chainStatus.className = 'status-badge success';
@@ -185,8 +194,8 @@
         // Render intents
         renderIntents(intents);
 
-        // Render ledger entries
-        renderLedgerEntries(entries);
+        // Render ledger entries (from transactions)
+        renderLedgerEntries(transactions);
     }
 
     // Check if array is sorted
@@ -220,21 +229,21 @@
                 </div>
                 <div class="receipt-field">
                     <label>Canonical Hash:</label>
-                    <code class="hash">${truncateHash(alloc.canonicalHash)}</code>
+                    <code class="hash">${escapeHtml(truncateHash(alloc.canonicalHash))}</code>
                 </div>
                 <div class="receipt-field">
                     <label>Decision Hash:</label>
-                    <code class="hash">${truncateHash(alloc.decisionHash)}</code>
+                    <code class="hash">${escapeHtml(truncateHash(alloc.decisionHash))}</code>
                 </div>
                 <div class="receipt-field">
                     <label>Intent Count:</label>
-                    <span>${alloc.intentCount || 0}</span>
+                    <span>${escapeHtml(String(alloc.intentCount || 0))}</span>
                 </div>
                 ${hashes.length ? `
                 <div class="receipt-field">
                     <label>Intent Hashes: ${sortedBadge}</label>
                     <ul class="hash-list">
-                        ${hashes.map(h => `<li><code class="hash">${truncateHash(h)}</code></li>`).join('')}
+                        ${hashes.map(h => `<li><code class="hash">${escapeHtml(truncateHash(h))}</code></li>`).join('')}
                     </ul>
                 </div>
                 ` : ''}
@@ -259,30 +268,30 @@
             <div class="receipt-item intent">
                 <div class="receipt-header">
                     <span class="receipt-type">Intent</span>
-                    <span class="receipt-asset">${intent.assetType || 'Unknown'}</span>
+                    <span class="receipt-asset">${escapeHtml(intent.assetType || 'Unknown')}</span>
                 </div>
                 <div class="receipt-field">
                     <label>Canonical Hash:</label>
-                    <code class="hash">${truncateHash(intent.canonicalHash)}</code>
+                    <code class="hash">${escapeHtml(truncateHash(intent.canonicalHash))}</code>
                 </div>
                 <div class="receipt-row">
                     <div class="receipt-field">
                         <label>From:</label>
-                        <span>${intent.from || '—'}</span>
+                        <span>${escapeHtml(intent.from || '—')}</span>
                     </div>
                     <div class="receipt-field">
                         <label>To:</label>
-                        <span>${intent.to || '—'}</span>
+                        <span>${escapeHtml(intent.to || '—')}</span>
                     </div>
                 </div>
                 <div class="receipt-row">
                     <div class="receipt-field">
                         <label>Amount:</label>
-                        <span class="amount">${intent.amount || 0} ${intent.unit || ''}</span>
+                        <span class="amount">${escapeHtml(String(intent.amount || 0))} ${escapeHtml(intent.unit || '')}</span>
                     </div>
                     <div class="receipt-field">
                         <label>Scope:</label>
-                        <span>${intent.scope || 'Unknown'}</span>
+                        <span>${escapeHtml(intent.scope || 'Unknown')}</span>
                     </div>
                 </div>
                 ${intent.memo ? `
@@ -297,57 +306,53 @@
         elements.intentsList.innerHTML = html;
     }
 
-    // Render ledger entries
-    function renderLedgerEntries(entries) {
-        if (!entries.length) {
+    // Render ledger entries (from TransactionHistoryEntry format)
+    function renderLedgerEntries(transactions) {
+        if (!transactions.length) {
             elements.ledgerList.innerHTML = '<p class="empty-state">No ledger entries found</p>';
             return;
         }
 
-        const html = entries.map(entry => `
+        // TransactionHistoryEntry has: id, timestamp, author, accounts[], decision_receipt_id, decision_hash
+        const html = transactions.map(tx => {
+            // Summarize account deltas
+            const accountSummary = (tx.accounts || []).map(acct => {
+                const delta = acct.credit ? `+${acct.credit}` : (acct.debit ? `-${acct.debit}` : '0');
+                return `${escapeHtml(acct.account_id)}: ${escapeHtml(delta)} ${escapeHtml(acct.currency || '')}`;
+            }).join(', ') || 'No accounts';
+
+            return `
             <div class="receipt-item ledger">
                 <div class="receipt-header">
                     <span class="receipt-type">Ledger Entry</span>
-                    <span class="receipt-status">${entry.status || 'Unknown'}</span>
+                    <span class="receipt-id">${escapeHtml(truncateHash(tx.id))}</span>
                 </div>
-                <div class="receipt-row">
-                    <div class="receipt-field">
-                        <label>From:</label>
-                        <span>${entry.from || '—'}</span>
-                    </div>
-                    <div class="receipt-field">
-                        <label>To:</label>
-                        <span>${entry.to || '—'}</span>
-                    </div>
+                <div class="receipt-field">
+                    <label>Author:</label>
+                    <span>${escapeHtml(tx.author || '—')}</span>
                 </div>
-                <div class="receipt-row">
-                    <div class="receipt-field">
-                        <label>Amount:</label>
-                        <span class="amount">${entry.amount || 0} ${entry.currency || ''}</span>
-                    </div>
-                    <div class="receipt-field">
-                        <label>Type:</label>
-                        <span>${entry.entryType || 'Transfer'}</span>
-                    </div>
+                <div class="receipt-field">
+                    <label>Accounts:</label>
+                    <span class="accounts">${accountSummary}</span>
                 </div>
-                ${entry.decisionHash ? `
+                ${tx.decision_hash ? `
                 <div class="receipt-field">
                     <label>Decision Hash:</label>
-                    <code class="hash">${truncateHash(entry.decisionHash)}</code>
+                    <code class="hash">${escapeHtml(truncateHash(tx.decision_hash))}</code>
                 </div>
                 ` : ''}
-                ${entry.decisionReceiptId ? `
+                ${tx.decision_receipt_id ? `
                 <div class="receipt-field">
                     <label>Decision Receipt ID:</label>
-                    <span>${entry.decisionReceiptId}</span>
+                    <span>${escapeHtml(tx.decision_receipt_id)}</span>
                 </div>
                 ` : ''}
                 <div class="receipt-field">
                     <label>Timestamp:</label>
-                    <span>${formatTimestamp(entry.timestamp)}</span>
+                    <span>${formatTimestamp(tx.timestamp)}</span>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
 
         elements.ledgerList.innerHTML = html;
     }

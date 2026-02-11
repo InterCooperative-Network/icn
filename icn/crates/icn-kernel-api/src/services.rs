@@ -682,8 +682,15 @@ impl TreasuryEntryRequest {
     /// * `treasury_id` - The treasury account ID (derived from scope/context)
     ///
     /// # Returns
-    /// A TreasuryEntryRequest ready for ledger submission
-    pub fn from_settlement_intent(intent: &SettlementIntent, treasury_id: &str) -> Self {
+    /// A TreasuryEntryRequest ready for ledger submission, or an error if the
+    /// amount exceeds i64::MAX (which would be ~9.2 quintillion units).
+    ///
+    /// # Errors
+    /// Returns an error if `intent.amount` exceeds `i64::MAX`.
+    pub fn from_settlement_intent(
+        intent: &SettlementIntent,
+        treasury_id: &str,
+    ) -> Result<Self, std::num::TryFromIntError> {
         let operation_type = match intent.asset {
             AssetType::Fungible => TreasuryOperationType::Spend,
             AssetType::Service { .. } => TreasuryOperationType::Spend,
@@ -696,28 +703,34 @@ impl TreasuryEntryRequest {
         // Convert canonical hash to hex string for provenance
         let decision_hash_hex = hex::encode(intent.decision_hash);
 
-        TreasuryEntryRequest {
+        // Safe conversion - returns error if amount exceeds i64::MAX
+        let amount = i64::try_from(intent.amount)?;
+
+        Ok(TreasuryEntryRequest {
             treasury_id: treasury_id.to_string(),
             operation_type,
-            amount: i64::try_from(intent.amount).expect("SettlementIntent amount exceeds i64::MAX"),
+            amount,
             currency: intent.unit.clone(),
             recipient: Some(intent.to.clone()),
             memo: intent.memo.clone().unwrap_or_default(),
             decision_receipt_id: intent.decision_receipt_id.clone(),
             decision_hash: decision_hash_hex,
-        }
+        })
     }
 
     /// Create a TreasuryEntryRequest from a SettlementIntent with an AllocationReceipt
     /// as provenance anchor.
     ///
     /// This includes the allocation_hash in provenance metadata.
+    ///
+    /// # Errors
+    /// Returns an error if `intent.amount` exceeds `i64::MAX`.
     pub fn from_settlement_with_allocation(
         intent: &SettlementIntent,
         treasury_id: &str,
         allocation_hash: &crate::receipts::Hash,
-    ) -> Self {
-        let mut request = Self::from_settlement_intent(intent, treasury_id);
+    ) -> Result<Self, std::num::TryFromIntError> {
+        let mut request = Self::from_settlement_intent(intent, treasury_id)?;
         // Include allocation hash in memo for full provenance chain
         let allocation_hex = hex::encode(allocation_hash);
         if request.memo.is_empty() {
@@ -725,7 +738,7 @@ impl TreasuryEntryRequest {
         } else {
             request.memo = format!("{} | allocation:{}", request.memo, allocation_hex);
         }
-        request
+        Ok(request)
     }
 }
 

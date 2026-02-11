@@ -91,27 +91,41 @@ GET /v1/receipts/chain?decision_hash={hex}
 GET /v1/ledger/{coop_id}/entries/by-decision?decision_hash={hex}
 ```
 
-Response includes `decision_receipt_id` and `decision_hash` fields for each entry:
+Response includes `decision_receipt_id` and `decision_hash` fields for each transaction:
 
 ```json
 {
-  "entries": [
+  "transactions": [
     {
-      "id": "entry-uuid",
+      "id": "tx-uuid",
       "timestamp": 1704067200,
-      "from": "treasury",
-      "to": "member-alice",
-      "amount": "1000",
-      "currency": "HOURS",
-      "entryType": "Transfer",
-      "status": "Confirmed",
+      "author": "did:icn:abc123...",
+      "accounts": [
+        {
+          "accountId": "treasury:main",
+          "debit": 1000,
+          "currency": "HOURS"
+        },
+        {
+          "accountId": "member:alice",
+          "credit": 1000,
+          "currency": "HOURS"
+        }
+      ],
       "decisionReceiptId": "decision-001",
       "decisionHash": "2a2a2a2a2a2a2a2a..."
     }
   ],
-  "total": 1
+  "pagination": {
+    "page": 1,
+    "perPage": 10,
+    "total": 1,
+    "hasMore": false
+  }
 }
 ```
+
+> **Note:** Ledger entries use double-entry accounting with account deltas (credit/debit) rather than simple from/to transfers.
 
 ### Receipt Chain Example
 
