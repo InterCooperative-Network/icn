@@ -55,12 +55,19 @@ fn tripwire_legacy_governance_handlers_deleted() {
 fn tripwire_effect_path_coverage() {
     // Proposal types with full effect path (Decision → Effect → Service → Durable State)
     let effect_path_complete = [
-        "Treasury::Spend",        // LedgerService
-        "Federation::Join",       // FederationService
-        "Federation::Vouch",      // FederationService
-        "Control::Veto",          // ControlService
-        "Control::ForceClose",    // ControlService
-        "Control::TextResolution", // ControlService (no-op)
+        "Treasury::Spend",              // LedgerService
+        "Federation::Join",             // FederationService
+        "Federation::Vouch",            // FederationService
+        "Control::Veto",                // ControlService
+        "Control::ForceClose",          // ControlService
+        "Control::TextResolution",      // ControlService (no-op)
+        "Membership::Add",              // MembershipService
+        "Membership::Remove",           // MembershipService
+        "Membership::Update",           // MembershipService
+        "Membership::Freeze",           // MembershipService
+        "Membership::Unfreeze",         // MembershipService
+        "Protocol::SetParameter",       // ProtocolParameterStore
+        "Protocol::SetGovernanceConfig", // ProtocolParameterStore
     ];
 
     // Proposal types with effect defined but not wired to service
@@ -73,15 +80,8 @@ fn tripwire_effect_path_coverage() {
         "Treasury::IssueBond",
         "Federation::Leave",
         "Federation::EstablishClearing",
-        "Membership::Add",
-        "Membership::Remove",
-        "Membership::Update",
-        "Membership::Freeze",
-        "Membership::Unfreeze",
-        "Protocol::SetParameter",
-        "Protocol::Upgrade",
-        "Protocol::SetSchedulingPolicy",
-        "Protocol::SetGovernanceConfig",
+        "Protocol::Upgrade",           // Not implemented - returns explicit failure
+        "Protocol::SetSchedulingPolicy", // Not implemented - returns explicit failure
         "Dispute::Resolve",
         "Dispute::Rollback",
         "Sdis::ApproveSteward",
@@ -106,10 +106,11 @@ fn tripwire_effect_path_coverage() {
     println!("║ ❌ Legacy only (no effect type): {:2}                              ║", legacy_only.len());
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
-    // Current target: 6 complete, 23 defined, 0 legacy-only
+    // Current target: 13 complete, 16 defined, 0 legacy-only
+    // Updated: Membership (5) + Protocol (2) now wired
     assert_eq!(
         effect_path_complete.len(),
-        6,
+        13,
         "Update this test when more effects are wired to services"
     );
 }

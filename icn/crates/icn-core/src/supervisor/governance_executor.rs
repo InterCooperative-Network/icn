@@ -135,10 +135,15 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         decision_receipt_id,
                     ))
                 } else {
+                    // Protocol effect not implemented - fail explicitly, no lying success
+                    tracing::warn!(
+                        effect = ?protocol_effect,
+                        "Protocol effect not implemented - returning failure"
+                    );
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
-                        success: true,
-                        message: "Protocol effect applied".to_string(),
+                        success: false,
+                        message: format!("Protocol effect not implemented: {:?}", protocol_effect),
                         state_change_hash: None,
                     })
                 }
