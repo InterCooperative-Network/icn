@@ -1396,3 +1396,41 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C9; continue with remaining active-doc drift.
+## Changes applied (Batch C10 - keystore migration guide vs identity runtime)
+
+1. `docs/migration-guides/keystore-versions.md`
+- Updated format status to reflect current migration target (`v3` current, `v2.1` legacy).
+- Corrected migration semantics to match code path in `icn-identity`:
+  - legacy formats migrate to v3 on unlock
+  - keystore is re-encrypted and saved in-place at `{data_dir}/identity.age`
+  - removed unsupported claim that migration auto-creates `backup-v1` files
+- Updated file/path references from `keystore.age` to `identity.age` in backup and verification examples.
+- Updated multi-keystore guidance from unsupported `ICN_DATA_DIR=... icnctl ...` to `icnctl --data-dir ...`.
+- Corrected downgrade statement to v3 format.
+
+## Verification updates (Batch C10)
+
+```bash
+rg -n "backup-v1|ICN_DATA_DIR=|keystore.age|v2.1 keystores cannot" docs/migration-guides/keystore-versions.md
+```
+
+Result: obsolete backup/env/path claims removed; version/downgrade wording aligned.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C10)
+
+- `docs/migration-guides/keystore-versions.md | icn/crates/icn-identity/src/keystore.rs + icn/bins/icnctl/src/main.rs | rg -n "migrat|v3|identity.age|--data-dir" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C10)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C10; continue active-doc drift cleanup.

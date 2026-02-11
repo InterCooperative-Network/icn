@@ -8,7 +8,8 @@ This guide covers migrating between keystore format versions in ICN.
 |---------|------|---------|--------|
 | v1 | 2025-01 | Ed25519 keypair only | Legacy |
 | v2 | 2025-01 | + TLS certificate with DID-TLS binding | Legacy |
-| v2.1 | 2025-01 | + X25519 keys for end-to-end encryption | Current |
+| v2.1 | 2025-01 | + X25519 keys for end-to-end encryption | Legacy |
+| v3 | 2026-01 | + DID Document + multi-device metadata | Current |
 
 ---
 
@@ -26,12 +27,13 @@ This guide covers migrating between keystore format versions in ICN.
    ```
 
 2. **Automatic migration**:
-   - Detects old format (v1 or v2)
+   - Detects old format (v1, v2, or v2.1)
    - Generates missing components:
-     - v1→v2.1: TLS certificate + X25519 keys
-     - v2→v2.1: X25519 keys (reuses TLS cert)
+     - v1→v3: TLS certificate + X25519 keys + DID document metadata
+     - v2→v3: X25519 keys + DID document metadata (reuses TLS cert)
+     - v2.1→v3: DID document metadata
    - Saves upgraded keystore immediately
-   - Creates backup: `keystore.age.backup-v1-<timestamp>`
+   - Overwrites the existing keystore file at `{data_dir}/identity.age`
 
 3. **Verification**:
    ```bash
@@ -46,7 +48,7 @@ This guide covers migrating between keystore format versions in ICN.
 
 You'll see this in the logs:
 ```
-✅ Successfully migrated and saved v2.1 keystore with persistent TLS binding and X25519 keys
+✅ Successfully migrated to v3 keystore (multi-device support enabled)
 ```
 
 ---
@@ -60,7 +62,7 @@ If automatic migration fails or you want manual control:
 **CRITICAL**: Always backup before manual migration!
 
 ```bash
-cp ~/.icn/keystore.age ~/.icn/keystore.age.backup-manual
+cp ~/.icn/identity.age ~/.icn/identity.age.backup-manual
 # Or use built-in backup
 icnctl backup ~/icn-backup-before-migration.tar.gz.age
 ```
@@ -92,11 +94,10 @@ Migration happens automatically on unlock.
 icnctl id show
 
 # Verify keystore file was updated
-ls -lh ~/.icn/keystore.age*
+ls -lh ~/.icn/identity.age
 
 # You should see:
-# keystore.age              (new v2.1)
-# keystore.age.backup-v1-*  (old version backup)
+# identity.age              (current format after migration)
 ```
 
 ---
@@ -156,24 +157,23 @@ ls -lh ~/.icn/keystore.age*
 
 **To backup only keystore**:
 ```bash
-tar -czf ~/keystore-only-backup.tar.gz -C ~/.icn keystore.age
+tar -czf ~/keystore-only-backup.tar.gz -C ~/.icn identity.age
 ```
 
 ---
 
 ## Version-Specific Details
 
-### v1 → v2.1 Migration
+### v1 → v3 Migration
 
 **What happens:**
 1. Loads Ed25519 keypair (unchanged)
 2. Generates TLS certificate from Ed25519 key
 3. Signs DID-TLS binding proof
 4. Generates X25519 keypair for encryption
-5. Creates v2.1 bundle
+5. Creates v3 bundle
 6. Encrypts with your passphrase
-7. Saves to disk (overwrites `keystore.age`)
-8. Creates backup of old keystore
+7. Saves to disk (overwrites `identity.age`)
 
 **Time**: < 1 second
 
@@ -181,15 +181,15 @@ tar -czf ~/keystore-only-backup.tar.gz -C ~/.icn keystore.age
 - ✅ Old nodes can still verify your identity (DID unchanged)
 - ✅ New features (E2E encryption, persistent TLS) now available
 
-### v2 → v2.1 Migration
+### v2 → v3 Migration
 
 **What happens:**
 1. Loads Ed25519 keypair + TLS certificate (unchanged)
 2. Generates X25519 keypair for encryption
-3. Creates v2.1 bundle
+3. Creates v3 bundle
 4. Encrypts with your passphrase
 5. Saves to disk
-6. Creates backup of v2 keystore
+6. Stores DID document and device metadata
 
 **Time**: < 1 second
 
@@ -231,7 +231,7 @@ See [multi-device-identity-design.md](../design/multi-device-identity-design.md)
 
 ## Downgrading (Not Recommended)
 
-**You cannot downgrade keystore versions.** v2.1 keystores cannot be read by older ICN versions.
+**You cannot downgrade keystore versions.** v3 keystores cannot be read by older ICN versions.
 
 **If you must use an older ICN version**:
 1. Restore from pre-migration backup
@@ -289,13 +289,13 @@ A: No. Stop icnd first: `sudo systemctl stop icnd`
 **Q: How long does migration take?**
 A: < 1 second. Cryptographic operations are fast.
 
-**Q: Can I migrate back to v1/v2?**
+**Q: Can I migrate back to v1/v2/v2.1?**
 A: No. Downgrading is not supported.
 
 **Q: What if I have multiple keystores (test/prod)?**
-A: Migrate each separately. Set `ICN_DATA_DIR` for non-default locations:
+A: Migrate each separately with explicit data directories:
 ```bash
-ICN_DATA_DIR=/path/to/test icnctl id show
+icnctl --data-dir /path/to/test id show
 ```
 
 ---
