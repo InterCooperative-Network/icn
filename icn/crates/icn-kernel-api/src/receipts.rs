@@ -157,7 +157,11 @@ struct AllocationReceiptCanonical<'a> {
 
 impl CanonicalReceipt for AllocationReceipt {
     fn canonical_hash(&self) -> Hash {
-        let intent_hashes: Vec<Hash> = self.intents.iter().map(|i| i.canonical_hash()).collect();
+        // Sort intent hashes to ensure order-independent determinism
+        // This prevents canonical hash divergence when intents are added in different orders
+        let mut intent_hashes: Vec<Hash> = self.intents.iter().map(|i| i.canonical_hash()).collect();
+        intent_hashes.sort();
+        
         let canonical = AllocationReceiptCanonical {
             decision_hash: &self.decision_hash,
             intent_hashes,
@@ -221,9 +225,14 @@ impl AllocationReceipt {
         self
     }
 
-    /// Get all intent canonical hashes
+    /// Get all intent canonical hashes (sorted for determinism)
+    ///
+    /// Returns hashes in sorted order to match canonical_hash() behavior.
+    /// This ensures callers don't reintroduce order-dependent logic.
     pub fn intent_hashes(&self) -> Vec<Hash> {
-        self.intents.iter().map(|i| i.canonical_hash()).collect()
+        let mut hashes: Vec<Hash> = self.intents.iter().map(|i| i.canonical_hash()).collect();
+        hashes.sort();
+        hashes
     }
 }
 
@@ -570,5 +579,83 @@ mod tests {
                 .contains(&decision_hash),
             "provenance must include decision_hash"
         );
+    }
+
+    #[test]
+    fn test_allocation_receipt_canonical_hash_order_independent() {
+        // D0 determinism hardening: intent order must not affect canonical hash
+        // Two nodes adding the same intents in different order must produce the same hash
+        
+        let decision_hash = [42u8; 32];
+        
+        // Create intents with different amounts so they have different hashes
+        let intent_100 = make_test_intent(100);
+        let intent_200 = make_test_intent(200);
+        let intent_300 = make_test_intent(300);
+        
+        // Node A adds intents in order: 100, 200, 300
+        let receipt_a = AllocationReceipt::new(decision_hash, ScopeLevel::Org)
+            .with_timestamp(1000)
+            .add_intent(intent_100.clone())
+            .add_intent(intent_200.clone())
+            .add_intent(intent_300.clone());
+        
+        // Node B adds intents in reverse order: 300, 200, 100
+        let receipt_b = AllocationReceipt::new(decision_hash, ScopeLevel::Org)
+            .with_timestamp(1000)
+            .add_intent(intent_300.clone())
+            .add_intent(intent_200.clone())
+            .add_intent(intent_100.clone());
+        
+        // Node C adds intents in different order: 200, 100, 300
+        let receipt_c = AllocationReceipt::new(decision_hash, ScopeLevel::Org)
+            .with_timestamp(1000)
+            .add_intent(intent_200)
+            .add_intent(intent_100)
+            .add_intent(intent_300);
+        
+        let hash_a = receipt_a.canonical_hash();
+        let hash_b = receipt_b.canonical_hash();
+        let hash_c = receipt_c.canonical_hash();
+        
+        assert_eq!(
+            hash_a, hash_b,
+            "canonical_hash must be order-independent (A vs B)"
+        );
+        assert_eq!(
+            hash_b, hash_c,
+            "canonical_hash must be order-independent (B vs C)"
+        );
+        assert_eq!(
+            hash_a, hash_c,
+            "canonical_hash must be order-independent (A vs C)"
+        );
+        
+        println!("✅ AllocationReceipt canonical_hash is order-independent");
+        println!("   Hash A (100,200,300): {}", hex::encode(&hash_a[..16]));
+        println!("   Hash B (300,200,100): {}", hex::encode(&hash_b[..16]));
+        println!("   Hash C (200,100,300): {}", hex::encode(&hash_c[..16]));
+        
+        // Also verify intent_hashes() returns sorted output
+        // This ensures callers don't reintroduce order-dependent logic
+        let hashes_a = receipt_a.intent_hashes();
+        let hashes_b = receipt_b.intent_hashes();
+        let hashes_c = receipt_c.intent_hashes();
+        
+        assert_eq!(
+            hashes_a, hashes_b,
+            "intent_hashes() must return sorted output (A vs B)"
+        );
+        assert_eq!(
+            hashes_b, hashes_c,
+            "intent_hashes() must return sorted output (B vs C)"
+        );
+        
+        // Verify the output is actually sorted
+        let mut sorted = hashes_a.clone();
+        sorted.sort();
+        assert_eq!(hashes_a, sorted, "intent_hashes() must be sorted");
+        
+        println!("✅ intent_hashes() returns sorted output");
     }
 }

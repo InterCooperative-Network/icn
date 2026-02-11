@@ -149,6 +149,12 @@ pub struct TransactionHistoryEntry {
     pub timestamp: u64,
     pub author: String, // DID
     pub accounts: Vec<AccountDeltaResponse>,
+    /// Decision receipt ID (node-local, links to governance decision)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_receipt_id: Option<String>,
+    /// Decision canonical hash (cross-node anchor)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_hash: Option<String>,
 }
 
 /// Account delta for transaction history

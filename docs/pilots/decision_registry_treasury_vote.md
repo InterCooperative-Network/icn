@@ -84,7 +84,36 @@ GET /v1/receipts/intents?decision_hash={hex}
 GET /v1/receipts/chain?decision_hash={hex}
 ```
 
-### Example Response
+### Ledger Provenance Queries
+
+```bash
+# Ledger entries with provenance for a decision
+GET /v1/ledger/{coop_id}/entries/by-decision?decision_hash={hex}
+```
+
+Response includes `decision_receipt_id` and `decision_hash` fields for each entry:
+
+```json
+{
+  "entries": [
+    {
+      "id": "entry-uuid",
+      "timestamp": 1704067200,
+      "from": "treasury",
+      "to": "member-alice",
+      "amount": "1000",
+      "currency": "HOURS",
+      "entryType": "Transfer",
+      "status": "Confirmed",
+      "decisionReceiptId": "decision-001",
+      "decisionHash": "2a2a2a2a2a2a2a2a..."
+    }
+  ],
+  "total": 1
+}
+```
+
+### Receipt Chain Example
 
 ```json
 {

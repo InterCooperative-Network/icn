@@ -476,16 +476,17 @@ fn test_allocation_receipt_intent_ordering() {
     );
     println!("║ Same order (A vs B): ✅ MATCH                                    ║");
 
-    // Different order → different hash (order matters!)
-    assert_ne!(
+    // D0 hardening: Different order → SAME hash (order is now normalized)
+    // This ensures nodes that add intents in different order still agree on canonical hash
+    assert_eq!(
         alloc_a.canonical_hash(),
         alloc_c.canonical_hash(),
-        "Different intent order must produce different hash"
+        "Different intent order must produce SAME hash (D0 determinism hardening)"
     );
-    println!("║ Different order (A vs C): ✅ DIFFERENT (correct behavior)        ║");
+    println!("║ Different order (A vs C): ✅ MATCH (order-independent hashing)   ║");
 
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║   RESULT: INTENT ORDERING AFFECTS HASH (CORRECT) ✅              ║");
+    println!("║   RESULT: INTENT ORDER NORMALIZED BEFORE HASHING ✅              ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 }

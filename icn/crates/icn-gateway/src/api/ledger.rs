@@ -10,7 +10,7 @@ use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreateCrossPaymentRequest, CreatePaymentRequest,
-    CrossPaymentQuoteRequest, TransactionHistoryEntry,
+    CrossPaymentQuoteRequest, PaginationInfo, TransactionHistoryEntry,
 };
 use crate::rate_limit::VelocityLimiter;
 use crate::trust_mgr::TrustManager;
@@ -312,6 +312,8 @@ pub async fn get_history(
                 timestamp: entry.timestamp,
                 author: entry.author.to_string(),
                 accounts,
+                decision_receipt_id: entry.decision_receipt_id.clone(),
+                decision_hash: entry.decision_hash.clone(),
             }
         })
         .collect();
@@ -333,6 +335,104 @@ pub async fn get_history(
 
     let response = TransactionHistoryResponse {
         transactions: history,
+        pagination,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// GET /ledger/:coop_id/entries/by-decision - Get ledger entries by decision hash
+///
+/// Queries ledger entries that were authorized by a specific governance decision.
+/// This enables tracing the economic effects of governance decisions.
+///
+/// Query parameters:
+/// - `decision_hash`: The canonical decision hash (hex-encoded)
+/// - `limit`: Maximum number of entries to return (default: 20, max: 100)
+#[get("/{coop_id}/entries/by-decision")]
+pub async fn get_entries_by_decision(
+    req: HttpRequest,
+    ledger_mgr: web::Data<Arc<LedgerManager>>,
+    coop_id: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse> {
+    use crate::models::TransactionHistoryResponse;
+    use crate::pagination::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
+
+    // Check authorization
+    require_scope(&req, "ledger:read")?;
+    require_coop_access(&req, &coop_id)?;
+
+    // Get decision hash from query
+    let decision_hash = query.get("decision_hash").ok_or_else(|| {
+        GatewayError::BadRequest("decision_hash query parameter required".to_string())
+    })?;
+
+    // Validate hex format
+    if decision_hash.len() != 64 {
+        return Err(GatewayError::BadRequest(
+            "decision_hash must be 64 hex characters (32 bytes)".to_string(),
+        ));
+    }
+    hex::decode(decision_hash).map_err(|_| {
+        GatewayError::BadRequest("decision_hash must be valid hex".to_string())
+    })?;
+
+    let limit: usize = query
+        .get("limit")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE);
+
+    // Get all history entries (bounded scan for pilot)
+    // TODO: Add index for decision_hash in ledger for efficient queries
+    let entries = ledger_mgr
+        .get_history(&coop_id, None, 0, 1000)
+        .await?;
+
+    // Filter entries by decision_hash
+    let filtered: Vec<TransactionHistoryEntry> = entries
+        .into_iter()
+        .filter(|entry| {
+            entry.decision_hash.as_deref() == Some(decision_hash.as_str())
+        })
+        .take(limit)
+        .map(|entry| {
+            let accounts: Vec<AccountDeltaResponse> = entry
+                .accounts
+                .iter()
+                .map(|delta| AccountDeltaResponse {
+                    account_id: delta.account_id.to_string(),
+                    currency: delta.currency.clone(),
+                    debit: delta.debit,
+                    credit: delta.credit,
+                })
+                .collect();
+
+            TransactionHistoryEntry {
+                id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
+                timestamp: entry.timestamp,
+                author: entry.author.to_string(),
+                accounts,
+                decision_receipt_id: entry.decision_receipt_id.clone(),
+                decision_hash: entry.decision_hash.clone(),
+            }
+        })
+        .collect();
+
+    let count = filtered.len();
+    let pagination = PaginationInfo {
+        total: Some(count),
+        next_cursor: None,
+        prev_cursor: None,
+        count,
+        has_more: false,
+        offset: None,
+        limit,
+    };
+
+    let response = TransactionHistoryResponse {
+        transactions: filtered,
         pagination,
     };
 
