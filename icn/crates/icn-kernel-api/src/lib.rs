@@ -37,6 +37,7 @@ pub mod bootstrap;
 pub mod comms;
 pub mod compute;
 pub mod coord;
+pub mod economics;
 pub mod effects;
 pub mod error;
 pub mod events;
@@ -45,6 +46,7 @@ pub mod identity;
 pub mod naming;
 pub mod proofs;
 pub mod protocol_params;
+pub mod receipts;
 pub mod scope;
 pub mod services;
 pub mod state;
@@ -66,6 +68,7 @@ pub use bootstrap::{
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
 pub use coord::Coordination;
+pub use economics::{AssetType, DepreciationSchedule, SettlementIntent};
 pub use effects::{
     ControlEffect, DisputeEffect, EffectResult, FederationEffect, KernelEffect, MembershipEffect,
     ProtocolEffect, ResourceEffect, SdisEffect, TreasuryEffect,
@@ -83,6 +86,9 @@ pub use naming::{
     Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
 };
 pub use proofs::ArtifactReceipt;
+pub use receipts::{
+    compute_canonical_hash, AllocationReceipt, CanonicalReceipt, Hash, ProvenanceAnchors, ReceiptId,
+};
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
     AddMemberRequest, AddMemberResult, CellService, ControlService, FederationJoinRequest,

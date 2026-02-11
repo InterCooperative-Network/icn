@@ -702,6 +702,10 @@ impl GatewayServer {
         let decision_registry = Arc::new(api::registry::DecisionRegistry::new());
         info!("Decision registry initialized");
 
+        // Create receipt store for economic receipts (AllocationReceipt, SettlementIntent)
+        let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
+        info!("Receipt store initialized");
+
         // Create recurring payment store
         let recurring_payment_store =
             crate::api::recurring_payments::RecurringPaymentStore::new(db.clone());
@@ -925,6 +929,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(listings_manager.clone()))
                 // Decision registry for governance meetings and decisions
                 .app_data(web::Data::new(decision_registry.clone()))
+                // Economic receipts store (AllocationReceipt, SettlementIntent)
+                .app_data(web::Data::new(receipt_store.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -1008,6 +1014,7 @@ impl GatewayServer {
                                 .service(api::ledger::get_balance)
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
+                                .service(api::ledger::get_entries_by_decision)
                                 .service(api::ledger::create_cross_payment)
                                 .service(api::ledger::get_cross_payment_quote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
@@ -1302,6 +1309,16 @@ impl GatewayServer {
                         .service(
                             web::scope("/registry")
                                 .configure(api::registry::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Economic receipts endpoints (auth + rate limiting)
+                        // AllocationReceipt + SettlementIntent queries
+                        .service(
+                            web::scope("/receipts")
+                                .configure(api::receipts::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

@@ -54,6 +54,7 @@ pub mod notifications;
 pub mod openapi;
 pub mod pagination;
 pub mod rate_limit;
+pub mod receipt_store;
 pub mod security;
 pub mod server;
 pub mod service_discovery_mgr;
@@ -96,6 +97,7 @@ pub use rate_limit::{
     EndpointCategory, IpRateLimiter, RateLimitConfig, RateLimiter, VelocityLimitConfig,
     VelocityLimiter,
 };
+pub use receipt_store::ReceiptStore;
 pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};

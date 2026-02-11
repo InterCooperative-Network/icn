@@ -640,6 +640,10 @@ export interface components {
         TransactionHistoryEntry: {
             accounts: components["schemas"]["AccountDeltaResponse"][];
             author: string;
+            /** @description Decision canonical hash (cross-node anchor) */
+            decision_hash?: string | null;
+            /** @description Decision receipt ID (node-local, links to governance decision) */
+            decision_receipt_id?: string | null;
             id: string;
             /** Format: int64 */
             timestamp: number;

@@ -665,6 +665,83 @@ pub struct TreasuryEntryResult {
     pub decision_hash: String,
 }
 
+// ============================================================================
+// SettlementIntent → TreasuryEntryRequest Conversion (INT-4)
+// ============================================================================
+
+use crate::economics::{AssetType, SettlementIntent};
+
+impl TreasuryEntryRequest {
+    /// Convert a SettlementIntent to a TreasuryEntryRequest.
+    ///
+    /// This is the canonical ledger binding pattern. The conversion is deterministic:
+    /// the same SettlementIntent always produces the same TreasuryEntryRequest.
+    ///
+    /// # Arguments
+    /// * `intent` - The settlement intent to convert
+    /// * `treasury_id` - The treasury account ID (derived from scope/context)
+    ///
+    /// # Returns
+    /// A TreasuryEntryRequest ready for ledger submission, or an error if the
+    /// amount exceeds i64::MAX (which would be ~9.2 quintillion units).
+    ///
+    /// # Errors
+    /// Returns an error if `intent.amount` exceeds `i64::MAX`.
+    pub fn from_settlement_intent(
+        intent: &SettlementIntent,
+        treasury_id: &str,
+    ) -> Result<Self, std::num::TryFromIntError> {
+        let operation_type = match intent.asset {
+            AssetType::Fungible => TreasuryOperationType::Spend,
+            AssetType::Service { .. } => TreasuryOperationType::Spend,
+            AssetType::Claim { .. } => TreasuryOperationType::IssueBond,
+            AssetType::Consumable { .. } => TreasuryOperationType::Spend,
+            AssetType::Depreciating { .. } => TreasuryOperationType::Allocate,
+            AssetType::Transformable { .. } => TreasuryOperationType::Allocate,
+        };
+
+        // Convert canonical hash to hex string for provenance
+        let decision_hash_hex = hex::encode(intent.decision_hash);
+
+        // Safe conversion - returns error if amount exceeds i64::MAX
+        let amount = i64::try_from(intent.amount)?;
+
+        Ok(TreasuryEntryRequest {
+            treasury_id: treasury_id.to_string(),
+            operation_type,
+            amount,
+            currency: intent.unit.clone(),
+            recipient: Some(intent.to.clone()),
+            memo: intent.memo.clone().unwrap_or_default(),
+            decision_receipt_id: intent.decision_receipt_id.clone(),
+            decision_hash: decision_hash_hex,
+        })
+    }
+
+    /// Create a TreasuryEntryRequest from a SettlementIntent with an AllocationReceipt
+    /// as provenance anchor.
+    ///
+    /// This includes the allocation_hash in provenance metadata.
+    ///
+    /// # Errors
+    /// Returns an error if `intent.amount` exceeds `i64::MAX`.
+    pub fn from_settlement_with_allocation(
+        intent: &SettlementIntent,
+        treasury_id: &str,
+        allocation_hash: &crate::receipts::Hash,
+    ) -> Result<Self, std::num::TryFromIntError> {
+        let mut request = Self::from_settlement_intent(intent, treasury_id)?;
+        // Include allocation hash in memo for full provenance chain
+        let allocation_hex = hex::encode(allocation_hash);
+        if request.memo.is_empty() {
+            request.memo = format!("allocation:{}", allocation_hex);
+        } else {
+            request.memo = format!("{} | allocation:{}", request.memo, allocation_hex);
+        }
+        Ok(request)
+    }
+}
+
 /// Ledger events that the kernel can report
 ///
 /// These are generic event types that don't expose ledger semantics.
@@ -1326,5 +1403,158 @@ impl ServiceRegistry {
     /// Get the cell service (if registered)
     pub fn cell(&self) -> Option<&Arc<dyn CellService>> {
         self.cell.as_ref()
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::economics::{AssetType, SettlementIntent};
+    use crate::receipts::{AllocationReceipt, CanonicalReceipt};
+
+    fn make_test_intent() -> SettlementIntent {
+        SettlementIntent::new(
+            "decision-001",
+            [42u8; 32],
+            "treasury",
+            "recipient-1",
+            1000,
+            "hours",
+        )
+        .with_timestamp(1000000)
+    }
+
+    #[test]
+    fn test_from_settlement_intent_basic() {
+        let intent = make_test_intent();
+        let request =
+            TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main").unwrap();
+
+        assert_eq!(request.treasury_id, "treasury-main");
+        assert_eq!(request.amount, 1000);
+        assert_eq!(request.currency, "hours");
+        assert_eq!(request.recipient, Some("recipient-1".to_string()));
+        assert_eq!(request.decision_receipt_id, "decision-001");
+        assert_eq!(request.operation_type, TreasuryOperationType::Spend);
+    }
+
+    #[test]
+    fn test_from_settlement_intent_decision_hash_preserved() {
+        let intent = make_test_intent();
+        let request =
+            TreasuryEntryRequest::from_settlement_intent(&intent, "treasury-main").unwrap();
+
+        // Verify decision hash is correctly hex-encoded
+        let expected_hex = hex::encode([42u8; 32]);
+        assert_eq!(request.decision_hash, expected_hex);
+    }
+
+    #[test]
+    fn test_from_settlement_intent_asset_type_mapping() {
+        // Fungible → Spend
+        let intent = SettlementIntent::new("d1", [1u8; 32], "a", "b", 100, "credits");
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
+        assert_eq!(req.operation_type, TreasuryOperationType::Spend);
+
+        // Service → Spend
+        let intent = SettlementIntent::new("d2", [2u8; 32], "a", "b", 100, "hours").with_asset(
+            AssetType::Service {
+                duration_secs: Some(3600),
+            },
+        );
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
+        assert_eq!(req.operation_type, TreasuryOperationType::Spend);
+
+        // Claim → IssueBond
+        let intent = SettlementIntent::new("d3", [3u8; 32], "a", "b", 100, "bond").with_asset(
+            AssetType::Claim {
+                due_by: None,
+                conditions: None,
+            },
+        );
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
+        assert_eq!(req.operation_type, TreasuryOperationType::IssueBond);
+
+        // Depreciating → Allocate
+        let intent = SettlementIntent::new("d4", [4u8; 32], "a", "b", 100, "equipment").with_asset(
+            AssetType::Depreciating {
+                schedule: crate::economics::DepreciationSchedule::Linear {
+                    lifespan_secs: 86400,
+                },
+            },
+        );
+        let req = TreasuryEntryRequest::from_settlement_intent(&intent, "t").unwrap();
+        assert_eq!(req.operation_type, TreasuryOperationType::Allocate);
+    }
+
+    #[test]
+    fn test_from_settlement_with_allocation_includes_hash() {
+        let intent = make_test_intent();
+        let allocation_hash = [99u8; 32];
+        let request = TreasuryEntryRequest::from_settlement_with_allocation(
+            &intent,
+            "treasury-main",
+            &allocation_hash,
+        )
+        .unwrap();
+
+        assert!(request.memo.contains("allocation:"));
+        assert!(request.memo.contains(&hex::encode([99u8; 32])));
+    }
+
+    #[test]
+    fn test_conversion_determinism() {
+        let intent = make_test_intent();
+
+        let req1 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury").unwrap();
+        let req2 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury").unwrap();
+
+        // Same intent → same request
+        assert_eq!(req1.treasury_id, req2.treasury_id);
+        assert_eq!(req1.amount, req2.amount);
+        assert_eq!(req1.currency, req2.currency);
+        assert_eq!(req1.recipient, req2.recipient);
+        assert_eq!(req1.decision_hash, req2.decision_hash);
+        assert_eq!(req1.decision_receipt_id, req2.decision_receipt_id);
+    }
+
+    #[test]
+    fn test_full_chain_provenance() {
+        // Simulate: Decision → AllocationReceipt → SettlementIntent → TreasuryEntryRequest
+        let decision_hash = [42u8; 32];
+
+        // Create allocation receipt from decision
+        let allocation =
+            AllocationReceipt::new(decision_hash, ScopeLevel::Org).with_timestamp(1000);
+        let allocation_hash = allocation.canonical_hash();
+
+        // Create settlement intent linked to decision (provenance is set in new())
+        let intent = SettlementIntent::new(
+            "decision-001",
+            decision_hash,
+            "treasury",
+            "member",
+            500,
+            "hours",
+        );
+
+        // Convert to treasury request with allocation provenance
+        let request = TreasuryEntryRequest::from_settlement_with_allocation(
+            &intent,
+            "treasury-main",
+            &allocation_hash,
+        )
+        .unwrap();
+
+        // Verify full chain is preserved
+        assert_eq!(request.decision_receipt_id, "decision-001");
+        let expected_decision_hex = hex::encode(decision_hash);
+        assert_eq!(request.decision_hash, expected_decision_hex);
+        let expected_allocation_hex = hex::encode(allocation_hash);
+        assert!(request.memo.contains(&expected_allocation_hex));
     }
 }

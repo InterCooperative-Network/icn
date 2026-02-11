@@ -4715,3 +4715,215 @@ footer .sync-status.error {
         animation: none !important;
     }
 }
+
+/* ============================================================================
+   Receipt Chain Viewer Styles
+   ============================================================================ */
+
+.receipt-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.receipt-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.receipt-section h4 {
+    margin-bottom: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.receipt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.receipt-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.receipt-item.allocation {
+    border-left: 4px solid var(--primary);
+}
+
+.receipt-item.intent {
+    border-left: 4px solid var(--success);
+}
+
+.receipt-item.ledger {
+    border-left: 4px solid var(--info);
+}
+
+.receipt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.receipt-type {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.receipt-scope,
+.receipt-asset,
+.receipt-status {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.receipt-field {
+    margin-bottom: 0.5rem;
+}
+
+.receipt-field:last-child {
+    margin-bottom: 0;
+}
+
+.receipt-field label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-bottom: 0.2rem;
+}
+
+.receipt-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 480px) {
+    .receipt-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.hash {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.8rem;
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    word-break: break-all;
+}
+
+.hash-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0 0 0;
+}
+
+.hash-list li {
+    margin-bottom: 0.25rem;
+}
+
+.amount {
+    font-weight: 600;
+    color: var(--success);
+}
+
+.memo {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.status-badge.success {
+    background: rgba(22, 163, 74, 0.1);
+    color: var(--success);
+}
+
+.status-badge.warning {
+    background: rgba(217, 119, 6, 0.1);
+    color: var(--warning);
+}
+
+.status-badge.loading {
+    background: rgba(8, 145, 178, 0.1);
+    color: var(--info);
+}
+
+.error-card {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.invariants-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.invariants-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.invariants-list li:last-child {
+    border-bottom: none;
+}
+
+.empty-state {
+    color: var(--text-tertiary);
+    font-style: italic;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Receipt chain actions */
+.chain-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Sorted verification badge */
+.sorted-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.sorted-badge.valid {
+    background: rgba(22, 163, 74, 0.15);
+    color: var(--success);
+}
+
+.sorted-badge.invalid {
+    background: rgba(220, 38, 38, 0.15);
+    color: var(--danger);
+}
+
+/* Copy button feedback */
+.btn.copied {
+    background: var(--success);
+    color: white;
+}

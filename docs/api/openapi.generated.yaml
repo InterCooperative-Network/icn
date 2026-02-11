@@ -1499,6 +1499,16 @@ components:
             $ref: '#/components/schemas/AccountDeltaResponse'
         author:
           type: string
+        decision_hash:
+          type:
+          - string
+          - 'null'
+          description: Decision canonical hash (cross-node anchor)
+        decision_receipt_id:
+          type:
+          - string
+          - 'null'
+          description: Decision receipt ID (node-local, links to governance decision)
         id:
           type: string
         timestamp:
