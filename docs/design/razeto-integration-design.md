@@ -1047,6 +1047,6 @@ impl Supervisor {
 
 ## Related Documents
 
-- [contribution-credits-design.md](contribution-credits-design.md) - Mutual credit and demurrage design
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture overview
-- [PHASE_HISTORY.md](PHASE_HISTORY.md) - Development phase history
+- [contribution-credits-design.md](economics/contribution-credits-design.md) - Mutual credit and demurrage design
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture overview
+- [PHASE_HISTORY.md](../PHASE_HISTORY.md) - Development phase history

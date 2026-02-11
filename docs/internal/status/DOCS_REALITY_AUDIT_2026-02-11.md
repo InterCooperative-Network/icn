@@ -413,3 +413,103 @@ Result: no missing-link matches for targeted governance design docs.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 7: design platform links)
+
+1. `docs/design/capability-based-features.md`
+- Fixed crate source links from `docs/design/` depth to canonical `icn/` paths.
+- Updated moved module links:
+  - `icn-net/src/actor/mod.rs`
+  - `icn-obs/src/metrics/mod.rs`
+
+2. `docs/design/scheduler-evolution-plan.md`
+- Corrected compute module links to `../../icn/crates/icn-compute/...`.
+- Corrected roadmap and project guidance links:
+  - `../development/sessions/undated/ROADMAP.md`
+  - `../../CLAUDE.md`
+- Repointed strategic gap analysis to dated session doc path.
+
+3. `docs/design/razeto-integration-design.md`
+- Corrected related document links:
+  - `economics/contribution-credits-design.md`
+  - `../ARCHITECTURE.md`
+  - `../PHASE_HISTORY.md`
+
+## Verification updates (Batch A4 - slice 7)
+
+```bash
+for f in docs/design/capability-based-features.md docs/design/scheduler-evolution-plan.md docs/design/razeto-integration-design.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted design docs.
+
+## Audit ledger updates (slice 7)
+
+- `docs/design/capability-based-features.md | icn/crates/icn-net/src/{version.rs,protocol.rs,actor/mod.rs}, icn/crates/icn-obs/src/metrics/mod.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/scheduler-evolution-plan.md | icn/crates/icn-compute/src/{actor/mod.rs,scheduler.rs}, docs/development/sessions/undated/ROADMAP.md, CLAUDE.md, docs/development/sessions/2026-01/2025-01-15-strategic-gap-analysis.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/razeto-integration-design.md | docs/design/economics/contribution-credits-design.md, docs/ARCHITECTURE.md, docs/PHASE_HISTORY.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 7)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 8: api/deploy/development links)
+
+1. `docs/api/README.md`
+- Repointed pilot coordinator guide link to `docs/internal/pilots/pilot-coordinator-guide.md`.
+
+2. `docs/demo/DEMO_README.md`
+- Repointed script link to repo script path: `../../scripts/quick-start-test.sh`.
+
+3. `docs/deployment/DEPLOY_TEST_NETWORK.md`
+- Fixed testing plan/quickstart links to `docs/development/testing/*`.
+- Fixed `CLAUDE.md` link to repo root `../../CLAUDE.md`.
+
+4. `docs/development/RELEASE_PROCESS.md`
+- Replaced dead `UPGRADING.md` links with canonical migration guide:
+  - `../migration-guides/version-upgrades.md`
+
+5. `docs/development/code-quality-improvements.md`
+- Fixed deny config source link to `../../icn/deny.toml`.
+
+6. `docs/development/testing/TESTING_QUICKSTART.md`
+- Fixed deploy guide link to `../../deployment/DEPLOY_TEST_NETWORK.md`.
+
+7. `docs/examples/policies/README.md`
+- Fixed governance primitives link to `../../design/governance/governance-primitives.md`.
+
+## Verification updates (Batch A4 - slice 8)
+
+```bash
+for f in docs/api/README.md docs/demo/DEMO_README.md docs/deployment/DEPLOY_TEST_NETWORK.md docs/development/RELEASE_PROCESS.md docs/development/code-quality-improvements.md docs/development/testing/TESTING_QUICKSTART.md docs/examples/policies/README.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted files.
+
+## Audit ledger updates (slice 8)
+
+- `docs/api/README.md | docs/internal/pilots/pilot-coordinator-guide.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/demo/DEMO_README.md | scripts/quick-start-test.sh | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/deployment/DEPLOY_TEST_NETWORK.md | docs/development/testing/{INTERNAL_TESTING_PLAN.md,TESTING_QUICKSTART.md}, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/development/RELEASE_PROCESS.md | docs/migration-guides/version-upgrades.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/development/code-quality-improvements.md | icn/deny.toml | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/development/testing/TESTING_QUICKSTART.md | docs/deployment/DEPLOY_TEST_NETWORK.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/examples/policies/README.md | docs/design/governance/governance-primitives.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 8)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.

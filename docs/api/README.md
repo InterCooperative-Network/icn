@@ -5,7 +5,7 @@ The ICN Gateway provides a REST and WebSocket API for cooperative applications.
 ## Quick Links
 
 - [OpenAPI Specification](openapi.yaml) - Full API specification (use with Swagger UI or Redoc)
-- [Pilot Coordinator Guide](../pilot-coordinator-guide.md) - Deployment and operations guide
+- [Pilot Coordinator Guide](../internal/pilots/pilot-coordinator-guide.md) - Deployment and operations guide
 
 ## Base URL
 

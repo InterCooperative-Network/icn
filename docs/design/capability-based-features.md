@@ -13,7 +13,7 @@ The network layer automatically negotiates the highest mutually-supported protoc
 
 ## Capability Flags
 
-All capabilities are defined in [`icn-net/src/version.rs`](../icn/crates/icn-net/src/version.rs):
+All capabilities are defined in [`icn-net/src/version.rs`](../../icn/crates/icn-net/src/version.rs):
 
 ```rust
 pub struct CapabilityFlags: u64 {
@@ -198,7 +198,7 @@ When adding a new feature that requires capability detection:
 
 ### 1. Define the Capability Flag
 
-Edit [`icn-net/src/version.rs`](../icn/crates/icn-net/src/version.rs):
+Edit [`icn-net/src/version.rs`](../../icn/crates/icn-net/src/version.rs):
 
 ```rust
 pub struct CapabilityFlags: u64 {
@@ -451,7 +451,7 @@ if let Some(info) = network.get_peer_connection_info(&peer).await {
 
 ## See Also
 
-- [Protocol Version Constants](../icn/crates/icn-net/src/protocol.rs) - Version numbers
-- [Version Negotiation Logic](../icn/crates/icn-net/src/version.rs) - Negotiation algorithm
-- [Network Actor](../icn/crates/icn-net/src/actor.rs) - Hello handshake implementation
-- [Prometheus Metrics](../icn/crates/icn-obs/src/metrics.rs) - Monitoring
+- [Protocol Version Constants](../../icn/crates/icn-net/src/protocol.rs) - Version numbers
+- [Version Negotiation Logic](../../icn/crates/icn-net/src/version.rs) - Negotiation algorithm
+- [Network Actor](../../icn/crates/icn-net/src/actor/mod.rs) - Hello handshake implementation
+- [Prometheus Metrics](../../icn/crates/icn-obs/src/metrics/mod.rs) - Monitoring

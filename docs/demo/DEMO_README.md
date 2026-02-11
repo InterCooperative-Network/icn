@@ -34,7 +34,7 @@ This repository contains a comprehensive assessment of ICN's demo readiness and 
    - Decision points and risk mitigation
    - 5-day roadmap to demo-ready
 
-4. **[scripts/quick-start-test.sh](./scripts/quick-start-test.sh)** ⚡ **VALIDATION**
+4. **[scripts/quick-start-test.sh](../../scripts/quick-start-test.sh)** ⚡ **VALIDATION**
    - Automated validation script
    - Tests basic stack functionality
    - Creates test environment

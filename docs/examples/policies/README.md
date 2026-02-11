@@ -280,5 +280,5 @@ Access metrics at `http://localhost:9090/metrics`
 ## Further Reading
 
 - [Cooperative Scheduling Design](../../ARCHITECTURE.md#phase-16e-cooperative-scheduling)
-- [Governance Primitives](../../governance-primitives.md)
+- [Governance Primitives](../../design/governance/governance-primitives.md)
 - [Economic Safety Rails](../../ARCHITECTURE.md#phase-12-economic-safety)
