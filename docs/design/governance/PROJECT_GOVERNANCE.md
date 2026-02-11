@@ -46,7 +46,7 @@ This document describes how the ICN project is governed, how decisions are made,
 - Participate in discussions
 - Help other users
 
-**No formal process**: Just start contributing! See [CONTRIBUTING.md](../CONTRIBUTING.md).
+**No formal process**: Just start contributing! See [CONTRIBUTING.md](../../../CONTRIBUTING.md).
 
 #### Pilot Community Partners
 
@@ -156,7 +156,7 @@ This document describes how the ICN project is governed, how decisions are made,
    - Revise based on feedback
 
 3. **Publish**:
-   - Update [ROADMAP.md](../../ROADMAP.md)
+   - Update [ROADMAP.md](../../development/sessions/undated/ROADMAP.md)
    - Announce in CHANGELOG
    - Communicate to pilot communities
 
@@ -205,7 +205,7 @@ If maintainers cannot reach consensus:
 
 **Guidelines:**
 - Reference related issue(s)
-- Follow code style (see [CONTRIBUTING.md](../CONTRIBUTING.md))
+- Follow code style (see [CONTRIBUTING.md](../../../CONTRIBUTING.md))
 - Include tests
 - Update documentation
 - Be responsive to feedback
@@ -279,7 +279,7 @@ ICN follows [Semantic Versioning](https://semver.org/):
 
 ## Code of Conduct Enforcement
 
-We follow the [Contributor Covenant Code of Conduct](../CODE_OF_CONDUCT.md).
+We follow the [Contributor Covenant Code of Conduct](../../../CODE_OF_CONDUCT.md).
 
 ### Reporting
 

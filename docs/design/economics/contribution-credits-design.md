@@ -1954,12 +1954,12 @@ These may be revisited in future RFCs based on community needs.
 
 ### ICN Documentation
 
-- [ROADMAP.md](/ROADMAP.md) - Strategic roadmap
+- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Strategic roadmap
 - [glossary.md](../../glossary.md) - Authoritative terminology definitions
 - [economic-safety.md](economic-safety.md) - Credit limits and disputes
 - [econ-modeling.md](econ-modeling.md) - Economic simulation results
 - [../governance/governance.md](../governance/governance.md) - Governance primitives
-- [docs/federation-roadmap-implementation.md](federation-roadmap-implementation.md) - Federation layer
+- [docs/federation-roadmap-implementation.md](../../development/federation-roadmap-implementation.md) - Federation layer
 
 ### External References
 

@@ -847,10 +847,10 @@ A jurisdiction can:
 
 ## References
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Current system architecture
-- [governance-primitives.md](governance-primitives.md) - Existing governance layer
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Current system architecture
+- [governance-primitives.md](governance/governance-primitives.md) - Existing governance layer
 - [multi-device-identity-design.md](multi-device-identity-design.md) - Key rotation patterns
-- [threat-model.md](threat-model.md) - Security considerations
+- [threat-model.md](../security/threat-model.md) - Security considerations
 
 ---
 

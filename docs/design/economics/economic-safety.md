@@ -676,11 +676,11 @@ let crisis_policy = CreditPolicy::new(
 
 ## References
 
-- [ROADMAP.md](/ROADMAP.md) - Phase 12 specification
-- [docs/incident-response.md](incident-response.md) - Default handling procedures
-- [docs/operations-guide.md](operations-guide.md) - Daily operational workflows
-- [icn-ledger/src/credit_policy.rs](/icn/crates/icn-ledger/src/credit_policy.rs) - Implementation
-- [icn-ledger/src/dispute.rs](/icn/crates/icn-ledger/src/dispute.rs) - Dispute resolution
+- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Phase 12 specification
+- [docs/incident-response.md](../../operations/deployment/incident-response.md) - Default handling procedures
+- [docs/operations-guide.md](../../guides/operations/operations-guide.md) - Daily operational workflows
+- [icn-ledger/src/credit_policy.rs](../../../icn/crates/icn-ledger/src/credit_policy.rs) - Implementation
+- [icn-ledger/src/dispute.rs](../../../icn/crates/icn-ledger/src/dispute.rs) - Dispute resolution
 
 ---
 

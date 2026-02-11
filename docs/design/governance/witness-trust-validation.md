@@ -211,10 +211,10 @@ Potential improvements for future iterations:
 
 ## Related Documentation
 
-- [Trust Graph Architecture](trust-multi-graph-migration.md)
-- [Governance Integration](dev-journal/2025-01-17-governance-ledger-integration.md)
-- [Trust Threshold Configuration](trust-threshold-configuration.md)
-- [Production Hardening](production-hardening.md)
+- [Trust Graph Architecture](../../development/trust-multi-graph-migration.md)
+- [Governance Integration](../../development/sessions/2026-01/2025-01-17-governance-ledger-integration.md)
+- [Trust Threshold Configuration](../../reference/config/trust-threshold-configuration.md)
+- [Production Hardening](../../security/production-hardening.md)
 
 ## References
 

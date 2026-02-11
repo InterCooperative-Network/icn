@@ -1375,10 +1375,10 @@ icn_compute_trust_penalties_total          // Trust penalties applied
 
 ## 14. References
 
-- [Gap Analysis](gap-analysis.md) - Section 7 (Compute Substrate Gaps)
-- [Economic Safety](economic-safety.md) - Credit limits and billing integration
-- [Governance](governance.md) - Proposal patterns for compute policies
-- [CLAUDE.md](../CLAUDE.md) - Actor patterns and integration points
+- [Gap Analysis](../architecture/IMPLEMENTATION_GAP_ANALYSIS.md) - Section 7 (Compute Substrate Gaps)
+- [Economic Safety](economics/economic-safety.md) - Credit limits and billing integration
+- [Governance](governance/governance.md) - Proposal patterns for compute policies
+- [CLAUDE.md](../../CLAUDE.md) - Actor patterns and integration points
 
 ---
 

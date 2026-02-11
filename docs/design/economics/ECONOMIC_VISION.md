@@ -217,8 +217,8 @@ At the minimal core stage, ICN must demonstrate:
 ## Relation to Other Documents
 
 - **[ECONOMIC_ARCHITECTURE.md](ECONOMIC_ARCHITECTURE.md)** — Technical design of the layered economy, transformation model, and exchange mechanisms
-- **[ROADMAP.md](dev-journal/ROADMAP.md)** — Implementation phases and timeline
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Technical system architecture
+- **[ROADMAP.md](../../development/sessions/undated/ROADMAP.md)** — Implementation phases and timeline
+- **[ARCHITECTURE.md](../../ARCHITECTURE.md)** — Technical system architecture
 
 ---
 

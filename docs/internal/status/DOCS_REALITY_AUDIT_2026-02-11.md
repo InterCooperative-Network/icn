@@ -307,3 +307,109 @@ Result: no matches.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; proceed to next A4 slices and D2.
+
+## Changes applied (Batch A4 - slice 5: design/economics links)
+
+1. `docs/design/COMMONS_EVOLUTION.md`
+- Repointed architecture/governance/security links to current locations:
+  - `../ARCHITECTURE.md`
+  - `governance/governance-primitives.md`
+  - `../security/threat-model.md`
+
+2. `docs/design/compute-substrate-design.md`
+- Fixed missing references for gap analysis, economics safety, governance, and repo root guidance:
+  - `../architecture/IMPLEMENTATION_GAP_ANALYSIS.md`
+  - `economics/economic-safety.md`
+  - `governance/governance.md`
+  - `../../CLAUDE.md`
+
+3. `docs/design/economics/ECONOMIC_VISION.md`
+- Corrected roadmap and architecture links to canonical docs paths.
+
+4. `docs/design/economics/contribution-credits-design.md`
+- Corrected roadmap and federation roadmap links to current docs/development paths.
+
+5. `docs/design/economics/econ-modeling.md`
+- Corrected simulation references to `sims/mutual-credit/` from the economics subdirectory depth.
+
+6. `docs/design/economics/economic-safety.md`
+- Corrected roadmap, operations, and implementation source links:
+  - `../../development/sessions/undated/ROADMAP.md`
+  - `../../operations/deployment/incident-response.md`
+  - `../../guides/operations/operations-guide.md`
+  - `../../../icn/crates/icn-ledger/src/credit_policy.rs`
+  - `../../../icn/crates/icn-ledger/src/dispute.rs`
+
+## Verification updates (Batch A4 - slice 5)
+
+```bash
+for f in docs/design/compute-substrate-design.md docs/design/economics/ECONOMIC_VISION.md docs/design/economics/contribution-credits-design.md docs/design/economics/econ-modeling.md docs/design/economics/economic-safety.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for the targeted design/economics docs.
+
+## Audit ledger updates (slice 5)
+
+- `docs/design/COMMONS_EVOLUTION.md | docs/ARCHITECTURE.md, docs/design/governance/governance-primitives.md, docs/security/threat-model.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/compute-substrate-design.md | docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md, docs/design/economics/economic-safety.md, docs/design/governance/governance.md, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/economics/ECONOMIC_VISION.md | docs/development/sessions/undated/ROADMAP.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/economics/contribution-credits-design.md | docs/development/sessions/undated/ROADMAP.md, docs/development/federation-roadmap-implementation.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/economics/econ-modeling.md | sims/mutual-credit/RESULTS_SUMMARY.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/economics/economic-safety.md | docs/development/sessions/undated/ROADMAP.md, docs/operations/deployment/incident-response.md, docs/guides/operations/operations-guide.md, icn/crates/icn-ledger/src/credit_policy.rs, icn/crates/icn-ledger/src/dispute.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 5)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 6: governance design links)
+
+1. `docs/design/governance/PROJECT_GOVERNANCE.md`
+- Fixed broken root-level governance links:
+  - `../../../CONTRIBUTING.md`
+  - `../../../CODE_OF_CONDUCT.md`
+  - `../../development/sessions/undated/ROADMAP.md`
+
+2. `docs/design/governance/governance.md`
+- Fixed architecture, social recovery, and roadmap links:
+  - `../../ARCHITECTURE.md`
+  - `../sdis/social-recovery.md`
+  - `../../development/sessions/undated/ROADMAP.md`
+
+3. `docs/design/governance/witness-trust-validation.md`
+- Fixed trust/governance/config/security references:
+  - `../../development/trust-multi-graph-migration.md`
+  - `../../development/sessions/2026-01/2025-01-17-governance-ledger-integration.md`
+  - `../../reference/config/trust-threshold-configuration.md`
+  - `../../security/production-hardening.md`
+
+## Verification updates (Batch A4 - slice 6)
+
+```bash
+for f in docs/design/governance/PROJECT_GOVERNANCE.md docs/design/governance/governance.md docs/design/governance/witness-trust-validation.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted governance design docs.
+
+## Audit ledger updates (slice 6)
+
+- `docs/design/governance/PROJECT_GOVERNANCE.md | CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/development/sessions/undated/ROADMAP.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/governance/governance.md | docs/ARCHITECTURE.md, docs/design/sdis/social-recovery.md, docs/development/sessions/undated/ROADMAP.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/design/governance/witness-trust-validation.md | docs/development/trust-multi-graph-migration.md, docs/development/sessions/2026-01/2025-01-17-governance-ledger-integration.md, docs/reference/config/trust-threshold-configuration.md, docs/security/production-hardening.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 6)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.

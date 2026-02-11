@@ -2,7 +2,7 @@
 
 **Status**: ✅ **COMPLETE** (Track B3)
 **Last Updated**: 2025-01-14
-**Simulation Results**: [sims/mutual-credit/RESULTS_SUMMARY.md](../sims/mutual-credit/RESULTS_SUMMARY.md)
+**Simulation Results**: [sims/mutual-credit/RESULTS_SUMMARY.md](../../../sims/mutual-credit/RESULTS_SUMMARY.md)
 
 ## Purpose
 
@@ -64,7 +64,7 @@ All economic safety features from simulation are now implemented in ICN:
 - Ledger: Double-entry with quarantine for conflicts
 - Trust graph: Transitive trust computation with decay
 
-See [sims/mutual-credit/](../sims/mutual-credit/) for complete framework, scenarios, and analysis notebooks.
+See [sims/mutual-credit/](../../../sims/mutual-credit/) for complete framework, scenarios, and analysis notebooks.
 
 ---
 
