@@ -1497,7 +1497,8 @@ mod tests {
             &intent,
             "treasury-main",
             &allocation_hash,
-        );
+        )
+        .unwrap();
 
         assert!(request.memo.contains("allocation:"));
         assert!(request.memo.contains(&hex::encode([99u8; 32])));
