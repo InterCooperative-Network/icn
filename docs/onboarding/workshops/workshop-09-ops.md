@@ -77,21 +77,20 @@ ls -la deploy/k8s/ 2>/dev/null
 ### Configuration file
 Create `$ICN_DATA/config.toml`:
 ```toml
+data_dir = "$ICN_DATA"
+
 [network]
 listen_addr = "0.0.0.0:4001"
 mdns_enabled = true
 
 [gateway]
-listen_addr = "0.0.0.0:8080"
-cors_origins = ["http://localhost:3000"]
-
-[metrics]
 enabled = true
-listen_addr = "0.0.0.0:9100"
+bind_addr = "0.0.0.0:8080"
 
-[logging]
-level = "info"
-format = "json"
+[observability]
+metrics_port = 9100
+health_port = 8081
+log_level = "info"
 ```
 
 ### Questions to answer
@@ -117,8 +116,9 @@ format = "json"
      --name icn-node \
      -p 8080:8080 \
      -p 9100:9100 \
+     -p 8081:8081 \
      -p 4001:4001 \
-     -e ICN_PASSPHRASE=workshop \
+     -e ICN_KEYSTORE_PASSPHRASE=workshop \
      icn:local
    ```
 

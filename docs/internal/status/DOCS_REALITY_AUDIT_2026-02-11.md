@@ -1543,3 +1543,39 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C13.
+## Changes applied (Batch C14 - workshop ops config schema alignment)
+
+1. `docs/onboarding/workshops/workshop-09-ops.md`
+- Updated workshop config example from obsolete sections/keys to current `icnd` schema:
+  - added top-level `data_dir`
+  - `[gateway].bind_addr` instead of `listen_addr`
+  - replaced `[metrics]` + `[logging]` with `[observability]` (`metrics_port`, `health_port`, `log_level`)
+  - removed unsupported `cors_origins` field
+- Updated Docker run example to expose health port and use preferred daemon passphrase env var (`ICN_KEYSTORE_PASSPHRASE`).
+
+## Verification updates (Batch C14)
+
+```bash
+rg -n "\[metrics\]|\[logging\]|listen_addr = \"0.0.0.0:8080\"|cors_origins|ICN_PASSPHRASE=workshop" docs/onboarding/workshops/workshop-09-ops.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C14)
+
+- `docs/onboarding/workshops/workshop-09-ops.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n "data_dir|gateway.bind_addr|observability|ICN_KEYSTORE_PASSPHRASE" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C14)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C14.
