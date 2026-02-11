@@ -18,14 +18,15 @@ This document specifies the implementation of the **ICN Deterministic Core (ICN-
 ## Table of Contents
 
 1. [Context & Problem Statement](#context--problem-statement)
-2. [Architecture Decision](#architecture-decision)
-3. [Current State Analysis](#current-state-analysis)
-4. [Implementation Plan](#implementation-plan)
-5. [Integration Points](#integration-points)
-6. [Test Strategy](#test-strategy)
-7. [Risks & Mitigations](#risks--mitigations)
-8. [File Map](#file-map)
-9. [Agent Handoff Checklist](#agent-handoff-checklist)
+2. [Firewall Integration](#firewall-integration)
+3. [Architecture Decision](#architecture-decision)
+4. [Current State Analysis](#current-state-analysis)
+5. [Implementation Plan](#implementation-plan)
+6. [Integration Points](#integration-points)
+7. [Test Strategy](#test-strategy)
+8. [Risks & Mitigations](#risks--mitigations)
+9. [File Map](#file-map)
+10. [Agent Handoff Checklist](#agent-handoff-checklist)
 
 ---
 
@@ -48,6 +49,75 @@ ICN's governance model requires:
 - `DecisionReceipt` computed identically on all nodes
 - Effects produced deterministically from receipts
 - Any node can verify any decision by replay
+
+---
+
+## Firewall Integration
+
+### The Meaning Firewall (Kernel/App Boundary)
+
+ICN has a strict **kernel/app separation** architecture. The deterministic compute implementation must respect this boundary.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                           APPS LAYER                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │ Trust App   │  │ Ledger App  │  │ Governance  │              │
+│  │ (PolicyOracle)│ │(PolicyOracle)│ │ (PolicyOracle)│            │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
+│         │                │                │                      │
+│         ▼                ▼                ▼                      │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              icn-kernel-api (The Firewall)                   ││
+│  │   PolicyRequest → PolicyDecision → ConstraintSet             ││
+│  │   DeterminismClass: Canonical | Advisory                     ││
+│  └─────────────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────────────┤
+│                         KERNEL LAYER                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  icn-net    │  │ icn-gossip  │  │ icn-compute │ ◄── HERE     │
+│  │  (network)  │  │  (replication)│ │  (execution) │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**The Rule**: Kernel enforces constraints WITHOUT understanding their semantic origin.
+
+### What Already Exists in icn-kernel-api
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `DeterminismClass` | `icn-kernel-api/src/compute.rs` | Canonical vs Advisory classification |
+| `PolicyOracle` | `icn-kernel-api/src/authz.rs` | Apps provide policy decisions |
+| `ConstraintSet` | `icn-kernel-api/src/authz.rs` | Kernel-enforceable constraints |
+| `PolicyDecision` | `icn-kernel-api/src/authz.rs` | Allow/Deny with constraints |
+
+### What We're Adding
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `create_deterministic_engine()` | `icn-compute/src/deterministic_engine.rs` | Hardened Wasmtime config |
+| `WasmSubsetValidator` | `icn-compute/src/subset.rs` | Opcode/import restrictions |
+| `DeterminismManifest` | `icn-compute/src/deterministic_engine.rs` | Audit trail |
+
+### Firewall Compliance Rules
+
+1. **Do NOT import domain crates** - `icn-compute` must not import `icn-trust`, `icn-governance`, etc.
+2. **Use icn-kernel-api types only** - Use `DeterminismClass`, not domain-specific types
+3. **Enforce constraints blindly** - Don't understand why a task is Canonical, just enforce it
+4. **Pass meaning_firewall tests** - Run `cargo test -p icn-core meaning_firewall` after changes
+
+### CI Enforcement
+
+```bash
+# Check firewall compliance after changes
+cd icn && cargo test -p icn-core meaning_firewall
+
+# Or use the firewall-check skill
+copilot skill firewall-check
+```
+
+See `kernel_surface.toml` for the full infection inventory and extraction roadmap.
 
 Without deterministic execution, honest nodes can be tricked into disagreement.
 
