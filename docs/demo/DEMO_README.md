@@ -5,6 +5,9 @@
 **Status:** Foundation solid, integration and polish needed  
 **Confidence:** 7/10 → 10/10 in 7-9 hours
 
+> This index points to a 2025-12-18 demo planning snapshot.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 📚 Document Overview

@@ -3,6 +3,9 @@
 **Date:** 2025-12-18 17:46 UTC  
 **Status:** ✅ **FULLY OPERATIONAL - ALL SYSTEMS GO!**
 
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 🏆 Mission Accomplished!

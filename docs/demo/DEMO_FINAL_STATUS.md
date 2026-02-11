@@ -4,6 +4,9 @@
 **Total Time:** 60 minutes  
 **Status:** ✅ **FULLY COMPLETE - READY TO DEMO**
 
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 🏆 Achievement Summary

@@ -4,6 +4,9 @@
 **Test Status**: ✅ **PASSED**  
 **Production Ready**: ✅ **YES**  
 
+> Historical test snapshot from 2025-12-16.
+> Re-run DR procedures and current CI checks before using these results for present-day readiness claims.
+
 ---
 
 ## Executive Summary

@@ -4,6 +4,9 @@
 **Based on:** Previous session work + New demo infrastructure  
 **Status:** 🟢 **EXCELLENT FOUNDATION - READY FOR DEMO BUILDING**
 
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 🎉 What's Already Working (From Previous Sessions)

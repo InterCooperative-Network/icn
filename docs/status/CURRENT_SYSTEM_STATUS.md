@@ -4,6 +4,9 @@
 **Status:** ✅ **FULLY OPERATIONAL**
 **Readiness:** 90% for full stack demo
 
+> Historical demo-environment snapshot from 2025-12-18.
+> For current CI posture, use `docs/ci/CI_CURRENT_STATUS.md` and re-run runtime checks.
+
 ---
 
 ## 🔎 Current Notes (2026-01-19)

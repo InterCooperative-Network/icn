@@ -1579,3 +1579,54 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C14.
+
+## Changes applied (Batch C15 - status/demo snapshot normalization)
+
+1. `docs/demo/DEMO_STATUS_SUMMARY.md`
+2. `docs/demo/DEMO_CURRENT_STATUS.md`
+3. `docs/demo/DEMO_FINAL_STATUS.md`
+4. `docs/demo/DEMO_SUCCESS_FINAL.md`
+5. `docs/demo/DEMO_README.md`
+6. `docs/mobile/MOBILE_APP_STATUS.md`
+7. `docs/development/testing/DR_TEST_RESULTS.md`
+8. `docs/status/DEPLOYMENT_VERIFICATION.md`
+9. `docs/status/CURRENT_SYSTEM_STATUS.md`
+
+- Added explicit historical snapshot banners with concrete dates.
+- Added pointers to current verification sources (`docs/ci/CI_CURRENT_STATUS.md` and, where relevant, `docs/status/CURRENT_SYSTEM_STATUS.md`).
+- Preserved underlying historical content while removing ambiguity that these reports are evergreen status truths.
+
+## Verification updates (Batch C15)
+
+```bash
+rg -n "Historical snapshot|For current project/CI status|For current status|For current readiness|Historical test snapshot" docs/demo/DEMO_STATUS_SUMMARY.md docs/demo/DEMO_CURRENT_STATUS.md docs/demo/DEMO_FINAL_STATUS.md docs/demo/DEMO_SUCCESS_FINAL.md docs/demo/DEMO_README.md docs/mobile/MOBILE_APP_STATUS.md docs/development/testing/DR_TEST_RESULTS.md docs/status/DEPLOYMENT_VERIFICATION.md docs/status/CURRENT_SYSTEM_STATUS.md
+```
+
+Result: all touched status/demo docs now contain explicit snapshot framing and current-status pointers.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain (archive/internal marker references and topology policy mentions).
+
+## Audit ledger additions (Batch C15)
+
+- `docs/demo/DEMO_STATUS_SUMMARY.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n "Date:|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/demo/DEMO_CURRENT_STATUS.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n "Date:|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/demo/DEMO_FINAL_STATUS.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n "Date:|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/demo/DEMO_SUCCESS_FINAL.md | document timestamp + docs/ci/CI_CURRENT_STATUS.md | rg -n "Date:|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/demo/DEMO_README.md | document created date + status pointer policy | rg -n "Created:|snapshot|CI_CURRENT_STATUS|CURRENT_SYSTEM_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/mobile/MOBILE_APP_STATUS.md | explicit legacy snapshot date + CI status pointer | rg -n "2024-12-12|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/development/testing/DR_TEST_RESULTS.md | test date + revalidation requirement | rg -n "Test Date|Historical test snapshot|Re-run DR" | aligned | reviewed_on(2026-02-11)`
+- `docs/status/DEPLOYMENT_VERIFICATION.md | timestamp + CI status pointer | rg -n "Date:|Historical deployment snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/status/CURRENT_SYSTEM_STATUS.md | timestamp + CI status pointer | rg -n "Date:|Historical demo-environment snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C15)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C15; continue active-doc content drift cleanup.

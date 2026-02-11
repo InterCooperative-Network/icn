@@ -4,6 +4,9 @@
 **Time Investment:** ~2 hours audit  
 **Confidence Level:** 7/10 → 10/10 achievable in 7-9 hours
 
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 🎯 Executive Summary
