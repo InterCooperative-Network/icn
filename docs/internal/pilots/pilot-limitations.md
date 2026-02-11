@@ -4,7 +4,7 @@ This document describes known limitations and constraints in the current ICN pil
 
 ## Overview
 
-The ICN pilot is ready for deployment with comprehensive infrastructure in place. The following limitations are documented to set appropriate expectations and guide post-pilot development priorities.
+In the assessment snapshot captured by this document, the ICN pilot was considered deployable with broad infrastructure coverage. The following limitations are documented to set expectations and guide post-pilot priorities.
 
 ---
 
@@ -172,7 +172,7 @@ The ICN pilot is ready for deployment with comprehensive infrastructure in place
 
 ## What's NOT Limited
 
-The following systems are production-ready for pilot:
+As of this pilot-readiness snapshot, the following systems were assessed as ready for pilot usage:
 
 1. **Identity & Cryptography**: Full Ed25519 DID implementation, Age-encrypted keystore
 2. **Trust Graph**: Multi-graph computation (Social/Economic/Technical) with caching

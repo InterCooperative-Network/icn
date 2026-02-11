@@ -791,3 +791,42 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue to next context slice.
+
+## Changes applied (Batch D2 - slice 2: active-doc readiness language)
+
+1. `docs/guides/FAQ.md`
+- Kept FAQ question unchanged, but normalized answer to explicit 2025-11-21 status snapshot language.
+- Added direction to verify current readiness against latest status/CI artifacts.
+
+2. `docs/internal/pilots/pilot-limitations.md`
+- Reframed overview and "What's NOT Limited" section from present-tense readiness claims to dated snapshot assessment wording.
+
+3. `docs/security/security-roadmap.md`
+- Reframed intro from implied current production-readiness to roadmap guidance.
+- Marked phase status as snapshot wording.
+
+## Verification updates (Batch D2 - slice 2)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "Status snapshot|Status \(snapshot\)|assessed as production-ready at that time|roadmap guidance" docs/guides/FAQ.md docs/internal/pilots/pilot-limitations.md docs/security/security-roadmap.md
+```
+
+Result:
+- Missing-link findings remain zero.
+- Targeted active-doc readiness language now uses snapshot/qualified wording.
+
+## Audit ledger updates (D2 slice 2)
+
+- `docs/guides/FAQ.md | snapshot policy for readiness claims | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/internal/pilots/pilot-limitations.md | pilot snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/security/security-roadmap.md | roadmap-vs-readiness framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (D2 slice 2)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.

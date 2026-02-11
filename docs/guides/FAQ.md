@@ -58,15 +58,15 @@ ICN uses **gossip** for eventual consistency, not global consensus. This is much
 
 ### Is ICN production-ready?
 
-**Current status (2025-11-21):**
-- ✅ **Substrate**: Production-ready (Phase 15 complete, 423 tests passing)
+**Status snapshot (2025-11-21):**
+- ✅ **Substrate**: assessed as production-ready at that time (Phase 15 complete, 423 tests passing)
 - ✅ **Security**: Three-layer architecture (transport, message, application)
 - ✅ **Economic Safety**: Dynamic credit limits, dispute resolution, new member throttling
 - ✅ **Operations**: Backup/restore, monitoring, graceful restart
-- 🚧 **Pilot Deployment**: Selecting first pilot community (Track C1)
-- ❌ **General Availability**: Not yet (need pilot learnings first)
+- 🚧 **Pilot Deployment**: first pilot community selection in progress (Track C1 at that time)
+- ❌ **General Availability**: not yet in this snapshot (pilot learnings required first)
 
-**Recommendation**: Wait for pilot results before deploying in production. You can experiment now, but expect rough edges.
+For current readiness, verify against the latest status docs and CI/workflow results rather than this dated snapshot.
 
 ---
 
