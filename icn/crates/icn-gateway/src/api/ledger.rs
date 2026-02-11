@@ -374,9 +374,8 @@ pub async fn get_entries_by_decision(
             "decision_hash must be 64 hex characters (32 bytes)".to_string(),
         ));
     }
-    hex::decode(decision_hash).map_err(|_| {
-        GatewayError::BadRequest("decision_hash must be valid hex".to_string())
-    })?;
+    hex::decode(decision_hash)
+        .map_err(|_| GatewayError::BadRequest("decision_hash must be valid hex".to_string()))?;
 
     let limit: usize = query
         .get("limit")
@@ -386,16 +385,12 @@ pub async fn get_entries_by_decision(
 
     // Get all history entries (bounded scan for pilot)
     // TODO: Add index for decision_hash in ledger for efficient queries
-    let entries = ledger_mgr
-        .get_history(&coop_id, None, 0, 1000)
-        .await?;
+    let entries = ledger_mgr.get_history(&coop_id, None, 0, 1000).await?;
 
     // Filter entries by decision_hash
     let filtered: Vec<TransactionHistoryEntry> = entries
         .into_iter()
-        .filter(|entry| {
-            entry.decision_hash.as_deref() == Some(decision_hash.as_str())
-        })
+        .filter(|entry| entry.decision_hash.as_deref() == Some(decision_hash.as_str()))
         .take(limit)
         .map(|entry| {
             let accounts: Vec<AccountDeltaResponse> = entry

@@ -185,7 +185,10 @@ pub async fn get_chain(
         Ok((allocations, intents)) => {
             let response = EconomicChainResponse {
                 decision_hash: query.decision_hash.clone(),
-                allocations: allocations.iter().map(AllocationReceiptResponse::from).collect(),
+                allocations: allocations
+                    .iter()
+                    .map(AllocationReceiptResponse::from)
+                    .collect(),
                 intents: intents.iter().map(SettlementIntentResponse::from).collect(),
             };
             HttpResponse::Ok().json(response)

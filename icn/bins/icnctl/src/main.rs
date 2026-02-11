@@ -9828,7 +9828,10 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             let client = reqwest::Client::new();
 
             // Query receipt chain
-            let chain_url = format!("{}/v1/receipts/chain?decision_hash={}", gateway, decision_hash);
+            let chain_url = format!(
+                "{}/v1/receipts/chain?decision_hash={}",
+                gateway, decision_hash
+            );
             let chain_resp = client
                 .get(&chain_url)
                 .send()
@@ -9837,7 +9840,10 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
 
             if !chain_resp.status().is_success() {
                 if chain_resp.status().as_u16() == 404 {
-                    println!("No receipts found for decision hash: {}", &decision_hash[..16]);
+                    println!(
+                        "No receipts found for decision hash: {}",
+                        &decision_hash[..16]
+                    );
                     return Ok(());
                 }
                 bail!("Gateway returned error: {}", chain_resp.status());
@@ -9877,7 +9883,8 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
                 println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
                 // Allocations
-                if let Some(allocations) = chain_data.get("allocations").and_then(|a| a.as_array()) {
+                if let Some(allocations) = chain_data.get("allocations").and_then(|a| a.as_array())
+                {
                     println!("Allocation Receipts: {}", allocations.len());
                     for alloc in allocations {
                         if let Some(hash) = alloc.get("canonicalHash").and_then(|h| h.as_str()) {
@@ -9916,8 +9923,10 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
                         for entry in entries {
                             let from = entry.get("from").and_then(|f| f.as_str()).unwrap_or("—");
                             let to = entry.get("to").and_then(|t| t.as_str()).unwrap_or("—");
-                            let amount = entry.get("amount").and_then(|a| a.as_str()).unwrap_or("0");
-                            let currency = entry.get("currency").and_then(|c| c.as_str()).unwrap_or("");
+                            let amount =
+                                entry.get("amount").and_then(|a| a.as_str()).unwrap_or("0");
+                            let currency =
+                                entry.get("currency").and_then(|c| c.as_str()).unwrap_or("");
                             println!("  • {} → {} : {} {}", from, to, amount, currency);
                         }
                     }
@@ -9928,7 +9937,11 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             }
         }
 
-        ReceiptCommands::Allocation { hash, gateway, json } => {
+        ReceiptCommands::Allocation {
+            hash,
+            gateway,
+            json,
+        } => {
             if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid hash: expected 64 hex characters");
             }
@@ -9955,7 +9968,11 @@ async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
             }
         }
 
-        ReceiptCommands::Intent { hash, gateway, json } => {
+        ReceiptCommands::Intent {
+            hash,
+            gateway,
+            json,
+        } => {
             if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid hash: expected 64 hex characters");
             }

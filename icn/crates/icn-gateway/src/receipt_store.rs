@@ -35,7 +35,11 @@ impl ReceiptStore {
     }
 
     /// Build a decision index key
-    fn make_decision_index_key(decision_hash: &Hash, type_tag: &[u8], receipt_hash: &Hash) -> Vec<u8> {
+    fn make_decision_index_key(
+        decision_hash: &Hash,
+        type_tag: &[u8],
+        receipt_hash: &Hash,
+    ) -> Vec<u8> {
         let mut key = DECISION_INDEX_PREFIX.to_vec();
         key.extend_from_slice(hex::encode(decision_hash).as_bytes());
         key.push(b':');
@@ -100,7 +104,7 @@ impl ReceiptStore {
         decision_hash: &Hash,
     ) -> Result<Vec<AllocationReceipt>, String> {
         let prefix = Self::make_decision_scan_prefix(decision_hash, b"allocation");
-        
+
         let mut receipts = Vec::new();
         for entry in self.db.scan_prefix(&prefix) {
             let (_, hash_bytes) = entry.map_err(|e| format!("Failed to scan: {}", e))?;
@@ -211,8 +215,15 @@ mod tests {
     }
 
     fn make_test_intent(decision_hash: Hash, amount: u64) -> SettlementIntent {
-        SettlementIntent::new("dec-001", decision_hash, "treasury", "member", amount, "HOURS")
-            .with_timestamp(1000000)
+        SettlementIntent::new(
+            "dec-001",
+            decision_hash,
+            "treasury",
+            "member",
+            amount,
+            "HOURS",
+        )
+        .with_timestamp(1000000)
     }
 
     #[test]
@@ -250,14 +261,16 @@ mod tests {
         let receipt_store = ReceiptStore::new(temp_db());
 
         let decision_hash = [42u8; 32];
-        
+
         // Store multiple intents for same decision
         let intent1 = make_test_intent(decision_hash, 100);
         let intent2 = make_test_intent(decision_hash, 200);
         receipt_store.put_intent(&intent1).unwrap();
         receipt_store.put_intent(&intent2).unwrap();
 
-        let intents = receipt_store.list_intents_by_decision(&decision_hash).unwrap();
+        let intents = receipt_store
+            .list_intents_by_decision(&decision_hash)
+            .unwrap();
         assert_eq!(intents.len(), 2);
     }
 
@@ -273,10 +286,14 @@ mod tests {
             .add_intent(intent1)
             .add_intent(intent2);
 
-        receipt_store.put_allocation_with_intents(&allocation).unwrap();
+        receipt_store
+            .put_allocation_with_intents(&allocation)
+            .unwrap();
 
         // Both intents should be retrievable
-        let intents = receipt_store.list_intents_by_decision(&decision_hash).unwrap();
+        let intents = receipt_store
+            .list_intents_by_decision(&decision_hash)
+            .unwrap();
         assert_eq!(intents.len(), 2);
 
         // Allocation should be retrievable
@@ -289,12 +306,10 @@ mod tests {
         let receipt_store = ReceiptStore::new(temp_db());
 
         let decision_hash = [42u8; 32];
-        
+
         // Two intents with different node-local IDs but same content
-        let intent1 = make_test_intent(decision_hash, 500)
-            .with_intent_id("node-a-id-001");
-        let intent2 = make_test_intent(decision_hash, 500)
-            .with_intent_id("node-b-id-999");
+        let intent1 = make_test_intent(decision_hash, 500).with_intent_id("node-a-id-001");
+        let intent2 = make_test_intent(decision_hash, 500).with_intent_id("node-b-id-999");
 
         // Same canonical hash
         assert_eq!(intent1.canonical_hash(), intent2.canonical_hash());
@@ -303,7 +318,9 @@ mod tests {
         receipt_store.put_intent(&intent1).unwrap();
         receipt_store.put_intent(&intent2).unwrap();
 
-        let intents = receipt_store.list_intents_by_decision(&decision_hash).unwrap();
+        let intents = receipt_store
+            .list_intents_by_decision(&decision_hash)
+            .unwrap();
         assert_eq!(intents.len(), 1); // Deduplicated by canonical hash
     }
 }

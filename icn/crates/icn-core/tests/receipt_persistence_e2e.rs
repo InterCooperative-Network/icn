@@ -252,7 +252,11 @@ impl ReceiptStore {
         key
     }
 
-    fn make_decision_index_key(decision_hash: &Hash, type_tag: &[u8], receipt_hash: &Hash) -> Vec<u8> {
+    fn make_decision_index_key(
+        decision_hash: &Hash,
+        type_tag: &[u8],
+        receipt_hash: &Hash,
+    ) -> Vec<u8> {
         let mut key = DECISION_INDEX_PREFIX.to_vec();
         key.extend_from_slice(hex::encode(decision_hash).as_bytes());
         key.push(b':');
