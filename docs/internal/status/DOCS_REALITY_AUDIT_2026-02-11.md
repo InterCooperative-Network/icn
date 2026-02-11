@@ -1350,3 +1350,49 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch D3; continue with remaining active docs.
+## Changes applied (Batch C9 - architecture map + user manual runtime alignment)
+
+1. `docs/manual/ICN_USER_MANUAL.md`
+- Replaced unsupported daemon commands/flags:
+  - `icnd --validate` -> `icnd --validate-config`
+  - removed `icnd --dry-run` usage
+  - removed `icnd --generate-config`
+- Updated config workflow to use `icn/config/icn.toml.example` copied to `~/.icn/config.toml`.
+- Updated startup examples to explicit `icnd --config ~/.icn/config.toml --data-dir ~/.icn`.
+- Corrected keystore naming to `identity.age`.
+- Updated config examples from obsolete sections/keys (`[node]`, `[metrics]`, gateway `listen_addr`) to current structure (`data_dir`, `[observability]`, gateway `bind_addr`).
+- Updated environment variable table to supported vars (`ICN_KEYSTORE_PASSPHRASE`, `ICN_PASSPHRASE`, `ICN_GATEWAY_JWT_SECRET`, OTEL vars).
+- Updated bootstrap grep path from `~/.icn/icn.toml` to `~/.icn/config.toml`.
+
+2. `docs/architecture/ARCHITECTURE_MAP.md`
+- Updated metrics default in config examples from `9090` to `9100`.
+- Replaced unsupported env override claim (`ICN_DATA_DIR`) with CLI `--data-dir` guidance.
+- Updated docker env block to supported secrets/logging vars and explicit runtime flag note (`icnd --data-dir /data --gateway-enable`).
+
+## Verification updates (Batch C9)
+
+```bash
+rg -n "--validate\b|--dry-run|--generate-config|keystore.age|\[node\]|\[metrics\]|listen_addr = \"127.0.0.1:8080\"|ICN_CONFIG|ICN_DATA_DIR|ICN_LOG_LEVEL" docs/manual/ICN_USER_MANUAL.md docs/architecture/ARCHITECTURE_MAP.md
+```
+
+Result: stale/unsupported runtime claims removed from edited sections.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C9)
+
+- `docs/manual/ICN_USER_MANUAL.md | icn/bins/icnd/src/main.rs + icn/bins/icnctl/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "--validate-config|--data-dir|--config|identity.age|bind_addr|observability" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/architecture/ARCHITECTURE_MAP.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "metrics_port|ICN_GATEWAY_JWT_SECRET|--data-dir" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C9)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C9; continue with remaining active-doc drift.
