@@ -24,10 +24,18 @@
 - No panics in protocol/network/actor runtime paths.
 - Demo status docs note STUN discovery disabled for local-only testing; re-validate before demo.
 
-## Current status (2026-01-20 snapshot)
+## Current status (2026-02-11 snapshot)
+- **Sprint 8-10 Economics Consolidation complete** - Full deterministic economic receipt chain implemented:
+  - CanonicalReceipt trait with Blake3-based deterministic hashing
+  - AllocationReceipt and SettlementIntent types with order-independent canonical hashes
+  - ReceiptStore with sled persistence and decision_hash indexing
+  - 6 REST endpoints for receipt and ledger provenance queries
+  - Pilot UI Receipts tab with sorted verification badge
+  - icnctl receipts commands (chain/allocation/intent)
+  - Demo scripts and E2E tests for cross-node determinism
 - Roadmap (docs/dev-journal/ROADMAP.md): Phase 18 complete, Phase 19 (Release Infrastructure) next; implementation ~75% (272K LOC, 2,287 tests).
 - CI status docs (docs/ci/CI_CURRENT_STATUS.md) last updated 2026-01-20.
-- Local CI baseline 2026-01-20 passed with rustc 1.89.0 override in icn/. (fmt/clippy/test).
+- Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).
 - K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.
 - Demo status doc (2025-12-18) reports daemon/gateway/UI running; re-validate before presenting.
 - Homelab deployment (docs/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).

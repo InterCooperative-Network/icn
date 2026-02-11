@@ -1,8 +1,7 @@
 # ICN TODO (ordered)
 
-1) Standardize Rust toolchain to 1.89.0:
-   - Current local override is set in icn/ to satisfy wasmtime/cranelift
-   - Option: add rust-toolchain.toml or update docs to declare required version
+1) ✅ DONE - Standardize Rust toolchain to 1.88.0:
+   - rust-toolchain.toml added in icn/ with toolchain = "1.88.0"
    Acceptance: repo clearly specifies required rustc and baseline runs without manual overrides.
 
 2) Refresh status docs with current timestamps and outcomes:
@@ -30,10 +29,11 @@
    - #224 Backup validation tests
    Acceptance: choose next issue and write a short execution plan.
 
-6) If Gateway API changes, regenerate TS types:
+6) ✅ DONE (2026-02-11) - Gateway API changes, regenerate TS types:
    - cd icn && ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml
    - cd sdk/typescript && npm run generate-types && npm run check-types
    Acceptance: generated types are committed and check-types passes.
+   Note: Updated for Sprint 8-10 Economics Consolidation (new receipt endpoints + ledger provenance).
 
 7) Code review follow-ups:
    - Consider secondary index/unsorted pagination for large domain counts (icn-gateway/src/api/governance.rs:174-176).
