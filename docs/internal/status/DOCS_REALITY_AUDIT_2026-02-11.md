@@ -1852,3 +1852,47 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C20; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C21 - SDIS quick-start endpoint/body alignment)
+
+1. `docs/sdis/SDIS_QUICK_START.md`
+
+Changes:
+
+- Replaced legacy enrollment examples (`/v1/sdis/enroll*`) with currently wired flow:
+  - `POST /v1/sdis/enrollment/start`
+  - `POST /v1/sdis/vouch/{id}`
+  - `GET /v1/sdis/status/{id}`
+- Updated request/response examples to match current simple-enrollment request models (`identity_name`, `coop_id`, `vouch_statement`) and status shape.
+- Replaced legacy anchor examples (`/v1/sdis/anchors*`) with current anchor routes:
+  - `POST /v1/sdis/anchor/devices/add`
+  - `GET /v1/sdis/anchor/{id}/devices`
+- Updated advanced endpoint table from legacy `enroll/anchors/recover` names to current `anchor/*` and `recovery/*` route shapes.
+- Added explicit caveat that JavaScript SDK snippet is conceptual and should be verified against current `sdk/typescript` exports.
+
+## Verification updates (Batch C21)
+
+```bash
+rg -n "/v1/sdis/enroll|/v1/sdis/anchors|/v1/sdis/recover/initiate|/v1/sdis/enrollment/start|/v1/sdis/anchor/|/v1/sdis/recovery/" docs/sdis/SDIS_QUICK_START.md
+```
+
+Result: legacy `enroll/anchors/recover/initiate` forms removed; current `enrollment/anchor/recovery` forms present.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C21)
+
+- `docs/sdis/SDIS_QUICK_START.md | icn/crates/icn-gateway/src/api/sdis/{simple_enrollment.rs,anchor.rs,recovery.rs} | rg -n "enrollment/start|vouch/\\{enrollment_id\\}|status/\\{enrollment_id\\}|scope\\(\"/anchor\"\\)|scope\\(\"/recovery\"\\)" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C21)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C21; continue active-doc content drift cleanup.
