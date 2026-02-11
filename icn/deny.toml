@@ -28,6 +28,11 @@ ignore = [
     # Recommended replacement is portable-atomic. Tracking in #535 (postcard migration).
     # Will be resolved when heapless updates or we use postcard without heapless feature.
     "RUSTSEC-2023-0089",  # atomic-polyfill deprecated
+
+    # bincode is unmaintained. The team considers v1.3.3 stable with no updates needed.
+    # Used as dev dependency in icn-kernel-api for testing serialization.
+    # Migration to postcard or bitcode is tracked for future work.
+    "RUSTSEC-2025-0141",  # bincode unmaintained
 ]
 
 [licenses]
