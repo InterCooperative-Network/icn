@@ -699,8 +699,7 @@ impl TreasuryEntryRequest {
         TreasuryEntryRequest {
             treasury_id: treasury_id.to_string(),
             operation_type,
-            amount: i64::try_from(intent.amount)
-                .expect("SettlementIntent amount exceeds i64::MAX"),
+            amount: i64::try_from(intent.amount).expect("SettlementIntent amount exceeds i64::MAX"),
             currency: intent.unit.clone(),
             recipient: Some(intent.to.clone()),
             memo: intent.memo.clone().unwrap_or_default(),
