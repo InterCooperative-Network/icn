@@ -1031,3 +1031,63 @@ pub struct ListingFilterParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<usize>,
 }
+
+
+#[cfg(test)]
+mod schema_contract_tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Contract test: TransactionHistoryResponse must serialize with "transactions" key.
+    /// This prevents accidental drift to "entries" or other names.
+    #[test]
+    fn transaction_history_response_uses_transactions_key() {
+        let response = TransactionHistoryResponse {
+            transactions: vec![TransactionHistoryEntry {
+                id: "tx-123".to_string(),
+                timestamp: 1704067200,
+                author: "did:icn:test123".to_string(),
+                accounts: vec![AccountDeltaResponse {
+                    account_id: "treasury:main".to_string(),
+                    currency: "HOURS".to_string(),
+                    debit: Some(100),
+                    credit: None,
+                }],
+                decision_receipt_id: Some("decision-001".to_string()),
+                decision_hash: Some("abcd1234".to_string()),
+            }],
+            pagination: PaginationInfo {
+                total: Some(1),
+                next_cursor: None,
+                prev_cursor: None,
+                count: 1,
+                has_more: false,
+                offset: None,
+                limit: 10,
+            },
+        };
+
+        let json = serde_json::to_value(&response).unwrap();
+
+        // Contract: response MUST have "transactions" array (not "entries")
+        assert!(json.get("transactions").is_some(), "Response must use transactions key");
+        assert!(json.get("entries").is_none(), "Response must NOT use entries key");
+
+        // Contract: each transaction has required fields
+        let tx = &json["transactions"][0];
+        assert!(tx.get("id").is_some(), "Transaction must have id");
+        assert!(tx.get("timestamp").is_some(), "Transaction must have timestamp");
+        assert!(tx.get("author").is_some(), "Transaction must have author");
+        assert!(tx.get("accounts").is_some(), "Transaction must have accounts");
+
+        // Contract: accounts have required fields
+        let acct = &tx["accounts"][0];
+        assert!(acct.get("account_id").is_some(), "Account must have account_id");
+        assert!(acct.get("currency").is_some(), "Account must have currency");
+
+        // Contract: provenance fields present when set
+        assert!(tx.get("decision_receipt_id").is_some());
+        assert!(tx.get("decision_hash").is_some());
+    }
+}
+
