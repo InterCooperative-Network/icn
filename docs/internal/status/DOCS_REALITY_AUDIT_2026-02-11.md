@@ -2052,3 +2052,38 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C24; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C25 - incident-response gateway health path correction)
+
+1. `docs/operations/deployment/incident-response.md`
+
+Changes:
+
+- Replaced remaining gateway health checks from `/health` to `/v1/health` in incident response workflows.
+
+## Verification updates (Batch C25)
+
+```bash
+rg -n "localhost:8080/health\\b|localhost:8080/v1/health\\b" docs/operations/deployment/incident-response.md
+```
+
+Result: all touched checks now use `/v1/health`.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C25)
+
+- `docs/operations/deployment/incident-response.md | icn/crates/icn-gateway/src/server.rs + docs/api/openapi.yaml | rg -n "/v1/health|scope\\(\"/v1\"\\)" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C25)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C25; continue active-doc content drift cleanup.
