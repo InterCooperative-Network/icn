@@ -162,10 +162,10 @@ fn test_multiple_receipts_persist_across_restart() {
 
         for (i, decision_hash) in [decision_hash_1, decision_hash_2].iter().enumerate() {
             let intent = SettlementIntent::new(
-                &format!("decision-{:03}", i),
+                format!("decision-{:03}", i),
                 *decision_hash,
                 "treasury",
-                &format!("member-{}", i),
+                format!("member-{}", i),
                 (i + 1) as u64 * 500,
                 "HOURS",
             )
@@ -193,12 +193,12 @@ fn test_multiple_receipts_persist_across_restart() {
             let retrieved_intent = store
                 .get_intent(intent_hash)
                 .expect("Failed to get intent")
-                .expect(&format!("Intent {} not found after restart", i));
+                .unwrap_or_else(|| panic!("Intent {} not found after restart", i));
 
             let retrieved_allocation = store
                 .get_allocation(alloc_hash)
                 .expect("Failed to get allocation")
-                .expect(&format!("Allocation {} not found after restart", i));
+                .unwrap_or_else(|| panic!("Allocation {} not found after restart", i));
 
             assert_eq!(
                 &retrieved_intent.canonical_hash(),
