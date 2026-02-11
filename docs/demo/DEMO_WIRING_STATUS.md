@@ -9,13 +9,13 @@
 ## ✅ What Worked
 
 ### Identity Creation
-- Successfully created test identity in `/home/matt/icn-demo-test/data`
+- Successfully created test identity in `<demo-data-dir>/data`
 - DID: `did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh`
 - Passphrase: `demo123`
 - Keystore format: v4 (SDIS support)
 
 ### Configuration
-- Created working config at `/home/matt/icn-demo-test/demo.toml`
+- Created working config at `<demo-data-dir>/demo.toml`
 - JWT secret configured
 - Gateway bind address: 127.0.0.1:8080
 - Network port: 19777
@@ -77,10 +77,10 @@ These might be holding resources (trust graph store, ledger store, etc.)
 
 ### Option 2: Check Store/Database Locks
 The daemon initializes several stores:
-- Trust graph: `/home/matt/icn-demo-test/data/store/trust`
-- Gossip: `/home/matt/icn-demo-test/data/store/gossip`
-- Ledger: `/home/matt/icn-demo-test/data/store/ledger`
-- Cooperative: `/home/matt/icn-demo-test/data/store/cooperative`
+- Trust graph: `<demo-data-dir>/data/store/trust`
+- Gossip: `<demo-data-dir>/data/store/gossip`
+- Ledger: `<demo-data-dir>/data/store/ledger`
+- Cooperative: `<demo-data-dir>/data/store/cooperative`
 
 If Sled (the database) has locks, that could cause "address already in use"
 
@@ -115,11 +115,11 @@ ps aux | grep icnd | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null
 sleep 5
 
 # Clean test directory
-rm -rf /home/matt/icn-demo-test/data/store/*
+rm -rf <demo-data-dir>/data/store/*
 
 # Retry daemon start
-cd /home/matt/projects/icn/icn
-./target/release/icnd --config /home/matt/icn-demo-test/demo.toml \
+cd <repo-root>/icn
+./target/release/icnd --config <demo-data-dir>/demo.toml \
     --gateway-enable \
     --gateway-bind "127.0.0.1:8080" \
     --gateway-jwt-secret "demo-secret-key-change-in-production" \

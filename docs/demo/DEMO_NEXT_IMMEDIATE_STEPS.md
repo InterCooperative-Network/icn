@@ -25,7 +25,7 @@ Instead of trying to get the daemon running, let's test the system using the exi
 ps aux | grep icnd
 
 # Try connecting to one with icnctl
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 
 # Test connection to existing daemon (likely on port 5601)
 ./target/release/icnctl status
@@ -158,7 +158,7 @@ icnctl gov proposal show 1
 ## Immediate Next Command
 
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl --help
 ./target/release/icnctl status
 ```

@@ -107,7 +107,7 @@ The gateway might need to use a different port:
    ```bash
    cd icn
    ./target/release/icnd \
-     -d /home/matt/icn-demo-test/data \
+     -d <demo-data-dir>/data \
      -e 127.0.0.1:15602 \
      --gateway-enable \
      --gateway-bind "127.0.0.1:3080"

@@ -1,6 +1,6 @@
 # ICN Demo Readiness Audit
 **Date:** 2025-12-18  
-**Repository:** /home/matt/projects/icn  
+**Repository:** <repo-root>  
 **Commit:** Current HEAD
 
 ---
@@ -388,7 +388,7 @@ find src/ -name "*.rs" -exec grep -l "api/members\|api/transactions" {} \;
 # Terminal 1: Start daemon with gateway
 cd /tmp/icn-demo-test
 icnctl id init
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd --config ../config/icn-alpha.toml --gateway-enable
 
 # Terminal 2: Test gateway

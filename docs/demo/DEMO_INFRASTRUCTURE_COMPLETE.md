@@ -144,7 +144,7 @@ $ curl http://localhost:8080/v1/health
 
 1. **Start UI** (Terminal 1)
    ```bash
-   cd /home/matt/projects/icn/web/pilot-ui
+   cd <repo-root>/web/pilot-ui
    python3 -m http.server 3000
    ```
 
@@ -335,7 +335,7 @@ Total: 9 files, ~24KB
 
 ```bash
 # Test the UI integration NOW
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Then open: http://localhost:3000

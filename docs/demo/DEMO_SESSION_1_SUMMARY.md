@@ -120,7 +120,7 @@ icnd --log-level trace ...
 strace -e bind,listen,socket icnd ...
 
 # Check for any error logs in data directory
-find /home/matt/icn-demo-test/data -name "*.log" -o -name "*error*"
+find <demo-data-dir>/data -name "*.log" -o -name "*error*"
 ```
 
 ---

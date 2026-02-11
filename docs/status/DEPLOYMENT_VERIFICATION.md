@@ -155,21 +155,21 @@ $ docker-compose logs --tail=10 icnd
 
 #### 1. Docker Compose (Current - Working)
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 docker-compose up -d
 ```
 **Status:** ✅ Running
 
 #### 2. Quick Start Script
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 ./quickstart.sh "Demo Timebank"
 ```
 **Status:** ✅ Ready to use
 
 #### 3. Native Installation
 ```bash
-cd /home/matt/projects/icn
+cd <repo-root>
 sudo deploy/install.sh
 ```
 **Status:** ✅ Available (not tested today)
@@ -276,7 +276,7 @@ sudo deploy/install.sh
 
 ### Start/Stop
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 
 # Start all services
 docker-compose up -d
@@ -327,13 +327,13 @@ docker-compose up -d --force-recreate icnd
 ## 📊 System Comparison
 
 ### Native Daemon (Our Test)
-- **Location:** `/home/matt/icn-demo-test/`
+- **Location:** `<demo-data-dir>/`
 - **Status:** ✅ Running in terminal
 - **Ports:** 19777 (QUIC), 8080 (Gateway), 15602 (RPC)
 - **Purpose:** Development and testing
 
 ### Docker Deployment (Production-Ready)
-- **Location:** `/home/matt/projects/icn/deploy/`
+- **Location:** `<repo-root>/deploy/`
 - **Status:** ✅ Running in containers
 - **Ports:** 7777 (QUIC), 8080 (Gateway), 5601 (RPC), 3000 (UI)
 - **Purpose:** Demo and production deployment

@@ -21,7 +21,7 @@
 - **Status:** ✅ Running
 - **Process:** PID from daemon-fixed session
 - **DID:** `did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh`
-- **Data Directory:** `/home/matt/icn-demo-test/data`
+- **Data Directory:** `<demo-data-dir>/data`
 
 ### Gateway API
 - **Status:** ✅ Operational
@@ -99,7 +99,7 @@ curl http://localhost:8080/v1/ledger
 
 ```bash
 # Option A: Via icnctl
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl -e 127.0.0.1:15602 init-coop
 
 # Option B: Via Gateway API

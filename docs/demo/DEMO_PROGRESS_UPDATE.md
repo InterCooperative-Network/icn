@@ -97,13 +97,13 @@
 
 ```bash
 # Terminal 1: UI (if not running)
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Terminal 2: Get token (if needed)
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \

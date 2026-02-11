@@ -88,7 +88,7 @@ let local_addr = socket.local_addr()?;
 
 ```bash
 # Edit demo.toml - remove or comment out stun_servers
-nano /home/matt/icn-demo-test/demo.toml
+nano <demo-data-dir>/demo.toml
 
 # Or: Don't pass stun_servers in config at all
 ```
@@ -134,7 +134,7 @@ These get resolved and passed to `session_manager.start()`, triggering the buggy
 ### Immediate (now):
 
 ```bash
-cd /home/matt/projects/icn/icn/crates/icn-net/src
+cd <repo-root>/icn/crates/icn-net/src
 
 # Quick fix: Comment out the problematic socket bind
 # Edit session.rs line 178-179
@@ -143,11 +143,11 @@ cd /home/matt/projects/icn/icn/crates/icn-net/src
 ### Test (5 minutes):
 
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 cargo build --release
 
 # Start daemon
-./target/release/icnd --config /home/matt/icn-demo-test/demo.toml \
+./target/release/icnd --config <demo-data-dir>/demo.toml \
     --gateway-enable \
     --gateway-bind "127.0.0.1:8080" \
     --gateway-jwt-secret "demo-secret-key-change-in-production"

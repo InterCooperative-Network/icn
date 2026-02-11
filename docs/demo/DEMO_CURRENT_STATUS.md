@@ -131,9 +131,9 @@ demo/
 **Priority 1: Verify UI → API Integration**
 ```bash
 # 1. Start daemon (already know this works)
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   --gateway-bind "127.0.0.1:8080" \
   --gateway-enable
 
@@ -226,9 +226,9 @@ Create script to populate the cooperative with 12 members:
 
 **Terminal 1: Start Daemon**
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   --gateway-enable \
   --gateway-bind "127.0.0.1:8080" \
@@ -238,9 +238,9 @@ cd /home/matt/projects/icn/icn
 
 **Terminal 2: Get Auth Token**
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
@@ -262,7 +262,7 @@ curl "http://localhost:8080/v1/ledger/did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptk
 
 **Terminal 4: Start UI**
 ```bash
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 # Open: http://localhost:3000
 ```
@@ -384,7 +384,7 @@ python3 -m http.server 3000
 
 ```bash
 # Test the UI connection to gateway
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 
 # Check what API endpoints it expects
 grep -r "localhost:8080" . || grep -r "gateway" . || grep -r "/api" . | head -20

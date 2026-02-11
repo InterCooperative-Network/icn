@@ -71,9 +71,9 @@ We successfully debugged, fixed, deployed, and tested the complete ICN stack fro
 
 ### Get JWT Token
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
@@ -102,7 +102,7 @@ curl http://localhost:8080/v1/health
 - **Running:** ✅ Session daemon-fixed
 - **Gateway:** http://localhost:8080
 - **RPC:** 127.0.0.1:15602
-- **Data:** /home/matt/icn-demo-test/data
+- **Data:** <demo-data-dir>/data
 
 ### Docker Stack
 - **icnd:** Up (healthy)

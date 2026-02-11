@@ -13,7 +13,7 @@
 
 ```bash
 cd icn
-./target/release/icnctl -d /home/matt/icn-demo-test/data id show
+./target/release/icnctl -d <demo-data-dir>/data id show
 # Enter passphrase: demo123
 ```
 
@@ -24,7 +24,7 @@ This will display your DID (starts with `did:icn:`)
 ```bash
 cd icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library
@@ -55,12 +55,12 @@ Copy the token that's displayed.
 cd icn
 
 echo "=== YOUR DID ==="
-echo "demo123" | ./target/release/icnctl -d /home/matt/icn-demo-test/data id show 2>&1 | grep "did:icn"
+echo "demo123" | ./target/release/icnctl -d <demo-data-dir>/data id show 2>&1 | grep "did:icn"
 
 echo ""
 echo "=== YOUR TOKEN ==="
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library 2>&1
@@ -94,7 +94,7 @@ Start it first:
 ```bash
 cd icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   --gateway-enable \
   --gateway-bind "127.0.0.1:8080" \
@@ -121,7 +121,7 @@ did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh
 
 **Demo passphrase:** `demo123`
 
-This is set for the demo environment at `/home/matt/icn-demo-test/data`
+This is set for the demo environment at `<demo-data-dir>/data`
 
 ---
 

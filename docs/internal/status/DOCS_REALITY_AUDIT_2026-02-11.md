@@ -1630,3 +1630,61 @@ Result: no broken relative links; expected marker-only findings remain (archive/
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C15; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C16 - demo/status path portability normalization)
+
+Touched files:
+
+- `docs/status/CURRENT_SYSTEM_STATUS.md`
+- `docs/status/DEPLOYMENT_VERIFICATION.md`
+- `docs/status/FINAL_DEMO_SUCCESS.md`
+- Demo snapshot set under `docs/demo/`:
+  - `DEMO_AUDIT.md`
+  - `DEMO_BUG_FOUND.md`
+  - `DEMO_CURRENT_STATUS.md`
+  - `DEMO_FINAL_SESSION_SUMMARY.md`
+  - `DEMO_INFRASTRUCTURE_COMPLETE.md`
+  - `DEMO_LOGIN_INFO.md`
+  - `DEMO_NEXT_IMMEDIATE_STEPS.md`
+  - `DEMO_NEXT_STEPS.md`
+  - `DEMO_PROGRESS_UPDATE.md`
+  - `DEMO_QUICK_START.md`
+  - `DEMO_SESSION_1_SUMMARY.md`
+  - `DEMO_SESSION_COMPLETE.md`
+  - `DEMO_STATUS_SUMMARY.md`
+  - `DEMO_SUCCESS_FINAL.md`
+  - `DEMO_WIRING_STATUS.md`
+
+Changes:
+
+- Replaced machine-specific paths with portable placeholders:
+  - `/home/matt/projects/icn` -> `<repo-root>`
+  - `/home/matt/icn-demo-test` -> `<demo-data-dir>`
+- Preserved command semantics while making examples reusable across environments.
+
+## Verification updates (Batch C16)
+
+```bash
+rg -n "/home/matt/projects/icn|/home/matt/icn-demo-test|<repo-root>|<demo-data-dir>" docs/demo docs/status/CURRENT_SYSTEM_STATUS.md docs/status/DEPLOYMENT_VERIFICATION.md docs/status/FINAL_DEMO_SUCCESS.md
+```
+
+Result: no `/home/matt/...` paths remain in the touched demo/status files; placeholder paths present in all converted locations.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain (archive/internal marker references and topology policy mentions).
+
+## Audit ledger additions (Batch C16)
+
+- `docs/demo/* + docs/status/{CURRENT_SYSTEM_STATUS,DEPLOYMENT_VERIFICATION,FINAL_DEMO_SUCCESS}.md | portability policy (no machine-specific absolute paths in reusable docs) | rg -n "/home/matt/projects/icn|/home/matt/icn-demo-test|<repo-root>|<demo-data-dir>" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C16)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C16; continue active-doc content drift cleanup.

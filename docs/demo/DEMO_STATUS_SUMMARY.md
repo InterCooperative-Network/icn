@@ -88,7 +88,7 @@
 
 ### Option 1: Run the validation script (10 minutes)
 ```bash
-cd /home/matt/projects/icn
+cd <repo-root>
 ./scripts/quick-start-test.sh
 ```
 
@@ -373,7 +373,7 @@ Send demo invitation:
 Ready to begin? Run this:
 
 ```bash
-cd /home/matt/projects/icn
+cd <repo-root>
 ./scripts/quick-start-test.sh
 ```
 
