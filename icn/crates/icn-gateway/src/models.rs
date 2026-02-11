@@ -1035,7 +1035,6 @@ pub struct ListingFilterParams {
 #[cfg(test)]
 mod schema_contract_tests {
     use super::*;
-    use serde_json::json;
 
     /// Contract test: TransactionHistoryResponse must serialize with "transactions" key.
     /// This prevents accidental drift to "entries" or other names.
