@@ -180,6 +180,83 @@ ECONOMIC DETERMINISM TRIPWIRES
 
 Proves the complete governance → ledger provenance chain.
 
+### Receipt Chain Demo (Full Visibility)
+
+```bash
+./scripts/pilot_receipt_chain_demo.sh
+```
+
+Runs determinism tests + queries gateway API (if running):
+
+```
+RECEIPT CHAIN INVARIANTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Cross-node determinism: VERIFIED
+✅ Intent ordering determinism: VERIFIED
+✅ Provenance chain integrity: VERIFIED
+
+════════════════════════════════════════════════════════════════════
+  RECEIPT CHAIN DEMO COMPLETE
+```
+
+## Proof of Legitimacy Walkthrough
+
+This section shows three ways to verify the economic chain is working correctly.
+
+### Method 1: CLI (icnctl)
+
+```bash
+# Query the full chain for a decision
+icnctl receipts chain <decision_hash_64hex> --gateway http://localhost:8080 --coop-id my-coop
+
+# Get a single allocation receipt
+icnctl receipts allocation <canonical_hash_64hex> --gateway http://localhost:8080
+
+# Get a single settlement intent
+icnctl receipts intent <canonical_hash_64hex> --gateway http://localhost:8080
+
+# JSON output for scripting
+icnctl receipts chain <hash> --json | jq '.allocations[0].canonicalHash'
+```
+
+### Method 2: REST API
+
+```bash
+# Query full chain
+curl http://localhost:8080/v1/receipts/chain?decision_hash=2a2a2a...
+
+# Query ledger entries by decision
+curl http://localhost:8080/v1/ledger/my-coop/entries/by-decision?decision_hash=2a2a2a...
+
+# Get single allocation
+curl http://localhost:8080/v1/receipts/allocations/<canonical_hash>
+
+# Get single intent
+curl http://localhost:8080/v1/receipts/intents/<canonical_hash>
+```
+
+### Method 3: Pilot UI
+
+1. Open Pilot UI in browser
+2. Navigate to **Receipts** tab
+3. Paste decision hash (64 hex characters)
+4. Click **Query Chain**
+5. View:
+   - Allocation receipts with **canonicalized** badge (sorted verification)
+   - Settlement intents with amounts/accounts
+   - Ledger entries with provenance links
+6. Click **Copy** to get chain summary for bug reports
+
+### Verification Checklist
+
+| Check | How to Verify |
+|-------|---------------|
+| Cross-node determinism | Run `pilot_receipt_chain_demo.sh` - all tripwires green |
+| Order-independence | AllocationReceipt hash unchanged regardless of intent order |
+| Provenance linkage | Ledger entries show `decision_hash` field |
+| Sorted intents | UI shows "✓ canonicalized" badge on allocation |
+| Restart durability | After `icnd` restart, same hashes returned |
+
 ## Invariants
 
 ### Cross-Node Determinism

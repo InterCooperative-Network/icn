@@ -4895,3 +4895,35 @@ footer .sync-status.error {
     text-align: center;
     padding: 1rem;
 }
+
+/* Receipt chain actions */
+.chain-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Sorted verification badge */
+.sorted-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.sorted-badge.valid {
+    background: rgba(22, 163, 74, 0.15);
+    color: var(--success);
+}
+
+.sorted-badge.invalid {
+    background: rgba(220, 38, 38, 0.15);
+    color: var(--danger);
+}
+
+/* Copy button feedback */
+.btn.copied {
+    background: var(--success);
+    color: white;
+}

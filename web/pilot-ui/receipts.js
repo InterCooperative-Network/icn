@@ -12,6 +12,7 @@
     const elements = {
         decisionHashInput: null,
         queryChainBtn: null,
+        copyChainBtn: null,
         chainResults: null,
         chainStatus: null,
         allocationsList: null,
@@ -21,10 +22,16 @@
         errorMessage: null,
     };
 
+    // Last query results for copy functionality
+    let lastChainData = null;
+    let lastLedgerData = null;
+    let lastDecisionHash = null;
+
     // Initialize when DOM is ready
     function init() {
         elements.decisionHashInput = document.getElementById('decision-hash-input');
         elements.queryChainBtn = document.getElementById('query-chain-btn');
+        elements.copyChainBtn = document.getElementById('copy-chain-btn');
         elements.chainResults = document.getElementById('receipt-chain-results');
         elements.chainStatus = document.getElementById('chain-status');
         elements.allocationsList = document.getElementById('allocations-list');
@@ -35,6 +42,10 @@
 
         if (elements.queryChainBtn) {
             elements.queryChainBtn.addEventListener('click', handleQueryChain);
+        }
+
+        if (elements.copyChainBtn) {
+            elements.copyChainBtn.addEventListener('click', handleCopyChain);
         }
 
         if (elements.decisionHashInput) {
@@ -147,6 +158,11 @@
 
     // Render results
     function renderResults(chainData, ledgerData, decisionHash) {
+        // Store for copy functionality
+        lastChainData = chainData;
+        lastLedgerData = ledgerData;
+        lastDecisionHash = decisionHash;
+
         elements.chainResults.classList.remove('hidden');
 
         const allocations = chainData.allocations || [];
@@ -173,6 +189,15 @@
         renderLedgerEntries(entries);
     }
 
+    // Check if array is sorted
+    function isSorted(arr) {
+        if (!arr || arr.length <= 1) return true;
+        for (let i = 0; i < arr.length - 1; i++) {
+            if (arr[i] > arr[i + 1]) return false;
+        }
+        return true;
+    }
+
     // Render allocation receipts
     function renderAllocations(allocations) {
         if (!allocations.length) {
@@ -180,11 +205,18 @@
             return;
         }
 
-        const html = allocations.map(alloc => `
+        const html = allocations.map(alloc => {
+            const hashes = alloc.intentHashes || [];
+            const sorted = isSorted(hashes);
+            const sortedBadge = sorted 
+                ? '<span class="sorted-badge valid">✓ canonicalized</span>'
+                : '<span class="sorted-badge invalid">⚠ not sorted</span>';
+            
+            return `
             <div class="receipt-item allocation">
                 <div class="receipt-header">
                     <span class="receipt-type">Allocation</span>
-                    <span class="receipt-scope">${alloc.scope || 'Unknown'}</span>
+                    <span class="receipt-scope">${escapeHtml(alloc.scope || 'Unknown')}</span>
                 </div>
                 <div class="receipt-field">
                     <label>Canonical Hash:</label>
@@ -198,11 +230,11 @@
                     <label>Intent Count:</label>
                     <span>${alloc.intentCount || 0}</span>
                 </div>
-                ${alloc.intentHashes?.length ? `
+                ${hashes.length ? `
                 <div class="receipt-field">
-                    <label>Intent Hashes (sorted):</label>
+                    <label>Intent Hashes: ${sortedBadge}</label>
                     <ul class="hash-list">
-                        ${alloc.intentHashes.map(h => `<li><code class="hash">${truncateHash(h)}</code></li>`).join('')}
+                        ${hashes.map(h => `<li><code class="hash">${truncateHash(h)}</code></li>`).join('')}
                     </ul>
                 </div>
                 ` : ''}
@@ -211,7 +243,7 @@
                     <span>${formatTimestamp(alloc.createdAt)}</span>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
 
         elements.allocationsList.innerHTML = html;
     }
@@ -318,6 +350,75 @@
         `).join('');
 
         elements.ledgerList.innerHTML = html;
+    }
+
+    // Handle copy chain button
+    async function handleCopyChain() {
+        if (!lastChainData || !lastDecisionHash) {
+            showError('No chain data to copy. Query a decision hash first.');
+            return;
+        }
+
+        const allocations = lastChainData.allocations || [];
+        const intents = lastChainData.intents || [];
+        const entries = lastLedgerData?.entries || [];
+
+        // Build summary text
+        let text = `ICN Receipt Chain Summary\n`;
+        text += `========================\n\n`;
+        text += `Decision Hash: ${lastDecisionHash}\n\n`;
+
+        if (allocations.length) {
+            text += `Allocation Receipts (${allocations.length}):\n`;
+            for (const alloc of allocations) {
+                text += `  - Canonical Hash: ${alloc.canonicalHash || '—'}\n`;
+                text += `    Scope: ${alloc.scope || 'Unknown'}\n`;
+                if (alloc.intentHashes?.length) {
+                    text += `    Intent Hashes (${alloc.intentHashes.length}):\n`;
+                    for (const h of alloc.intentHashes) {
+                        text += `      • ${h}\n`;
+                    }
+                }
+            }
+            text += '\n';
+        }
+
+        if (intents.length) {
+            text += `Settlement Intents (${intents.length}):\n`;
+            for (const intent of intents) {
+                text += `  - Canonical Hash: ${intent.canonicalHash || '—'}\n`;
+                text += `    ${intent.from || '—'} → ${intent.to || '—'}: ${intent.amount || 0} ${intent.unit || ''}\n`;
+            }
+            text += '\n';
+        }
+
+        if (entries.length) {
+            text += `Ledger Entries (${entries.length}):\n`;
+            for (const entry of entries) {
+                text += `  - ${entry.from || '—'} → ${entry.to || '—'}: ${entry.amount || 0} ${entry.currency || ''}\n`;
+                if (entry.decisionHash) {
+                    text += `    Decision Hash: ${entry.decisionHash}\n`;
+                }
+            }
+        }
+
+        text += `\n--- Generated ${new Date().toISOString()} ---\n`;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            // Visual feedback
+            const btn = elements.copyChainBtn;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('copied');
+            }, 2000);
+        } catch (err) {
+            console.error('[Receipts] Copy failed:', err);
+            showError('Failed to copy to clipboard');
+        }
     }
 
     // Helper functions

@@ -177,6 +177,10 @@ enum Commands {
     #[command(subcommand)]
     Api(ApiCommands),
 
+    /// Economic receipt chain queries
+    #[command(subcommand)]
+    Receipts(ReceiptCommands),
+
     /// Pre-deployment health checks
     Preflight {
         /// Gateway endpoint to check (if running)
@@ -207,6 +211,55 @@ enum ApiCommands {
         /// Output format: yaml or json
         #[arg(short, long, default_value = "yaml")]
         format: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ReceiptCommands {
+    /// Get a receipt chain for a decision hash
+    Chain {
+        /// Decision hash (64 hex characters)
+        decision_hash: String,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Cooperative ID for ledger queries
+        #[arg(short, long)]
+        coop_id: Option<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Get a single allocation receipt by canonical hash
+    Allocation {
+        /// Canonical hash (64 hex characters)
+        hash: String,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Get a single settlement intent by canonical hash
+    Intent {
+        /// Canonical hash (64 hex characters)
+        hash: String,
+
+        /// Gateway API URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -2032,6 +2085,10 @@ async fn main() -> Result<()> {
         }
 
         Commands::Api(api_cmd) => handle_api_command(api_cmd)?,
+
+        Commands::Receipts(receipt_cmd) => {
+            handle_receipt_command(receipt_cmd).await?;
+        }
 
         Commands::Preflight {
             gateway,
@@ -9747,6 +9804,181 @@ fn handle_api_command(cmd: ApiCommands) -> Result<()> {
                 println!("OpenAPI specification written to {}", path.display());
             } else {
                 print!("{content}");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle receipt chain queries via Gateway API
+async fn handle_receipt_command(cmd: ReceiptCommands) -> Result<()> {
+    match cmd {
+        ReceiptCommands::Chain {
+            decision_hash,
+            gateway,
+            coop_id,
+            json,
+        } => {
+            // Validate hash format
+            if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                bail!("Invalid decision hash: expected 64 hex characters");
+            }
+
+            let client = reqwest::Client::new();
+
+            // Query receipt chain
+            let chain_url = format!("{}/v1/receipts/chain?decision_hash={}", gateway, decision_hash);
+            let chain_resp = client
+                .get(&chain_url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !chain_resp.status().is_success() {
+                if chain_resp.status().as_u16() == 404 {
+                    println!("No receipts found for decision hash: {}", &decision_hash[..16]);
+                    return Ok(());
+                }
+                bail!("Gateway returned error: {}", chain_resp.status());
+            }
+
+            let chain_data: serde_json::Value = chain_resp
+                .json()
+                .await
+                .context("Failed to parse receipt chain response")?;
+
+            // Query ledger entries if coop_id provided
+            let ledger_data = if let Some(ref coop) = coop_id {
+                let ledger_url = format!(
+                    "{}/v1/ledger/{}/entries/by-decision?decision_hash={}",
+                    gateway, coop, decision_hash
+                );
+                match client.get(&ledger_url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        resp.json::<serde_json::Value>().await.ok()
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+            if json {
+                // JSON output
+                let mut output = chain_data.clone();
+                if let Some(ledger) = ledger_data {
+                    output["ledgerEntries"] = ledger;
+                }
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            } else {
+                // Human-readable output
+                println!("Receipt Chain for Decision: {}...", &decision_hash[..16]);
+                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+                // Allocations
+                if let Some(allocations) = chain_data.get("allocations").and_then(|a| a.as_array()) {
+                    println!("Allocation Receipts: {}", allocations.len());
+                    for alloc in allocations {
+                        if let Some(hash) = alloc.get("canonicalHash").and_then(|h| h.as_str()) {
+                            println!("  • Canonical Hash: {}...", &hash[..hash.len().min(24)]);
+                        }
+                        if let Some(count) = alloc.get("intentCount").and_then(|c| c.as_u64()) {
+                            println!("    Intent Count: {}", count);
+                        }
+                        if let Some(scope) = alloc.get("scope").and_then(|s| s.as_str()) {
+                            println!("    Scope: {}", scope);
+                        }
+                    }
+                    println!();
+                }
+
+                // Intents
+                if let Some(intents) = chain_data.get("intents").and_then(|i| i.as_array()) {
+                    println!("Settlement Intents: {}", intents.len());
+                    for intent in intents {
+                        if let Some(hash) = intent.get("canonicalHash").and_then(|h| h.as_str()) {
+                            println!("  • Canonical Hash: {}...", &hash[..hash.len().min(24)]);
+                        }
+                        let from = intent.get("from").and_then(|f| f.as_str()).unwrap_or("—");
+                        let to = intent.get("to").and_then(|t| t.as_str()).unwrap_or("—");
+                        let amount = intent.get("amount").and_then(|a| a.as_u64()).unwrap_or(0);
+                        let unit = intent.get("unit").and_then(|u| u.as_str()).unwrap_or("");
+                        println!("    {} → {} : {} {}", from, to, amount, unit);
+                    }
+                    println!();
+                }
+
+                // Ledger entries
+                if let Some(ledger) = ledger_data {
+                    if let Some(entries) = ledger.get("entries").and_then(|e| e.as_array()) {
+                        println!("Ledger Entries: {}", entries.len());
+                        for entry in entries {
+                            let from = entry.get("from").and_then(|f| f.as_str()).unwrap_or("—");
+                            let to = entry.get("to").and_then(|t| t.as_str()).unwrap_or("—");
+                            let amount = entry.get("amount").and_then(|a| a.as_str()).unwrap_or("0");
+                            let currency = entry.get("currency").and_then(|c| c.as_str()).unwrap_or("");
+                            println!("  • {} → {} : {} {}", from, to, amount, currency);
+                        }
+                    }
+                }
+
+                println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                println!("Query complete");
+            }
+        }
+
+        ReceiptCommands::Allocation { hash, gateway, json } => {
+            if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                bail!("Invalid hash: expected 64 hex characters");
+            }
+
+            let client = reqwest::Client::new();
+            let url = format!("{}/v1/receipts/allocations/{}", gateway, hash);
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !resp.status().is_success() {
+                bail!("Receipt not found or gateway error: {}", resp.status());
+            }
+
+            let data: serde_json::Value = resp.json().await.context("Failed to parse response")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&data)?);
+            } else {
+                println!("Allocation Receipt: {}...", &hash[..16]);
+                println!("{}", serde_json::to_string_pretty(&data)?);
+            }
+        }
+
+        ReceiptCommands::Intent { hash, gateway, json } => {
+            if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                bail!("Invalid hash: expected 64 hex characters");
+            }
+
+            let client = reqwest::Client::new();
+            let url = format!("{}/v1/receipts/intents/{}", gateway, hash);
+            let resp = client
+                .get(&url)
+                .send()
+                .await
+                .context("Failed to connect to gateway")?;
+
+            if !resp.status().is_success() {
+                bail!("Intent not found or gateway error: {}", resp.status());
+            }
+
+            let data: serde_json::Value = resp.json().await.context("Failed to parse response")?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&data)?);
+            } else {
+                println!("Settlement Intent: {}...", &hash[..16]);
+                println!("{}", serde_json::to_string_pretty(&data)?);
             }
         }
     }
