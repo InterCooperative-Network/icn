@@ -1,5 +1,8 @@
 # SDIS Quick Start Guide
 
+> Snapshot guidance: this document contains both currently wired endpoints and forward-looking flows.
+> Verify live behavior against `icn/crates/icn-gateway/src/api/sdis/mod.rs` and `docs/sdis/SDIS_STATUS.md`.
+
 ## 🚀 Getting Started with SDIS
 
 SDIS (Secure Distributed Identity System) enables secure multi-device identity management and recovery for ICN.
@@ -113,7 +116,7 @@ View your steward metrics:
 
 ```bash
 # Step 1: Request enrollment
-curl -X POST http://localhost:8080/api/v1/sdis/enroll \
+curl -X POST http://localhost:8080/v1/sdis/enroll \
   -H "Content-Type: application/json" \
   -d '{
     "root_did": "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
@@ -130,7 +133,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/enroll \
 }
 
 # Step 2: Approve (on existing device)
-curl -X POST http://localhost:8080/api/v1/sdis/enroll/enr_abc123/approve \
+curl -X POST http://localhost:8080/v1/sdis/enroll/enr_abc123/approve \
   -H "Content-Type: application/json" \
   -d '{
     "signature": "base64_ed25519_signature"
@@ -143,7 +146,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/enroll/enr_abc123/approve \
 }
 
 # Step 3: Verify (on new device)
-curl http://localhost:8080/api/v1/sdis/enroll/enr_abc123
+curl http://localhost:8080/v1/sdis/enroll/enr_abc123
 
 # Response:
 {
@@ -156,7 +159,7 @@ curl http://localhost:8080/api/v1/sdis/enroll/enr_abc123
 #### Add Recovery Anchor
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/anchors \
+curl -X POST http://localhost:8080/v1/sdis/anchors \
   -H "Content-Type: application/json" \
   -d '{
     "anchor_type": "device",
@@ -174,7 +177,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/anchors \
 #### List Anchors
 
 ```bash
-curl http://localhost:8080/api/v1/sdis/anchors
+curl http://localhost:8080/v1/sdis/anchors
 
 # Response:
 {
@@ -375,15 +378,15 @@ User needs: Recover identity
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/v1/sdis/enroll` | POST | Start enrollment |
-| `/api/v1/sdis/enroll/{id}/approve` | POST | Approve enrollment |
-| `/api/v1/sdis/enroll/{id}` | GET | Check status |
-| `/api/v1/sdis/anchors` | POST | Add anchor |
-| `/api/v1/sdis/anchors` | GET | List anchors |
-| `/api/v1/sdis/anchors/{id}/revoke` | POST | Revoke anchor |
-| `/api/v1/sdis/recover/initiate` | POST | Start recovery |
-| `/api/v1/sdis/recover/{id}/approve` | POST | Approve recovery |
-| `/api/v1/sdis/recover/{id}` | GET | Check recovery |
+| `/v1/sdis/enroll` | POST | Start enrollment |
+| `/v1/sdis/enroll/{id}/approve` | POST | Approve enrollment |
+| `/v1/sdis/enroll/{id}` | GET | Check status |
+| `/v1/sdis/anchors` | POST | Add anchor |
+| `/v1/sdis/anchors` | GET | List anchors |
+| `/v1/sdis/anchors/{id}/revoke` | POST | Revoke anchor |
+| `/v1/sdis/recover/initiate` | POST | Start recovery |
+| `/v1/sdis/recover/{id}/approve` | POST | Approve recovery |
+| `/v1/sdis/recover/{id}` | GET | Check recovery |
 
 ---
 
@@ -400,9 +403,9 @@ User needs: Recover identity
 
 ## Resources
 
-📖 **Full Documentation**: `docs/SDIS_SYSTEM.md`  
+📖 **Full Documentation**: `docs/sdis/SDIS_SYSTEM.md`  
 🏗️ **Architecture**: `docs/ARCHITECTURE.md`  
-🔐 **Security Model**: `docs/security-model.md`  
+🔐 **Security Model**: `docs/security/SDIS_THREAT_MODEL.md`  
 🐛 **Report Issues**: `github.com/InterCooperative-Network/icn/issues`  
 💬 **Get Help**: Join ICN Discord #sdis channel
 

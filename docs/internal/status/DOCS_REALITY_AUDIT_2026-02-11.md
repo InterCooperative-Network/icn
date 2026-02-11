@@ -1688,3 +1688,44 @@ Result: no broken relative links; expected marker-only findings remain (archive/
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C16; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C17 - SDIS API prefix and reality caveats)
+
+1. `docs/sdis/SDIS_QUICK_START.md`
+2. `docs/sdis/SDIS_SYSTEM.md`
+3. `docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md`
+
+Changes:
+
+- Replaced stale `/api/v1/sdis/*` references with `/v1/sdis/*`.
+- Added explicit caveats that these SDIS docs include design/snapshot material and must be validated against currently wired gateway routes.
+- Fixed stale resource references in quick-start (`docs/SDIS_SYSTEM.md` -> `docs/sdis/SDIS_SYSTEM.md`, `docs/security-model.md` -> `docs/security/SDIS_THREAT_MODEL.md`).
+
+## Verification updates (Batch C17)
+
+```bash
+rg -n "/api/v1/sdis|/v1/sdis" docs/sdis/SDIS_QUICK_START.md docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md
+```
+
+Result: no `/api/v1/sdis` occurrences remain in touched SDIS docs; `/v1/sdis` paths now used.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C17)
+
+- `docs/sdis/SDIS_QUICK_START.md | icn/crates/icn-gateway/src/api/sdis/{mod.rs,simple_enrollment.rs} | rg -n "/api/v1/sdis|/v1/sdis|enrollment/start|verify/level1|verify/level2" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/sdis/SDIS_SYSTEM.md | icn/crates/icn-gateway/src/api/sdis/mod.rs | rg -n "/api/v1/sdis|/v1/sdis" + source review | partially-aligned-with-caveat | reviewed_on(2026-02-11)`
+- `docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md | snapshot-date policy + gateway route prefix convention | rg -n "/api/v1/sdis|/v1/sdis|Historical implementation snapshot" + source review | aligned-with-snapshot-caveat | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C17)
+
+- Accuracy: 4/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C17; continue active-doc content drift cleanup.
