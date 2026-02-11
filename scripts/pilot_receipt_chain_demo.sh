@@ -94,15 +94,15 @@ if [ "$GATEWAY_AVAILABLE" = true ]; then
     if echo "$CHAIN_RESP" | grep -q '"allocations"'; then
         echo "✅ Receipt chain query returned allocations"
         
-        # Extract and display allocation hashes
-        ALLOC_HASH=$(echo "$CHAIN_RESP" | grep -o '"canonicalHash":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "none")
-        if [ "$ALLOC_HASH" != "none" ] && [ -n "$ALLOC_HASH" ]; then
+        # Extract and display allocation hashes using jq for proper JSON parsing
+        ALLOC_HASH=$(echo "$CHAIN_RESP" | jq -r '.allocations[0].canonicalHash // empty' 2>/dev/null || echo "")
+        if [ -n "$ALLOC_HASH" ]; then
             echo "   Allocation canonical hash: ${ALLOC_HASH:0:32}..."
         fi
         
-        # Count intents
-        INTENT_COUNT=$(echo "$CHAIN_RESP" | grep -c '"canonicalHash"' || echo "0")
-        echo "   Intent count: $((INTENT_COUNT - 1))"  # Subtract 1 for allocation
+        # Count intents from the intents array
+        INTENT_COUNT=$(echo "$CHAIN_RESP" | jq '.intents | length' 2>/dev/null || echo "0")
+        echo "   Intent count: $INTENT_COUNT"
     else
         echo "ℹ️  No receipts found for test decision hash (expected if not seeded)"
     fi

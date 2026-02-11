@@ -602,7 +602,7 @@ mod tests {
             },
         ];
 
-        let hashes: Vec<Hash> = variants.iter().map(|v| compute_canonical_hash(v)).collect();
+        let hashes: Vec<Hash> = variants.iter().map(compute_canonical_hash).collect();
 
         // Verify all hashes are unique
         for i in 0..hashes.len() {
