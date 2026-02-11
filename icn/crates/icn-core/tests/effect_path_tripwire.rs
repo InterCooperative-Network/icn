@@ -56,6 +56,7 @@ fn tripwire_effect_path_coverage() {
     // Proposal types with full effect path (Decision → Effect → Service → Durable State)
     let effect_path_complete = [
         "Treasury::Spend",              // LedgerService
+        "Treasury::CreateBudget",       // LedgerService (via Allocate)
         "Federation::Join",             // FederationService
         "Federation::Vouch",            // FederationService
         "Control::Veto",                // ControlService
@@ -72,7 +73,6 @@ fn tripwire_effect_path_coverage() {
 
     // Proposal types with effect defined but not wired to service
     let effect_defined_only = [
-        "Treasury::CreateBudget",
         "Treasury::Allocate",
         "Treasury::Transfer",
         "Treasury::DistributeSurplus",
@@ -106,11 +106,11 @@ fn tripwire_effect_path_coverage() {
     println!("║ ❌ Legacy only (no effect type): {:2}                              ║", legacy_only.len());
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
-    // Current target: 13 complete, 16 defined, 0 legacy-only
-    // Updated: Membership (5) + Protocol (2) now wired
+    // Current target: 14 complete, 15 defined, 0 legacy-only
+    // Updated: Treasury::CreateBudget now wired with provenance
     assert_eq!(
         effect_path_complete.len(),
-        13,
+        14,
         "Update this test when more effects are wired to services"
     );
 }

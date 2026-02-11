@@ -294,6 +294,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             total_amount,
             currency,
             name,
+            decision_hash,
             ..
         } => TreasuryOperation {
             treasury_id: treasury_did.clone(),
@@ -302,7 +303,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: name.clone(),
-            decision_hash: None,
+            decision_hash: Some(decision_hash.clone()),
         },
         TreasuryEffect::Allocate {
             treasury_did,

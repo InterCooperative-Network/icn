@@ -135,15 +135,25 @@ impl EffectExecutor for KernelGovernanceExecutor {
                         decision_receipt_id,
                     ))
                 } else {
-                    // Protocol effect not implemented - fail explicitly, no lying success
+                    // PILOT V1 DECISION: Protocol::Upgrade and Protocol::SetSchedulingPolicy
+                    // return explicit failure here because:
+                    // 1. Upgrade requires migration coordination not implemented in pilot
+                    // 2. SetSchedulingPolicy already works via EventBus side-channel
+                    //    (see governance_policy_integration.rs test)
+                    //
+                    // This explicit failure prevents lying about success. The tripwire
+                    // test documents these as expected failures.
                     tracing::warn!(
                         effect = ?protocol_effect,
-                        "Protocol effect not implemented - returning failure"
+                        "Protocol effect not supported via kernel path in pilot v1"
                     );
                     Ok(EffectResult {
                         effect_id: decision_receipt_id.to_string(),
                         success: false,
-                        message: format!("Protocol effect not implemented: {:?}", protocol_effect),
+                        message: format!(
+                            "Protocol effect not supported in pilot v1 (use EventBus for SchedulingPolicy): {:?}",
+                            protocol_effect
+                        ),
                         state_change_hash: None,
                     })
                 }
@@ -739,6 +749,7 @@ fn treasury_effect_to_operation(
             total_amount,
             currency,
             name,
+            decision_hash,
             ..
         } => TreasuryOperation {
             treasury_id: treasury_did.clone(),
@@ -747,7 +758,7 @@ fn treasury_effect_to_operation(
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: name.clone(),
-            decision_hash: None, // CreateBudget doesn't carry provenance
+            decision_hash: Some(decision_hash.clone()),
         },
         TreasuryEffect::Allocate {
             treasury_did,
@@ -1645,6 +1656,75 @@ mod tests {
         assert_eq!(
             parse_value_like("50%", &ref_pct).unwrap(),
             ParameterValue::Percentage(50.0)
+        );
+    }
+
+    // =========================================================================
+    // Pilot V1 Protocol Effect Handling Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_protocol_upgrade_returns_explicit_failure() {
+        // PILOT V1 DECISION: Protocol::Upgrade is not supported via kernel effect path.
+        // This test asserts the expected failure behavior.
+        use icn_kernel_api::effects::ProtocolEffect;
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-upgrade-receipt";
+
+        let effect = KernelEffect::Protocol(ProtocolEffect::Upgrade {
+            version: "2.0.0".to_string(),
+            upgrade_hash: "sha256:abc123".to_string(),
+            activation_height: 1000,
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(!effect_result.success, "Protocol::Upgrade should fail in pilot v1");
+        assert!(
+            effect_result.message.contains("not supported in pilot v1"),
+            "Failure message should explain pilot limitation: {}",
+            effect_result.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_protocol_set_scheduling_policy_returns_explicit_failure() {
+        // PILOT V1 DECISION: Protocol::SetSchedulingPolicy is not supported via kernel
+        // effect path. SchedulingPolicy proposals work via EventBus side-channel instead.
+        // See governance_policy_integration.rs for the working flow.
+        use icn_kernel_api::effects::ProtocolEffect;
+
+        let store = Arc::new(MockParamStore::new());
+        let executor = KernelGovernanceExecutor::new(store);
+        let receipt_id = "test-scheduling-policy-receipt";
+
+        let effect = KernelEffect::Protocol(ProtocolEffect::SetSchedulingPolicy {
+            coop_id: "test-coop".to_string(),
+            policy_hash: "sha256:policy123".to_string(),
+            policy_json: r#"{"coop_id":"test-coop"}"#.to_string(),
+        });
+
+        let result = executor.execute_effect(effect, receipt_id).await;
+        assert!(result.is_ok());
+
+        let effect_result = result.unwrap();
+        assert!(
+            !effect_result.success,
+            "Protocol::SetSchedulingPolicy should fail via kernel path in pilot v1"
+        );
+        assert!(
+            effect_result.message.contains("not supported in pilot v1"),
+            "Failure message should explain pilot limitation: {}",
+            effect_result.message
+        );
+        assert!(
+            effect_result.message.contains("EventBus"),
+            "Failure message should point to EventBus alternative: {}",
+            effect_result.message
         );
     }
 }

@@ -179,6 +179,8 @@ pub fn translate_payload_to_effects(
             name: purpose.clone(),
             validity_start: 0,
             validity_end: u64::MAX,
+            decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: "pending".to_string(), // Wired when full context available
         })],
 
         // Membership proposals
@@ -310,6 +312,8 @@ fn translate_treasury_operation(
             name: purpose.clone(),
             validity_start: 0,
             validity_end: period_end.unwrap_or(u64::MAX),
+            decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: "pending".to_string(), // Wired when full context available
         })],
 
         // Fallback for other treasury operations

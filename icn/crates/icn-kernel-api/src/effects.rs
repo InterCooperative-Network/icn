@@ -58,6 +58,10 @@ pub enum TreasuryEffect {
         name: String,
         validity_start: u64,
         validity_end: u64,
+        /// Links back to governance decision receipt
+        decision_receipt_id: String,
+        /// Canonical content hash for verification
+        decision_hash: String,
     },
     /// Spend from treasury to recipient
     Spend {
