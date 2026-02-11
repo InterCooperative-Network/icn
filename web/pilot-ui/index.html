@@ -360,6 +360,9 @@
                 <button class="nav-btn" data-tab="exchange">
                     <span aria-label="Internal exchange marketplace">Exchange</span>
                 </button>
+                <button class="nav-btn" data-tab="receipts">
+                    <span aria-label="Economic receipt chain viewer">Receipts</span>
+                </button>
             </nav>
 
             <!-- Dashboard Tab -->
@@ -1623,6 +1626,78 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                 </div>
             </main>
 
+            <!-- Receipts Tab -->
+            <main id="receipts" class="tab-content" role="tabpanel" aria-labelledby="tab-receipts">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Economic Receipt Chain</h2>
+                    </div>
+                    <p class="subtitle">View the provenance chain: Decision → Allocation → Intent → Ledger</p>
+
+                    <div class="form-group">
+                        <label for="decision-hash-input">Decision Hash</label>
+                        <input 
+                            type="text" 
+                            id="decision-hash-input" 
+                            placeholder="Enter 64-character hex hash (e.g., 2a2a2a...)"
+                            pattern="[0-9a-fA-F]{64}"
+                            maxlength="64"
+                            aria-describedby="decision-hash-hint"
+                        />
+                        <small id="decision-hash-hint">64 hex characters representing the governance decision hash</small>
+                    </div>
+
+                    <button id="query-chain-btn" class="btn btn-primary">Query Chain</button>
+                </div>
+
+                <!-- Chain Results -->
+                <div id="receipt-chain-results" class="card hidden">
+                    <div class="card-header">
+                        <h3>Receipt Chain</h3>
+                        <span id="chain-status" class="status-badge"></span>
+                    </div>
+
+                    <!-- Allocation Receipts -->
+                    <div id="allocations-section" class="receipt-section">
+                        <h4>Allocation Receipts</h4>
+                        <div id="allocations-list" class="receipt-list">
+                            <p class="empty-state">No allocations found</p>
+                        </div>
+                    </div>
+
+                    <!-- Settlement Intents -->
+                    <div id="intents-section" class="receipt-section">
+                        <h4>Settlement Intents</h4>
+                        <div id="intents-list" class="receipt-list">
+                            <p class="empty-state">No intents found</p>
+                        </div>
+                    </div>
+
+                    <!-- Ledger Entries -->
+                    <div id="ledger-section" class="receipt-section">
+                        <h4>Ledger Entries</h4>
+                        <div id="ledger-list" class="receipt-list">
+                            <p class="empty-state">No ledger entries found</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error/Status Messages -->
+                <div id="receipt-error" class="card error-card hidden">
+                    <p id="receipt-error-message"></p>
+                </div>
+
+                <!-- Invariants Section -->
+                <div class="card">
+                    <h3>Receipt Chain Invariants</h3>
+                    <ul class="invariants-list">
+                        <li><strong>Cross-node determinism:</strong> Same inputs → same canonical hashes</li>
+                        <li><strong>Order-independence:</strong> Intent order does not affect allocation hash</li>
+                        <li><strong>Provenance chain:</strong> Every ledger entry links back to its decision</li>
+                    </ul>
+                </div>
+            </main>
+
             <!-- Status Bar -->
             <footer>
                 <span id="connection-status" class="status-indicator">
@@ -1636,5 +1711,6 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
 
     <script src="offline-storage.js"></script>
     <script src="app.js"></script>
+    <script src="receipts.js"></script>
 </body>
 </html>
