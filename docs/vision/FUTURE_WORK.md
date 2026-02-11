@@ -2,7 +2,10 @@
 
 **Document**: ICN-DOC-FUTURE-01
 **Last Updated**: 2025-12-04
-**Status**: Living Document
+**Status**: Historical planning snapshot (2025-12-04)
+
+> Historical note: This plan reflects priorities and issue states at 2025-12-04.
+> Validate current priorities against latest roadmap/status artifacts before execution.
 
 This document captures all planned and potential future work for ICN, organized by priority and timeline.
 
@@ -23,7 +26,7 @@ This document captures all planned and potential future work for ICN, organized 
 
 ### 1.1 Gap Closure (from GAP_ANALYSIS.md)
 
-**Status**: ✅ **22/23 gaps fixed (96%)** - All pilot blockers resolved!
+**Status (historical, 2025-12-04)**: ✅ **22/23 gaps fixed (96%)** - all pilot blockers resolved in this planning snapshot.
 
 **Completed Integration Tests** (2025-12-04):
 
@@ -48,7 +51,7 @@ This document captures all planned and potential future work for ICN, organized 
 | #40 | Contract deployment gossip | `icn-ccl/src/actor.rs:125` |
 | #41 | Governance operations | `icn-core/src/supervisor.rs:2033` |
 
-These are post-pilot features - not blocking pilot deployment.
+In this 2025-12-04 snapshot, these were treated as post-pilot features and not blocking pilot deployment.
 
 ### 1.2 Entity Model Evolution (Vision Phase 1)
 

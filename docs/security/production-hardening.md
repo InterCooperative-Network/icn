@@ -21,7 +21,7 @@ ICN's production hardening focuses on three primary threat vectors:
 2. **Resource exhaustion**: Memory/CPU attacks via unbounded allocations or streams
 3. **Operational failures**: Edge cases like clock skew, malformed data, blocking operations
 
-All critical and high-priority security issues have been resolved as of Phase 7 completion.
+Historical claim from the Phase 7 cycle: critical and high-priority issues in that cycle were marked resolved at the time.
 
 ---
 
@@ -599,7 +599,7 @@ grep "Message too large\|Invalid message" /var/log/icnd.log
 **Metrics** (added in PR #962):
 - `icn_compute_task_scope_map_size` (gauge): Number of active task→scope mappings. Tracks memory overhead of scope queue tracking. Alert if >500 (warning) or >2000 (critical, possible leak).
 
-**Alert rules**: See `deploy/prometheus/scope-capacity-alerts.yml` for production-ready Prometheus rules.
+**Alert rules**: See `deploy/prometheus/scope-capacity-alerts.yml` for the rule set used by this hardening pass.
 
 **Operational notes**:
 

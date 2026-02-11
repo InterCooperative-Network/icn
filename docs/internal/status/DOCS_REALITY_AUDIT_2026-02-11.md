@@ -746,3 +746,48 @@ Result: zero missing-link findings.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; link-drift backlog cleared for active scanner scope.
+
+## Changes applied (Batch D2 - slice 1: context normalization)
+
+1. `docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md`
+- Converted absolute readiness language to explicit historical framing (2025-12-17 snapshot).
+- Reworded test and production-readiness statements to point-in-time conclusions.
+
+2. `docs/internal/status/GAP_ANALYSIS.md`
+- Recast status and progress statements as historical snapshot language (2025-12-04).
+- Preserved underlying findings while removing present-tense implication.
+
+3. `docs/security/production-hardening.md`
+- Recast Phase 7 completion claim as historical cycle claim.
+- Softened “production-ready rules” wording to avoid present-tense readiness assertion.
+
+4. `docs/vision/FUTURE_WORK.md`
+- Marked document as historical planning snapshot (2025-12-04).
+- Recast gap-closure and pilot-blocker statements as date-bounded planning context.
+
+## Verification updates (Batch D2 - slice 1)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "Historical note|historical|snapshot|pilot-ready|production-ready|all critical and high-priority" docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md docs/internal/status/GAP_ANALYSIS.md docs/security/production-hardening.md docs/vision/FUTURE_WORK.md
+```
+
+Result:
+- Missing-link findings remain zero.
+- Targeted stale-claim hotspots now include explicit historical/snapshot framing.
+
+## Audit ledger updates (D2 slice 1)
+
+- `docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md | docs/ARCHITECTURE.md + CI/workflow reality context | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/internal/status/GAP_ANALYSIS.md | dated snapshot normalization policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/security/production-hardening.md | phase-bound security claim normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/vision/FUTURE_WORK.md | roadmap/status historical framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (D2 slice 1)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next context slice.
