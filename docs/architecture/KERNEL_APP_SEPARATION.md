@@ -1201,7 +1201,7 @@ Kernel code should only use `icn_kernel_api::TrustClass`.
 
 ## Appendix A: Store Path Structure
 
-The daemon creates sled-backed stores under `config.store_path()` (default: `~/.icn/store/`):
+The daemon creates sled-backed stores under `config.store_path()` (default: `~/.local/share/icn/store/` on Linux):
 
 | Path | Owner | Contents |
 |------|-------|----------|

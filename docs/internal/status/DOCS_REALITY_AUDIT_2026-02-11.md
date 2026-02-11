@@ -1082,3 +1082,41 @@ Result: no broken relative links; only expected historical/stale-marker reports 
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C3; proceed with next active-doc slices.
+## Changes applied (Batch C4 - active FAQ/architecture defaults)
+
+1. `docs/guides/FAQ.md`
+- Corrected default P2P port references from `5600` to `7777` and updated firewall examples.
+- Replaced hard-coded keystore path (`~/.icn/keystore.age`) with runtime-correct `{data_dir}/identity.age` wording.
+- Reworded persistence and troubleshooting sections to use configured data-dir semantics.
+- Kept reset example explicit with `--data-dir ~/.icn` to avoid ambiguity.
+
+2. `docs/architecture/KERNEL_APP_SEPARATION.md`
+- Corrected daemon default store-path example to `~/.local/share/icn/store/` (Linux default via `Config::default().data_dir`).
+
+## Verification updates (Batch C4)
+
+```bash
+rg -n "5600|keystore.age|~/.icn/store/|~/.icn/keystore.age" docs/guides/FAQ.md docs/architecture/KERNEL_APP_SEPARATION.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; only expected historical marker reports remain.
+
+## Audit ledger additions (Batch C4)
+
+- `docs/guides/FAQ.md | icn/crates/icn-core/src/config/mod.rs + icn/bins/icnd/src/main.rs | rg -n "listen_addr|metrics_port|keystore_path|data_dir" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/architecture/KERNEL_APP_SEPARATION.md | icn/crates/icn-core/src/config/mod.rs | rg -n "store_path|data_dir|dirs::data_dir" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C4)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C4; continue active-doc drift reduction.
