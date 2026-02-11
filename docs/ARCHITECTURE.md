@@ -1405,6 +1405,80 @@ pub struct CreditLimit {
 
 ---
 
+### 4.6 Economic Receipt Chain (Sprint 8-10)
+
+**Problem:** Governance decisions (e.g., "approve $1000 for project X") must be traceable all the way to ledger entries with cross-node verifiable determinism.
+
+**Decision: CanonicalReceipt trait + deterministic hash chain**
+
+**Architecture:**
+
+```
+GovernanceProposal → DecisionReceipt → AllocationReceipt → SettlementIntent → LedgerEntry
+         ↓                  ↓                  ↓                  ↓              ↓
+   (stores vote)    (canonical_hash)   (canonical_hash)   (canonical_hash)  (decision_hash)
+```
+
+**Key types (icn-kernel-api):**
+
+```rust
+/// Trait for receipts that can be verified across nodes
+pub trait CanonicalReceipt {
+    /// Compute deterministic Blake3 hash (order-independent)
+    fn canonical_hash(&self) -> Hash;
+    
+    /// Node-local receipt ID
+    fn receipt_id(&self) -> &str;
+    
+    /// Links to upstream receipts (governance, parent allocations)
+    fn provenance_anchors(&self) -> Vec<Hash>;
+}
+
+/// Allocation of resources from a governance decision
+pub struct AllocationReceipt {
+    pub decision_receipt_id: String,
+    pub decision_hash: Hash,       // Cross-node anchor
+    pub scope: ScopeLevel,
+    pub intents: Vec<SettlementIntent>,
+    pub timestamp: u64,
+}
+
+/// Declarative economic intent (what to do, not how)
+pub struct SettlementIntent {
+    pub decision_receipt_id: String,
+    pub decision_hash: Hash,
+    pub from: String,              // Treasury/source
+    pub to: String,                // Recipient
+    pub amount: u64,
+    pub unit: String,              // "USD", "HOURS", etc.
+    pub asset_type: Option<AssetType>,
+}
+```
+
+**Invariants:**
+
+1. **Canonical hash is order-independent:** `intent_hashes` sorted before hashing
+2. **Same inputs → same hash across nodes:** Blake3 over deterministic serialization
+3. **Provenance is queryable:** `decision_hash` links ledger entries back to governance
+
+**API Endpoints:**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /v1/receipts/chain?decision_hash=...` | Get full receipt chain for a decision |
+| `GET /v1/receipts/allocations/{hash}` | Get allocation by canonical hash |
+| `GET /v1/receipts/intents/{hash}` | Get intent by canonical hash |
+| `GET /v1/ledger/{coop}/entries/by-decision?decision_hash=...` | Ledger entries with provenance |
+
+**Why this matters:**
+
+- Governance becomes auditable: every spend links to a vote
+- Cross-node equality: canonical hashes match regardless of which node created them
+- Disputes become tractable: deterministic chain enables arbitration
+- CCL gains teeth: contracts can verify receipt chains before acting
+
+---
+
 ## 5. Contract Execution (CCL)
 
 Contracts define rules governing economic or procedural interactions, executed deterministically across all nodes. They enable cooperatives to codify agreements without trusting a central authority.
