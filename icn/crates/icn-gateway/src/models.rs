@@ -1032,7 +1032,6 @@ pub struct ListingFilterParams {
     pub offset: Option<usize>,
 }
 
-
 #[cfg(test)]
 mod schema_contract_tests {
     use super::*;
@@ -1070,19 +1069,34 @@ mod schema_contract_tests {
         let json = serde_json::to_value(&response).unwrap();
 
         // Contract: response MUST have "transactions" array (not "entries")
-        assert!(json.get("transactions").is_some(), "Response must use transactions key");
-        assert!(json.get("entries").is_none(), "Response must NOT use entries key");
+        assert!(
+            json.get("transactions").is_some(),
+            "Response must use transactions key"
+        );
+        assert!(
+            json.get("entries").is_none(),
+            "Response must NOT use entries key"
+        );
 
         // Contract: each transaction has required fields
         let tx = &json["transactions"][0];
         assert!(tx.get("id").is_some(), "Transaction must have id");
-        assert!(tx.get("timestamp").is_some(), "Transaction must have timestamp");
+        assert!(
+            tx.get("timestamp").is_some(),
+            "Transaction must have timestamp"
+        );
         assert!(tx.get("author").is_some(), "Transaction must have author");
-        assert!(tx.get("accounts").is_some(), "Transaction must have accounts");
+        assert!(
+            tx.get("accounts").is_some(),
+            "Transaction must have accounts"
+        );
 
         // Contract: accounts have required fields
         let acct = &tx["accounts"][0];
-        assert!(acct.get("account_id").is_some(), "Account must have account_id");
+        assert!(
+            acct.get("account_id").is_some(),
+            "Account must have account_id"
+        );
         assert!(acct.get("currency").is_some(), "Account must have currency");
 
         // Contract: provenance fields present when set
@@ -1090,4 +1104,3 @@ mod schema_contract_tests {
         assert!(tx.get("decision_hash").is_some());
     }
 }
-
