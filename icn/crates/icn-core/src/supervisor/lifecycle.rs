@@ -597,7 +597,7 @@ async fn spawn_actors_with_identity(
             governance_handle.clone(),
             dispute_manager_handle.clone(),
             treasury_manager_handle.clone(),
-            treasury_did,
+            treasury_did.clone(),
         );
 
         if let (Some(registry), Some(clearing), Some(attestations)) = (
@@ -621,11 +621,71 @@ async fn spawn_actors_with_identity(
         // Current dispatch still uses event subscription (create_governance_subscription).
         // Sprint 3+ will replace event subscription with executor-based dispatch.
 
-        event_bus
+        // Subscribe legacy handler (will be removed after full effect migration)
+        let legacy_handle = event_bus
             .subscribe(super::governance_handlers::create_governance_subscription(
                 handler,
             ))
-            .await
+            .await;
+
+        // === EFFECT PATH (Production Path) ===
+        // When ICN_USE_EFFECT_PATH=1 is set, proposals also route through the effect system.
+        // This is the new production path being wired for eventual replacement of legacy handlers.
+        let use_effect_path = std::env::var("ICN_USE_EFFECT_PATH").unwrap_or_default() == "1";
+        if use_effect_path {
+            // Create kernel executor with protocol parameter store
+            let mut kernel_executor = super::governance_executor::KernelGovernanceExecutor::new(
+                protocol_parameter_store.clone(),
+            );
+
+            // Wire ledger service adapter
+            let oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle> =
+                Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
+            let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new(
+                ledger_handle.clone(),
+                oracle,
+                treasury_did.clone(),
+            ));
+            kernel_executor = kernel_executor.with_ledger_service(ledger_service);
+
+            // Wire federation service adapter if available
+            if let Some(registry) = federation_registry_for_rpc.clone() {
+                let federation_service = Arc::new(crate::services::FederationServiceImpl::new(
+                    registry,
+                ));
+                kernel_executor = kernel_executor.with_federation_service(federation_service);
+            }
+
+            // Wire control service adapter
+            let control_service = Arc::new(crate::services::ControlServiceImpl::new(
+                governance_handle.clone(),
+            ));
+            kernel_executor = kernel_executor.with_control_service(control_service);
+
+            // Create effect dispatcher
+            let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
+                Arc::new(kernel_executor),
+            ));
+
+            // Create callback that routes effects through dispatcher
+            let effect_callback = super::effect_dispatcher::create_effect_executor_callback(
+                effect_dispatcher,
+            );
+
+            // Create effect-based subscription
+            let effect_subscription = icn_governance_actor::create_effect_subscription(
+                move |effects, receipt_id| {
+                    effect_callback(effects, receipt_id);
+                },
+            );
+
+            // Subscribe but ignore handle (we track legacy handle for shutdown)
+            let _effect_handle = event_bus.subscribe(effect_subscription).await;
+            info!("✓ Effect-based governance path enabled (ICN_USE_EFFECT_PATH=1)");
+        }
+
+        // Return legacy handle for tracking
+        legacy_handle
     });
 
     info!("✓ Governance event handlers registered");

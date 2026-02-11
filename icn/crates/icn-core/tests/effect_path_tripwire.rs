@@ -154,12 +154,12 @@ fn tripwire_effect_path_coverage() {
 // EFFECT DISPATCHER WIRING TRIPWIRES
 // =============================================================================
 
-/// Tripwire: Effect dispatcher should not be in lifecycle.rs yet
+/// Tripwire: Effect dispatcher should be in lifecycle.rs
 ///
-/// This test will fail when we wire the effect dispatcher into production.
-/// That's the signal to update the test and document the change.
+/// This test verifies the effect path wiring is in place.
+/// When ICN_USE_EFFECT_PATH=1, governance proposals route through effects.
 #[test]
-fn tripwire_effect_dispatcher_not_in_lifecycle() {
+fn tripwire_effect_dispatcher_in_lifecycle() {
     let workspace = find_workspace_root();
     let lifecycle_path = workspace.join("crates/icn-core/src/supervisor/lifecycle.rs");
 
@@ -168,31 +168,38 @@ fn tripwire_effect_dispatcher_not_in_lifecycle() {
     let has_effect_dispatcher = content.contains("EffectDispatcher")
         || content.contains("effect_dispatcher");
 
-    if has_effect_dispatcher {
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║         🎉 EFFECT DISPATCHER WIRED INTO LIFECYCLE 🎉             ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ EffectDispatcher is now in production path!                      ║");
-        println!("║ Update this test to verify correct wiring.                       ║");
-        println!("╚══════════════════════════════════════════════════════════════════╝");
-        // When this happens, update the test to verify the wiring is correct
-    } else {
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║         EFFECT DISPATCHER STATUS                                 ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ Status: NOT YET IN PRODUCTION                                    ║");
-        println!("║ Effect dispatcher exists but is test-only                        ║");
-        println!("║                                                                  ║");
-        println!("║ Production path: lifecycle.rs → governance_handlers              ║");
-        println!("║ Test path: effect_dispatcher.rs → governance_executor            ║");
-        println!("╚══════════════════════════════════════════════════════════════════╝");
-    }
+    // Verify required components are present
+    let has_kernel_executor = content.contains("KernelGovernanceExecutor");
+    let has_effect_subscription = content.contains("create_effect_subscription");
+    let has_env_gate = content.contains("ICN_USE_EFFECT_PATH");
 
-    // Document current state: effect dispatcher is NOT in lifecycle.rs
+    println!("╔══════════════════════════════════════════════════════════════════╗");
+    println!("║         🎉 EFFECT DISPATCHER WIRED INTO LIFECYCLE 🎉             ║");
+    println!("╠══════════════════════════════════════════════════════════════════╣");
+    println!("║ EffectDispatcher:           {}                           ║", if has_effect_dispatcher { "✅" } else { "❌" });
+    println!("║ KernelGovernanceExecutor:   {}                           ║", if has_kernel_executor { "✅" } else { "❌" });
+    println!("║ create_effect_subscription: {}                           ║", if has_effect_subscription { "✅" } else { "❌" });
+    println!("║ ICN_USE_EFFECT_PATH gate:   {}                           ║", if has_env_gate { "✅" } else { "❌" });
+    println!("╠══════════════════════════════════════════════════════════════════╣");
+    println!("║ Status: Effect path is production-ready (env-gated)            ║");
+    println!("║ Enable: ICN_USE_EFFECT_PATH=1                                  ║");
+    println!("╚══════════════════════════════════════════════════════════════════╝");
+
     assert!(
-        !has_effect_dispatcher,
-        "Effect dispatcher found in lifecycle.rs! \
-         Update this test to verify correct wiring."
+        has_effect_dispatcher,
+        "EffectDispatcher should be in lifecycle.rs"
+    );
+    assert!(
+        has_kernel_executor,
+        "KernelGovernanceExecutor should be in lifecycle.rs"
+    );
+    assert!(
+        has_effect_subscription,
+        "create_effect_subscription should be in lifecycle.rs"
+    );
+    assert!(
+        has_env_gate,
+        "ICN_USE_EFFECT_PATH gate should be in lifecycle.rs"
     );
 }
 

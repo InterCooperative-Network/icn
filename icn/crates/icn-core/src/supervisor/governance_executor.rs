@@ -57,6 +57,21 @@ impl KernelGovernanceExecutor {
         self.control = Arc::new(KernelControlExecutor::with_service(service));
         self
     }
+
+    /// Set the ledger service for treasury operations.
+    pub fn with_ledger_service(mut self, service: Arc<dyn icn_kernel_api::LedgerService>) -> Self {
+        self.treasury = Arc::new(KernelTreasuryExecutor::with_ledger(service));
+        self
+    }
+
+    /// Set the federation service for federation operations.
+    pub fn with_federation_service(
+        mut self,
+        service: Arc<dyn icn_kernel_api::FederationService>,
+    ) -> Self {
+        self.federation = Arc::new(KernelFederationExecutor::with_service(service));
+        self
+    }
 }
 
 impl GovernanceExecutor for KernelGovernanceExecutor {
@@ -144,13 +159,22 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     decision_receipt_id,
                 ))
             }
-            // For other effect types (Membership, Dispute, Resource, Sdis), return success placeholder
-            _ => Ok(EffectResult {
-                effect_id: decision_receipt_id.to_string(),
-                success: true,
-                message: "Effect type not yet implemented".to_string(),
-                state_change_hash: None,
-            }),
+            // For other effect types (Membership, Dispute, Resource, Sdis), return FAILURE
+            // This ensures no silent success for unimplemented effect paths
+            _ => {
+                let effect_type = format!("{:?}", effect);
+                warn!(
+                    receipt_id = %decision_receipt_id,
+                    effect_type = %effect_type,
+                    "Effect type not yet implemented - returning failure"
+                );
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: false,
+                    message: format!("Effect type not yet implemented: {}", effect_type),
+                    state_change_hash: None,
+                })
+            },
         }
     }
 }
@@ -821,7 +845,20 @@ impl KernelControlExecutor {
             "Executing control operation"
         );
 
-        // If we have a real service, use it
+        // TextResolution is a no-op - it doesn't need a service
+        // Handle it before the service check
+        if let ControlEffect::TextResolution { resolution_hash } = &effect {
+            info!(
+                resolution_hash = %resolution_hash,
+                "Text resolution recorded (no state change)"
+            );
+            return Ok(ExecutionOutcome::Success {
+                receipt_id: receipt_id.clone(),
+                effects: vec![format!("Text resolution: {}", resolution_hash)],
+            });
+        }
+
+        // Other control effects require a service
         if let Some(ref service) = self.service {
             match effect {
                 ControlEffect::VetoProposal {
@@ -908,17 +945,9 @@ impl KernelControlExecutor {
                         })
                     }
                 }
-                ControlEffect::TextResolution { resolution_hash } => {
-                    // Text resolutions are no-ops (informational only)
-                    info!(
-                        resolution_hash = %resolution_hash,
-                        "Text resolution recorded (no state change)"
-                    );
-                    Ok(ExecutionOutcome::Success {
-                        receipt_id: receipt_id.clone(),
-                        effects: vec![format!("Text resolution: {}", resolution_hash)],
-                    })
-                }
+                // TextResolution is handled above, before the service check
+                // This arm should never be reached
+                ControlEffect::TextResolution { .. } => unreachable!(),
             }
         } else {
             // Placeholder mode: log and return failure
