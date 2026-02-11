@@ -902,10 +902,10 @@ pub fn update_witness_pool_from_trust(
 
 ## Related Documentation
 
-- **[ECONOMIC_ARCHITECTURE.md](../ECONOMIC_ARCHITECTURE.md)**: Asset token witness bonding (Layer 2 economy)
-- **[production-hardening.md](../production-hardening.md)**: Witness signature timestamp validation
-- **[trust-multi-graph-migration.md](../trust-multi-graph-migration.md)**: Trust graph architecture for future witness integration
-- **[governance-primitives.md](../governance-primitives.md)**: Governance-based witness pool management
+- **[ECONOMIC_ARCHITECTURE.md](../design/economics/ECONOMIC_ARCHITECTURE.md)**: Asset token witness bonding (Layer 2 economy)
+- **[production-hardening.md](../security/production-hardening.md)**: Witness signature timestamp validation
+- **[trust-multi-graph-migration.md](../development/trust-multi-graph-migration.md)**: Trust graph architecture for future witness integration
+- **[governance-primitives.md](../design/governance/governance-primitives.md)**: Governance-based witness pool management
 - **Ledger Implementation**: `icn/crates/icn-ledger/src/ledger_impl/witness_ops.rs`
 - **Resource Access**: `icn/crates/icn-ledger/src/use_access.rs`
 - **Integration Tests**: `icn/crates/icn-core/tests/witness_integration.rs`

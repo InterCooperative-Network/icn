@@ -513,3 +513,50 @@ Result: no missing-link matches for targeted files.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 9: sdis/features/glossary/migration links)
+
+1. `docs/design/sdis/social-recovery.md`
+- Fixed related design and source links:
+  - `../multi-device-identity-design.md`
+  - `../../../icn/crates/icn-identity/src/recovery.rs`
+  - `../../../icn/crates/icn-core/tests/recovery_integration.rs`
+
+2. `docs/features/witness-signature-best-practices.md`
+- Fixed cross-doc references to current architecture/security/development/design locations.
+
+3. `docs/glossary.md`
+- Fixed design references for contribution credits, governance primitives, and commons evolution.
+
+4. `docs/migration-guides/keystore-versions.md`
+- Fixed multi-device identity and operations guide references to current docs paths.
+
+5. `docs/migration-guides/version-upgrades.md`
+- Fixed backup/operations references to `docs/guides/operations/*`.
+
+## Verification updates (Batch A4 - slice 9)
+
+```bash
+for f in docs/design/sdis/social-recovery.md docs/features/witness-signature-best-practices.md docs/glossary.md docs/migration-guides/keystore-versions.md docs/migration-guides/version-upgrades.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted files.
+
+## Audit ledger updates (slice 9)
+
+- `docs/design/sdis/social-recovery.md | docs/design/multi-device-identity-design.md, icn/crates/icn-identity/src/recovery.rs, icn/crates/icn-core/tests/recovery_integration.rs | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/features/witness-signature-best-practices.md | docs/design/economics/ECONOMIC_ARCHITECTURE.md, docs/security/production-hardening.md, docs/development/trust-multi-graph-migration.md, docs/design/governance/governance-primitives.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/glossary.md | docs/design/economics/contribution-credits-design.md, docs/design/governance/governance-primitives.md, docs/design/COMMONS_EVOLUTION.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/migration-guides/keystore-versions.md | docs/design/multi-device-identity-design.md, docs/guides/operations/{backup-and-recovery.md,operations-guide.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/migration-guides/version-upgrades.md | docs/guides/operations/{backup-and-recovery.md,operations-guide.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 9)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue to next drift slice.

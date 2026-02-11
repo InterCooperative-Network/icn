@@ -466,7 +466,7 @@ icnctl status || {
 If upgrade fails and you need help:
 
 1. **GitHub Issues**: https://github.com/InterCooperative-Network/icn/issues
-2. **Emergency rollback**: Use backups (see [Backup & Recovery](../backup-and-recovery.md))
+2. **Emergency rollback**: Use backups (see [Backup & Recovery](../guides/operations/backup-and-recovery.md))
 3. **Community support**: Check community channels
 
 ---
@@ -475,8 +475,8 @@ If upgrade fails and you need help:
 
 - [CHANGELOG.md](../../CHANGELOG.md) - Version history
 - [Keystore Migration](keystore-versions.md) - Identity format changes
-- [Backup & Recovery](../backup-and-recovery.md) - Backup strategies
-- [Operations Guide](../operations-guide.md) - Day-to-day management
+- [Backup & Recovery](../guides/operations/backup-and-recovery.md) - Backup strategies
+- [Operations Guide](../guides/operations/operations-guide.md) - Day-to-day management
 
 ---
 

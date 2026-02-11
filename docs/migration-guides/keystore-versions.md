@@ -225,7 +225,7 @@ If you use multi-device identity:
    icnctl device list
    ```
 
-See [multi-device-identity-design.md](../multi-device-identity-design.md) for details.
+See [multi-device-identity-design.md](../design/multi-device-identity-design.md) for details.
 
 ---
 
@@ -303,9 +303,9 @@ ICN_DATA_DIR=/path/to/test icnctl id show
 ## Related Documentation
 
 - [Getting Started Guide](../GETTING_STARTED.md) - Initial setup
-- [Multi-Device Identity](../multi-device-identity-design.md) - Multiple devices
-- [Backup & Recovery](../backup-and-recovery.md) - Backup strategies
-- [Operations Guide](../operations-guide.md) - Day-to-day management
+- [Multi-Device Identity](../design/multi-device-identity-design.md) - Multiple devices
+- [Backup & Recovery](../guides/operations/backup-and-recovery.md) - Backup strategies
+- [Operations Guide](../guides/operations/operations-guide.md) - Day-to-day management
 
 ---
 

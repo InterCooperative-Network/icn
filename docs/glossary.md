@@ -401,15 +401,15 @@ Both are first-class ICN entities. Individuals typically belong to both.
 
 ## Related Documents
 
-- [Contribution Credits Design](contribution-credits-design.md) - Full economic design specification
+- [Contribution Credits Design](design/economics/contribution-credits-design.md) - Full economic design specification
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
-- [governance-primitives.md](governance-primitives.md) - Governance layer design
+- [governance-primitives.md](design/governance/governance-primitives.md) - Governance layer design
 
 ---
 
 ## Proposed Terms (Commons Evolution RFC)
 
-*These terms are proposed in [COMMONS_EVOLUTION.md](COMMONS_EVOLUTION.md) and are under review for v0.3.x+. They are not yet implemented.*
+*These terms are proposed in [COMMONS_EVOLUTION.md](design/COMMONS_EVOLUTION.md) and are under review for v0.3.x+. They are not yet implemented.*
 
 ### The Commons
 **Status**: Proposed (v0.3.0+)
