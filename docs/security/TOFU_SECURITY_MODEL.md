@@ -179,11 +179,11 @@ If stricter security is needed:
 - [TOFU Security Model](https://en.wikipedia.org/wiki/Trust_on_first_use)
 - [TLS 1.3 Specification](https://datatracker.ietf.org/doc/html/rfc8446)
 - [Decentralized Trust Systems](https://www.w3.org/TR/did-core/)
-- [ICN Trust Graph Documentation](../TRUST_GRAPH.md)
+- [ICN Trust Graph Documentation](../development/trust-multi-graph-migration.md)
 
 ## See Also
 
-- `docs/ARCHITECTURE.md` - Overall system architecture
-- `docs/production-hardening.md` - Security hardening measures
-- `icn/crates/icn-net/src/tls.rs` - TLS implementation
-- `icn/crates/icn-net/src/actor.rs` - Hello message handling
+- [docs/ARCHITECTURE.md](../ARCHITECTURE.md) - Overall system architecture
+- [docs/security/production-hardening.md](production-hardening.md) - Security hardening measures
+- [icn/crates/icn-net/src/tls.rs](../../icn/crates/icn-net/src/tls.rs) - TLS implementation
+- [icn/crates/icn-net/src/actor/mod.rs](../../icn/crates/icn-net/src/actor/mod.rs) - Hello message handling

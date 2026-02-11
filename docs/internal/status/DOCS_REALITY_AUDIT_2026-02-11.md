@@ -631,3 +631,66 @@ Result: no missing-link matches for targeted files.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue to next drift slice.
+
+## Changes applied (Batch A4 - slice 11: developer/internal/sdis/security-roadmap/vision)
+
+1. `docs/guides/developer/i18n-guide.md`
+- Fixed root and workspace path references for contribution guide and localization directories.
+
+2. `docs/guides/developer/DOCUMENTATION_STYLE.md`
+- Replaced placeholder broken link example with non-link file-location literal.
+
+3. `docs/internal/pilots/pilot-playbook.md`
+- Fixed incident response link to canonical ops runbook path.
+
+4. `docs/internal/pilots/pilot-readiness-gaps.md`
+- Replaced dead completion-doc link with existing governance-ledger session record.
+
+5. `docs/internal/status/GAP_ANALYSIS.md`
+- Fixed references to repo root `CLAUDE.md`, roadmap, and internal testing plan.
+
+6. `docs/sdis/SDIS_SYSTEM.md`
+- Repointed missing SDIS references to canonical design/security docs.
+
+7. `docs/security/TOFU_SECURITY_MODEL.md`
+- Replaced dead trust-graph link with current trust migration doc.
+- Converted plain-text source references into verified clickable links.
+
+8. `docs/security/security-roadmap.md`
+- Fixed architecture and root guidance links.
+
+9. `docs/vision/FUTURE_WORK.md`
+- Fixed gap/roadmap/architecture references to canonical docs locations.
+
+## Verification updates (Batch A4 - slice 11)
+
+```bash
+for f in docs/guides/developer/i18n-guide.md docs/guides/developer/DOCUMENTATION_STYLE.md docs/internal/pilots/pilot-playbook.md docs/internal/pilots/pilot-readiness-gaps.md docs/internal/status/GAP_ANALYSIS.md docs/sdis/SDIS_SYSTEM.md docs/security/TOFU_SECURITY_MODEL.md docs/security/security-roadmap.md docs/vision/FUTURE_WORK.md; do
+  ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg "^MISSING_LINK\|${f//\//\/}\|" || true
+done
+```
+
+Result: no missing-link matches for targeted files.
+
+Global missing-link count after this slice: `29`.
+
+## Audit ledger updates (slice 11)
+
+- `docs/guides/developer/i18n-guide.md | CONTRIBUTING.md, icn/bins/icnctl/locales, icn/crates/icn-gateway/locales, web/pilot-ui/locales, sdk/react-native/examples/CoopWallet/src/i18n | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/guides/developer/DOCUMENTATION_STYLE.md | style guidance example normalization | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/internal/pilots/pilot-playbook.md | docs/operations/deployment/incident-response.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/internal/pilots/pilot-readiness-gaps.md | docs/development/sessions/2026-01/2025-01-17-governance-ledger-integration.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/internal/status/GAP_ANALYSIS.md | CLAUDE.md, docs/development/sessions/undated/ROADMAP.md, docs/development/testing/INTERNAL_TESTING_PLAN.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/sdis/SDIS_SYSTEM.md | docs/design/multi-device-identity-design.md, docs/security/threat-model.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/security/TOFU_SECURITY_MODEL.md | docs/development/trust-multi-graph-migration.md, docs/ARCHITECTURE.md, docs/security/production-hardening.md, icn/crates/icn-net/src/{tls.rs,actor/mod.rs} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/security/security-roadmap.md | docs/ARCHITECTURE.md, CLAUDE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/vision/FUTURE_WORK.md | docs/internal/status/GAP_ANALYSIS.md, docs/development/sessions/undated/ROADMAP.md, docs/ARCHITECTURE.md | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 11)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.

@@ -458,8 +458,8 @@ governance:
 
 ## Related Documentation
 
-- [Contributing Guide](../CONTRIBUTING.md) - General contribution guidelines
-- [icnctl locales](../icn/bins/icnctl/locales/) - CLI translation files
-- [Gateway locales](../icn/crates/icn-gateway/locales/) - Gateway API messages
-- [Web UI locales](../web/pilot-ui/locales/) - Web interface translations
-- [CoopWallet i18n](../sdk/react-native/examples/CoopWallet/src/i18n/) - Mobile app example
+- [Contributing Guide](../../../CONTRIBUTING.md) - General contribution guidelines
+- [icnctl locales](../../../icn/bins/icnctl/locales/) - CLI translation files
+- [Gateway locales](../../../icn/crates/icn-gateway/locales/) - Gateway API messages
+- [Web UI locales](../../../web/pilot-ui/locales/) - Web interface translations
+- [CoopWallet i18n](../../../sdk/react-native/examples/CoopWallet/src/i18n/) - Mobile app example

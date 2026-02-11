@@ -537,7 +537,7 @@ icnctl dispute resolve \
 
 ### 6.3 Incident Response
 
-See [docs/incident-response.md](incident-response.md) for detailed procedures.
+See [docs/incident-response.md](../../operations/deployment/incident-response.md) for detailed procedures.
 
 **Quick Reference:**
 - Node down: Check systemd status, logs, disk space

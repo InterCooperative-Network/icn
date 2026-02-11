@@ -2501,6 +2501,6 @@ async fn test_flap_detection() {
 
 ## References
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 - [production-hardening.md](production-hardening.md) - Production hardening measures
-- [CLAUDE.md](../CLAUDE.md) - Development guidance
+- [CLAUDE.md](../../CLAUDE.md) - Development guidance

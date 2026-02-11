@@ -440,9 +440,9 @@ This document should be updated:
 - After pilot feedback sessions
 
 Related documents:
-- [GAP_ANALYSIS.md](GAP_ANALYSIS.md) - Current gap status
-- [ROADMAP.md](../ROADMAP.md) - Strategic roadmap
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [GAP_ANALYSIS.md](../internal/status/GAP_ANALYSIS.md) - Current gap status
+- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Strategic roadmap
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 
 ---
 

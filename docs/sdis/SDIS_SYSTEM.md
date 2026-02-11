@@ -414,5 +414,5 @@ npm test -- sdis
 
 - [DID Specification](https://www.w3.org/TR/did-core/)
 - [Ed25519 Signatures](https://ed25519.cr.yp.to/)
-- [SDIS Design Doc](./sdis-design.md)
-- [Security Model](./security-model.md)
+- [SDIS Design Doc](../design/multi-device-identity-design.md)
+- [Security Model](../security/threat-model.md)
