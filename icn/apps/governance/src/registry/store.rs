@@ -129,7 +129,7 @@ mod tests {
         Meeting {
             meeting_id: id.to_string(),
             coop_id: coop_id.to_string(),
-            title: format!("Meeting {}", id),
+            title: format!("Meeting {id}"),
             starts_at: 1700000000,
             notes: None,
             created_at: 1699999900,
@@ -139,10 +139,10 @@ mod tests {
     fn sample_decision(receipt_id: &str, coop_id: &str) -> DecisionIndexEntry {
         DecisionIndexEntry {
             decision_receipt_id: receipt_id.to_string(),
-            decision_hash: format!("hash-{}", receipt_id),
+            decision_hash: format!("hash-{receipt_id}"),
             coop_id: coop_id.to_string(),
             meeting_id: None,
-            title: format!("Decision {}", receipt_id),
+            title: format!("Decision {receipt_id}"),
             tags: vec![],
             status: DecisionStatus::Pending,
             created_at: 1700000000,

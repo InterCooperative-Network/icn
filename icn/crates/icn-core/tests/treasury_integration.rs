@@ -1254,7 +1254,9 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
     use icn_core::services::LedgerServiceImpl;
     use icn_core::supervisor::KernelTreasuryExecutor;
     use icn_kernel_api::authz::AllowAllOracle;
-    use icn_kernel_api::governance::{DecisionReceiptId, TreasuryExecutor, TreasuryOperation, TreasuryOperationType};
+    use icn_kernel_api::governance::{
+        DecisionReceiptId, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+    };
     use icn_ledger::Ledger;
     use rand::rngs::OsRng;
 
@@ -1281,9 +1283,11 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
 
     // Create the LedgerService adapter
     let oracle = Arc::new(AllowAllOracle::wildcard());
-    let ledger_service = Arc::new(
-        LedgerServiceImpl::new(ledger_handle.clone(), oracle, treasury_did.clone())
-    );
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger_handle.clone(),
+        oracle,
+        treasury_did.clone(),
+    ));
 
     // Create KernelTreasuryExecutor with ledger wired in (production mode)
     let executor = KernelTreasuryExecutor::with_ledger(ledger_service);
@@ -1341,8 +1345,8 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
         let ledger = ledger_handle.read().await;
 
         // Parse hex hash to ContentHash
-        let hash_bytes = hex::decode(&entry_hash_hex)
-            .map_err(|e| anyhow::anyhow!("Invalid hex hash: {}", e))?;
+        let hash_bytes =
+            hex::decode(&entry_hash_hex).map_err(|e| anyhow::anyhow!("Invalid hex hash: {}", e))?;
         let hash_array: [u8; 32] = hash_bytes
             .try_into()
             .map_err(|_| anyhow::anyhow!("Hash wrong length"))?;

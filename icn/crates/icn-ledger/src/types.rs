@@ -81,7 +81,6 @@ pub struct JournalEntry {
     // =========================================================================
     // PROVENANCE FIELDS (Pilot-grade invariant: governance → ledger traceability)
     // =========================================================================
-
     /// Governance decision receipt ID that authorized this entry.
     ///
     /// Links this ledger entry back to the governance decision that caused it.

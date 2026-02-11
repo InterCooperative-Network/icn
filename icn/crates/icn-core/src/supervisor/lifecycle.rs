@@ -607,9 +607,8 @@ async fn spawn_actors_with_identity(
 
         // Wire federation service adapter if available
         if let Some(registry) = federation_registry_for_rpc.clone() {
-            let federation_service = Arc::new(crate::services::FederationServiceImpl::new(
-                registry,
-            ));
+            let federation_service =
+                Arc::new(crate::services::FederationServiceImpl::new(registry));
             kernel_executor = kernel_executor.with_federation_service(federation_service);
             info!("✓ Federation service wired to governance executor");
         }
@@ -633,16 +632,14 @@ async fn spawn_actors_with_identity(
         ));
 
         // Create callback that routes effects through dispatcher
-        let effect_callback = super::effect_dispatcher::create_effect_executor_callback(
-            effect_dispatcher,
-        );
+        let effect_callback =
+            super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
 
         // Create effect-based subscription
-        let effect_subscription = icn_governance_actor::create_effect_subscription(
-            move |effects, receipt_id| {
+        let effect_subscription =
+            icn_governance_actor::create_effect_subscription(move |effects, receipt_id| {
                 effect_callback(effects, receipt_id);
-            },
-        );
+            });
 
         // Subscribe and return handle for lifecycle tracking
         let effect_handle = event_bus.subscribe(effect_subscription).await;

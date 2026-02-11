@@ -636,7 +636,6 @@ pub struct TreasuryEntryRequest {
     pub memo: String,
 
     // Provenance fields (pilot-critical)
-
     /// Decision receipt ID that authorized this entry (node-local reference)
     pub decision_receipt_id: String,
     /// Canonical decision hash (cross-node equality anchor)
@@ -783,8 +782,7 @@ pub trait FederationService: Send + Sync {
     /// Get provenance info for a cooperative registration.
     ///
     /// Returns (decision_receipt_id, decision_hash) if available.
-    fn get_registration_provenance(&self, coop_did: &str)
-        -> Option<(String, String)>;
+    fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)>;
 }
 
 // ============================================================================

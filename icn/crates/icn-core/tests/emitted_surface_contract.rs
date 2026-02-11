@@ -15,6 +15,8 @@
 //!
 //! This test prevents accidentally landing new effects without the above.
 
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -66,10 +68,8 @@ fn extract_emitted_effects(source: &str) -> BTreeSet<String> {
 
     // Pattern 1: KernelEffect::Category(CategoryEffect::Variant { ... })
     // e.g., KernelEffect::Treasury(TreasuryEffect::Spend {
-    let nested_re = regex::Regex::new(
-        r"KernelEffect::(\w+)\(\s*(\w+)Effect::(\w+)\s*\{",
-    )
-    .expect("valid regex");
+    let nested_re =
+        regex::Regex::new(r"KernelEffect::(\w+)\(\s*(\w+)Effect::(\w+)\s*\{").expect("valid regex");
 
     for cap in nested_re.captures_iter(source) {
         let category = &cap[1];
@@ -109,9 +109,9 @@ fn find_translator_source() -> Option<String> {
 
     // Try using CARGO_MANIFEST_DIR to construct path
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let from_manifest = Path::new(manifest_dir)
-        .join("../../apps/governance/src/handlers/execution.rs");
-    
+    let from_manifest =
+        Path::new(manifest_dir).join("../../apps/governance/src/handlers/execution.rs");
+
     fs::read_to_string(&from_manifest).ok()
 }
 
@@ -153,9 +153,9 @@ fn test_emitted_effects_surface_contract() {
     }
 
     // Also check for effects in approved list that are no longer emitted (stale entries)
-    let stale: Vec<_> = approved
+    let stale: Vec<_> = approved_set
         .iter()
-        .filter(|a| !actual.contains(&a.to_string()))
+        .filter(|a| !actual.contains(*a))
         .collect();
 
     if !stale.is_empty() {
@@ -192,7 +192,10 @@ mod unit_tests {
             })]
         "#;
         let effects = extract_emitted_effects(source);
-        assert!(effects.contains("Treasury::Spend"), "Should find Treasury::Spend");
+        assert!(
+            effects.contains("Treasury::Spend"),
+            "Should find Treasury::Spend"
+        );
     }
 
     #[test]

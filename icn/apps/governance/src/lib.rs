@@ -79,8 +79,7 @@ pub fn create_executor(
 ///
 /// This callback receives pre-translated kernel effects and a decision receipt ID.
 /// The kernel's EffectDispatcher typically wraps this.
-pub type EffectExecutionCallback =
-    std::sync::Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync>;
+pub type EffectExecutionCallback = std::sync::Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync>;
 
 /// Create an event subscription that routes proposals through the effect system.
 ///
@@ -116,16 +115,14 @@ where
         } = &event
         {
             // Generate decision_receipt_id from proposal_id and domain
-            let decision_receipt_id = format!("gov:{}:{}:receipt", domain_id, proposal_id);
+            let decision_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
 
             // Deserialize payload
             match serde_json::from_value::<ProposalPayload>(payload.clone()) {
                 Ok(proposal_payload) => {
                     // Translate to effects
-                    let effects = translate_payload_to_effects(
-                        &proposal_payload,
-                        &decision_receipt_id,
-                    );
+                    let effects =
+                        translate_payload_to_effects(&proposal_payload, &decision_receipt_id);
 
                     if effects.is_empty() {
                         debug!(

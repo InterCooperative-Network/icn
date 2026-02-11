@@ -312,11 +312,9 @@ mod tests {
         assert_eq!(diff.len(), 3);
 
         // Check effect_1 mismatch
-        assert!(diff
-            .iter()
-            .any(|(id, a, b)| id == "effect_1"
-                && a == &Some("different1".into())
-                && b == &Some("different2".into())));
+        assert!(diff.iter().any(|(id, a, b)| id == "effect_1"
+            && a == &Some("different1".into())
+            && b == &Some("different2".into())));
 
         // Check effect_2 only in A
         assert!(diff
@@ -350,7 +348,10 @@ mod tests {
         );
 
         // No state hash
-        assert_eq!(extract_state_hash_from_effect("Just a regular effect"), None);
+        assert_eq!(
+            extract_state_hash_from_effect("Just a regular effect"),
+            None
+        );
     }
 
     #[test]

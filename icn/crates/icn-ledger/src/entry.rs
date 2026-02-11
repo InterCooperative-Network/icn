@@ -326,16 +326,13 @@ mod tests {
         );
 
         // Verify deserialization preserves provenance
-        let deserialized: JournalEntry =
-            serde_json::from_str(&json).expect("should deserialize");
+        let deserialized: JournalEntry = serde_json::from_str(&json).expect("should deserialize");
         assert_eq!(
-            deserialized.decision_receipt_id,
-            entry.decision_receipt_id,
+            deserialized.decision_receipt_id, entry.decision_receipt_id,
             "decision_receipt_id must survive round-trip"
         );
         assert_eq!(
-            deserialized.decision_hash,
-            entry.decision_hash,
+            deserialized.decision_hash, entry.decision_hash,
             "decision_hash must survive round-trip"
         );
     }

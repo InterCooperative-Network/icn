@@ -860,7 +860,10 @@ fn test_protocol_parameter_reload_durability() -> Result<()> {
         assert_eq!(before_close.value, ParameterValue::Integer(expected_value));
         assert_eq!(before_close.version, expected_version);
         assert_eq!(before_close.updated_by, Some(proposal_id.to_string()));
-        info!("✓ Verified value={}, version={} before close", expected_value, expected_version);
+        info!(
+            "✓ Verified value={}, version={} before close",
+            expected_value, expected_version
+        );
 
         // Verify history exists
         let history = store.get_history(param_id)?;
@@ -884,7 +887,9 @@ fn test_protocol_parameter_reload_durability() -> Result<()> {
         let store = SledParameterStore::new(Arc::new(db))?;
 
         // Verify parameter exists and has correct values
-        let after_reload = store.get(param_id)?.expect("Parameter should survive reload");
+        let after_reload = store
+            .get(param_id)?
+            .expect("Parameter should survive reload");
 
         assert_eq!(
             after_reload.value,

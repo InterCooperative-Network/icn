@@ -105,6 +105,7 @@ impl FederationService for FederationServiceImpl {
                 let state_change_hash = Self::compute_join_hash(&request);
 
                 // Store provenance
+                #[allow(clippy::unwrap_used)]
                 {
                     let mut prov = self.provenance.write().unwrap();
                     prov.insert(
@@ -144,7 +145,10 @@ impl FederationService for FederationServiceImpl {
         }
     }
 
-    fn vouch_for_cooperative(&self, request: FederationVouchRequest) -> Result<FederationVouchResult> {
+    fn vouch_for_cooperative(
+        &self,
+        request: FederationVouchRequest,
+    ) -> Result<FederationVouchResult> {
         info!(
             voucher_did = %request.voucher_did,
             vouchee_did = %request.vouchee_did,
@@ -209,9 +213,8 @@ impl FederationService for FederationServiceImpl {
 
     fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)> {
         let prov = self.provenance.read().ok()?;
-        prov.get(coop_did).map(|p| {
-            (p.decision_receipt_id.clone(), p.decision_hash.clone())
-        })
+        prov.get(coop_did)
+            .map(|p| (p.decision_receipt_id.clone(), p.decision_hash.clone()))
     }
 }
 
@@ -270,7 +273,10 @@ mod tests {
 
         // Verify success
         assert!(result.success, "Join should succeed");
-        assert!(!result.state_change_hash.is_empty(), "Should have state change hash");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "Should have state change hash"
+        );
         assert!(result.error.is_none(), "Should have no error");
 
         // Verify durable record exists
@@ -314,7 +320,10 @@ mod tests {
             let result = service.join_federation(request).unwrap();
             assert!(result.success, "Join should succeed");
             state_change_hash = result.state_change_hash;
-            assert!(!state_change_hash.is_empty(), "Should have state change hash");
+            assert!(
+                !state_change_hash.is_empty(),
+                "Should have state change hash"
+            );
 
             // Registry and service drop here, simulating process boundary
         }
@@ -329,9 +338,14 @@ mod tests {
 
             let coop_info = stored.unwrap();
             assert_eq!(coop_info.name, "Reload Test Coop", "Name should match");
-            assert_eq!(coop_info.coop_id, federation_id, "Federation ID should match");
+            assert_eq!(
+                coop_info.coop_id, federation_id,
+                "Federation ID should match"
+            );
             assert!(
-                coop_info.gateway_endpoints.contains(&"https://reload.test".to_string()),
+                coop_info
+                    .gateway_endpoints
+                    .contains(&"https://reload.test".to_string()),
                 "Gateway endpoints should survive"
             );
 
@@ -339,7 +353,10 @@ mod tests {
             println!("╔══════════════════════════════════════════════════════════════════╗");
             println!("║          FEDERATION RELOAD DURABILITY VERIFIED                   ║");
             println!("╠══════════════════════════════════════════════════════════════════╣");
-            println!("║ state_change_hash: {:<43} ║", &state_change_hash[..43.min(state_change_hash.len())]);
+            println!(
+                "║ state_change_hash: {:<43} ║",
+                &state_change_hash[..43.min(state_change_hash.len())]
+            );
             println!("║ federation_id:     {:<43} ║", &federation_id);
             println!("║ coop_name:         {:<43} ║", coop_info.name);
             println!("╚══════════════════════════════════════════════════════════════════╝");
@@ -362,33 +379,39 @@ mod tests {
             let service = FederationServiceImpl::new(registry.clone());
 
             // Register voucher
-            service.join_federation(FederationJoinRequest {
-                coop_did: "did:icn:zVoucherReload123456789012345".to_string(),
-                coop_name: "Voucher Reload".to_string(),
-                federation_id: voucher_id.clone(),
-                gateway_endpoints: vec![],
-                decision_receipt_id: "gov:join:voucher".to_string(),
-                decision_hash: "sha256:v1".to_string(),
-            }).unwrap();
+            service
+                .join_federation(FederationJoinRequest {
+                    coop_did: "did:icn:zVoucherReload123456789012345".to_string(),
+                    coop_name: "Voucher Reload".to_string(),
+                    federation_id: voucher_id.clone(),
+                    gateway_endpoints: vec![],
+                    decision_receipt_id: "gov:join:voucher".to_string(),
+                    decision_hash: "sha256:v1".to_string(),
+                })
+                .unwrap();
 
             // Register vouchee
-            service.join_federation(FederationJoinRequest {
-                coop_did: "did:icn:zVoucheeReload123456789012345".to_string(),
-                coop_name: "Vouchee Reload".to_string(),
-                federation_id: vouchee_id.clone(),
-                gateway_endpoints: vec![],
-                decision_receipt_id: "gov:join:vouchee".to_string(),
-                decision_hash: "sha256:v2".to_string(),
-            }).unwrap();
+            service
+                .join_federation(FederationJoinRequest {
+                    coop_did: "did:icn:zVoucheeReload123456789012345".to_string(),
+                    coop_name: "Vouchee Reload".to_string(),
+                    federation_id: vouchee_id.clone(),
+                    gateway_endpoints: vec![],
+                    decision_receipt_id: "gov:join:vouchee".to_string(),
+                    decision_hash: "sha256:v2".to_string(),
+                })
+                .unwrap();
 
             // Create vouch
-            let result = service.vouch_for_cooperative(FederationVouchRequest {
-                voucher_did: voucher_id.clone(),
-                vouchee_did: vouchee_id.clone(),
-                trust_score: 0.75,
-                decision_receipt_id: "gov:vouch:reload-test".to_string(),
-                decision_hash: "sha256:vouch-reload".to_string(),
-            }).unwrap();
+            let result = service
+                .vouch_for_cooperative(FederationVouchRequest {
+                    voucher_did: voucher_id.clone(),
+                    vouchee_did: vouchee_id.clone(),
+                    trust_score: 0.75,
+                    decision_receipt_id: "gov:vouch:reload-test".to_string(),
+                    decision_hash: "sha256:vouch-reload".to_string(),
+                })
+                .unwrap();
 
             assert!(result.success, "Vouch should succeed: {:?}", result.error);
         }
@@ -407,8 +430,14 @@ mod tests {
             );
 
             // Verify cooperatives also survived
-            assert!(registry_b.get(&voucher_id).unwrap().is_some(), "Voucher coop should survive");
-            assert!(registry_b.get(&vouchee_id).unwrap().is_some(), "Vouchee coop should survive");
+            assert!(
+                registry_b.get(&voucher_id).unwrap().is_some(),
+                "Voucher coop should survive"
+            );
+            assert!(
+                registry_b.get(&vouchee_id).unwrap().is_some(),
+                "Vouchee coop should survive"
+            );
 
             println!();
             println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -461,7 +490,10 @@ mod tests {
         let result = service.vouch_for_cooperative(vouch_req).unwrap();
 
         assert!(result.success, "Vouch should succeed: {:?}", result.error);
-        assert!(!result.state_change_hash.is_empty(), "Should have state change hash");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "Should have state change hash"
+        );
 
         // Verify vouch is stored
         let vouches = registry.get_vouches("vouchee-coop").unwrap();

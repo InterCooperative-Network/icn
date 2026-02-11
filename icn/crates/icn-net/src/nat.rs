@@ -421,8 +421,8 @@ mod tests {
     fn test_needs_turn_relay() {
         let _config = NatConfig::default();
         // Cannot test full NatTraversal without async, just verify logic
-        assert_eq!(NatType::Symmetric == NatType::Symmetric, true);
-        assert_eq!(NatType::FullCone == NatType::Symmetric, false);
+        assert!(NatType::Symmetric == NatType::Symmetric);
+        assert!(NatType::FullCone != NatType::Symmetric);
     }
 
     #[tokio::test]

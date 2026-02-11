@@ -82,15 +82,16 @@ impl ControlServiceImpl {
     }
 
     /// Store provenance for an operation.
+    #[allow(clippy::expect_used)]
     fn store_provenance(&self, key: String, provenance: ControlProvenance) {
         let mut map = self.provenance.write().expect("provenance lock poisoned");
         map.insert(key, provenance);
     }
 
     /// Get provenance for an operation.
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::expect_used)]
     pub fn get_provenance(&self, operation: &str, target_id: &str) -> Option<ControlProvenance> {
-        let key = format!("{}:{}", operation, target_id);
+        let key = format!("{operation}:{target_id}");
         let map = self.provenance.read().expect("provenance lock poisoned");
         map.get(&key).cloned()
     }
@@ -157,7 +158,10 @@ impl ControlService for ControlServiceImpl {
 
                 Ok(VetoProposalResult {
                     success: true,
-                    message: format!("Proposal {} vetoed successfully", request.target_proposal_id),
+                    message: format!(
+                        "Proposal {} vetoed successfully",
+                        request.target_proposal_id
+                    ),
                     state_change_hash: Some(state_change_hash),
                     vetoed_at: timestamp,
                 })

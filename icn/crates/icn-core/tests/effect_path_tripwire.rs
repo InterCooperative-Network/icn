@@ -9,12 +9,19 @@
 //! The legacy `governance_handlers/` has been deleted.
 //! Effect path is now the only path for governance proposal execution.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::path::PathBuf;
 
 /// Find the workspace root by looking for Cargo.toml with [workspace]
 fn find_workspace_root() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.parent().unwrap().parent().unwrap().to_path_buf()
+    manifest_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf()
 }
 
 // =============================================================================
@@ -55,19 +62,19 @@ fn tripwire_legacy_governance_handlers_deleted() {
 fn tripwire_effect_path_coverage() {
     // Proposal types with full effect path (Decision → Effect → Service → Durable State)
     let effect_path_complete = [
-        "Treasury::Spend",              // LedgerService
-        "Treasury::CreateBudget",       // LedgerService (via Allocate)
-        "Federation::Join",             // FederationService
-        "Federation::Vouch",            // FederationService
-        "Control::Veto",                // ControlService
-        "Control::ForceClose",          // ControlService
-        "Control::TextResolution",      // ControlService (no-op)
-        "Membership::Add",              // MembershipService
-        "Membership::Remove",           // MembershipService
-        "Membership::Update",           // MembershipService
-        "Membership::Freeze",           // MembershipService
-        "Membership::Unfreeze",         // MembershipService
-        "Protocol::SetParameter",       // ProtocolParameterStore
+        "Treasury::Spend",               // LedgerService
+        "Treasury::CreateBudget",        // LedgerService (via Allocate)
+        "Federation::Join",              // FederationService
+        "Federation::Vouch",             // FederationService
+        "Control::Veto",                 // ControlService
+        "Control::ForceClose",           // ControlService
+        "Control::TextResolution",       // ControlService (no-op)
+        "Membership::Add",               // MembershipService
+        "Membership::Remove",            // MembershipService
+        "Membership::Update",            // MembershipService
+        "Membership::Freeze",            // MembershipService
+        "Membership::Unfreeze",          // MembershipService
+        "Protocol::SetParameter",        // ProtocolParameterStore
         "Protocol::SetGovernanceConfig", // ProtocolParameterStore
     ];
 
@@ -80,7 +87,7 @@ fn tripwire_effect_path_coverage() {
         "Treasury::IssueBond",
         "Federation::Leave",
         "Federation::EstablishClearing",
-        "Protocol::Upgrade",           // Not implemented - returns explicit failure
+        "Protocol::Upgrade", // Not implemented - returns explicit failure
         "Protocol::SetSchedulingPolicy", // Not implemented - returns explicit failure
         "Dispute::Resolve",
         "Dispute::Rollback",
@@ -96,14 +103,23 @@ fn tripwire_effect_path_coverage() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║              EFFECT PATH MIGRATION STATUS                        ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ ✅ Complete (Effect → Service → State): {:2}                      ║", effect_path_complete.len());
+    println!(
+        "║ ✅ Complete (Effect → Service → State): {:2}                      ║",
+        effect_path_complete.len()
+    );
     for effect in &effect_path_complete {
         println!("║    • {:50}      ║", effect);
     }
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ ⚠️  Effect defined, service needed: {:2}                          ║", effect_defined_only.len());
+    println!(
+        "║ ⚠️  Effect defined, service needed: {:2}                          ║",
+        effect_defined_only.len()
+    );
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ ❌ Legacy only (no effect type): {:2}                              ║", legacy_only.len());
+    println!(
+        "║ ❌ Legacy only (no effect type): {:2}                              ║",
+        legacy_only.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     // Current target: 14 complete, 15 defined, 0 legacy-only
@@ -130,8 +146,8 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
 
     let content = std::fs::read_to_string(&lifecycle_path).expect("Failed to read lifecycle.rs");
 
-    let has_effect_dispatcher = content.contains("EffectDispatcher")
-        || content.contains("effect_dispatcher");
+    let has_effect_dispatcher =
+        content.contains("EffectDispatcher") || content.contains("effect_dispatcher");
 
     // Verify required components are present
     let has_kernel_executor = content.contains("KernelGovernanceExecutor");
@@ -142,10 +158,26 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║         🎉 EFFECT DISPATCHER IS THE DEFAULT PATH 🎉              ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ EffectDispatcher:           {}                           ║", if has_effect_dispatcher { "✅" } else { "❌" });
-    println!("║ KernelGovernanceExecutor:   {}                           ║", if has_kernel_executor { "✅" } else { "❌" });
-    println!("║ create_effect_subscription: {}                           ║", if has_effect_subscription { "✅" } else { "❌" });
-    println!("║ Env gate removed:           {}                           ║", if has_no_env_gate { "✅" } else { "❌" });
+    println!(
+        "║ EffectDispatcher:           {}                           ║",
+        if has_effect_dispatcher { "✅" } else { "❌" }
+    );
+    println!(
+        "║ KernelGovernanceExecutor:   {}                           ║",
+        if has_kernel_executor { "✅" } else { "❌" }
+    );
+    println!(
+        "║ create_effect_subscription: {}                           ║",
+        if has_effect_subscription {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "║ Env gate removed:           {}                           ║",
+        if has_no_env_gate { "✅" } else { "❌" }
+    );
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!("║ Status: Effect path is production-ready (always active)         ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
@@ -191,12 +223,54 @@ fn tripwire_kernel_services_implemented() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║              KERNEL SERVICE TRAITS STATUS                        ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ LedgerService:     {} ║", if has_ledger_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
-    println!("║ FederationService: {} ║", if has_federation_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
-    println!("║ MembershipService: {} ║", if has_membership_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
-    println!("║ ControlService:    {} ║", if has_control_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
-    println!("║ ProtocolService:   {} ║", if has_protocol_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
-    println!("║ DisputeService:    {} ║", if has_dispute_service { "✅ IMPLEMENTED" } else { "❌ NOT FOUND  " });
+    println!(
+        "║ LedgerService:     {} ║",
+        if has_ledger_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
+    println!(
+        "║ FederationService: {} ║",
+        if has_federation_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
+    println!(
+        "║ MembershipService: {} ║",
+        if has_membership_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
+    println!(
+        "║ ControlService:    {} ║",
+        if has_control_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
+    println!(
+        "║ ProtocolService:   {} ║",
+        if has_protocol_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
+    println!(
+        "║ DisputeService:    {} ║",
+        if has_dispute_service {
+            "✅ IMPLEMENTED"
+        } else {
+            "❌ NOT FOUND  "
+        }
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     // Current state: LedgerService, FederationService, and ControlService implemented

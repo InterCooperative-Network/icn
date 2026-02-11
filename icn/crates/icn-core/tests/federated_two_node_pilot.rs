@@ -27,17 +27,16 @@ use tracing::info;
 
 use icn_coop::CoopStore;
 use icn_core::services::{
-    FederationServiceImpl, LedgerServiceImpl, MembershipServiceImpl, compare_effect_results,
+    compare_effect_results, FederationServiceImpl, LedgerServiceImpl, MembershipServiceImpl,
 };
 use icn_core::supervisor::governance_executor::{
     KernelFederationExecutor, KernelMembershipExecutor, KernelProtocolExecutor,
     KernelTreasuryExecutor,
 };
-use icn_federation::CooperativeRegistry;
 use icn_federation::types::{CooperativeInfo, FederationPolicy};
+use icn_federation::CooperativeRegistry;
 use icn_governance::protocol_store::state::InMemoryParameterStore;
 use icn_identity::Did;
-use icn_kernel_api::MembershipService;
 use icn_kernel_api::authz::AllowAllOracle;
 use icn_kernel_api::effects::{
     FederationEffect, KernelEffect, MembershipEffect, ProtocolEffect, TreasuryEffect,
@@ -46,6 +45,7 @@ use icn_kernel_api::governance::{
     DecisionReceiptId, FederationExecutor, ProtocolExecutor, TreasuryExecutor,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
+use icn_kernel_api::MembershipService;
 use icn_ledger::Ledger;
 use icn_store::SledStore;
 

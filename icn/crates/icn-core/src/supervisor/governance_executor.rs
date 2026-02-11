@@ -17,14 +17,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect, MembershipEffect};
 use icn_kernel_api::governance::{
-    DecisionReceiptId, EffectExecutor, ExecutionOutcome, FederationExecutor, FederationOperation,
-    GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
-    federation_effect_to_operation,
+    federation_effect_to_operation, DecisionReceiptId, EffectExecutor, ExecutionOutcome,
+    FederationExecutor, FederationOperation, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
+    TreasuryExecutor, TreasuryOperation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
-use icn_kernel_api::{
-    ControlService, ForceCloseProposalRequest, VetoProposalRequest,
-};
+use icn_kernel_api::{ControlService, ForceCloseProposalRequest, VetoProposalRequest};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
@@ -843,13 +841,11 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
         ExecutionOutcome::Success { effects, .. } => {
             // Extract state_change_hash from effects if present
             // Format: "... -> state_hash=<hash>"
-            let state_change_hash = effects
-                .iter()
-                .find_map(|e| {
-                    e.find("-> state_hash=").map(|pos| {
-                        e[pos + 14..].to_string() // Skip "-> state_hash="
-                    })
-                });
+            let state_change_hash = effects.iter().find_map(|e| {
+                e.find("-> state_hash=").map(|pos| {
+                    e[pos + 14..].to_string() // Skip "-> state_hash="
+                })
+            });
 
             EffectResult {
                 effect_id: effect_id.to_string(),
@@ -1683,7 +1679,10 @@ mod tests {
         assert!(result.is_ok());
 
         let effect_result = result.unwrap();
-        assert!(!effect_result.success, "Protocol::Upgrade should fail in pilot v1");
+        assert!(
+            !effect_result.success,
+            "Protocol::Upgrade should fail in pilot v1"
+        );
         assert!(
             effect_result.message.contains("not supported in pilot v1"),
             "Failure message should explain pilot limitation: {}",

@@ -120,7 +120,10 @@ async fn test_treasury_create_budget_provenance_chain() -> Result<()> {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║  TREASURY EFFECT PROVENANCE CHAIN VERIFIED                       ║");
     println!("║  decision_receipt_id: {}  ║", decision_receipt_id);
-    println!("║  decision_hash: {}...                      ║", &decision_hash[..30]);
+    println!(
+        "║  decision_hash: {}...                      ║",
+        &decision_hash[..30]
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     Ok(())
@@ -216,7 +219,10 @@ async fn test_membership_add_member_provenance_chain() -> Result<()> {
     info!("✅ Membership::AddMember provenance chain verified");
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║  MEMBERSHIP::ADDMEMBER PROVENANCE CHAIN VERIFIED                 ║");
-    println!("║  decision_receipt_id: {}             ║", decision_receipt_id);
+    println!(
+        "║  decision_receipt_id: {}             ║",
+        decision_receipt_id
+    );
     println!("║  member stored: ✅                                               ║");
     println!("║  provenance tracked: ✅                                          ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
@@ -425,8 +431,7 @@ async fn test_protocol_set_parameter_provenance_chain() -> Result<()> {
     info!("=== Testing Protocol::SetParameter provenance chain ===");
 
     // Create an in-memory parameter store and initialize a parameter
-    let param_store: Arc<dyn ProtocolParameterStore> =
-        Arc::new(InMemoryParameterStore::new());
+    let param_store: Arc<dyn ProtocolParameterStore> = Arc::new(InMemoryParameterStore::new());
 
     let initial_param = ProtocolParameter {
         id: "governance.voting_period".to_string(),
@@ -434,8 +439,8 @@ async fn test_protocol_set_parameter_provenance_chain() -> Result<()> {
         description: "Duration of voting phase in seconds".to_string(),
         value: ParameterValue::Duration(604800), // 7 days
         constraints: ParameterConstraints {
-            min: Some(ParameterValue::Duration(86400)),    // 1 day
-            max: Some(ParameterValue::Duration(2592000)),  // 30 days
+            min: Some(ParameterValue::Duration(86400)),   // 1 day
+            max: Some(ParameterValue::Duration(2592000)), // 30 days
             allowed_values: None,
             requires_restart: false,
             allow_override: true,
@@ -471,7 +476,9 @@ async fn test_protocol_set_parameter_provenance_chain() -> Result<()> {
         icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
             info!(effects = ?effects, "SetParameter executor returned success");
             assert!(
-                effects.iter().any(|e| e.contains("7d") && e.contains("14d")),
+                effects
+                    .iter()
+                    .any(|e| e.contains("7d") && e.contains("14d")),
                 "Effects should show old and new values"
             );
             assert!(
@@ -822,7 +829,9 @@ fn test_effect_groups_coverage_documentation() {
     ];
 
     // Effect groups covered by treasury_integration.rs
-    let existing_tests = ["Treasury::Spend - treasury_integration.rs (test_decision_to_ledger_provenance_end_to_end)"];
+    let existing_tests = [
+        "Treasury::Spend - treasury_integration.rs (test_decision_to_ledger_provenance_end_to_end)",
+    ];
 
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║           EFFECT GROUP INTEGRATION TEST COVERAGE                 ║");
@@ -844,6 +853,14 @@ fn test_effect_groups_coverage_documentation() {
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     // Sanity check counts
-    assert_eq!(tested_effect_groups.len(), 9, "Update this if test count changes");
-    assert_eq!(explicit_fail_effects.len(), 2, "Update if explicit-fail count changes");
+    assert_eq!(
+        tested_effect_groups.len(),
+        9,
+        "Update this if test count changes"
+    );
+    assert_eq!(
+        explicit_fail_effects.len(),
+        2,
+        "Update if explicit-fail count changes"
+    );
 }

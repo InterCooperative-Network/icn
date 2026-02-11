@@ -23,9 +23,9 @@ use anyhow::Result;
 use icn_coop::{CoopStore, Member, MemberRole, MemberStatus, MembershipTier};
 use icn_identity::Did;
 use icn_kernel_api::{
-    AddMemberRequest, AddMemberResult, FreezeMemberRequest, FreezeMemberResult,
-    MembershipService, RemoveMemberRequest, RemoveMemberResult, UnfreezeMemberRequest,
-    UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
+    AddMemberRequest, AddMemberResult, FreezeMemberRequest, FreezeMemberResult, MembershipService,
+    RemoveMemberRequest, RemoveMemberResult, UnfreezeMemberRequest, UnfreezeMemberResult,
+    UpdateMemberRequest, UpdateMemberResult,
 };
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
@@ -681,7 +681,10 @@ mod tests {
     use tempfile::TempDir;
 
     fn make_test_did() -> Did {
-        KeyPair::generate().expect("keypair generation failed").did().clone()
+        KeyPair::generate()
+            .expect("keypair generation failed")
+            .did()
+            .clone()
     }
 
     fn make_store_at_path(path: &Path) -> Arc<CoopStore> {
@@ -710,15 +713,22 @@ mod tests {
             decision_hash: "sha256:addtest12345".to_string(),
         };
 
-        let result = service.add_member(request.clone()).expect("add_member failed");
+        let result = service
+            .add_member(request.clone())
+            .expect("add_member failed");
 
         // Verify success
         assert!(result.success, "Add should succeed");
-        assert!(!result.state_change_hash.is_empty(), "Should have state change hash");
+        assert!(
+            !result.state_change_hash.is_empty(),
+            "Should have state change hash"
+        );
         assert!(result.error.is_none(), "Should have no error");
 
         // Verify durable record exists
-        let stored = store.get_member("coop:test-coop", &test_did).expect("get_member failed");
+        let stored = store
+            .get_member("coop:test-coop", &test_did)
+            .expect("get_member failed");
         assert_eq!(stored.role, MemberRole::Worker);
         assert_eq!(stored.status, MemberStatus::Active);
 
@@ -758,7 +768,10 @@ mod tests {
             let result = service.add_member(request).expect("add_member failed");
             assert!(result.success, "Add should succeed");
             state_change_hash = result.state_change_hash;
-            assert!(!state_change_hash.is_empty(), "Should have state change hash");
+            assert!(
+                !state_change_hash.is_empty(),
+                "Should have state change hash"
+            );
 
             // Store drops here, simulating process boundary
         }
@@ -768,17 +781,29 @@ mod tests {
             let store_b = make_store_at_path(&store_path);
 
             // Verify record exists after reload
-            let stored = store_b.get_member(&entity_id, &test_did).expect("get_member failed");
+            let stored = store_b
+                .get_member(&entity_id, &test_did)
+                .expect("get_member failed");
             assert_eq!(stored.role, MemberRole::BoardMember, "Role should match");
-            assert_eq!(stored.status, MemberStatus::Active, "Status should be active");
+            assert_eq!(
+                stored.status,
+                MemberStatus::Active,
+                "Status should be active"
+            );
 
             println!();
             println!("╔══════════════════════════════════════════════════════════════════╗");
             println!("║          MEMBERSHIP ADD RELOAD DURABILITY VERIFIED               ║");
             println!("╠══════════════════════════════════════════════════════════════════╣");
-            println!("║ state_change_hash: {:<43} ║", &state_change_hash[..43.min(state_change_hash.len())]);
+            println!(
+                "║ state_change_hash: {:<43} ║",
+                &state_change_hash[..43.min(state_change_hash.len())]
+            );
             println!("║ entity_id:         {:<43} ║", &entity_id);
-            println!("║ member_role:       {:<43} ║", format!("{:?}", stored.role));
+            println!(
+                "║ member_role:       {:<43} ║",
+                format!("{:?}", stored.role)
+            );
             println!("╚══════════════════════════════════════════════════════════════════╝");
             println!();
         }
@@ -828,8 +853,14 @@ mod tests {
         {
             let store_b = make_store_at_path(&store_path);
 
-            let stored = store_b.get_member(&entity_id, &test_did).expect("get_member failed");
-            assert_eq!(stored.status, MemberStatus::Suspended, "Status should be suspended");
+            let stored = store_b
+                .get_member(&entity_id, &test_did)
+                .expect("get_member failed");
+            assert_eq!(
+                stored.status,
+                MemberStatus::Suspended,
+                "Status should be suspended"
+            );
             assert!(
                 stored.metadata.contains_key("freeze_reason"),
                 "Should have freeze reason"
@@ -845,7 +876,13 @@ mod tests {
             println!("╠══════════════════════════════════════════════════════════════════╣");
             println!("║ entity_id:     {:<48} ║", &entity_id);
             println!("║ status:        {:<48} ║", format!("{:?}", stored.status));
-            println!("║ freeze_reason: {:<48} ║", stored.metadata.get("freeze_reason").unwrap_or(&"".to_string()));
+            println!(
+                "║ freeze_reason: {:<48} ║",
+                stored
+                    .metadata
+                    .get("freeze_reason")
+                    .unwrap_or(&"".to_string())
+            );
             println!("╚══════════════════════════════════════════════════════════════════╝");
             println!();
         }
@@ -892,8 +929,14 @@ mod tests {
         {
             let store_b = make_store_at_path(&store_path);
 
-            let stored = store_b.get_member(&entity_id, &test_did).expect("get_member failed");
-            assert_eq!(stored.status, MemberStatus::Removed, "Status should be removed");
+            let stored = store_b
+                .get_member(&entity_id, &test_did)
+                .expect("get_member failed");
+            assert_eq!(
+                stored.status,
+                MemberStatus::Removed,
+                "Status should be removed"
+            );
             assert!(
                 stored.metadata.contains_key("removal_reason"),
                 "Should have removal reason"
@@ -905,7 +948,13 @@ mod tests {
             println!("╠══════════════════════════════════════════════════════════════════╣");
             println!("║ entity_id:      {:<47} ║", &entity_id);
             println!("║ status:         {:<47} ║", format!("{:?}", stored.status));
-            println!("║ removal_reason: {:<47} ║", stored.metadata.get("removal_reason").unwrap_or(&"".to_string()));
+            println!(
+                "║ removal_reason: {:<47} ║",
+                stored
+                    .metadata
+                    .get("removal_reason")
+                    .unwrap_or(&"".to_string())
+            );
             println!("╚══════════════════════════════════════════════════════════════════╝");
             println!();
         }
@@ -953,10 +1002,20 @@ mod tests {
         {
             let store_b = make_store_at_path(&store_path);
 
-            let stored = store_b.get_member(&entity_id, &test_did).expect("get_member failed");
-            assert_eq!(stored.role, MemberRole::BoardMember, "Role should be BoardMember");
+            let stored = store_b
+                .get_member(&entity_id, &test_did)
+                .expect("get_member failed");
+            assert_eq!(
+                stored.role,
+                MemberRole::BoardMember,
+                "Role should be BoardMember"
+            );
             assert!(stored.tier.is_some(), "Should have tier");
-            assert_eq!(stored.tier.as_ref().unwrap().name, "Senior", "Tier name should be Senior");
+            assert_eq!(
+                stored.tier.as_ref().unwrap().name,
+                "Senior",
+                "Tier name should be Senior"
+            );
 
             println!();
             println!("╔══════════════════════════════════════════════════════════════════╗");
@@ -964,7 +1023,14 @@ mod tests {
             println!("╠══════════════════════════════════════════════════════════════════╣");
             println!("║ entity_id: {:<52} ║", &entity_id);
             println!("║ new_role:  {:<52} ║", format!("{:?}", stored.role));
-            println!("║ new_tier:  {:<52} ║", stored.tier.as_ref().map(|t| t.name.as_str()).unwrap_or("N/A"));
+            println!(
+                "║ new_tier:  {:<52} ║",
+                stored
+                    .tier
+                    .as_ref()
+                    .map(|t| t.name.as_str())
+                    .unwrap_or("N/A")
+            );
             println!("╚══════════════════════════════════════════════════════════════════╝");
             println!();
         }
@@ -1049,6 +1115,9 @@ mod tests {
             "receipt-123",
             1700000000,
         );
-        assert_ne!(hash1, hash2, "Different operations should produce different hashes");
+        assert_ne!(
+            hash1, hash2,
+            "Different operations should produce different hashes"
+        );
     }
 }
