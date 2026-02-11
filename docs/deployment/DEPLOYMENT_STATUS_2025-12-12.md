@@ -1,5 +1,8 @@
 # ICN Deployment Status - December 12, 2025
 
+> Historical snapshot (December 12, 2025). Values in this document are not authoritative for current deployments.
+> For current status, run live checks and consult `docs/ci/CI_CURRENT_STATUS.md`.
+
 ## 🎉 DEPLOYMENT SUCCESSFUL
 
 All ICN services are now deployed and running!

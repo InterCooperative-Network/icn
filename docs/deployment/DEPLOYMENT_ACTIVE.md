@@ -1,7 +1,11 @@
 # ICN Deployment Active
 
 **Date:** December 12, 2025
-**Status:** 🟢 LIVE
+**Status:** Historical Snapshot (not current operational status)
+
+> This document captures a point-in-time environment from December 12, 2025.
+> Runtime defaults, ports, and service health may have changed since then.
+> For current status, use live checks and see `docs/ci/CI_CURRENT_STATUS.md`.
 
 ## Deployment Summary
 

@@ -1312,3 +1312,41 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C8; continue active-doc drift cleanup.
+## Changes applied (Batch D3 - deployment status snapshot framing)
+
+1. `docs/deployment/DEPLOYMENT_ACTIVE.md`
+2. `docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md`
+3. `docs/deployment/DEPLOYMENT_READY.md`
+
+Updates:
+- Added explicit historical snapshot banners (with concrete date context) to prevent these docs from being interpreted as current operational truth.
+- Added pointer to `docs/ci/CI_CURRENT_STATUS.md` for current/live status verification.
+
+## Verification updates (Batch D3)
+
+```bash
+rg -n "Historical snapshot|not current|CI_CURRENT_STATUS" docs/deployment/DEPLOYMENT_ACTIVE.md docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md docs/deployment/DEPLOYMENT_READY.md
+```
+
+Result: all three docs now explicitly marked as historical snapshots.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch D3)
+
+- `docs/deployment/DEPLOYMENT_ACTIVE.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n "Date|Status|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n "December 12, 2025|Historical snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+- `docs/deployment/DEPLOYMENT_READY.md | docs/ci/CI_CURRENT_STATUS.md + document date metadata | rg -n "December 12, 2025|Historical readiness snapshot|CI_CURRENT_STATUS" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch D3)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch D3; continue with remaining active docs.
