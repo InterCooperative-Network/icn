@@ -1271,3 +1271,44 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C7; continue active-doc drift cleanup.
+## Changes applied (Batch C8 - testing and migration guide command drift)
+
+1. `docs/development/testing/INTERNAL_TESTING_PLAN.md`
+- Replaced unsupported local-process examples (`ICN_DATA_DIR=...` and `--bind`) with valid per-node config-file startup (`--config /tmp/icn-nodeN.toml`) using `network.listen_addr` and per-node observability ports.
+
+2. `docs/development/testing/testing-rpc.md`
+- Updated daemon/runtime examples from stale defaults (`0.0.0.0:4433`) to current `0.0.0.0:7777`.
+- Updated sample data-dir output to Linux default path `~/.local/share/icn`.
+- Updated peer dial example port to `7777`.
+
+3. `docs/migration-guides/version-upgrades.md`
+- Updated metrics endpoint examples from `:9090/metrics` to `:9100/metrics`.
+
+## Verification updates (Batch C8)
+
+```bash
+rg -n "ICN_DATA_DIR=/tmp/icn-node|--bind 127.0.0.1|0.0.0.0:4433|:9090/metrics" docs/development/testing/INTERNAL_TESTING_PLAN.md docs/development/testing/testing-rpc.md docs/migration-guides/version-upgrades.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C8)
+
+- `docs/development/testing/INTERNAL_TESTING_PLAN.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "--config|listen_addr|metrics_port|health_port" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/development/testing/testing-rpc.md | icn/crates/icn-core/src/config/mod.rs | rg -n "listen_addr|data_dir" | aligned | reviewed_on(2026-02-11)`
+- `docs/migration-guides/version-upgrades.md | icn/crates/icn-core/src/config/mod.rs | rg -n "metrics_port|9100" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C8)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C8; continue active-doc drift cleanup.

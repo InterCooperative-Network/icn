@@ -266,7 +266,7 @@ journalctl -u icnd -f
 
 ### 5. Metrics
 ```bash
-curl http://localhost:9090/metrics | grep icn_network_connections_active
+curl http://localhost:9100/metrics | grep icn_network_connections_active
 # Expected: > 0 connections
 ```
 
@@ -444,7 +444,7 @@ icnctl status || {
 **Solution**:
 1. Wait 5-10 minutes for anti-entropy
 2. Force sync: Restart daemon
-3. Check gossip metrics: `curl localhost:9090/metrics | grep gossip`
+3. Check gossip metrics: `curl localhost:9100/metrics | grep gossip`
 
 ---
 

@@ -82,16 +82,52 @@ docker compose -f docker-compose.test.yml ps
 **Option 2: Local Processes (Quick Start)**
 ```bash
 # Terminal 1: Node 1
-ICN_DATA_DIR=/tmp/icn-node1 cargo run --release --bin icnd -- --bind 127.0.0.1:5001
+cat > /tmp/icn-node1.toml <<EOF
+data_dir = "/tmp/icn-node1"
+[network]
+listen_addr = "127.0.0.1:5001"
+[observability]
+metrics_port = 9101
+health_port = 18081
+log_level = "info"
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node1.toml
 
 # Terminal 2: Node 2
-ICN_DATA_DIR=/tmp/icn-node2 cargo run --release --bin icnd -- --bind 127.0.0.1:5002
+cat > /tmp/icn-node2.toml <<EOF
+data_dir = "/tmp/icn-node2"
+[network]
+listen_addr = "127.0.0.1:5002"
+[observability]
+metrics_port = 9102
+health_port = 18082
+log_level = "info"
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node2.toml
 
 # Terminal 3: Node 3
-ICN_DATA_DIR=/tmp/icn-node3 cargo run --release --bin icnd -- --bind 127.0.0.1:5003
+cat > /tmp/icn-node3.toml <<EOF
+data_dir = "/tmp/icn-node3"
+[network]
+listen_addr = "127.0.0.1:5003"
+[observability]
+metrics_port = 9103
+health_port = 18083
+log_level = "info"
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node3.toml
 
 # Terminal 4: Node 4 (Byzantine)
-ICN_DATA_DIR=/tmp/icn-node4 cargo run --release --bin icnd -- --bind 127.0.0.1:5004
+cat > /tmp/icn-node4.toml <<EOF
+data_dir = "/tmp/icn-node4"
+[network]
+listen_addr = "127.0.0.1:5004"
+[observability]
+metrics_port = 9104
+health_port = 18084
+log_level = "info"
+EOF
+cargo run --release --bin icnd -- --config /tmp/icn-node4.toml
 
 # Terminal 5: Prometheus
 prometheus --config.file=monitoring/prometheus.yml
