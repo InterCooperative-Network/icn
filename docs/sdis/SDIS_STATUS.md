@@ -2,6 +2,9 @@
 **Date:** 2025-12-12  
 **Status:** ✅ Infrastructure Deployed, ⚠️ Steward System Pending
 
+> Historical snapshot from 2025-12-12.
+> Route truth source: `icn/crates/icn-gateway/src/api/sdis/mod.rs` and `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`.
+
 ## Overview
 
 The Secure Distributed Identity System (SDIS) has its **infrastructure deployed** on the ICN K3s cluster. API endpoints are live, but **end-to-end enrollment requires the Steward system**, which is not yet implemented (see [SDIS_DEPLOYMENT_STATUS.md](SDIS_DEPLOYMENT_STATUS.md) for details). This document provides the current status, what works, what's in progress, and next steps.
@@ -10,31 +13,30 @@ The Secure Distributed Identity System (SDIS) has its **infrastructure deployed*
 
 ## ✅ What's Working
 
-### 1. SDIS Core API (DEPLOYED)
+### 1. SDIS Core API (wired in this snapshot)
 
-All SDIS endpoints are live at **`http://10.8.10.40:30080/v1/sdis/`**
+Base route: **`/v1/sdis`**
 
-**Enrollment Endpoints:**
+**Enrollment + Steward workflow endpoints (wired):**
 - ✅ `POST /v1/sdis/enrollment/start` - Start new enrollment
+- ✅ `POST /v1/sdis/enrollment/verify/level1` - Verify device proof
+- ✅ `POST /v1/sdis/enrollment/verify/level2` - Steward-level verification
 - ✅ `POST /v1/sdis/enrollment/complete` - Complete enrollment
+- ✅ `GET /v1/sdis/status/{enrollment_id}` - Enrollment status
+- ✅ `GET /v1/sdis/pending` - Pending enrollments
+- ✅ `POST /v1/sdis/vouch/{enrollment_id}` - Steward vouch action
+- ✅ `POST /v1/sdis/reject/{enrollment_id}` - Steward reject action
+- ✅ `GET /v1/sdis/steward/stats` - Steward metrics
+- ✅ `GET /v1/sdis/steward/history` - Steward history
 
-**Verification Endpoints:**
-- ✅ `POST /v1/sdis/verify/level1` - Device verification
-- ✅ `POST /v1/sdis/verify/level2` - Steward vouching
-
-**Anchor Management:**
-- ✅ `GET /v1/sdis/anchors` - List anchor devices
-- ✅ `POST /v1/sdis/anchors` - Add anchor device
-- ✅ `DELETE /v1/sdis/anchors/{id}` - Remove anchor
-- ✅ `POST /v1/sdis/anchors/{id}/promote` - Promote to primary
-
-**Recovery:**
-- ✅ `POST /v1/sdis/recovery/initiate` - Start recovery
-- ✅ `POST /v1/sdis/recovery/complete` - Complete recovery
-
-**Utilities:**
-- ✅ `POST /v1/sdis/ephemeral/generate` - Generate ephemeral DID
+**Verification + utility endpoints (wired):**
+- ✅ `POST /v1/sdis/verify/level1` - QR/device verification
+- ✅ `POST /v1/sdis/verify/level2` - Binding verification
+- ✅ `POST /v1/sdis/ephemeral/generate` - Generate ephemeral DID proof
 - ✅ `GET /v1/sdis/health` - Health check
+
+**Not wired via current route configuration:**
+- ⚠️ Anchor/recovery routes described in older docs (`/v1/sdis/anchors/*`, `/v1/sdis/recovery/*`) are present as module-level implementation work but are not registered by the current `sdis::configure` path.
 
 **Verified Working:**
 ```bash
@@ -42,14 +44,14 @@ $ curl http://10.8.10.40:30080/v1/sdis/health
 {"status":"healthy","timestamp":"2025-12-12T22:00:00Z"}
 ```
 
-### 2. Backend Implementation (COMPLETE)
+### 2. Backend Implementation (PARTIAL WIRING)
 
 **Location:** `icn/crates/icn-gateway/src/api/sdis/`
 
 - ✅ `enrollment.rs` - Enrollment flow handlers
 - ✅ `verify.rs` - Multi-level verification
-- ✅ `anchor.rs` - Anchor device management
-- ✅ `recovery.rs` - Identity recovery handlers
+- ✅ `anchor.rs` - Anchor device management module (not wired in current route config)
+- ✅ `recovery.rs` - Identity recovery handlers module (not wired in current route config)
 - ✅ `ephemeral.rs` - Ephemeral DID generation
 - ✅ `qr.rs` - QR code generation
 - ✅ `mod.rs` - Route configuration

@@ -1729,3 +1729,41 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C17; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C18 - SDIS status route-wiring correction)
+
+1. `docs/sdis/SDIS_STATUS.md`
+
+Changes:
+
+- Added explicit historical snapshot banner with truth-source pointers.
+- Replaced overbroad "all SDIS endpoints are live" framing with currently wired endpoint groups from `sdis::configure`.
+- Added explicit caveat that anchor/recovery routes described in older docs are module-level work not currently registered by route configuration.
+- Updated backend implementation section from "COMPLETE" to "PARTIAL WIRING" to reflect route exposure reality.
+
+## Verification updates (Batch C18)
+
+```bash
+rg -n "Historical snapshot|Anchor/recovery routes described in older docs|PARTIAL WIRING|sdis::configure" docs/sdis/SDIS_STATUS.md
+```
+
+Result: snapshot framing and route-wiring caveats present.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C18)
+
+- `docs/sdis/SDIS_STATUS.md | icn/crates/icn-gateway/src/api/sdis/{mod.rs,simple_enrollment.rs} | rg -n "scope(\"/v1/sdis\")|service\\(simple_enrollment::configure\\)|enrollment/start|pending|vouch|steward/stats" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C18)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C18; continue active-doc content drift cleanup.
