@@ -59,10 +59,14 @@ All runbooks follow this structure:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ICN_DATA_DIR` | Data directory | `~/.icn` |
-| `ICN_PASSPHRASE` | Keystore passphrase | (required) |
-| `ICN_CONFIG` | Config file path | `~/.icn/config.toml` |
+| `ICN_KEYSTORE_PASSPHRASE` | Daemon keystore passphrase (preferred for `icnd`) | (optional) |
+| `ICN_PASSPHRASE` | CLI passphrase (`icnctl`) and daemon legacy fallback | (optional) |
+| `ICN_GATEWAY_JWT_SECRET` | Gateway JWT secret (when gateway enabled) | (required if gateway enabled) |
 | `KUBECONFIG` | K8s config (if K8s) | `~/.kube/config` |
+
+Use CLI flags for paths:
+- `icnd --data-dir /path --config /path/config.toml`
+- `icnctl --data-dir /path`
 
 ## Contact
 

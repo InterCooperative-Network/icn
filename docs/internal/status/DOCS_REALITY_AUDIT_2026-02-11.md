@@ -1035,3 +1035,50 @@ Result: no `MISSING_LINK` findings.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C2; continue next A4 slices and D2 historical normalization.
+## Changes applied (Batch C3 - onboarding/ops runtime semantics)
+
+1. `docs/GETTING_STARTED.md`
+- Added explicit `--data-dir ~/.icn` usage for `icnctl` and `icnd` in startup flow so identity and daemon state align.
+- Updated keystore terminology/path to `{data_dir}/identity.age`.
+
+2. `docs/operations/deployment/deployment-guide.md`
+- Corrected daemon defaults and examples:
+  - QUIC default port `7777` (not `4433`)
+  - Prometheus metrics default `9100` (not `9090`)
+  - data/identity path examples to `/var/lib/icn/identity.age`
+- Removed unsupported environment-variable assumptions and clarified that path/network settings are controlled via `--data-dir`, `--config`, and config file fields.
+- Corrected systemd and Docker examples to pass explicit `--data-dir`/`--config`.
+- Fixed backup/recovery examples to reference `identity.age` instead of `keystore.age`.
+
+3. `docs/ops/runbooks/README.md`
+- Updated environment variable table to reflect current runtime behavior (`ICN_KEYSTORE_PASSPHRASE`, `ICN_PASSPHRASE`, `ICN_GATEWAY_JWT_SECRET`).
+- Added explicit CLI-path guidance for `icnd` and `icnctl`.
+
+## Verification updates (Batch C3)
+
+```bash
+rg -n "~/.icn/keystore.age|0.0.0.0:4433|:9090/metrics|ICN_DATA_DIR=|ICN_OBSERVABILITY_LOG_LEVEL|/etc/icn/icn.toml|targets: \['icnd:9090'\]" docs/GETTING_STARTED.md docs/operations/deployment/deployment-guide.md docs/ops/runbooks/README.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; only expected historical/stale-marker reports remain.
+
+## Audit ledger additions (Batch C3)
+
+- `docs/GETTING_STARTED.md | icn/bins/icnctl/src/main.rs:get_data_dir + icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "get_data_dir|identity.age|data_dir|listen_addr|metrics_port" | aligned | reviewed_on(2026-02-11)`
+- `docs/operations/deployment/deployment-guide.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "data_dir|listen_addr|metrics_port|ICN_KEYSTORE_PASSPHRASE|ICN_GATEWAY_JWT_SECRET" | aligned | reviewed_on(2026-02-11)`
+- `docs/ops/runbooks/README.md | icn/bins/icnd/src/main.rs + icn/bins/icnctl/src/main.rs | rg -n "ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|--data-dir|--config" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C3)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C3; proceed with next active-doc slices.
