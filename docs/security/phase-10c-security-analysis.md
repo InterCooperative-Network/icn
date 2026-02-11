@@ -19,7 +19,7 @@ All issues have remediation plans below.
 
 ### H1: No Participant Validation in Contract
 
-**File**: [`crates/icn-ccl/src/ast.rs:259-350`](crates/icn-ccl/src/ast.rs#L259-L350)
+**File**: [`crates/icn-ccl/src/ast.rs:259-350`](../../icn/crates/icn-ccl/src/ast.rs#L259-L350)
 
 **Issue**: `Contract::validate()` does NOT validate the `participants` field.
 
@@ -111,7 +111,7 @@ for participant in &self.participants {
 
 ### H2: No Validation of Installation.signatures Map Size
 
-**File**: [`crates/icn-ccl/src/messages.rs:80-96`](crates/icn-ccl/src/messages.rs#L80-L96)
+**File**: [`crates/icn-ccl/src/messages.rs:80-96`](../../icn/crates/icn-ccl/src/messages.rs#L80-L96)
 
 **Issue**: While participants list is now bounded (after H1 fix), the `installation.signatures` HashMap is not validated before set comparison.
 
@@ -149,7 +149,7 @@ if self.installation.signatures.len() > MAX_PARTICIPANTS {
 
 ### M1: Deployer Signature Verified Twice
 
-**File**: [`crates/icn-ccl/src/messages.rs:101-131`](crates/icn-ccl/src/messages.rs#L101-L131)
+**File**: [`crates/icn-ccl/src/messages.rs:101-131`](../../icn/crates/icn-ccl/src/messages.rs#L101-L131)
 
 **Issue**: Deployer signature is verified at lines 101-109, then again in the loop at lines 112-131 (since deployer is a participant).
 
@@ -181,7 +181,7 @@ for (participant_did, sig_bytes) in &self.installation.signatures {
 
 ### M2: No Validation of `deployer_signature` Field
 
-**File**: [`crates/icn-ccl/src/messages.rs:22`](crates/icn-ccl/src/messages.rs#L22)
+**File**: [`crates/icn-ccl/src/messages.rs:22`](../../icn/crates/icn-ccl/src/messages.rs#L22)
 
 **Issue**: The `ContractDeploymentMessage` has both:
 - `deployer_signature: Vec<u8>` (line 22)
@@ -227,7 +227,7 @@ if self.deployer_signature != *deployer_sig_in_installation {
 
 ### M3: No Check for Malformed DIDs in Signatures
 
-**File**: [`crates/icn-ccl/src/messages.rs:113`](crates/icn-ccl/src/messages.rs#L113)
+**File**: [`crates/icn-ccl/src/messages.rs:113`](../../icn/crates/icn-ccl/src/messages.rs#L113)
 
 **Issue**: `participant_did.to_verifying_key()` is called without checking if the DID is well-formed.
 
@@ -268,7 +268,7 @@ for (participant_did, sig_bytes) in &self.installation.signatures {
 
 ### L1: No Bounds on State Variables or Rules
 
-**File**: [`crates/icn-ccl/src/ast.rs:260-350`](crates/icn-ccl/src/ast.rs#L260-L350)
+**File**: [`crates/icn-ccl/src/ast.rs:260-350`](../../icn/crates/icn-ccl/src/ast.rs#L260-L350)
 
 **Issue**: `Contract::validate()` checks `MAX_NAME_LENGTH` for names but doesn't bound the number of state variables or rules.
 
@@ -451,7 +451,7 @@ fn test_missing_signature() {
 
 ### C1: No Validation of Input JSON in `contract sign`
 
-**File**: [`bins/icnctl/src/main.rs:1074-1157`](bins/icnctl/src/main.rs#L1074-L1157)
+**File**: [`bins/icnctl/src/main.rs:1074-1157`](../../icn/bins/icnctl/src/main.rs#L1074-L1157)
 
 **Issue**: `handle_contract_sign()` loads `PartialDeployment` JSON without validating structure.
 

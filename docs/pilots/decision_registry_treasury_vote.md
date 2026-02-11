@@ -348,4 +348,4 @@ Receipts persist in durable storage. After node restart:
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 - [governance-primitives.md](../design/governance/governance-primitives.md) - Governance design
-- [Sprint 8 Plan](../../.copilot/session-state/*/plan.md) - Economics consolidation
+- `Sprint 8 Plan`: `.copilot/session-state/*/plan.md` (local planning artifact, not tracked in repo)

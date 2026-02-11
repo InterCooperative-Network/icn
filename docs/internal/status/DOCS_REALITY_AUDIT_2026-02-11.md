@@ -694,3 +694,55 @@ Global missing-link count after this slice: `29`.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+
+## Changes applied (Batch A4 - slice 12: final residual scan cleanup)
+
+1. `docs/DOCUMENTATION_MAINTENANCE.md`
+- Fixed root-relative path examples to docs-relative examples.
+- Reworked markdown-link regex examples to avoid scanner false positives from literal markdown-link syntax in code examples.
+- Updated cross-reference examples to current existing docs paths.
+
+2. `docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md`
+- Repointed historical references to current canonical locations:
+  - `../ARCHITECTURE.md`
+  - `../development/sessions/undated/ROADMAP.md`
+  - `../GETTING_STARTED.md`
+  - `../security/production-hardening.md`
+  - `../design/governance/governance-primitives.md`
+
+3. `docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md`
+- Repointed `../dev-journal/` to `../development/sessions/`.
+
+4. `docs/pilots/decision_registry_treasury_vote.md`
+- Replaced non-repo wildcard link with explicit local-artifact note for `.copilot/session-state/*/plan.md`.
+
+5. `docs/security/phase-10c-security-analysis.md`
+- Corrected source-code links to repo root relative paths:
+  - `../../icn/crates/icn-ccl/src/ast.rs`
+  - `../../icn/crates/icn-ccl/src/messages.rs`
+  - `../../icn/bins/icnctl/src/main.rs`
+
+## Verification updates (Batch A4 - slice 12)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+```
+
+Result: zero missing-link findings.
+
+## Audit ledger updates (slice 12)
+
+- `docs/DOCUMENTATION_MAINTENANCE.md | docs/{INDEX.md,architecture/ARCHITECTURE_MAP.md,architecture/README.md,reference/api/api-versioning.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md | docs/{ARCHITECTURE.md,GETTING_STARTED.md,security/production-hardening.md,design/governance/governance-primitives.md,development/sessions/undated/ROADMAP.md} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md | docs/development/sessions/ | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/pilots/decision_registry_treasury_vote.md | local artifact note + docs policy | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+- `docs/security/phase-10c-security-analysis.md | icn/{crates/icn-ccl/src/{ast.rs,messages.rs},bins/icnctl/src/main.rs} | ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (A4 slice 12)
+
+- Accuracy: 5/5
+- Completeness: 5/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; link-drift backlog cleared for active scanner scope.

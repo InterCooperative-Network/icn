@@ -942,7 +942,7 @@ Target test coverage by component:
 - [CANONICAL_ENCODING.md](./CANONICAL_ENCODING.md) - Encoding rules
 - [FEDERATION_ACTIONS.md](./FEDERATION_ACTIONS.md) - Action specification
 - [GOVERNANCE_STATE_MACHINE.md](./GOVERNANCE_STATE_MACHINE.md) - State machine specification
-- [ICN Codebase Exploration](../dev-journal/) - Development session notes
+- [ICN Codebase Exploration](../development/sessions/) - Development session notes
 
 ---
 

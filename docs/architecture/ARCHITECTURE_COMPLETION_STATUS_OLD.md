@@ -315,11 +315,11 @@ The system demonstrates:
 
 ## References
 
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) - System design
-- [ROADMAP.md](./ROADMAP.md) - Development phases  
-- [GETTING_STARTED.md](./docs/GETTING_STARTED.md) - Developer guide
-- [production-hardening.md](./docs/production-hardening.md) - Security measures
-- [governance-primitives.md](./docs/governance-primitives.md) - Democratic system
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System design
+- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Development phases  
+- [GETTING_STARTED.md](../GETTING_STARTED.md) - Developer guide
+- [production-hardening.md](../security/production-hardening.md) - Security measures
+- [governance-primitives.md](../design/governance/governance-primitives.md) - Democratic system
 
 ---
 
