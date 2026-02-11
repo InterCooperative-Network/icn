@@ -1,0 +1,4 @@
+interface:
+  display_name: "ICN Docs Reality Sync"
+  short_description: "Audit docs against code and fix drift"
+  default_prompt: "Audit ICN documentation against code and workflows, produce mismatch report, apply minimal doc fixes, and verify alignment."

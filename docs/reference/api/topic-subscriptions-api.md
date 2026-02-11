@@ -443,6 +443,6 @@ These limitations will be addressed in future releases.
 
 ## See Also
 
-- [ARCHITECTURE.md](ARCHITECTURE.md#66-topic-subscriptions) - Architecture documentation
-- [CLAUDE.md](../CLAUDE.md) - Development guide
+- [ARCHITECTURE.md](../../ARCHITECTURE.md#66-topic-subscriptions) - Architecture documentation
+- [CLAUDE.md](../../../CLAUDE.md) - Development guide
 - Integration test examples: `icn/crates/icn-core/tests/subscription_integration.rs`

@@ -148,7 +148,7 @@ docker run -e ICN_KEYSTORE_PASSPHRASE="$(cat /run/secrets/icn_passphrase)" icn:l
 
 ### Configuration File
 
-ICN supports TOML configuration files. See [../config/](../config/) for examples:
+ICN supports TOML configuration files. See [config/](../../../config/README.md) for examples:
 
 ```toml
 # ~/.icn/icn.toml
@@ -252,7 +252,7 @@ sudo journalctl -u icnd -f
 
 ### Docker Compose
 
-See [../docker/](../docker/) for complete Docker Compose examples.
+See [docker/](../../../docker/README.md) for complete Docker Compose examples.
 
 ```yaml
 version: '3.9'
@@ -597,9 +597,9 @@ icnctl network dial did:icn:abc123... 192.168.1.100:4433
 
 ## Additional Resources
 
-- [Architecture Documentation](ARCHITECTURE.md)
-- [Production Hardening Details](production-hardening.md)
-- [Topic Subscriptions API](topic-subscriptions-api.md)
+- [Architecture Documentation](../../ARCHITECTURE.md)
+- [Production Hardening Details](../../security/production-hardening.md)
+- [Topic Subscriptions API](../../reference/api/topic-subscriptions-api.md)
 - [GitHub Repository](https://github.com/your-org/icn)
 - [Community Forum](https://forum.intercooperative.network) (future)
 

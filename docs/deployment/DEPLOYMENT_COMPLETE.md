@@ -505,11 +505,11 @@ sudo systemctl start icnd
 
 ## 📚 Additional Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Getting Started](docs/GETTING_STARTED.md)
-- [API Reference](docs/api/)
-- [Security Hardening](docs/production-hardening.md)
-- [Mobile Integration](MOBILE_APP_STATUS.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Getting Started](../GETTING_STARTED.md)
+- [API Reference](../reference/api/README.md)
+- [Security Hardening](../security/production-hardening.md)
+- [Mobile Integration](../mobile/MOBILE_APP_STATUS.md)
 
 ---
 

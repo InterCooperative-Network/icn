@@ -445,9 +445,9 @@ After deployment, verify:
 
 - [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Comprehensive deployment guide
 - [DEPLOY_TEST_NETWORK.md](DEPLOY_TEST_NETWORK.md) - Test network setup
-- [MOBILE_APP_STATUS.md](MOBILE_APP_STATUS.md) - Mobile integration status
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [docs/production-hardening.md](docs/production-hardening.md) - Security hardening
+- [MOBILE_APP_STATUS.md](../mobile/MOBILE_APP_STATUS.md) - Mobile integration status
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
+- [production-hardening.md](../security/production-hardening.md) - Security hardening
 
 ---
 

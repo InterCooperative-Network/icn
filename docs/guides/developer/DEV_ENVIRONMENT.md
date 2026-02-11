@@ -124,6 +124,6 @@ Workstation (matt)
 
 ## Related Documentation
 
-- [HOMELAB_DEPLOYMENT.md](./HOMELAB_DEPLOYMENT.md) - K3s cluster details
-- [GETTING_STARTED.md](./GETTING_STARTED.md) - ICN quickstart guide
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
+- [HOMELAB_DEPLOYMENT.md](../../operations/deployment/HOMELAB_DEPLOYMENT.md) - K3s cluster details
+- [GETTING_STARTED.md](../../GETTING_STARTED.md) - ICN quickstart guide
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - System architecture

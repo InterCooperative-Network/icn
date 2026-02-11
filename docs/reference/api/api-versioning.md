@@ -509,10 +509,10 @@ cargo test -p icn-gateway test_v1_compat
 
 ## References
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
-- [capability-based-features.md](capability-based-features.md) - Detailed capability guide
-- [deployment-guide.md](deployment-guide.md) - Deployment procedures
-- [CHANGELOG.md](../CHANGELOG.md) - Version history
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - System architecture
+- [capability-based-features.md](../../design/capability-based-features.md) - Detailed capability guide
+- [deployment-guide.md](../../operations/deployment/deployment-guide.md) - Deployment procedures
+- [CHANGELOG.md](../../../CHANGELOG.md) - Version history
 
 ---
 

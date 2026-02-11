@@ -29,7 +29,7 @@ These invariants are mechanically enforced to ensure the kernel remains semantic
 
 **Rule**: Kernel crates (`icn-core`, `icn-kernel-api`, `icn-net`, `icn-gossip`, `icn-store`) must NOT depend on:
 - Domain crates: `icn-trust`, `icn-governance`, `icn-ledger` (internals)
-- App crates: anything under `apps/`
+- App crates: runtime app crates under `icn/apps/*` (canonical) or legacy top-level `apps/*` during migration
 
 **Rationale**: Direct imports create compile-time coupling. If kernel code can import `TrustGraph`, it can call domain-specific methods, violating the meaning firewall.
 
@@ -112,7 +112,7 @@ fn rate_limit_for(&self, actor: &Did) -> RateLimit {
 
 **Correct Pattern**:
 ```rust
-// ✅ In apps/trust/src/oracle.rs (PolicyOracle implementation)
+// ✅ In icn/apps/trust/src/oracle.rs (or apps/trust/src/oracle.rs during migration)
 impl PolicyOracle for TrustPolicyOracle {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         let score = self.graph.compute_trust_score(&request.actor);
@@ -852,7 +852,7 @@ pub enum Domain {
 2. **Implement PolicyOracle** in your app crate:
 
 ```rust
-// In apps/membership/src/oracle.rs
+// In icn/apps/membership/src/oracle.rs
 use icn_kernel_api::{PolicyOracle, PolicyRequest, PolicyDecision, ConstraintSet, Domain};
 
 pub struct MembershipOracle {
@@ -1228,7 +1228,6 @@ Helper methods on `Config`:
 | `icn/crates/icn-core/src/supervisor/init_governance.rs` | Governance initialization |
 | `icn/crates/icn-core/src/supervisor/init_ledger.rs` | Ledger initialization |
 | `icn/crates/icn-gateway/src/trust_policy.rs` | TrustPolicyOracle implementation |
-| `apps/trust/` | TrustService app implementation |
-| `apps/governance/` | GovernanceService app implementation |
-| `apps/ledger/` | LedgerService app implementation |
+| `icn/apps/*` | Canonical runtime app implementations |
+| `apps/*` | Legacy runtime app location during migration |
 | `CLAUDE.md` | Agent guidance (Kernel/App section) |

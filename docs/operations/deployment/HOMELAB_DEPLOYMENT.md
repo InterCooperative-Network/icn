@@ -40,7 +40,7 @@ cd deploy/k8s
 make full-deploy-dev  # Build, sync, and deploy in one command
 ```
 
-See [deploy/k8s/README.md](../deploy/k8s/README.md) for complete documentation.
+See [deploy/k8s/README.md](../../../deploy/k8s/README.md) for complete documentation.
 
 **Features**:
 - Version-controlled Kubernetes manifests
@@ -192,7 +192,7 @@ Manual deployment with fixes for:
 
 | Resource | Location |
 |----------|----------|
-| **Dev Environment** | [DEV_ENVIRONMENT.md](./DEV_ENVIRONMENT.md) - icn-dev VM details |
+| **Dev Environment** | [DEV_ENVIRONMENT.md](../../guides/developer/DEV_ENVIRONMENT.md) - icn-dev VM details |
 | **Homelab Inventory** | `/home/matt/homelab-inventory` |
 | **ICN Launchpad** | `/home/matt/homelab-inventory/projects/icn/ICN_LAUNCHPAD.md` |
 | **K3s Cluster Docs** | `/home/matt/homelab-inventory/projects/icn/docs/K3S_CLUSTER.md` |

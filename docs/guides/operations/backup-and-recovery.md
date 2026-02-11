@@ -435,6 +435,6 @@ Flags:
 
 ## See Also
 
-- [Multi-Device Identity Guide](dev-journal/2025-01-14-phase-11-multi-device-identity.md) - Device management
-- [Deployment Guide](deployment-guide.md) - Production deployment
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [Multi-Device Identity Guide](../../development/sessions/2025-11/2025-11-14-phase-11-multi-device-identity.md) - Device management
+- [Deployment Guide](../../operations/deployment/deployment-guide.md) - Production deployment
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - System architecture

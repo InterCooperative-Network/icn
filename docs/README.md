@@ -98,8 +98,8 @@ docs/
 
 **Status:** Living document, updated as decisions are made and implementation progresses.
 
-### Development Journal
-The [dev-journal/](./dev-journal/) directory contains narrative entries documenting:
+### Development Sessions
+The [development/sessions/](./development/sessions/) directory contains narrative entries documenting:
 - What was built in each phase
 - Technical decisions and rationale
 - Problems encountered and solutions
@@ -110,8 +110,8 @@ The [dev-journal/](./dev-journal/) directory contains narrative entries document
 
 **Example:** `2025-11-10-phase-0-bootstrap.md`
 
-### Architecture Decision Records (Future)
-The [decisions/](./decisions/) directory will contain ADRs for specific architectural choices.
+### Architecture Decision Records
+The [adr/](./adr/) directory contains architecture decision records for specific architectural choices.
 
 **Format:** Lightweight, template-based
 ```markdown
@@ -139,11 +139,11 @@ What other options did we evaluate?
 ### For Contributors
 1. **Before implementing:** Read [ARCHITECTURE.md](./ARCHITECTURE.md) to understand design constraints
 2. **During implementation:** Update relevant sections if decisions change
-3. **After milestone:** Create dev journal entry documenting what was built
+3. **After milestone:** Create a development session entry documenting what was built
 
 ### For Users
 1. **Understanding the system:** Start with [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. **Learning the history:** Read dev journal entries chronologically
+2. **Learning the history:** Read development session entries chronologically
 3. **Understanding specific decisions:** Check ADRs (once we have them)
 
 ### For Reviewers

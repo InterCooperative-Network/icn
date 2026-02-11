@@ -5,8 +5,8 @@ This document provides step-by-step procedures for diagnosing and resolving comm
 **Audience**: ICN node operators, system administrators, SRE teams
 
 **Related Documents**:
-- [Incident Response Playbook](incident-response.md) - For security incidents and critical failures
-- [Production Hardening](production-hardening.md) - Security configuration reference
+- [Incident Response Playbook](../../operations/deployment/incident-response.md) - For security incidents and critical failures
+- [Production Hardening](../../security/production-hardening.md) - Security configuration reference
 
 > **Note**: Commands marked with "(future feature)" are planned but not yet implemented.
 > These are included for completeness and will be available in future ICN releases.

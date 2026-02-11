@@ -587,11 +587,11 @@ server {
 
 ## 📚 Additional Resources
 
-- [Architecture Documentation](docs/ARCHITECTURE.md)
-- [API Reference](docs/api/)
-- [Mobile App Status](MOBILE_APP_STATUS.md)
-- [Security Hardening](docs/production-hardening.md)
-- [Governance Primitives](docs/governance-primitives.md)
+- [Architecture Documentation](../ARCHITECTURE.md)
+- [API Reference](../reference/api/README.md)
+- [Mobile App Status](../mobile/MOBILE_APP_STATUS.md)
+- [Security Hardening](../security/production-hardening.md)
+- [Governance Primitives](../design/governance/governance-primitives.md)
 
 ---
 

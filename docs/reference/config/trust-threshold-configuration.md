@@ -166,9 +166,9 @@ Set `min_trust_threshold = 0.0` in the network configuration for cooperative dep
 
 ## Related Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture and trust model
-- [production-hardening.md](./production-hardening.md) - Security hardening measures
-- [DEPLOYMENT_GUIDE.md](../deploy/k8s/DEPLOYMENT_GUIDE.md) - Kubernetes deployment guide
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - System architecture and trust model
+- [production-hardening.md](../../security/production-hardening.md) - Security hardening measures
+- [DEPLOYMENT_GUIDE.md](../../operations/deployment/deployment-guide.md) - Kubernetes deployment guide
 
 ## Version History
 

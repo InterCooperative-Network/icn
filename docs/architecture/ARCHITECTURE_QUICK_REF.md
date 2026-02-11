@@ -207,7 +207,7 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
     │
     ├─ ARCHITECTURE_VISUAL.md  ← Diagrams & flows
     ├─ ARCHITECTURE_MAP.md     ← Complete inventory
-    └─ docs/ARCHITECTURE.md    ← Design rationale
+    └─ ../ARCHITECTURE.md      ← Design rationale
 ```
 
 ## 🚦 Current Status
@@ -230,8 +230,8 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
 1. Read [ARCHITECTURE_INDEX.md](./ARCHITECTURE_INDEX.md)
 2. Browse [ARCHITECTURE_VISUAL.md](./ARCHITECTURE_VISUAL.md)
 3. Study [ARCHITECTURE_MAP.md](./ARCHITECTURE_MAP.md)
-4. Deep-dive [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-5. Get started [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)
+4. Deep-dive [ARCHITECTURE.md](../ARCHITECTURE.md)
+5. Get started [GETTING_STARTED.md](../GETTING_STARTED.md)
 
 ## 📞 Resources
 

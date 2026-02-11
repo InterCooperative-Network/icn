@@ -1,126 +1,58 @@
-# CI Status: ALL GREEN ✅
+# CI Current Status
 
-**Last Updated**: 2026-01-20 (local run)
-**Status**: **ALL CHECKS PASSING** 🟢
+**Last Reviewed**: 2026-02-11  
+**Status Type**: Operational snapshot (not a persistent truth source)
 
----
+## Purpose
 
-## 🔎 Current Notes (2026-01-20)
-- Local CI baseline on 2026-01-20 succeeded with rustc 1.89.0 override in icn/.
-- K3s/self-hosted runner node is down (per user report); deployment workflows blocked.
+This file records a point-in-time CI posture and how to re-verify it.
+It must not be used as proof that CI is currently green without rerunning checks.
 
----
+## Authoritative Sources
 
-## Latest Local Run (2026-01-20)
-- Result: PASSED (cargo fmt, cargo clippy, cargo test --workspace).
-- Toolchain: rustc 1.89.0 override in icn/.
+- CI definitions: `.github/workflows/*.yml`
+- Required local command routing: `AGENTS.md`
+- Rust workspace root: `icn/`
 
----
+## Current Notes (as of 2026-02-11)
 
-## Fixed Issues (This Session)
+- Treat older "all green" statements as historical snapshots only.
+- Deployment-related checks may depend on external infrastructure availability.
+- Architecture/docs status must be validated against the current branch and workflows.
 
-### 1. Format Check ✅
-**Issue**: Long function calls not formatted properly
-**Fix**: Applied `cargo fmt --all`
-**Commit**: `8ef0669`
+## Re-verify CI Locally
 
-### 2. Clippy (Derivable Impls) ✅
-**Issue**: Manual `impl Default` could be derived
-**Fix**: Added `#[derive(Default)]` and `#[default]` attribute
-**Commit**: `e2414a9`
+Run from repo root unless noted:
 
-### 3. Test Compilation Errors ✅
-**Issues**:
-- E0433: `KeyPair` undeclared in session.rs tests
-- E0061: `create_client_config` signature mismatch in tls.rs test
-- clippy::cloned_ref_to_slice_refs in charter_validator.rs
+```bash
+# Rust checks (run from icn/)
+cd icn
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --lib
+cargo test --workspace --test '*' -- --test-threads=1
+```
 
-**Fixes**:
-- Updated session.rs tests to use `IdentityBundle::generate()`
-- Updated tls.rs test to pass certs/key to `create_client_config()`
-- Used `std::slice::from_ref()` instead of `.clone()` in tests
+Subsystem checks by change scope (see `AGENTS.md`):
 
-**Commit**: `bfd4173`
+- Gateway: `cargo test -p icn-gateway --features sled-storage`
+- TypeScript SDK: `cd sdk/typescript && npm ci && npm run build && npm test && npm run lint`
+- React Native SDK: `cd sdk/react-native && npm test && npm run build`
+- Pilot UI: `cd web/pilot-ui && npm ci && npm run test && npm run test:e2e && npm run test:a11y`
 
----
+## Reporting Format
 
-## Current CI Status
+When updating this file, include:
 
-### ✅ Format Check
-**Status**: PASSING
-**Runtime**: ~7s
-**Details**: All code properly formatted with `rustfmt`
+1. Exact date/time reviewed
+2. Branch/commit checked
+3. Commands run
+4. Pass/fail outcomes
+5. Known external blockers (for example unavailable runners)
 
-### ✅ Clippy
-**Status**: PASSING
-**Runtime**: ~4m
-**Details**: 0 warnings with `-D warnings` flag
+## History
 
-### ✅ Build
-**Status**: PASSING
-**Runtime**: ~4m
-**Details**: All crates compile successfully
+For older narrative CI reports, see session/status documents under:
 
-### ✅ Tests
-**Status**: PASSING
-**Runtime**: ~5m
-**Details**: All unit and integration tests pass
-
----
-
-## Test Results Summary
-
-### Contract Deployment Tests: **5/5 PASSING** ✅
-- `test_two_node_contract_deployment` ✅
-- `test_contract_gossip_sync` ✅
-- `test_contract_execution_with_verification` ✅
-- Plus 2 more integration tests ✅
-
-### Unit Tests: **ALL PASSING** ✅
-- icn-net: Session manager, TLS, networking
-- icn-ccl: Charter validation, interpreter
-- icn-identity: DID-TLS binding
-- icn-compute: Dispute resolution
-- All other crates
-
----
-
-## Commit History (CI Fixes)
-
-1. `8ef0669` - style: apply cargo fmt to fix CI format check
-2. `e2414a9` - fix(clippy): derive Default for VerificationMode enum
-3. `bfd4173` - fix(tests): update tests to use IdentityBundle instead of KeyPair
-
----
-
-## Production Readiness Checklist
-
-- ✅ **Format**: All code formatted
-- ✅ **Linting**: 0 clippy warnings
-- ✅ **Compilation**: All crates build
-- ✅ **Tests**: All tests pass
-- ✅ **Security**: All vulnerabilities fixed
-- ✅ **Documentation**: Comprehensive and organized
-- ✅ **CI/CD**: All checks green
-
-**Status**: **READY FOR PRODUCTION DEPLOYMENT** 🚀
-
----
-
-## Next Steps
-
-1. ✅ Monitor CI pipeline (should be all green)
-2. ✅ Merge to main (already on main)
-3. ✅ Deploy to staging
-4. ✅ Deploy to production
-
-**Recommendation**: **DEPLOY NOW** 🎉
-
----
-
-*Last CI Run*: PASSED (2026-01-20 local run)
-*Confidence*: 100%
-
----
-
-**End of Report** ✨
+- `docs/status/`
+- `docs/development/sessions/`

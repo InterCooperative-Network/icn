@@ -131,7 +131,7 @@ ICN uses **mDNS for local discovery** and **QUIC for connections**. For internet
    - Set up Tailscale/Wireguard
    - Use Tailscale IPs for peering
 
-See [nat-traversal-design.md](nat-traversal-design.md) for details.
+See [nat-traversal-design.md](../design/nat-traversal-design.md) for details.
 
 ### Can I run ICN in Docker?
 
@@ -206,7 +206,7 @@ Use multiple devices so losing one doesn't lose your identity:
 icnctl device add --name "My Phone"
 ```
 
-See [multi-device-identity-design.md](multi-device-identity-design.md).
+See [multi-device-identity-design.md](../design/multi-device-identity-design.md).
 
 ### Is communication encrypted?
 
@@ -239,7 +239,7 @@ ICN provides tools for GDPR compliance:
 - Appoint data protection officer (if required)
 - Provide privacy policy to members
 
-See [legal-considerations.md](legal-considerations.md) for details.
+See [legal-considerations.md](../internal/legal-considerations.md) for details.
 
 ---
 
@@ -266,7 +266,7 @@ Credit limits are set by the **cooperative's credit policy**. Options:
    // See docs/economic-safety.md
    ```
 
-See [economic-safety.md](economic-safety.md) for details.
+See [economic-safety.md](../design/economics/economic-safety.md) for details.
 
 ### Can I use multiple currencies?
 
@@ -303,7 +303,7 @@ icnctl ledger pay <did> 10 USD "Grocery share"
 
 Outcomes: `Uphold` (keep entry), `Reverse` (cancel entry), `Adjust` (modify amount)
 
-See [economic-safety.md](economic-safety.md) for details.
+See [economic-safety.md](../design/economics/economic-safety.md) for details.
 
 ### Can I delete my transaction history?
 
@@ -344,7 +344,7 @@ ICN provides **governance primitives**, not a fixed system:
    icnctl gov proposal close --proposal-id <id>
    ```
 
-See [governance-primitives.md](governance-primitives.md) for details.
+See [governance-primitives.md](../design/governance/governance-primitives.md) for details.
 
 ---
 
@@ -431,7 +431,7 @@ icnctl id init
 
 ### What's next for ICN?
 
-See [ROADMAP.md](../ROADMAP.md) for detailed plans. Summary:
+See [ROADMAP.md](../development/sessions/undated/ROADMAP.md) for detailed plans. Summary:
 
 **Immediate (2025 Q1):**
 - Track C1: Select pilot community
@@ -484,15 +484,15 @@ If yes to all four, ICN is likely a good fit!
 ## Getting Help
 
 **Documentation:**
-- [Getting Started Guide](GETTING_STARTED.md)
-- [Architecture Overview](ARCHITECTURE.md)
-- [Operations Guide](operations-guide.md)
+- [Getting Started Guide](../GETTING_STARTED.md)
+- [Architecture Overview](../ARCHITECTURE.md)
+- [Operations Guide](operations/operations-guide.md)
 - [All docs](.) in `docs/` directory
 
 **Community:**
 - GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
-- Roadmap: [ROADMAP.md](../ROADMAP.md)
-- Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- Roadmap: [ROADMAP.md](../development/sessions/undated/ROADMAP.md)
+- Contributing: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ---
 

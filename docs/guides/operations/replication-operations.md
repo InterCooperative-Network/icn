@@ -429,15 +429,15 @@ Health check cycle (every 60 seconds):
 
 ## Related Documentation
 
-- [ARCHITECTURE.md Section 7.4](ARCHITECTURE.md#74-data-durability--replication) - Technical design
-- [ROADMAP.md Phase 17](../ROADMAP.md#phase-17-storage-hardening--replication-4-weeks) - Implementation timeline
-- [CHANGELOG.md](../CHANGELOG.md) - Release notes
+- [ARCHITECTURE.md Section 7.4](../../ARCHITECTURE.md#74-data-durability--replication) - Technical design
+- [ROADMAP.md Phase 17](../../development/sessions/undated/ROADMAP.md#phase-17-storage-hardening--replication-4-weeks) - Implementation timeline
+- [CHANGELOG.md](../../../CHANGELOG.md) - Release notes
 
 ## Support
 
 For operational questions or issues:
 - GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
-- Development journal: `docs/dev-journal/` (detailed implementation notes)
+- Development sessions: `docs/development/sessions/` (detailed implementation notes)
 - Metrics dashboard: `http://localhost:9090/metrics` (Prometheus)
 
 ---

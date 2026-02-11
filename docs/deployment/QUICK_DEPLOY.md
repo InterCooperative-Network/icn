@@ -182,9 +182,9 @@ cat deploy/.env | grep JWT_SECRET
 ## 📚 Full Documentation
 
 - **Deployment Guide:** [DEPLOYMENT_READY.md](DEPLOYMENT_READY.md)
-- **Mobile Integration:** [MOBILE_APP_STATUS.md](MOBILE_APP_STATUS.md)
-- **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Security:** [docs/production-hardening.md](docs/production-hardening.md)
+- **Mobile Integration:** [MOBILE_APP_STATUS.md](../mobile/MOBILE_APP_STATUS.md)
+- **Architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md)
+- **Security:** [production-hardening.md](../security/production-hardening.md)
 
 ---
 

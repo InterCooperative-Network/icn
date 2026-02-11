@@ -218,4 +218,4 @@ Key requirements:
 - [Age encryption specification](https://age-encryption.org/)
 - [PKCS#11 standard](https://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/pkcs11-base-v3.0.html)
 - [TPM 2.0 specification](https://trustedcomputinggroup.org/resource/tpm-library-specification/)
-- [ICN Identity Architecture](ARCHITECTURE.md#identity-layer)
+- [ICN Identity Architecture](../../ARCHITECTURE.md#identity-layer)

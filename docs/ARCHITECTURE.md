@@ -237,7 +237,8 @@ While the constraint engine model describes the **conceptual architecture**, the
 
 ## Kernel/App Separation
 
-**Goal:** Remove direct domain imports from kernel crates (`icn-core`, `icn-net`, `icn-gossip`) by routing all domain knowledge through boundary traits in `icn-kernel-api`, implemented by adapters in `apps/*`.
+**Goal:** Remove direct domain imports from kernel crates (`icn-core`, `icn-net`, `icn-gossip`) by routing all domain knowledge through boundary traits in `icn-kernel-api`, implemented by app-layer adapters.
+Canonical runtime app location is `icn/apps/*`; legacy top-level `apps/*` remains during migration.
 
 ### Definition
 
@@ -263,7 +264,7 @@ flowchart LR
   B --> C[PolicyOracle]
   C --> D[ConstraintSet]
   D --> E["Kernel enforcement (icn-core/icn-net/icn-gossip)"]
-  C <-->|adapters| F["App layer (apps/* domain state)"]
+  C <-->|adapters| F["App layer (icn/apps/* canonical, apps/* transitional)"]
 ```
 
 ### Pass 7 invariants as kernel-level contracts
@@ -2577,7 +2578,7 @@ ICN implements comprehensive DoS protection and resource management:
   - All message handlers spawn async tasks
   - Prevents thread pool starvation
 
-**See also:** [Production Hardening Documentation](production-hardening.md) for detailed implementation notes, configuration, and monitoring recommendations.
+**See also:** [Production Hardening Documentation](security/production-hardening.md) for detailed implementation notes, configuration, and monitoring recommendations.
 
 ---
 

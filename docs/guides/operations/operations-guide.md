@@ -20,7 +20,7 @@ Comprehensive operational procedures and workflows for running ICN nodes in prod
 ## Overview
 
 This guide provides operational procedures for ICN node operators. It assumes you have already:
-- Deployed ICN following [deployment-guide.md](deployment-guide.md)
+- Deployed ICN following [deployment-guide.md](../../operations/deployment/deployment-guide.md)
 - Configured systemd service (or equivalent)
 - Set up monitoring dashboard and Prometheus
 
@@ -76,7 +76,7 @@ journalctl -u icnd --since "1 hour ago" | grep -i warn
 
 **Action if issues found:**
 - See [Troubleshooting Workflows](#troubleshooting-workflows)
-- For critical issues, see [Incident Response](incident-response.md)
+- For critical issues, see [Incident Response](../../operations/deployment/incident-response.md)
 
 ---
 
@@ -319,8 +319,8 @@ icnctl restore ~/backups/icn-backup-20250114.tar --keystore-only
 ```
 
 **See also:**
-- [Incident Response: Ledger Corruption](incident-response.md#ledger-corruption-detected-p1)
-- [Deployment Guide: Backup & Recovery](deployment-guide.md#backup--recovery)
+- [Incident Response: Ledger Corruption](../../operations/deployment/incident-response.md#ledger-corruption-detected-p1)
+- [Deployment Guide: Backup & Recovery](../../operations/deployment/deployment-guide.md#backup--recovery)
 
 ---
 
@@ -423,7 +423,7 @@ icnctl upgrade --to v0.2.0
 
 ## Incident Response
 
-For emergency situations, see the comprehensive [Incident Response Playbook](incident-response.md).
+For emergency situations, see the comprehensive [Incident Response Playbook](../../operations/deployment/incident-response.md).
 
 **Quick reference:**
 
@@ -973,7 +973,7 @@ icnctl ledger quarantine list --format json | jq '.[] | .account' | sort | uniq 
 3. **Network partition**: Check connectivity to peers
 4. **Attack/malicious entries**: Investigate and potentially block peer
 
-**See also:** [Incident Response: Quarantine Growth](incident-response.md#quarantine-growth-p2)
+**See also:** [Incident Response: Quarantine Growth](../../operations/deployment/incident-response.md#quarantine-growth-p2)
 
 ### High Memory Usage
 
@@ -1021,11 +1021,11 @@ icnctl gossip stats
 
 ## Additional Resources
 
-- **Deployment Guide**: [deployment-guide.md](deployment-guide.md)
-- **Incident Response**: [incident-response.md](incident-response.md)
+- **Deployment Guide**: [deployment-guide.md](../../operations/deployment/deployment-guide.md)
+- **Incident Response**: [incident-response.md](../../operations/deployment/incident-response.md)
 - **Architecture**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- **Changelog**: [CHANGELOG.md](../CHANGELOG.md)
-- **Roadmap**: [ROADMAP.md](../ROADMAP.md)
+- **Changelog**: [CHANGELOG.md](../../../CHANGELOG.md)
+- **Roadmap**: [ROADMAP.md](../../development/sessions/undated/ROADMAP.md)
 
 ---
 
