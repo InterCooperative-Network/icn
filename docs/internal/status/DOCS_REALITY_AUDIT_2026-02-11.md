@@ -994,3 +994,44 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+## Changes applied (Batch C2 - Quickstart/runtime docs)
+
+1. `icn/QUICKSTART.md`
+- Aligned passphrase guidance with `icnd` runtime precedence:
+  - `ICN_KEYSTORE_PASSPHRASE` preferred
+  - `ICN_PASSPHRASE` legacy fallback
+- Replaced legacy `~/.icn/identity.age` assumptions with default Linux path from `Config::default()` (`~/.local/share/icn/identity.age`).
+- Reworked "without identity" flow to use `--data-dir /tmp/icn-demo` instead of renaming files in-place.
+- Corrected static asset layout to current files under `crates/icn-gateway/static/` (`index.html`, `style.css`, `app.js`, `README.md`).
+- Kept health endpoint guidance on `/v1/health`.
+
+2. `icn/start-gateway.sh`
+- Updated operator hint to prefer `ICN_KEYSTORE_PASSPHRASE` (was legacy-only `ICN_PASSPHRASE`).
+
+## Verification updates (Batch C2)
+
+```bash
+rg -n "ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|~/.local/share/icn/identity.age|~/.icn/identity.age|crates/icn-gateway/static/js|crates/icn-gateway/static/css" icn/QUICKSTART.md icn/start-gateway.sh
+```
+
+Result: quickstart and startup script now use preferred passphrase variable, retain legacy fallback note, and no longer reference obsolete static subdirectories.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no `MISSING_LINK` findings.
+
+## Audit ledger additions (Batch C2)
+
+- `icn/QUICKSTART.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs + icn/crates/icn-gateway/static/* | rg -n "ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|data_dir|identity.age|health" + find icn/crates/icn-gateway/static -maxdepth 2 -type f | aligned | reviewed_on(2026-02-11)`
+- `icn/start-gateway.sh | icn/bins/icnd/src/main.rs (passphrase precedence comments) | rg -n "ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE" icn/start-gateway.sh icn/bins/icnd/src/main.rs | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C2)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C2; continue next A4 slices and D2 historical normalization.
