@@ -1504,3 +1504,42 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C12; continue active-doc drift cleanup.
+## Changes applied (Batch C13 - PR review feedback fixes)
+
+1. `scripts/pilot_receipt_chain_demo.sh`
+- Fixed gateway connectivity check path from `/v1/healthz` to `/healthz` (actual liveness endpoint).
+
+2. `docs/guides/developer/DEV_ENVIRONMENT.md`
+- Removed exposed code-server password and replaced with secure-channel retrieval guidance.
+
+3. `docs/internal/pilots/pilot-limitations.md`
+- Added explicit snapshot date (`2026-02-11`) to make deployability framing unambiguous.
+
+## Verification updates (Batch C13)
+
+```bash
+rg -n "/v1/healthz|/healthz|Password:|Snapshot Date" scripts/pilot_receipt_chain_demo.sh docs/guides/developer/DEV_ENVIRONMENT.md docs/internal/pilots/pilot-limitations.md
+```
+
+Result: liveness path corrected, credential removed, snapshot date present.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C13)
+
+- `scripts/pilot_receipt_chain_demo.sh | icn/crates/icn-gateway/src/api/health.rs + server route wiring | rg -n "healthz|/healthz|/v1/health" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/guides/developer/DEV_ENVIRONMENT.md | security hygiene policy (no embedded secrets) | manual review | aligned | reviewed_on(2026-02-11)`
+- `docs/internal/pilots/pilot-limitations.md | docs snapshot-date policy + document context | rg -n "Snapshot Date|Overview" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C13)
+
+- Accuracy: 5/5
+- Completeness: 5/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C13.

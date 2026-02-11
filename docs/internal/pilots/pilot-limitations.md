@@ -6,6 +6,8 @@ This document describes known limitations and constraints in the current ICN pil
 
 In the assessment snapshot captured by this document, the ICN pilot was considered deployable with broad infrastructure coverage. The following limitations are documented to set expectations and guide post-pilot priorities.
 
+**Snapshot Date**: 2026-02-11.
+
 ---
 
 ## Security Limitations

@@ -22,7 +22,7 @@ ssh ubuntu@10.8.10.45
 
 # Web VSCode (code-server)
 http://10.8.10.45:8443
-# Password: 264a2290faa81c3b6d19fa4b
+# Access credential: retrieve from secure channel (vault/team secret manager)
 ```
 
 ### Installed Tools

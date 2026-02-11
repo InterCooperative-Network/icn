@@ -61,8 +61,8 @@ echo "[3/4] Gateway API Connectivity Check"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 
-# Check if gateway is reachable (use /v1/healthz which is the liveness probe)
-if curl -sf "$GATEWAY_URL/v1/healthz" >/dev/null 2>&1; then
+# Check if gateway is reachable (use /healthz liveness probe)
+if curl -sf "$GATEWAY_URL/healthz" >/dev/null 2>&1; then
     GATEWAY_AVAILABLE=true
     echo "✅ Gateway is reachable at $GATEWAY_URL"
 else
