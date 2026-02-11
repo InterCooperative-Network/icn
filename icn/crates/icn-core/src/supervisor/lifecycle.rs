@@ -620,6 +620,13 @@ async fn spawn_actors_with_identity(
         ));
         kernel_executor = kernel_executor.with_control_service(control_service);
 
+        // Wire membership service adapter
+        let membership_service = Arc::new(crate::services::MembershipServiceImpl::new(
+            coop_store.clone(),
+        ));
+        kernel_executor = kernel_executor.with_membership_service(membership_service);
+        info!("✓ Membership service wired to governance executor");
+
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
             Arc::new(kernel_executor),
