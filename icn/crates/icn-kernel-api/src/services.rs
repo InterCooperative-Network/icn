@@ -1507,8 +1507,8 @@ mod tests {
     fn test_conversion_determinism() {
         let intent = make_test_intent();
 
-        let req1 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury");
-        let req2 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury");
+        let req1 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury").unwrap();
+        let req2 = TreasuryEntryRequest::from_settlement_intent(&intent, "treasury").unwrap();
 
         // Same intent → same request
         assert_eq!(req1.treasury_id, req2.treasury_id);
@@ -1544,7 +1544,8 @@ mod tests {
             &intent,
             "treasury-main",
             &allocation_hash,
-        );
+        )
+        .unwrap();
 
         // Verify full chain is preserved
         assert_eq!(request.decision_receipt_id, "decision-001");
