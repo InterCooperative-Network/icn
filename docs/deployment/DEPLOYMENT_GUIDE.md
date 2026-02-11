@@ -595,6 +595,6 @@ server {
 
 ---
 
-**Ready to Deploy!** 🚀
+**Deployment Snapshot Guidance** 🚀
 
-The backend is production-ready. Mobile app just needs FCM integration for full push notification support. Start with Docker Compose for quick testing, then move to native installation or Kubernetes for production.
+As of this guide revision, the backend was treated as production-capable for pilot deployments, while the mobile app still required FCM integration for full push notification support. Start with Docker Compose for quick testing, then move to native installation or Kubernetes for production.

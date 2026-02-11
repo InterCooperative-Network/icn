@@ -21,7 +21,7 @@ backend = "age"  # Options: "age", "pkcs11", "tpm"
 
 ### Age Backend (Default)
 
-The Age backend stores encrypted keys in a file (default: `~/.icn/identity.age`). This is the recommended backend for most users and is production-ready.
+The Age backend stores encrypted keys in a file (default: `~/.icn/identity.age`). This is the recommended backend for most users and is the most mature backend in current ICN deployments.
 
 **Configuration:**
 
@@ -33,7 +33,7 @@ backend = "age"
 No additional configuration required. The keystore file location is determined by the `data_dir` setting.
 
 **Features:**
-- ✅ Production-ready
+- ✅ Mature and widely used in current deployments
 - ✅ Cross-platform
 - ✅ Simple deployment
 - ✅ Passphrase protection

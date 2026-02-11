@@ -830,3 +830,42 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+
+## Changes applied (Batch D2 - slice 3: architecture/deploy/config wording)
+
+1. `docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md`
+- Marked document as historical review snapshot (2025-12-17).
+- Reframed pilot-readiness conclusion statements to point-in-time assessment language.
+
+2. `docs/deployment/DEPLOYMENT_GUIDE.md`
+- Replaced absolute "Ready to Deploy" footer wording with snapshot guidance phrasing.
+- Reframed backend readiness language as revision-time, pilot-scoped guidance.
+
+3. `docs/reference/config/identity-backend-configuration.md`
+- Replaced absolute "production-ready" phrasing for Age backend with maturity-based wording.
+
+## Verification updates (Batch D2 - slice 3)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "pilot-ready|production-ready|historical review snapshot|production-capable|mature backend" docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md docs/deployment/DEPLOYMENT_GUIDE.md docs/reference/config/identity-backend-configuration.md
+```
+
+Result:
+- Missing-link findings remain zero.
+- Targeted wording in active docs now uses qualified/snapshot phrasing.
+
+## Audit ledger updates (D2 slice 3)
+
+- `docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md | historical framing policy for readiness claims | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/deployment/DEPLOYMENT_GUIDE.md | deployment guidance phrasing normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/reference/config/identity-backend-configuration.md | backend maturity wording normalization | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (D2 slice 3)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.
