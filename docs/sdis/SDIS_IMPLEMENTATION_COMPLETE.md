@@ -7,6 +7,7 @@
 
 > Historical implementation snapshot from 2025-12-12.
 > Verify current endpoint wiring in `icn/crates/icn-gateway/src/api/sdis/mod.rs` before relying on endpoint lists here.
+> Legacy endpoint naming may appear in examples below; prefer `docs/sdis/SDIS_API_GUIDE.md` for currently wired route shapes.
 
 ---
 

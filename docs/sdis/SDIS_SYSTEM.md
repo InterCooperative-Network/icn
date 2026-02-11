@@ -80,6 +80,9 @@ enum ClaimType {
 
 ## Enrollment Flow
 
+> Route note: some endpoint examples in this design section use legacy naming.
+> For currently wired route shapes, see `docs/sdis/SDIS_API_GUIDE.md` and `docs/sdis/SDIS_STATUS.md`.
+
 ### 1. Initiate Enrollment (New Device)
 
 The new device generates a keypair and requests enrollment:
@@ -295,10 +298,10 @@ Proofs are:
 
 ### Gateway API
 
-- **Enrollment**: `/v1/sdis/enroll/*`
-- **Anchors**: `/v1/sdis/anchors/*`
-- **Recovery**: `/v1/sdis/recover/*`
-- **Proofs**: `/v1/sdis/proofs/*`
+- **Enrollment**: `/v1/sdis/enrollment/*` and steward workflow routes (`/v1/sdis/status/*`, `/v1/sdis/vouch/*`, `/v1/sdis/reject/*`)
+- **Anchors**: `/v1/sdis/anchor/*`
+- **Recovery**: `/v1/sdis/recovery/*`
+- **Proofs**: `/v1/sdis/ephemeral/*` and verification routes (`/v1/sdis/verify/*`)
 
 ### Pilot UI
 

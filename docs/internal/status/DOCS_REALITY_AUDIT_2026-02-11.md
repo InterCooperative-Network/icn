@@ -2002,3 +2002,53 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C23; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C24 - SDIS design/roadmap route taxonomy refresh)
+
+Touched files:
+
+1. `docs/sdis/SDIS_SYSTEM.md`
+2. `docs/sdis/SDIS_STEWARD_ROADMAP.md`
+3. `docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md`
+
+Changes:
+
+- `SDIS_SYSTEM.md`:
+  - Added explicit route-note that some design examples retain legacy naming.
+  - Updated Gateway API integration summary to current route taxonomy:
+    - enrollment workflow (`/v1/sdis/enrollment/*`, `/status/*`, `/vouch/*`, `/reject/*`)
+    - anchor (`/v1/sdis/anchor/*`)
+    - recovery (`/v1/sdis/recovery/*`)
+    - verification/ephemeral (`/v1/sdis/verify/*`, `/v1/sdis/ephemeral/*`)
+- `SDIS_STEWARD_ROADMAP.md`:
+  - Updated status sentence from “not exposed” to “exposed but needs productization hardening.”
+  - Replaced legacy endpoint block with currently wired route shapes from `server.rs` + SDIS module configs.
+- `SDIS_IMPLEMENTATION_COMPLETE.md`:
+  - Added explicit note that legacy endpoint naming may appear and to prefer `SDIS_API_GUIDE.md` for current route shapes.
+
+## Verification updates (Batch C24)
+
+```bash
+rg -n "legacy naming|/v1/sdis/enrollment/\\*|/v1/sdis/anchor/\\*|/v1/sdis/recovery/\\*|aren't exposed|/v1/sdis/enrollment/start|/v1/sdis/recovery/start" docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md docs/sdis/SDIS_STEWARD_ROADMAP.md
+```
+
+Result: route taxonomy updates and explicit caveats present; stale “not exposed” claim removed.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C24)
+
+- `docs/sdis/SDIS_SYSTEM.md + docs/sdis/SDIS_STEWARD_ROADMAP.md + docs/sdis/SDIS_IMPLEMENTATION_COMPLETE.md | icn/crates/icn-gateway/src/server.rs + icn/crates/icn-gateway/src/api/sdis/{simple_enrollment.rs,anchor.rs,recovery.rs} | rg -n "scope\\(\"/sdis\"\\)|configure\\(api::sdis::simple_enrollment::configure\\)|configure\\(api::sdis::anchor::configure\\)|configure\\(api::sdis::recovery::configure\\)" + source review | aligned-with-design-caveats | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C24)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C24; continue active-doc content drift cleanup.

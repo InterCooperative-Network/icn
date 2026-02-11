@@ -49,25 +49,31 @@
 
 ### Priority 1: Integration with Gateway API (2-3 weeks)
 
-The SDIS components exist but aren't exposed through the Gateway API yet.
+SDIS components are now exposed through gateway route wiring, but this roadmap tracks productization hardening and user-facing completion work.
 
 #### Tasks:
 
 **1. Gateway SDIS Endpoints**
 ```
-POST /v1/sdis/enroll              - Start enrollment ceremony
-GET  /v1/sdis/enroll/:id          - Check enrollment status
-POST /v1/sdis/enroll/:id/submit   - Submit enrollment proof
+POST /v1/sdis/enrollment/start            - Start enrollment ceremony
+GET  /v1/sdis/status/{enrollment_id}      - Check enrollment status
+POST /v1/sdis/vouch/{enrollment_id}       - Steward vouch action
+POST /v1/sdis/reject/{enrollment_id}      - Steward reject action
+POST /v1/sdis/enrollment/complete         - Complete enrollment
 
-POST /v1/sdis/recover             - Start recovery ceremony
-GET  /v1/sdis/recover/:id         - Check recovery status
-POST /v1/sdis/recover/:id/verify  - Verify recovery shares
+GET  /v1/sdis/anchor/{anchor_id}          - Get anchor info
+POST /v1/sdis/anchor/rotate-keys          - Rotate keys (keep anchor)
+POST /v1/sdis/anchor/devices/add          - Add trusted anchor device
+GET  /v1/sdis/anchor/{anchor_id}/devices  - List anchor devices
 
-GET  /v1/sdis/anchor/:anchor_id   - Get anchor info
-POST /v1/sdis/keybundle/rotate    - Rotate keys (keep anchor)
+POST /v1/sdis/recovery/start              - Start recovery ceremony
+GET  /v1/sdis/recovery/{id}               - Check recovery status
+POST /v1/sdis/recovery/{id}/approve       - Steward recovery approval (admin-gated)
+POST /v1/sdis/recovery/{id}/complete      - Complete recovery
 
-POST /v1/sdis/proof/generate      - Generate ZK proof
-POST /v1/sdis/proof/verify        - Verify ZK proof
+POST /v1/sdis/verify/level1               - Level-1 verification
+POST /v1/sdis/verify/level2               - Level-2 verification
+POST /v1/sdis/ephemeral/generate          - Generate ephemeral proof
 ```
 
 **2. Steward Discovery**
