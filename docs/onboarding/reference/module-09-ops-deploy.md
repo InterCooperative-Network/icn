@@ -55,42 +55,35 @@ ICN uses a layered configuration system where later sources override earlier one
 
 | Source | Example | Use Case |
 |--------|---------|----------|
-| Built-in | `network.port = 7777` | Safe starting point |
-| Config File | `icn.toml` | Production settings |
-| Environment | `ICN_NETWORK_PORT=7778` | Container deployment |
-| CLI Flag | `--port 7779` | Testing overrides |
+| Built-in | `network.listen_addr = "0.0.0.0:7777"` | Safe starting point |
+| Config File | `config.toml` | Production settings |
+| Environment | `ICN_GATEWAY_JWT_SECRET=...` | Secret injection |
+| CLI Flag | `--data-dir /var/lib/icn` | Testing/runtime overrides |
 
 ### Configuration File Structure
 
 ```toml
-# icn.toml - Main configuration file
+# config.toml - Main configuration file
 
-[identity]
 data_dir = "/var/lib/icn"
-# Keystore passphrase set via ICN_PASSPHRASE env var
+# Keystore passphrase set via ICN_KEYSTORE_PASSPHRASE (preferred) or ICN_PASSPHRASE
 
 [network]
-bind_address = "0.0.0.0"
-port = 7777
+listen_addr = "0.0.0.0:7777"
 mdns_enabled = true
 bootstrap_peers = [
     "icn://did:icn:abc@192.168.1.10:7777",
 ]
 
-[rpc]
-bind_address = "127.0.0.1"
-port = 5601
-
 [gateway]
 enabled = true
-bind_address = "0.0.0.0"
-port = 8080
+bind_addr = "0.0.0.0:8080"
 # JWT secret set via ICN_GATEWAY_JWT_SECRET env var
 
-[metrics]
-enabled = true
-bind_address = "0.0.0.0"
-port = 9100
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = "info"
 
 [rate_limits]
 # Trust-based velocity limiting
@@ -104,15 +97,15 @@ Always validate configuration before starting:
 
 ```bash
 # Validate configuration file
-icnd --config /etc/icn/icn.toml --validate-config
+icnd --config /etc/icn/config.toml --validate-config
 
 # Output shows warnings and errors
 Validating configuration...
 
-✓ network.port: 7777 (valid range: 1024-65535)
+✓ network.listen_addr: 0.0.0.0:7777
 ✓ gateway.enabled: true
 ⚠ Warning: gateway.jwt_secret not set, will use ICN_GATEWAY_JWT_SECRET env var
-✓ metrics.enabled: true
+✓ observability.metrics_port: 9100
 
 Configuration is valid with 1 warning(s).
 ```
@@ -132,7 +125,7 @@ Best for dedicated servers and bare-metal deployments.
 │   systemd ──▶ icnd (daemon)                           │
 │                  │                                     │
 │                  ├── /var/lib/icn/ (data)             │
-│                  ├── /etc/icn/icn.toml (config)       │
+│                  ├── /etc/icn/config.toml (config)    │
 │                  └── /etc/icn/icnd.env (secrets)      │
 │                                                        │
 │   nginx ──▶ pilot-ui (static files)                   │
@@ -186,7 +179,7 @@ Type=simple
 User=icn
 Group=icn
 EnvironmentFile=/etc/icn/icnd.env
-ExecStart=/usr/local/bin/icnd --config /etc/icn/icn.toml
+ExecStart=/usr/local/bin/icnd --config /etc/icn/config.toml --data-dir /var/lib/icn
 Restart=on-failure
 RestartSec=5
 
@@ -257,9 +250,9 @@ JWT_SECRET=your-secure-secret-at-least-32-chars
 GRAFANA_PASSWORD=admin
 
 # Optional configuration
-ICN_NETWORK_PORT=7777
-ICN_GATEWAY_PORT=8080
-ICN_METRICS_PORT=9100
+ICN_GATEWAY_JWT_SECRET=your-secure-secret-at-least-32-chars
+ICN_KEYSTORE_PASSPHRASE=your-keystore-passphrase
+RUST_LOG=icn=info
 ```
 
 ### Kubernetes
@@ -314,7 +307,7 @@ spec:
       containers:
       - name: icnd
         image: icn:latest
-        args: ["--config", "/etc/icn/icn.toml"]
+        args: ["--config", "/etc/icn/config.toml", "--data-dir", "/var/lib/icn"]
         env:
         - name: ICN_PASSPHRASE
           valueFrom:
@@ -711,7 +704,7 @@ icnctl network peers
 export RUST_LOG=icn=debug,icn_gateway=trace
 
 # Or via CLI
-icnd --config /etc/icn/icn.toml --log-level debug
+icnd --config /etc/icn/config.toml --log-level debug
 ```
 
 ---

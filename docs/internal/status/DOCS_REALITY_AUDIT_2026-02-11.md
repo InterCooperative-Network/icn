@@ -1434,3 +1434,73 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C10; continue active-doc drift cleanup.
+## Changes applied (Batch C11 - config/onboarding validation command cleanup)
+
+1. `docs/reference/config/CONFIGURATION.md`
+- Removed stale `--dry-run` guidance from upgrade checklist (flag not available in current `icnd`).
+
+2. `docs/onboarding/reference/module-09-ops-deploy.md`
+- Updated validation path example from `/etc/icn/icn.toml` to `/etc/icn/config.toml`.
+- Updated sample validation output keys from stale fields to current config naming (`network.listen_addr`, `observability.metrics_port`).
+
+## Verification updates (Batch C11)
+
+```bash
+rg -n "--dry-run|/etc/icn/icn.toml|network\.port|metrics\.enabled" docs/reference/config/CONFIGURATION.md docs/onboarding/reference/module-09-ops-deploy.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C11)
+
+- `docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs | rg -n "validate_config|--validate-config" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/onboarding/reference/module-09-ops-deploy.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "--validate-config|listen_addr|metrics_port" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C11)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C11; continue active-doc drift cleanup.
+## Changes applied (Batch C12 - module-09 deployment config schema correction)
+
+1. `docs/onboarding/reference/module-09-ops-deploy.md`
+- Replaced outdated configuration model (`network.port`, `bind_address`, `[rpc]`, `[metrics]`) with current schema (`network.listen_addr`, gateway `bind_addr`, `[observability]`).
+- Replaced unsupported environment override examples (`ICN_NETWORK_PORT`) with supported secret/logging vars.
+- Updated systemd/Kubernetes examples to use `/etc/icn/config.toml` and explicit `--data-dir /var/lib/icn`.
+- Updated CLI examples to current config path conventions.
+
+## Verification updates (Batch C12)
+
+```bash
+rg -n "ICN_NETWORK_PORT|network.port|\[rpc\]|\[metrics\]|bind_address|/etc/icn/icn.toml" docs/onboarding/reference/module-09-ops-deploy.md
+```
+
+Result: no matches.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C12)
+
+- `docs/onboarding/reference/module-09-ops-deploy.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "listen_addr|bind_addr|observability|--config|--data-dir" + source review | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C12)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C12; continue active-doc drift cleanup.

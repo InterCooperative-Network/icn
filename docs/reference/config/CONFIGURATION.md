@@ -466,7 +466,7 @@ When upgrading ICN:
 1. **Backup configuration**: `cp config.toml config.toml.backup`
 2. **Review CHANGELOG**: Check for config changes
 3. **Validate**: `icnd --config /path/to/config.toml --validate-config`
-4. **Test**: Run with `--dry-run` if available
+4. **Test startup**: Start with your target flags in a non-production environment
 5. **Monitor**: Watch logs after upgrade
 
 ---
