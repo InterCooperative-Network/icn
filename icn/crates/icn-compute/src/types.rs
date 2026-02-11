@@ -94,6 +94,54 @@ pub struct ComputeTask {
     /// If None, determined automatically from estimated_value
     #[serde(default)]
     pub verification: Option<crate::result_quorum::TaskVerification>,
+
+    // ========================================================================
+    // Workload Manifest Fields (E1 - Constitution for Execution)
+    // ========================================================================
+    /// Hash of input data for deterministic verification.
+    ///
+    /// Required for Canonical tasks; allows re-execution verification.
+    /// Computed as blake3(inputs) by the submitter.
+    #[serde(default)]
+    pub inputs_hash: Option<ContentHash>,
+
+    /// Hash of the CCL policy governing this execution.
+    ///
+    /// Links execution to governance: the policy defines what this task
+    /// is allowed to do and what constraints apply to its outputs.
+    /// Required for Canonical tasks that mutate state.
+    #[serde(default)]
+    pub policy_hash: Option<ContentHash>,
+
+    /// Classification for state mutation permissions (E1).
+    ///
+    /// Canonical: outputs can mutate ledger/governance state.
+    /// Advisory: outputs are suggestions only, cannot mutate state.
+    #[serde(default)]
+    pub determinism_class: DeterminismClass,
+
+    /// Privacy classification for inputs/outputs (E1).
+    ///
+    /// Controls audit visibility tier and access permissions.
+    #[serde(default)]
+    pub privacy_class: PrivacyClass,
+
+    // ========================================================================
+    // Storage Specification Fields (E4 - Storage Tiers & Data Locality)
+    // ========================================================================
+    /// Storage class for task outputs (E4).
+    ///
+    /// Determines how outputs are stored and replicated.
+    /// Default: ServiceState (mutable, coop-scoped).
+    #[serde(default)]
+    pub storage_class: Option<icn_kernel_api::storage::StorageClass>,
+
+    /// Data locality constraints for task execution (E4).
+    ///
+    /// Determines where the task can execute and what data it can access.
+    /// Default: CellLocal (most restrictive).
+    #[serde(default)]
+    pub data_locality: Option<icn_kernel_api::storage::DataLocality>,
 }
 
 impl ComputeTask {
@@ -224,12 +272,169 @@ impl ComputeTask {
             ));
         }
 
+        // Validate workload manifest fields (E1)
+        // Canonical tasks that can mutate state have stricter requirements
+        if self.determinism_class == DeterminismClass::Canonical {
+            // Canonical tasks must have inputs_hash for verification
+            if self.inputs_hash.is_none() && !self.inputs.is_empty() {
+                return Err(crate::error::ComputeError::InvalidCode(
+                    "Canonical tasks with inputs must provide inputs_hash for verification".into(),
+                ));
+            }
+            // Verify inputs_hash matches actual inputs when provided
+            if let Some(provided_hash) = &self.inputs_hash {
+                if !self.inputs.is_empty() {
+                    let computed_hash = *blake3::hash(&self.inputs).as_bytes();
+                    if provided_hash != &computed_hash {
+                        return Err(crate::error::ComputeError::InvalidCode(
+                            "inputs_hash does not match blake3 hash of inputs".into(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Validate storage specification fields (E4)
+        // Canonical tasks producing outputs SHOULD use StorageClass::Canonical
+        if self.determinism_class == DeterminismClass::Canonical {
+            if let Some(storage_class) = &self.storage_class {
+                if !storage_class.can_hold_canonical_output() {
+                    // This is a SHOULD, not a MUST - log warning but don't reject
+                    // The scheduler may apply stricter enforcement
+                }
+            }
+        }
+
+        // CellLocal data cannot be accessed by tasks with FederationMirrored locality
+        // None defaults to CellLocal behavior for safety
+        let effective_locality = self
+            .data_locality
+            .unwrap_or(icn_kernel_api::storage::DataLocality::CellLocal);
+        if let Some(ref fed_constraints) = self.federation_constraints {
+            use crate::scheduler::FederationPolicy;
+            // Federation tasks (AllowFederated or FederatedWhitelist) should not use CellLocal
+            let allows_federation = !matches!(
+                fed_constraints.federation_policy,
+                FederationPolicy::LocalOnly
+            );
+            if effective_locality.is_cell_local() && allows_federation {
+                return Err(crate::error::ComputeError::InvalidCode(
+                    "Tasks with CellLocal data locality cannot allow federated execution".into(),
+                ));
+            }
+        }
+
         Ok(())
     }
 }
 
 /// Content hash for contract/WASM addressing
 pub type ContentHash = [u8; 32];
+
+// ============================================================================
+// Workload Manifest Types (E1 - Constitution for Execution)
+// ============================================================================
+
+/// Classification for whether workload outputs can mutate canonical state.
+///
+/// This is the "split the universe" rule: only Canonical workloads can
+/// mutate ledger state, governance records, or trust edges.
+///
+/// # Examples
+///
+/// ```
+/// use icn_compute::DeterminismClass;
+///
+/// // Governance tallying must be deterministic
+/// let tally = DeterminismClass::Canonical;
+///
+/// // ML recommendations are advisory only
+/// let forecast = DeterminismClass::Advisory;
+///
+/// assert!(tally.can_mutate_state());
+/// assert!(!forecast.can_mutate_state());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DeterminismClass {
+    /// Must be deterministic; outputs can mutate canonical state.
+    ///
+    /// Examples: governance tallying, budget computation, settlement/netting,
+    /// eligibility evaluation, trust edge updates.
+    #[default]
+    Canonical,
+    /// Can be probabilistic; outputs are suggestions only.
+    ///
+    /// Examples: demand forecasting, routing optimization, recommendations,
+    /// anomaly detection, predictive maintenance.
+    Advisory,
+}
+
+impl DeterminismClass {
+    /// Returns true if workloads of this class can mutate canonical state.
+    #[inline]
+    pub const fn can_mutate_state(&self) -> bool {
+        matches!(self, DeterminismClass::Canonical)
+    }
+
+    /// Returns true if workloads must produce deterministic outputs.
+    #[inline]
+    pub const fn requires_determinism(&self) -> bool {
+        matches!(self, DeterminismClass::Canonical)
+    }
+}
+
+/// Privacy classification for workload inputs and outputs.
+///
+/// Maps directly to audit visibility tiers defined in the governance model.
+/// Controls who can observe task inputs, outputs, and execution traces.
+///
+/// # Examples
+///
+/// ```
+/// use icn_compute::PrivacyClass;
+///
+/// let public_task = PrivacyClass::Public;
+/// let member_task = PrivacyClass::Member;
+/// let sensitive = PrivacyClass::NeedToKnow;
+///
+/// assert!(public_task.visible_to_public());
+/// assert!(!member_task.visible_to_public());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivacyClass {
+    /// Anyone can see inputs, outputs, and execution traces.
+    /// Suitable for public governance, commons computation, open data.
+    #[default]
+    Public,
+    /// Only organization/cooperative members can observe.
+    /// Suitable for internal operations, member-only services.
+    Member,
+    /// Selective disclosure via ZK proofs; only authorized parties see data.
+    /// Suitable for personal data, sensitive financial info, health records.
+    NeedToKnow,
+}
+
+impl PrivacyClass {
+    /// Returns true if data is visible to the general public.
+    #[inline]
+    pub const fn visible_to_public(&self) -> bool {
+        matches!(self, PrivacyClass::Public)
+    }
+
+    /// Returns true if membership verification is required for access.
+    #[inline]
+    pub const fn requires_membership(&self) -> bool {
+        matches!(self, PrivacyClass::Member | PrivacyClass::NeedToKnow)
+    }
+
+    /// Returns true if ZK proof verification is required for access.
+    #[inline]
+    pub const fn requires_zk_proof(&self) -> bool {
+        matches!(self, PrivacyClass::NeedToKnow)
+    }
+}
 
 /// Task code format
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -534,6 +739,14 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let hash1 = task.hash();
@@ -691,6 +904,14 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 
@@ -797,5 +1018,268 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("At least one capability"));
+    }
+
+    // ========================================================================
+    // E1: Workload Manifest Tests
+    // ========================================================================
+
+    #[test]
+    fn test_determinism_class_default() {
+        assert_eq!(DeterminismClass::default(), DeterminismClass::Canonical);
+    }
+
+    #[test]
+    fn test_determinism_class_can_mutate_state() {
+        assert!(DeterminismClass::Canonical.can_mutate_state());
+        assert!(!DeterminismClass::Advisory.can_mutate_state());
+    }
+
+    #[test]
+    fn test_determinism_class_requires_determinism() {
+        assert!(DeterminismClass::Canonical.requires_determinism());
+        assert!(!DeterminismClass::Advisory.requires_determinism());
+    }
+
+    #[test]
+    fn test_privacy_class_default() {
+        assert_eq!(PrivacyClass::default(), PrivacyClass::Public);
+    }
+
+    #[test]
+    fn test_privacy_class_visibility() {
+        assert!(PrivacyClass::Public.visible_to_public());
+        assert!(!PrivacyClass::Member.visible_to_public());
+        assert!(!PrivacyClass::NeedToKnow.visible_to_public());
+    }
+
+    #[test]
+    fn test_privacy_class_requires_membership() {
+        assert!(!PrivacyClass::Public.requires_membership());
+        assert!(PrivacyClass::Member.requires_membership());
+        assert!(PrivacyClass::NeedToKnow.requires_membership());
+    }
+
+    #[test]
+    fn test_privacy_class_requires_zk_proof() {
+        assert!(!PrivacyClass::Public.requires_zk_proof());
+        assert!(!PrivacyClass::Member.requires_zk_proof());
+        assert!(PrivacyClass::NeedToKnow.requires_zk_proof());
+    }
+
+    #[test]
+    fn test_validate_canonical_task_with_inputs_requires_hash() {
+        let mut task = valid_task();
+        task.determinism_class = DeterminismClass::Canonical;
+        task.inputs = vec![1, 2, 3]; // Non-empty inputs
+        task.inputs_hash = None; // Missing hash
+
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("inputs_hash for verification"));
+    }
+
+    #[test]
+    fn test_validate_canonical_task_with_inputs_and_hash_ok() {
+        let mut task = valid_task();
+        task.determinism_class = DeterminismClass::Canonical;
+        task.inputs = vec![1, 2, 3];
+        task.inputs_hash = Some(*blake3::hash(&task.inputs).as_bytes());
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_advisory_task_no_hash_required() {
+        let mut task = valid_task();
+        task.determinism_class = DeterminismClass::Advisory;
+        task.inputs = vec![1, 2, 3]; // Non-empty inputs
+        task.inputs_hash = None; // No hash required for advisory
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_canonical_empty_inputs_no_hash_ok() {
+        let mut task = valid_task();
+        task.determinism_class = DeterminismClass::Canonical;
+        task.inputs = vec![]; // Empty inputs
+        task.inputs_hash = None; // No hash needed for empty inputs
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_determinism_class_serialization() {
+        let canonical = DeterminismClass::Canonical;
+        let advisory = DeterminismClass::Advisory;
+
+        let canonical_json = serde_json::to_string(&canonical).unwrap();
+        let advisory_json = serde_json::to_string(&advisory).unwrap();
+
+        assert_eq!(canonical_json, r#""canonical""#);
+        assert_eq!(advisory_json, r#""advisory""#);
+
+        // Deserialize back
+        let parsed: DeterminismClass = serde_json::from_str(&canonical_json).unwrap();
+        assert_eq!(parsed, DeterminismClass::Canonical);
+    }
+
+    #[test]
+    fn test_privacy_class_serialization() {
+        let public = PrivacyClass::Public;
+        let member = PrivacyClass::Member;
+        let ntk = PrivacyClass::NeedToKnow;
+
+        assert_eq!(serde_json::to_string(&public).unwrap(), r#""public""#);
+        assert_eq!(serde_json::to_string(&member).unwrap(), r#""member""#);
+        assert_eq!(serde_json::to_string(&ntk).unwrap(), r#""need_to_know""#);
+    }
+
+    // ========================================================================
+    // E4: Storage Specification Tests
+    // ========================================================================
+
+    #[test]
+    fn test_storage_class_default_is_service_state() {
+        use icn_kernel_api::storage::StorageClass;
+        assert_eq!(StorageClass::default(), StorageClass::ServiceState);
+    }
+
+    #[test]
+    fn test_data_locality_default_is_cell_local() {
+        use icn_kernel_api::storage::DataLocality;
+        assert_eq!(DataLocality::default(), DataLocality::CellLocal);
+    }
+
+    #[test]
+    fn test_task_with_storage_class() {
+        use icn_kernel_api::storage::StorageClass;
+        let mut task = valid_task();
+        task.storage_class = Some(StorageClass::Canonical);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_task_with_data_locality() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CoopReplicated);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_task_with_all_storage_fields() {
+        use icn_kernel_api::storage::{DataLocality, StorageClass};
+        let mut task = valid_task();
+        task.storage_class = Some(StorageClass::ServiceState);
+        task.data_locality = Some(DataLocality::CoopReplicated);
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_cell_local_with_cross_coop_rejected() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CellLocal);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::AllowFederated,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        let result = task.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("CellLocal data locality cannot allow federated"));
+    }
+
+    #[test]
+    fn test_validate_cell_local_without_cross_coop_ok() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::CellLocal);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::LocalOnly,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_federation_mirrored_with_cross_coop_ok() {
+        use icn_kernel_api::storage::DataLocality;
+        let mut task = valid_task();
+        task.data_locality = Some(DataLocality::FederationMirrored);
+        task.federation_constraints = Some(crate::scheduler::FederatedPlacementConstraints {
+            base: crate::policy::PlacementConstraints::default(),
+            federation_policy: crate::scheduler::FederationPolicy::AllowFederated,
+            min_federated_trust: None,
+            local_preference_weight: None,
+        });
+
+        assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_storage_class_serialization() {
+        use icn_kernel_api::storage::StorageClass;
+
+        let canonical = StorageClass::Canonical;
+        let service = StorageClass::ServiceState;
+        let blobs = StorageClass::Blobs;
+
+        assert_eq!(serde_json::to_string(&canonical).unwrap(), r#""canonical""#);
+        assert_eq!(
+            serde_json::to_string(&service).unwrap(),
+            r#""service_state""#
+        );
+        assert_eq!(serde_json::to_string(&blobs).unwrap(), r#""blobs""#);
+    }
+
+    #[test]
+    fn test_data_locality_serialization() {
+        use icn_kernel_api::storage::DataLocality;
+
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CellLocal).unwrap(),
+            r#""cell_local""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CoopReplicated).unwrap(),
+            r#""coop_replicated""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::FederationMirrored).unwrap(),
+            r#""federation_mirrored""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DataLocality::CommonsPublic).unwrap(),
+            r#""commons_public""#
+        );
+    }
+
+    #[test]
+    fn test_data_locality_access_rules() {
+        use icn_kernel_api::storage::DataLocality;
+
+        // FederationMirrored cannot access CellLocal
+        assert!(!DataLocality::FederationMirrored.can_access(DataLocality::CellLocal));
+
+        // CellLocal can access all levels
+        assert!(DataLocality::CellLocal.can_access(DataLocality::CellLocal));
+        assert!(DataLocality::CellLocal.can_access(DataLocality::CommonsPublic));
+
+        // Same level access is always allowed
+        assert!(DataLocality::CoopReplicated.can_access(DataLocality::CoopReplicated));
     }
 }

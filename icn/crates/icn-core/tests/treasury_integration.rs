@@ -243,6 +243,8 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
@@ -277,6 +279,8 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
@@ -334,6 +338,8 @@ async fn test_spending_below_threshold_allowed() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         };
 
         let result = guard.validate_entry(&entry);
@@ -1110,5 +1116,280 @@ async fn test_multi_currency_operations() -> Result<()> {
     }
 
     info!("Multi-currency operations test passed");
+    Ok(())
+}
+
+// ============================================================================
+// PILOT-CRITICAL: End-to-End Provenance Test
+// ============================================================================
+
+/// Test the pilot-critical invariant: ledger entries carry decision provenance.
+///
+/// This test proves: DecisionReceipt → TreasuryEffect → JournalEntry with
+/// decision_receipt_id + decision_hash.
+///
+/// Without this test passing, the pilot claim is not defensible.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ledger_entry_carries_decision_provenance() -> Result<()> {
+    use ed25519_dalek::SigningKey;
+    use icn_core::services::LedgerServiceImpl;
+    use icn_kernel_api::authz::AllowAllOracle;
+    use icn_kernel_api::services::{LedgerService, TreasuryEntryRequest, TreasuryOperationType};
+    use icn_ledger::Ledger;
+    use rand::rngs::OsRng;
+
+    // Setup: create a ledger and LedgerServiceImpl
+    let store = Arc::new(SledStore::temporary().unwrap());
+
+    // Create valid Ed25519 keypairs for treasury and recipient
+    let treasury_key = SigningKey::generate(&mut OsRng);
+    let treasury_did = Did::from_public_key(&treasury_key.verifying_key());
+
+    let recipient_key = SigningKey::generate(&mut OsRng);
+    let recipient_did = Did::from_public_key(&recipient_key.verifying_key());
+
+    // Create ledger
+    let ledger = Ledger::new(store.clone())?;
+    let ledger_handle = Arc::new(RwLock::new(ledger));
+
+    // Create the LedgerService adapter
+    let oracle = Arc::new(AllowAllOracle::wildcard());
+    let ledger_service =
+        LedgerServiceImpl::new(ledger_handle.clone(), oracle, treasury_did.clone());
+
+    // The pilot invariant: these are the provenance fields
+    let decision_receipt_id = "gov:proposal:2024-pilot:receipt:abc123".to_string();
+    let decision_hash = "sha256:deadbeefcafe1234567890abcdef".to_string();
+
+    // Create a treasury entry request with provenance
+    let request = TreasuryEntryRequest {
+        treasury_id: "coop-treasury".to_string(),
+        operation_type: TreasuryOperationType::Spend,
+        amount: 100,
+        currency: "HOURS".to_string(),
+        recipient: Some(recipient_did.to_string()),
+        memo: "Pilot test payment".to_string(),
+        decision_receipt_id: decision_receipt_id.clone(),
+        decision_hash: decision_hash.clone(),
+    };
+
+    // Execute the treasury operation
+    let result = ledger_service.submit_treasury_entry(request);
+    assert!(
+        result.is_ok(),
+        "submit_treasury_entry should succeed: {:?}",
+        result.err()
+    );
+
+    let entry_result = result.unwrap();
+
+    // PILOT INVARIANT ASSERTIONS:
+    // 1. The result echoes back the provenance fields
+    assert_eq!(
+        entry_result.decision_receipt_id, decision_receipt_id,
+        "Result must echo decision_receipt_id"
+    );
+    assert_eq!(
+        entry_result.decision_hash, decision_hash,
+        "Result must echo decision_hash"
+    );
+
+    // 2. The entry hash is valid (non-empty)
+    assert!(
+        !entry_result.entry_hash.is_empty(),
+        "Entry hash must be non-empty"
+    );
+
+    // 3. Retrieve the entry from the ledger and verify provenance is persisted
+    {
+        let ledger = ledger_handle.read().await;
+
+        // Parse hex hash to ContentHash
+        let hash_bytes = hex::decode(&entry_result.entry_hash)
+            .map_err(|e| anyhow::anyhow!("Invalid hex hash: {}", e))?;
+        let hash_array: [u8; 32] = hash_bytes
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Hash wrong length"))?;
+        let entry_hash = ContentHash::from_bytes(hash_array);
+
+        let entry = ledger
+            .get_entry(&entry_hash)?
+            .ok_or_else(|| anyhow::anyhow!("Entry not found in ledger"))?;
+
+        // THE PILOT-CRITICAL ASSERTIONS:
+        assert_eq!(
+            entry.decision_receipt_id.as_ref(),
+            Some(&decision_receipt_id),
+            "Ledger entry must carry decision_receipt_id"
+        );
+        assert_eq!(
+            entry.decision_hash.as_ref(),
+            Some(&decision_hash),
+            "Ledger entry must carry decision_hash (canonical cross-node anchor)"
+        );
+
+        info!(
+            entry_hash = %entry_result.entry_hash,
+            decision_receipt_id = %decision_receipt_id,
+            decision_hash = %decision_hash,
+            "✅ PILOT INVARIANT VERIFIED: Ledger entry carries decision provenance"
+        );
+    }
+
+    Ok(())
+}
+
+/// End-to-end test: Decision → TreasuryEffect → KernelTreasuryExecutor → Ledger.
+///
+/// This test proves the FULL chain through the executor path:
+/// 1. Creates a TreasuryEffect::Spend with decision_hash
+/// 2. Executes via KernelTreasuryExecutor (with LedgerServiceImpl wired)
+/// 3. Verifies ledger entry exists with both provenance fields
+///
+/// This is the definitive proof that governance decisions flow through
+/// the kernel executor and land in the ledger with audit provenance.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
+    use ed25519_dalek::SigningKey;
+    use icn_core::services::LedgerServiceImpl;
+    use icn_core::supervisor::KernelTreasuryExecutor;
+    use icn_kernel_api::authz::AllowAllOracle;
+    use icn_kernel_api::governance::{
+        DecisionReceiptId, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
+    };
+    use icn_ledger::Ledger;
+    use rand::rngs::OsRng;
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== E2E Provenance Test: Decision → TreasuryEffect → Executor → Ledger ===");
+
+    // Setup: create a ledger and LedgerServiceImpl
+    let store = Arc::new(SledStore::temporary().unwrap());
+
+    // Create valid Ed25519 keypairs for treasury and recipient
+    let treasury_key = SigningKey::generate(&mut OsRng);
+    let treasury_did = Did::from_public_key(&treasury_key.verifying_key());
+
+    let recipient_key = SigningKey::generate(&mut OsRng);
+    let recipient_did = Did::from_public_key(&recipient_key.verifying_key());
+
+    // Create ledger
+    let ledger = Ledger::new(store.clone())?;
+    let ledger_handle = Arc::new(RwLock::new(ledger));
+
+    // Create the LedgerService adapter
+    let oracle = Arc::new(AllowAllOracle::wildcard());
+    let ledger_service = Arc::new(LedgerServiceImpl::new(
+        ledger_handle.clone(),
+        oracle,
+        treasury_did.clone(),
+    ));
+
+    // Create KernelTreasuryExecutor with ledger wired in (production mode)
+    let executor = KernelTreasuryExecutor::with_ledger(ledger_service);
+
+    // The pilot invariant: these are the provenance fields from a governance decision
+    let decision_receipt_id = DecisionReceiptId::new("gov:proposal:2024-pilot:receipt:e2e-test");
+    let decision_hash = "sha256:e2e1234567890abcdef1234567890".to_string();
+
+    // Create TreasuryOperation (as produced by treasury_effect_to_operation)
+    let operation = TreasuryOperation {
+        treasury_id: treasury_did.to_string(),
+        operation_type: TreasuryOperationType::Spend,
+        amount: 250,
+        currency: "HOURS".to_string(),
+        recipient: Some(recipient_did.to_string()),
+        memo: "E2E provenance test payment".to_string(),
+        decision_hash: Some(decision_hash.clone()),
+    };
+
+    // Execute via the executor trait (this is the real kernel path)
+    let outcome = executor
+        .execute_treasury_operation(&decision_receipt_id, operation)
+        .await?;
+
+    // Verify execution succeeded
+    match &outcome {
+        icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
+            info!(effects = ?effects, "Executor returned success");
+            assert!(
+                effects.iter().any(|e| e.contains("ledger entry")),
+                "Success effects should mention ledger entry"
+            );
+        }
+        other => panic!("Expected Success, got {:?}", other),
+    }
+
+    // Extract entry hash from the outcome message
+    let entry_hash_hex = match &outcome {
+        icn_kernel_api::governance::ExecutionOutcome::Success { effects, .. } => {
+            // Parse "... -> ledger entry <hex>" from the effect message
+            effects
+                .iter()
+                .find_map(|e| {
+                    e.split("ledger entry ")
+                        .nth(1)
+                        .map(|s| s.trim().to_string())
+                })
+                .expect("Effect message should contain ledger entry hash")
+        }
+        _ => panic!("Expected Success"),
+    };
+
+    // Retrieve the entry from the ledger and verify provenance is persisted
+    {
+        let ledger = ledger_handle.read().await;
+
+        // Parse hex hash to ContentHash
+        let hash_bytes =
+            hex::decode(&entry_hash_hex).map_err(|e| anyhow::anyhow!("Invalid hex hash: {}", e))?;
+        let hash_array: [u8; 32] = hash_bytes
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Hash wrong length"))?;
+        let entry_hash = ContentHash::from_bytes(hash_array);
+
+        let entry = ledger
+            .get_entry(&entry_hash)?
+            .ok_or_else(|| anyhow::anyhow!("Entry not found in ledger"))?;
+
+        // THE E2E PILOT-CRITICAL ASSERTIONS:
+        assert_eq!(
+            entry.decision_receipt_id.as_ref(),
+            Some(&decision_receipt_id.to_string()),
+            "Ledger entry must carry decision_receipt_id from executor path"
+        );
+        assert_eq!(
+            entry.decision_hash.as_ref(),
+            Some(&decision_hash),
+            "Ledger entry must carry decision_hash from executor path"
+        );
+
+        // Print the pilot chain for demo visibility (machine-parseable + human-readable)
+        println!();
+        println!("╔══════════════════════════════════════════════════════════════════════╗");
+        println!("║              ICN PILOT PROVENANCE CHAIN VERIFIED                     ║");
+        println!("╠══════════════════════════════════════════════════════════════════════╣");
+        println!("║ Ledger Entry Provenance Fields:                                      ║");
+        println!("║   decision_receipt_id: ✅ MATCHES                                    ║");
+        println!("║   decision_hash:       ✅ MATCHES                                    ║");
+        println!("╚══════════════════════════════════════════════════════════════════════╝");
+        // Machine-parseable full values (for copy/paste and grep tripwires)
+        println!("PILOT_DECISION_RECEIPT_ID={}", decision_receipt_id);
+        println!("PILOT_DECISION_HASH={}", decision_hash);
+        println!("PILOT_LEDGER_ENTRY_HASH={}", entry_hash_hex);
+        println!();
+
+        info!(
+            entry_hash = %entry_hash_hex,
+            decision_receipt_id = %decision_receipt_id,
+            decision_hash = %decision_hash,
+            "✅ E2E PROVENANCE VERIFIED: Decision → Executor → Ledger chain complete"
+        );
+    }
+
     Ok(())
 }

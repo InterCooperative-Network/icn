@@ -19,28 +19,20 @@ ignore = [
     # Recommended replacement is web-time, but sled needs to update first.
     "RUSTSEC-2024-0384",  # instant unmaintained
 
-    # rustls-pemfile is unmaintained, used transitively by reqwest.
-    # Functionality now in rustls-pki-types. reqwest needs to update.
-    "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained
-
     # paste is no longer maintained but is a stable macro utility with no
     # known vulnerabilities. Used transitively by pqcrypto-mldsa (NIST PQ crypto).
     # The maintainer archived the repo, but paste v1.x is widely used and stable.
     "RUSTSEC-2024-0436",  # paste unmaintained (transitive via pqcrypto-mldsa)
-
-    # proc-macro-error is unmaintained, used by i18n-embed-fl (via age)
-    # and utoipa-gen. Both upstream deps need to migrate to alternatives.
-    "RUSTSEC-2024-0370",  # proc-macro-error unmaintained
 
     # atomic-polyfill is deprecated, used transitively by postcard via heapless.
     # Recommended replacement is portable-atomic. Tracking in #535 (postcard migration).
     # Will be resolved when heapless updates or we use postcard without heapless feature.
     "RUSTSEC-2023-0089",  # atomic-polyfill deprecated
 
-    # time 0.3.x has a DoS via stack exhaustion (fixed in 0.3.47).
-    # Transitive dep via cookie, x509-parser/yasna, pqcrypto-mldsa.
-    # No direct upgrade path until upstream crates update.
-    "RUSTSEC-2026-0009",  # time 0.3.x DoS
+    # bincode is unmaintained. The team considers v1.3.3 stable with no updates needed.
+    # Used as dev dependency in icn-kernel-api for testing serialization.
+    # Migration to postcard or bitcode is tracked for future work.
+    "RUSTSEC-2025-0141",  # bincode unmaintained
 ]
 
 [licenses]

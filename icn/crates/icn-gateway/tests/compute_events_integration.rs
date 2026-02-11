@@ -7,7 +7,8 @@
 //! 3. WebSocket subscribers receive events in real-time
 
 use icn_compute::{
-    ComputeActor, ComputeTask, ExecutorCapability, FuelLimit, TaskCode, TaskPriority, TrustCallback,
+    ComputeActor, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
+    TaskCode, TaskPriority, TrustCallback,
 };
 use icn_gateway::{create_forwarding_callback, EventBroadcaster, GatewayEvent};
 use std::sync::Arc;
@@ -88,6 +89,12 @@ async fn test_compute_events_to_websocket() {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     let task_hash = handle
@@ -199,6 +206,12 @@ async fn test_multiple_subscribers_receive_events() {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     handle
@@ -314,6 +327,12 @@ async fn test_events_have_sequence_numbers() {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        storage_class: None,
+        data_locality: None,
     };
 
     handle

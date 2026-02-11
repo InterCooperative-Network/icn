@@ -282,4 +282,18 @@ impl CoopHandle {
         rx.await
             .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
     }
+
+    /// Create a treasury for a cooperative
+    ///
+    /// Creates and assigns a treasury DID to the specified cooperative.
+    /// Returns the treasury ID on success.
+    pub async fn create_treasury(&self, coop_id: String) -> Result<String> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::CreateTreasury { coop_id, reply })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
 }

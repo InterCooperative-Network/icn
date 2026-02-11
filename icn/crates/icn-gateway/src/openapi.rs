@@ -9,11 +9,11 @@ use crate::models::{
     AccountDeltaResponse, AddMemberRequest, BalanceResponse, CastVoteRequest, ChallengeRequest,
     ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest,
     CreateInviteRequest, CreatePaymentRequest, CreateProposalRequest, CreateSessionRequest,
-    CreateSessionResponse, HealthResponse, InviteInfo, InviteListResponse, InviteResponse,
-    JoinRequest, JoinResponse, OpenProposalRequest, PaginationInfo, ProposalPayloadRequest,
-    SessionQrData, SessionStatusResponse, TokenResponse, TransactionHistoryEntry,
-    TransactionHistoryResponse, UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest,
-    VoteChoiceResponse,
+    CreateSessionResponse, DetailedComponentHealth, DetailedHealthResponse, HealthResponse,
+    HealthStatus, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
+    OpenProposalRequest, PaginationInfo, ProposalPayloadRequest, SessionQrData,
+    SessionStatusResponse, TokenResponse, TransactionHistoryEntry, TransactionHistoryResponse,
+    UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
 };
 
 // API module types
@@ -80,7 +80,7 @@ use icn_store::notifications::{InAppNotification, Platform};
     components(
         schemas(
             // Core models
-            HealthResponse, ComponentHealth,
+            HealthResponse, ComponentHealth, DetailedHealthResponse, DetailedComponentHealth, HealthStatus,
             // Auth
             ChallengeRequest, ChallengeResponse, VerifyRequest, TokenResponse,
             // Coops

@@ -78,8 +78,8 @@ pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
 };
 pub use policy::{
-    CoopSchedulingPolicy, EnforcementMode, MemberQuota, PlacementConstraints, PolicyDecision,
-    PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
+    CharterPriority, CommonsPoolPolicy, CoopSchedulingPolicy, EnforcementMode, MemberQuota,
+    PlacementConstraints, PolicyDecision, PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
 };
 pub use receipt::{ExecutionReceipt, ReceiptHash, SettlementMessage, SignatureBytes};
 pub use result_quorum::{
@@ -95,8 +95,8 @@ pub use scheduler::{
 };
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
-    ComputeMessage, ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, FuelLimit,
-    TaskCode, TaskHash, TaskId, TaskPriority,
+    ComputeMessage, ComputeResult, ComputeTask, ContentHash, DeterminismClass, ExecutionOutcome,
+    ExecutorCapability, FuelLimit, PrivacyClass, TaskCode, TaskHash, TaskId, TaskPriority,
 };
 pub use wasm_executor::WasmExecutor;
 pub use wasm_registry::{

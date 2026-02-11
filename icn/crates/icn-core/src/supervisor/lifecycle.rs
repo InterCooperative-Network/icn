@@ -194,7 +194,6 @@ pub async fn run_supervisor(
     // are dropped and the subscriptions are automatically removed from the event bus.
     // This prevents memory leaks while ensuring subscriptions remain active during runtime.
     drop(event_subscriptions.governance_event_subscription);
-    drop(event_subscriptions.policy_governance_subscription);
 
     // Set supervisor state to stopped
     icn_obs::metrics::supervisor::state_set(0);
@@ -337,9 +336,14 @@ async fn spawn_actors_with_identity(
     icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
     icn_obs::metrics::supervisor::actor_active_set("ledger", true);
 
-    // Initialize cooperative services
-    let coop_services =
-        super::init_coop::init_coop_services(config, gossip_handle.clone(), did.clone()).await?;
+    // Initialize cooperative services with treasury manager for ledger integration
+    let coop_services = super::init_coop::init_coop_services_with_treasury(
+        config,
+        gossip_handle.clone(),
+        did.clone(),
+        Some(treasury_manager_handle.clone()),
+    )
+    .await?;
     icn_obs::metrics::supervisor::actor_spawned_inc("coop");
     icn_obs::metrics::supervisor::actor_active_set("coop", true);
     let coop_handle = coop_services.coop_handle.clone();
@@ -446,8 +450,8 @@ async fn spawn_actors_with_identity(
 
     let (
         federation_registry_for_rpc,
-        clearing_manager_for_governance,
-        attestation_store_for_governance,
+        _clearing_manager_for_governance,
+        _attestation_store_for_governance,
         federation_handler_for_notifications,
     ) = if let Some(ref services) = federation_services {
         gateway_handles.agreement_manager = Some(services.agreement_manager.clone());
@@ -561,8 +565,8 @@ async fn spawn_actors_with_identity(
     .await?;
 
     let governance_handle = governance_services.governance_handle;
-    let dead_letter_queue = governance_services.dead_letter_queue;
-    let gov_store = governance_services.governance_store;
+    let _dead_letter_queue = governance_services.dead_letter_queue;
+    let _gov_store = governance_services.governance_store;
     let protocol_parameter_store = governance_services.protocol_parameter_store;
 
     // Store handles for gateway
@@ -570,7 +574,8 @@ async fn spawn_actors_with_identity(
     gateway_handles.treasury = Some(treasury_manager_handle.clone());
     gateway_handles.ledger = Some(ledger_handle.clone());
 
-    // Subscribe to governance events for ledger execution
+    // Subscribe to governance events via the effect path
+    // The effect path is now the default - legacy governance_handlers have been removed.
     event_subscriptions.governance_event_subscription = Some({
         let treasury_did = config
             .cooperative
@@ -585,42 +590,61 @@ async fn spawn_actors_with_identity(
                 did.clone()
             });
 
-        let mut handler = super::governance_handlers::GovernanceEventHandler::new(
-            ledger_handle.clone(),
-            gov_store.clone(),
-            dead_letter_queue.clone(),
-            governance_handle.clone(),
-            dispute_manager_handle.clone(),
-            treasury_manager_handle.clone(),
-            treasury_did,
+        // Create kernel executor with protocol parameter store
+        let mut kernel_executor = super::governance_executor::KernelGovernanceExecutor::new(
+            protocol_parameter_store.clone(),
         );
 
-        if let (Some(registry), Some(clearing), Some(attestations)) = (
-            federation_registry_for_rpc.clone(),
-            clearing_manager_for_governance.clone(),
-            attestation_store_for_governance.clone(),
-        ) {
-            handler = handler.with_federation(registry, clearing, attestations);
-            info!("✓ Federation components wired to governance event handler");
+        // Wire ledger service adapter
+        let oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle> =
+            Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
+        let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new(
+            ledger_handle.clone(),
+            oracle,
+            treasury_did.clone(),
+        ));
+        kernel_executor = kernel_executor.with_ledger_service(ledger_service);
+
+        // Wire federation service adapter if available
+        if let Some(registry) = federation_registry_for_rpc.clone() {
+            let federation_service =
+                Arc::new(crate::services::FederationServiceImpl::new(registry));
+            kernel_executor = kernel_executor.with_federation_service(federation_service);
+            info!("✓ Federation service wired to governance executor");
         }
 
-        // Create a proposal executor from the handler (Phase 4 Sprint 2)
-        // This demonstrates the ProposalExecutor trait interface.
-        // Future sprints will use this for actual dispatch instead of event subscription.
-        let handler_for_executor = handler.clone();
-        let _executor: Arc<dyn icn_kernel_api::services::ProposalExecutor> =
-            icn_governance_actor::create_executor(
-                super::governance_handlers::create_execution_callback(handler_for_executor),
-            );
-        // NOTE: Executor is created but not yet used for dispatch.
-        // Current dispatch still uses event subscription (create_governance_subscription).
-        // Sprint 3+ will replace event subscription with executor-based dispatch.
+        // Wire control service adapter
+        let control_service = Arc::new(crate::services::ControlServiceImpl::new(
+            governance_handle.clone(),
+        ));
+        kernel_executor = kernel_executor.with_control_service(control_service);
 
-        event_bus
-            .subscribe(super::governance_handlers::create_governance_subscription(
-                handler,
-            ))
-            .await
+        // Wire membership service adapter
+        let membership_service = Arc::new(crate::services::MembershipServiceImpl::new(
+            coop_store.clone(),
+        ));
+        kernel_executor = kernel_executor.with_membership_service(membership_service);
+        info!("✓ Membership service wired to governance executor");
+
+        // Create effect dispatcher
+        let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
+            Arc::new(kernel_executor),
+        ));
+
+        // Create callback that routes effects through dispatcher
+        let effect_callback =
+            super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
+
+        // Create effect-based subscription
+        let effect_subscription =
+            icn_governance_actor::create_effect_subscription(move |effects, receipt_id| {
+                effect_callback(effects, receipt_id);
+            });
+
+        // Subscribe and return handle for lifecycle tracking
+        let effect_handle = event_bus.subscribe(effect_subscription).await;
+        info!("✓ Effect-based governance path active");
+        effect_handle
     });
 
     info!("✓ Governance event handlers registered");
@@ -662,20 +686,9 @@ async fn spawn_actors_with_identity(
     let compute_handle = compute_services.compute_handle;
     let broadcaster = compute_services.broadcaster;
 
-    // Subscribe to policy governance events
-    event_subscriptions.policy_governance_subscription = Some({
-        let policy_handler = super::governance_handlers::PolicyEventHandler::new(
-            compute_handle.clone(),
-            gov_store.clone(),
-        );
-        event_bus
-            .subscribe(super::governance_handlers::create_policy_subscription(
-                policy_handler,
-            ))
-            .await
-    });
-
-    info!("✓ Policy governance integration active");
+    // Policy governance now routes through the effect path.
+    // SchedulingPolicy proposals will be handled by ProtocolService when implemented.
+    info!("✓ Compute integration active");
 
     // Spawn RPC server with OracleRegistry-backed trust-based rate limiting
     let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config);

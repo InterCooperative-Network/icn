@@ -362,6 +362,9 @@ impl GatewayServer {
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
 
+        // Initialize server start time for health check uptime reporting
+        api::health::init_start_time();
+
         // SECURITY: Validate JWT secret is configured
         if self.jwt_secret.is_empty() {
             return Err(GatewayError::InternalError(
@@ -695,6 +698,10 @@ impl GatewayServer {
             notification_queue.clone(),
         ));
 
+        // Create decision registry (in-memory store for meetings and decisions)
+        let decision_registry = Arc::new(api::registry::DecisionRegistry::new());
+        info!("Decision registry initialized");
+
         // Create recurring payment store
         let recurring_payment_store =
             crate::api::recurring_payments::RecurringPaymentStore::new(db.clone());
@@ -916,6 +923,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(service_discovery_manager.clone()))
                 // Listings manager for cooperative exchange
                 .app_data(web::Data::new(listings_manager.clone()))
+                // Decision registry for governance meetings and decisions
+                .app_data(web::Data::new(decision_registry.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -933,6 +942,7 @@ impl GatewayServer {
                         // Public endpoints (no auth required)
                         .service(api::health::liveness)
                         .service(api::health::readiness)
+                        .service(api::health::ready)
                         .service(api::health::health)
                         .service(api::health::health_detailed)
                         .service(api::auth::challenge)
@@ -1282,6 +1292,16 @@ impl GatewayServer {
                         .service(
                             web::scope("")
                                 .configure(api::communities::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Decision Registry endpoints (auth + rate limiting)
+                        // Governance meetings and decisions indexing
+                        .service(
+                            web::scope("/registry")
+                                .configure(api::registry::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

@@ -559,6 +559,47 @@ components:
           $ref: '#/components/schemas/SessionQrData'
         session_id:
           type: string
+    DetailedComponentHealth:
+      type: object
+      description: Detailed component health with latency information
+      required:
+      - status
+      properties:
+        latency_ms:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        message:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+    DetailedHealthResponse:
+      type: object
+      description: Detailed health response with component-level status
+      required:
+      - status
+      - version
+      - uptime_seconds
+      - components
+      properties:
+        components:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DetailedComponentHealth'
+          propertyNames:
+            type: string
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        uptime_seconds:
+          type: integer
+          format: int64
+          minimum: 0
+        version:
+          type: string
     DeviceInfo:
       type: object
       description: Device information in responses
@@ -724,6 +765,13 @@ components:
           type: string
         version:
           type: string
+    HealthStatus:
+      type: string
+      description: Structured health status enum for typed responses
+      enum:
+      - ok
+      - degraded
+      - unhealthy
     InAppNotification:
       type: object
       description: In-app notification

@@ -747,6 +747,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -872,6 +881,15 @@ checksum = "874bb8112abecc98cbd6d81ea4fa7e94fb9449648c93cc89aa40c81c24d7de03"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
+]
+
+[[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
 ]
 
 [[package]]
@@ -1642,7 +1660,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -2773,6 +2791,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "blake3",
  "hex",
  "icn-compute",
  "icn-identity",
@@ -2794,6 +2813,7 @@ dependencies = [
  "hex",
  "icn-encoding",
  "icn-identity",
+ "icn-kernel-api",
  "icn-ledger",
  "icn-obs",
  "icn-store",
@@ -2886,10 +2906,13 @@ dependencies = [
 name = "icn-coop"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "bs58",
  "chrono",
  "ed25519-dalek",
  "hex",
  "icn-encoding",
+ "icn-entity",
  "icn-gossip",
  "icn-governance",
  "icn-identity",
@@ -2944,6 +2967,7 @@ dependencies = [
  "metrics",
  "portpicker",
  "rand 0.8.5",
+ "regex",
  "reqwest 0.13.1",
  "rustls",
  "semver",
@@ -3189,6 +3213,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "blake3",
  "ed25519-dalek",
  "hex",
  "icn-entity",
@@ -3261,6 +3286,7 @@ dependencies = [
  "anyhow",
  "arc-swap",
  "async-trait",
+ "bincode",
  "blake3",
  "ordered-float 5.1.0",
  "parking_lot 0.12.5",

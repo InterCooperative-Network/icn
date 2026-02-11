@@ -217,6 +217,8 @@ pub struct GovernanceHandle {
     protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
     /// Entity registry for validating scope entity existence
     entity_registry: Option<Arc<dyn icn_entity::EntityRegistry>>,
+    /// Optional kernel governance executor for delegated proposal execution
+    executor: Option<Arc<dyn icn_kernel_api::governance::GovernanceExecutor>>,
 }
 
 impl GovernanceHandle {
@@ -399,6 +401,36 @@ impl GovernanceHandle {
     pub fn with_entity_registry(mut self, registry: Arc<dyn icn_entity::EntityRegistry>) -> Self {
         self.entity_registry = Some(registry);
         self
+    }
+
+    /// Set the kernel governance executor for delegated proposal execution.
+    ///
+    /// When an executor is configured, the governance actor can delegate treasury
+    /// and protocol operations to the kernel-provided executors. This enables clean
+    /// separation between governance domain logic and kernel execution services.
+    ///
+    /// **Note**: This method consumes self and returns a new handle. Any clones made
+    /// before calling this method will NOT have the executor configured.
+    /// Always call this before cloning the handle.
+    pub fn with_executor(
+        mut self,
+        executor: Arc<dyn icn_kernel_api::governance::GovernanceExecutor>,
+    ) -> Self {
+        self.executor = Some(executor.clone());
+        // Also set on inner actor for use in handle() method
+        // SAFETY: Called during initialization before handle is shared
+        if let Ok(mut actor) = self.inner.try_write() {
+            actor.executor = Some(executor);
+        }
+        self
+    }
+
+    /// Get the configured executor (if any).
+    ///
+    /// Returns the kernel governance executor, which provides access to
+    /// treasury and protocol executors for delegated proposal execution.
+    pub fn executor(&self) -> Option<&Arc<dyn icn_kernel_api::governance::GovernanceExecutor>> {
+        self.executor.as_ref()
     }
 
     /// List all protocol parameters
@@ -966,6 +998,8 @@ pub struct GovernanceActor {
     protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
     /// Ed25519 signing key for generating GovernanceProofs
     signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
+    /// Optional kernel governance executor for delegated proposal execution
+    executor: Option<Arc<dyn icn_kernel_api::governance::GovernanceExecutor>>,
 }
 
 impl GovernanceActor {
@@ -1035,12 +1069,14 @@ impl GovernanceActor {
             event_bus,
             protocol_params: None,
             signing_key,
+            executor: None,
         };
 
         let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
             protocol_params: None,
             entity_registry: None,
+            executor: None,
         };
 
         // Spawn background timer task for scheduled governance events

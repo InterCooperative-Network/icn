@@ -53,7 +53,7 @@ pub use coop::{CoopMembershipConfig, CoopMembershipManager};
 pub use entity::{Condition, EntityConfig, MembershipClass, MembershipConfig, MembershipCriteria};
 pub use membership::{
     MembershipCapability, MembershipError, MembershipManager, MembershipRole, MembershipStatus,
-    MembershipTrait, UnifiedMembership,
+    MembershipTrait, UnifiedMembership, UnifiedMembershipStatus,
 };
 
 // Re-export EntityId for convenience

@@ -258,6 +258,43 @@ mod tests {
         }
     }
 
+    /// Pinned count of ALL `icn_governance::` references (imports + inline) in icn-gateway.
+    ///
+    /// This ratchet captures both `use icn_governance::` import statements AND
+    /// inline qualified paths like `icn_governance::ProposalPayload`. Together with
+    /// `strict_governance_import_violations`, this prevents governance surface from
+    /// growing even if developers avoid adding `use` statements.
+    ///
+    /// Target state: 0 after gateway governance extraction (Phase 4).
+    ///
+    /// Current state (2026-02-10):
+    /// - api/governance.rs: 54 (proposal handlers, membership, voting)
+    /// - governance_mgr.rs: 5 (manager implementation)
+    /// - commons_store.rs: 5 (commons governance)
+    /// - commons_mgr.rs: 3 (commons manager)
+    /// - Other scattered: 10 (entity, treasury, steward, constitutional)
+    #[test]
+    fn strict_gateway_governance_total_refs() {
+        let expected: usize = 77;
+        let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-gateway has {actual} `icn_governance::` references \
+             (expected at most {expected}). \
+             Do not add new governance references to icn-gateway — \
+             extract to gateway DTOs or use kernel-api types instead."
+        );
+
+        if actual < expected {
+            panic!(
+                "✅ PROGRESS: icn-gateway now has only {actual} `icn_governance::` \
+                 references (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_gateway_governance_total_refs()."
+            );
+        }
+    }
+
     // ===================================================================
     // ICN-CORE DOMAIN DEPENDENCY RATCHETS
     //
@@ -282,20 +319,22 @@ mod tests {
     ///
     /// Target state: 0 after ledger extraction completes (#914).
     ///
-    /// Current state (2026-02-07):
-    /// - governance_handlers.rs: 19 (treasury types, dispute types, ledger types)
-    /// - treasury.rs: 2 (TreasuryOperation, ApprovalType — added for pilot treasury governance)
-    /// - lifecycle.rs: 5 (raw_handle extractions, fn signatures)
-    /// - init_compute.rs: 2 (LedgerHandle alias, JournalEntryBuilder)
-    /// - init_notifications.rs: 1 (LedgerHandle alias)
-    /// - init_rpc.rs: 2 (Ledger, DisputeManager imports)
-    /// - config/ledger.rs: 1 (doc comment reference)
-    /// - actors.rs: 1 (CoreActorHandles LedgerHandle type)
+    /// Current state (2026-02-11):
+    /// - services/ledger_service.rs: Legitimate composition root for LedgerService
+    /// - lifecycle.rs: ledger_handle fn signature
+    /// - init_compute.rs: LedgerHandle alias, JournalEntryBuilder
+    /// - init_notifications.rs: LedgerHandle alias
+    /// - init_rpc.rs: Ledger, DisputeManager imports
+    /// - actors.rs: CoreActorHandles ledger types
     ///
-    /// The 2 treasury.rs references are tracked for extraction in #914.
+    /// governance_handlers/ has been DELETED (Sprint 4 migration complete).
+    ///
+    /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        let expected: usize = 30;
+        // Note: services/ledger_service.rs legitimately imports icn_ledger types
+        // to implement LedgerService trait. This is the composition root.
+        let expected: usize = 12;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(
@@ -357,23 +396,17 @@ mod tests {
     ///
     /// Target state: 0 after governance extraction to apps/governance (#913).
     ///
-    /// Current state (2026-01-31):
-    /// - governance_handlers/mod.rs: 22 (proposal dispatch, resource, membership, dispute, SDIS)
-    /// - governance_handlers/treasury.rs: 9 (treasury governance handlers)
-    /// - governance_handlers/protocol.rs: 7 (protocol change handlers)
-    /// - governance_handlers/federation.rs: 3 (federation handlers)
-    /// - governance/actor.rs: 0 (extracted to apps/governance icn-governance-actor)
-    /// - init_governance.rs: 0 (imports routed through icn-governance-actor)
-    /// - events.rs: 0 (decoupled — tests use serde_json::json! directly)
-    /// - actors.rs: 1 (GatewayActorHandles governance handle)
-    /// - init_gateway.rs: 1 (GovernanceManager import)
-    /// - lifecycle.rs: 0 (migrated to kernel-api)
-    /// - background_tasks.rs: 0 (migrated to kernel-api)
+    /// Current state (2026-02-11):
+    /// governance_handlers/ has been DELETED (Sprint 4 migration complete).
+    /// Remaining references are:
+    /// - actors.rs: GatewayActorHandles governance handle
+    /// - init_gateway.rs: GovernanceManager import
+    /// - Other initialization/wiring files
     ///
-    /// The module splits add +2 refs (each submodule needs its own `use` statement).
+    /// All proposal execution now routes through the effect path.
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 43;
+        let expected: usize = 3; // Dropped from 44 after governance_handlers deletion
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(

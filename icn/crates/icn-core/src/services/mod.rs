@@ -1,0 +1,29 @@
+//! Service implementations for kernel-api traits.
+//!
+//! This module provides concrete implementations of `icn-kernel-api` service
+//! traits. These adapters bridge the kernel-safe API boundary to actual
+//! domain implementations (ledger, trust, etc.).
+//!
+//! # Architecture
+//!
+//! - `icn-kernel-api`: Defines traits + DTOs (kernel-safe boundary)
+//! - `icn-ledger`, `icn-trust`, etc.: Domain implementations
+//! - `icn-core::services`: Adapters that implement kernel-api traits using domain crates
+//!
+//! This is the "composition root" where real implementations are wired into
+//! kernel-safe traits.
+
+mod control_service;
+mod federation_service;
+mod ledger_service;
+mod membership_service;
+pub mod state_hash;
+
+pub use control_service::ControlServiceImpl;
+pub use federation_service::FederationServiceImpl;
+pub use ledger_service::LedgerServiceImpl;
+pub use membership_service::MembershipServiceImpl;
+pub use state_hash::{
+    compare_effect_results, compare_state_hashes, extract_state_hashes_from_outcome,
+    verify_effect_results_match, verify_state_hash_match, StateHashComparison, StateHashSet,
+};

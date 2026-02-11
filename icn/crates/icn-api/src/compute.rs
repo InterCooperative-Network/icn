@@ -3,8 +3,8 @@
 use crate::error::ApiError;
 use crate::ApiContext;
 use icn_compute::{
-    ComputeHandle, ComputeTask, ExecutorCapability, FuelLimit, ResourceProfile, TaskCode,
-    TaskPriority, TaskStatus,
+    ComputeHandle, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
+    ResourceProfile, TaskCode, TaskPriority, TaskStatus,
 };
 
 // ============================================================================
@@ -116,6 +116,13 @@ impl ComputeService {
         let now = icn_time::current_timestamp_millis();
         let deadline = params.deadline_ms.map(|relative_ms| now + relative_ms);
 
+        // Compute inputs_hash for verification (E1)
+        let inputs_hash = if inputs.is_empty() {
+            None
+        } else {
+            Some(*blake3::hash(&inputs).as_bytes())
+        };
+
         // Build the compute task
         let task = ComputeTask {
             id: params.task_id,
@@ -136,6 +143,14 @@ impl ComputeService {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash,
+            policy_hash: None, // TODO: Add to API params when policy support is added
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         // Submit the task

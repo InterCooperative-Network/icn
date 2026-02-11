@@ -9,9 +9,13 @@ use icn_kernel_api::ScopeLevel;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ComputeError;
+use crate::types::ContentHash;
 
 /// Blake3 hash identifying a receipt by its content (non-signature fields).
 pub type ReceiptHash = [u8; 32];
+
+/// Unique dispute identifier
+pub type DisputeId = String;
 
 // ---------------------------------------------------------------------------
 // Domain-separation prefixes (byte constants, single source of truth)
@@ -127,6 +131,76 @@ fn scope_to_wire(scope: ScopeLevel) -> u8 {
 }
 
 // ---------------------------------------------------------------------------
+// E2: Execution Receipt Types (Named Artifact Parity)
+// ---------------------------------------------------------------------------
+
+/// Type of artifact produced or logged during execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactType {
+    /// Execution log (stdout, stderr, trace)
+    Log,
+    /// Cryptographic proof (ZK proof, Merkle proof)
+    Proof,
+    /// Primary result output
+    Result,
+    /// Intermediate computation state
+    Intermediate,
+}
+
+/// Pointer to an artifact stored in the network.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactPointer {
+    /// Type of the artifact
+    pub artifact_type: ArtifactType,
+    /// Content-addressed hash of the artifact
+    pub content_hash: ContentHash,
+    /// Scope at which the artifact is stored
+    pub storage_scope: ScopeLevel,
+}
+
+/// Result of verification for this execution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VerificationResult {
+    /// Verification not yet attempted
+    #[default]
+    Pending,
+    /// Verification passed with witness attestations
+    Passed {
+        /// DIDs of nodes that witnessed/verified the execution
+        witnesses: Vec<String>,
+    },
+    /// Verification failed
+    Failed {
+        /// Reason for failure
+        reason: String,
+        /// Hash of evidence supporting the failure
+        evidence: ContentHash,
+    },
+    /// Execution is under dispute
+    Disputed {
+        /// Reference to the dispute record
+        dispute_id: DisputeId,
+    },
+}
+
+/// Settlement action triggered by this receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SettlementHook {
+    /// Type of ledger entry to create (e.g., "payment", "credit", "claim")
+    pub ledger_entry_type: String,
+    /// Amount in smallest currency unit
+    pub amount: u64,
+    /// Currency identifier
+    pub currency: String,
+    /// Account to debit
+    pub from_account: String,
+    /// Account to credit
+    pub to_account: String,
+}
+
+// ---------------------------------------------------------------------------
 // ExecutionReceipt
 // ---------------------------------------------------------------------------
 
@@ -208,6 +282,49 @@ pub struct ExecutionReceipt {
     // -- Timestamp --
     /// Unix timestamp (seconds) when the receipt was created.
     pub created_at: u64,
+
+    // =========================================================================
+    // E2: Named Artifact Parity Fields
+    // =========================================================================
+    /// Hash of the code version that was executed.
+    ///
+    /// For CCL: hash of the contract source. For WASM: hash of the module.
+    /// Enables verification that the correct code version ran.
+    #[serde(default)]
+    pub version_hash: Option<ContentHash>,
+
+    /// Hash of the inputs (from workload manifest).
+    ///
+    /// Copied from `ComputeTask::inputs_hash` for verification continuity.
+    #[serde(default)]
+    pub inputs_hash: Option<ContentHash>,
+
+    /// Hash of the execution outputs.
+    ///
+    /// Blake3 hash of the serialized result, enabling output verification
+    /// without storing the full output in the receipt.
+    #[serde(default)]
+    pub outputs_hash: Option<ContentHash>,
+
+    /// Pointers to artifacts produced during execution.
+    ///
+    /// Logs, proofs, intermediate results stored in the network.
+    #[serde(default)]
+    pub artifact_pointers: Vec<ArtifactPointer>,
+
+    /// Result of verification for this execution.
+    #[serde(default)]
+    pub verification_result: VerificationResult,
+
+    /// Dispute ID if this execution is under dispute.
+    #[serde(default)]
+    pub dispute_id: Option<DisputeId>,
+
+    /// Settlement action to trigger on receipt finalization.
+    ///
+    /// Links execution to economic settlement in the ledger.
+    #[serde(default)]
+    pub settlement_hook: Option<SettlementHook>,
 }
 
 impl ExecutionReceipt {
@@ -216,7 +333,7 @@ impl ExecutionReceipt {
     /// This is the content that signatures bind to. Field order is fixed and
     /// all variable-length strings are length-prefixed to prevent ambiguity.
     pub fn signing_payload(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(256);
+        let mut buf = Vec::with_capacity(512);
 
         // Nonce (replay protection)
         buf.extend_from_slice(&self.receipt_id);
@@ -241,6 +358,85 @@ impl ExecutionReceipt {
 
         // Timestamp
         buf.extend_from_slice(&self.created_at.to_le_bytes());
+
+        // E2: Named artifact parity fields
+        // Optional hashes: 1 byte presence flag + 32 bytes if present
+        fn encode_optional_hash(buf: &mut Vec<u8>, hash: &Option<ContentHash>) {
+            match hash {
+                Some(h) => {
+                    buf.push(1);
+                    buf.extend_from_slice(h);
+                }
+                None => buf.push(0),
+            }
+        }
+        encode_optional_hash(&mut buf, &self.version_hash);
+        encode_optional_hash(&mut buf, &self.inputs_hash);
+        encode_optional_hash(&mut buf, &self.outputs_hash);
+
+        // Artifact pointers: count + each pointer
+        buf.extend_from_slice(&(self.artifact_pointers.len() as u32).to_le_bytes());
+        for ap in &self.artifact_pointers {
+            buf.push(match ap.artifact_type {
+                ArtifactType::Log => 0,
+                ArtifactType::Proof => 1,
+                ArtifactType::Result => 2,
+                ArtifactType::Intermediate => 3,
+            });
+            buf.extend_from_slice(&ap.content_hash);
+            buf.push(scope_to_wire(ap.storage_scope));
+        }
+
+        // Verification result: discriminant + variant data
+        match &self.verification_result {
+            VerificationResult::Pending => buf.push(0),
+            VerificationResult::Passed { witnesses } => {
+                buf.push(1);
+                buf.extend_from_slice(&(witnesses.len() as u32).to_le_bytes());
+                for w in witnesses {
+                    buf.extend_from_slice(&(w.len() as u32).to_le_bytes());
+                    buf.extend_from_slice(w.as_bytes());
+                }
+            }
+            VerificationResult::Failed { reason, evidence } => {
+                buf.push(2);
+                buf.extend_from_slice(&(reason.len() as u32).to_le_bytes());
+                buf.extend_from_slice(reason.as_bytes());
+                buf.extend_from_slice(evidence);
+            }
+            VerificationResult::Disputed { dispute_id } => {
+                buf.push(3);
+                buf.extend_from_slice(&(dispute_id.len() as u32).to_le_bytes());
+                buf.extend_from_slice(dispute_id.as_bytes());
+            }
+        }
+
+        // Dispute ID (separate from verification for direct lookup)
+        match &self.dispute_id {
+            Some(id) => {
+                buf.push(1);
+                buf.extend_from_slice(&(id.len() as u32).to_le_bytes());
+                buf.extend_from_slice(id.as_bytes());
+            }
+            None => buf.push(0),
+        }
+
+        // Settlement hook
+        match &self.settlement_hook {
+            Some(hook) => {
+                buf.push(1);
+                buf.extend_from_slice(&(hook.ledger_entry_type.len() as u32).to_le_bytes());
+                buf.extend_from_slice(hook.ledger_entry_type.as_bytes());
+                buf.extend_from_slice(&hook.amount.to_le_bytes());
+                buf.extend_from_slice(&(hook.currency.len() as u32).to_le_bytes());
+                buf.extend_from_slice(hook.currency.as_bytes());
+                buf.extend_from_slice(&(hook.from_account.len() as u32).to_le_bytes());
+                buf.extend_from_slice(hook.from_account.as_bytes());
+                buf.extend_from_slice(&(hook.to_account.len() as u32).to_le_bytes());
+                buf.extend_from_slice(hook.to_account.as_bytes());
+            }
+            None => buf.push(0),
+        }
 
         buf
     }
@@ -323,6 +519,30 @@ impl ExecutionReceipt {
                 "egress_bytes {} exceeds maximum {}",
                 self.egress_bytes, MAX_EGRESS_BYTES
             )));
+        }
+
+        // E2: Ensure dispute_id consistency between verification_result and top-level field
+        match &self.verification_result {
+            VerificationResult::Disputed { dispute_id } => {
+                // If verification_result is Disputed, top-level dispute_id should match
+                if let Some(top_level_id) = &self.dispute_id {
+                    if top_level_id != dispute_id {
+                        return Err(ComputeError::InvalidInput(
+                            "dispute_id mismatch: verification_result.dispute_id differs from top-level dispute_id".into(),
+                        ));
+                    }
+                }
+                // Note: We allow dispute_id to be None when verification_result has it
+                // (the verification_result is authoritative)
+            }
+            _ => {
+                // If not disputed, top-level dispute_id should be None
+                if self.dispute_id.is_some() {
+                    return Err(ComputeError::InvalidInput(
+                        "dispute_id is set but verification_result is not Disputed".into(),
+                    ));
+                }
+            }
         }
 
         Ok(())
@@ -620,6 +840,14 @@ mod tests {
             attester: None,
             attester_signature: None,
             created_at: 1_700_000_000,
+            // E2: Named artifact parity fields
+            version_hash: None,
+            inputs_hash: None,
+            outputs_hash: None,
+            artifact_pointers: vec![],
+            verification_result: VerificationResult::default(),
+            dispute_id: None,
+            settlement_hook: None,
         }
     }
 
@@ -814,6 +1042,14 @@ mod tests {
             attester: None,
             attester_signature: None,
             created_at: 1_700_000_000,
+            // E2: Named artifact parity fields
+            version_hash: None,
+            inputs_hash: None,
+            outputs_hash: None,
+            artifact_pointers: vec![],
+            verification_result: VerificationResult::default(),
+            dispute_id: None,
+            settlement_hook: None,
         };
         (r, executor_kp)
     }
@@ -938,6 +1174,14 @@ mod tests {
             attester: None,
             attester_signature: None,
             created_at: 1_700_000_001,
+            // E2: Named artifact parity fields
+            version_hash: None,
+            inputs_hash: None,
+            outputs_hash: None,
+            artifact_pointers: vec![],
+            verification_result: VerificationResult::default(),
+            dispute_id: None,
+            settlement_hook: None,
         };
 
         let r = r
@@ -1273,5 +1517,135 @@ mod tests {
             postcard_bytes.len(),
             json_bytes.len()
         );
+    }
+
+    // =========================================================================
+    // E2: Named Artifact Parity Tests
+    // =========================================================================
+
+    #[test]
+    fn test_artifact_type_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ArtifactType::Log).unwrap(),
+            r#""log""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArtifactType::Proof).unwrap(),
+            r#""proof""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArtifactType::Result).unwrap(),
+            r#""result""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArtifactType::Intermediate).unwrap(),
+            r#""intermediate""#
+        );
+    }
+
+    #[test]
+    fn test_verification_result_serialization() {
+        let pending = VerificationResult::Pending;
+        let json = serde_json::to_string(&pending).unwrap();
+        assert_eq!(json, r#""pending""#);
+
+        let passed = VerificationResult::Passed {
+            witnesses: vec!["did:icn:witness1".into(), "did:icn:witness2".into()],
+        };
+        let json = serde_json::to_string(&passed).unwrap();
+        assert!(json.contains("passed"));
+        assert!(json.contains("witnesses"));
+    }
+
+    #[test]
+    fn test_signing_payload_includes_e2_fields() {
+        let mut r1 = sample_receipt();
+        let base_payload = r1.signing_payload();
+
+        // Add E2 fields
+        r1.version_hash = Some([0xAA; 32]);
+        let with_version = r1.signing_payload();
+        assert_ne!(
+            base_payload, with_version,
+            "version_hash should change payload"
+        );
+
+        let mut r2 = sample_receipt();
+        r2.inputs_hash = Some([0xBB; 32]);
+        assert_ne!(
+            base_payload,
+            r2.signing_payload(),
+            "inputs_hash should change payload"
+        );
+
+        let mut r3 = sample_receipt();
+        r3.outputs_hash = Some([0xCC; 32]);
+        assert_ne!(
+            base_payload,
+            r3.signing_payload(),
+            "outputs_hash should change payload"
+        );
+
+        let mut r4 = sample_receipt();
+        r4.artifact_pointers = vec![ArtifactPointer {
+            artifact_type: ArtifactType::Log,
+            content_hash: [0xDD; 32],
+            storage_scope: ScopeLevel::Cell,
+        }];
+        assert_ne!(
+            base_payload,
+            r4.signing_payload(),
+            "artifact_pointers should change payload"
+        );
+
+        let mut r5 = sample_receipt();
+        r5.verification_result = VerificationResult::Passed {
+            witnesses: vec!["did:icn:witness".into()],
+        };
+        assert_ne!(
+            base_payload,
+            r5.signing_payload(),
+            "verification_result should change payload"
+        );
+
+        let mut r6 = sample_receipt();
+        r6.settlement_hook = Some(SettlementHook {
+            ledger_entry_type: "payment".into(),
+            amount: 100,
+            currency: "credits".into(),
+            from_account: "did:icn:payer".into(),
+            to_account: "did:icn:payee".into(),
+        });
+        assert_ne!(
+            base_payload,
+            r6.signing_payload(),
+            "settlement_hook should change payload"
+        );
+    }
+
+    #[test]
+    fn test_artifact_pointer_roundtrip() {
+        let ap = ArtifactPointer {
+            artifact_type: ArtifactType::Proof,
+            content_hash: [0xEE; 32],
+            storage_scope: ScopeLevel::Federation,
+        };
+        let json = serde_json::to_string(&ap).unwrap();
+        let deserialized: ArtifactPointer = serde_json::from_str(&json).unwrap();
+        assert_eq!(ap, deserialized);
+    }
+
+    #[test]
+    fn test_settlement_hook_roundtrip() {
+        let hook = SettlementHook {
+            ledger_entry_type: "claim".into(),
+            amount: 5000,
+            currency: "hours".into(),
+            from_account: "did:icn:org".into(),
+            to_account: "did:icn:member".into(),
+        };
+        let json = serde_json::to_string(&hook).unwrap();
+        let deserialized: SettlementHook = serde_json::from_str(&json).unwrap();
+        assert_eq!(hook, deserialized);
     }
 }

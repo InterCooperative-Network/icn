@@ -133,9 +133,18 @@ pub async fn init_governance_services(
         info!("✓ Protocol parameter store ready ({} parameters)", count);
     }
 
-    // Attach protocol parameter store to governance handle
-    let governance_handle =
-        governance_handle.with_protocol_params(protocol_parameter_store.clone());
+    // Create the kernel governance executor for proposal execution
+    let governance_executor = Arc::new(
+        crate::supervisor::governance_executor::KernelGovernanceExecutor::new(
+            protocol_parameter_store.clone(),
+        ),
+    );
+    info!("✓ Governance executor created");
+
+    // Attach protocol parameter store and executor to governance handle
+    let governance_handle = governance_handle
+        .with_protocol_params(protocol_parameter_store.clone())
+        .with_executor(governance_executor);
 
     Ok(GovernanceServices {
         governance_handle,

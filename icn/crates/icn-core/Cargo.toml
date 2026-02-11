@@ -61,6 +61,7 @@ tracing-subscriber.workspace = true
 hex = "0.4"
 tempfile = "3.24"
 sha2 = "0.10"
+regex = "1.10"
 icn-governance.workspace = true
 icn-trust.workspace = true
 portpicker.workspace = true

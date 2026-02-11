@@ -17,9 +17,11 @@ pub mod store;
 /// Cooperative types and data structures
 pub mod types;
 
-pub use actor::{CoopActor, CoopMessage, GossipHandle, COOP_TOPIC};
+pub use actor::{CoopActor, CoopMessage, GossipHandle, TreasuryManagerHandle, COOP_TOPIC};
 pub use handle::CoopHandle;
-pub use lifecycle::{LifecycleEvent, LifecycleManager};
+pub use lifecycle::{
+    derive_treasury_anchor, derive_treasury_did, LifecycleEvent, LifecycleManager,
+};
 pub use membership::{MembershipChange, MembershipManager};
 pub use store::CoopStore;
 pub use types::{

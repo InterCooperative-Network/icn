@@ -17,6 +17,7 @@ pub mod envelope;
 pub mod error;
 pub mod global_rate_limit;
 mod handlers;
+pub mod nat;
 pub mod protocol;
 pub mod rate_limit;
 pub mod replay_guard;
@@ -39,6 +40,7 @@ pub use encryption::{EncryptedEnvelope, EncryptionType};
 pub use envelope::{PayloadType, SignedEnvelope};
 pub use error::{NetError, Result};
 pub use global_rate_limit::GlobalRateLimiter;
+pub use nat::{NatConfig, NatTraversal, NatType, PublicAddress, TurnServerConfig};
 pub use protocol::{
     read_message, read_message_compressed, read_message_negotiated, write_message,
     write_message_compressed, write_message_negotiated, CompressionFormat, EncodingFormat,

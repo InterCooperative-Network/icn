@@ -12,6 +12,8 @@ pub struct JournalEntryBuilder {
     accounts: Vec<AccountDelta>,
     parents: Vec<ContentHash>,
     nonce: Option<[u8; 32]>,
+    decision_receipt_id: Option<String>,
+    decision_hash: Option<String>,
 }
 
 impl JournalEntryBuilder {
@@ -23,6 +25,8 @@ impl JournalEntryBuilder {
             accounts: Vec::new(),
             parents: Vec::new(),
             nonce: None,
+            decision_receipt_id: None,
+            decision_hash: None,
         }
     }
 
@@ -68,6 +72,24 @@ impl JournalEntryBuilder {
         self
     }
 
+    /// Set the governance decision provenance.
+    ///
+    /// Links this ledger entry to the governance decision that authorized it.
+    /// Both fields should be set together for complete provenance.
+    ///
+    /// # Arguments
+    /// * `receipt_id` - Node-local decision receipt ID (e.g., "gov:proposal:2024-001:receipt:abc")
+    /// * `hash` - Canonical decision hash (cross-node anchor, e.g., "sha256:abc123...")
+    pub fn with_decision_provenance(
+        mut self,
+        receipt_id: impl Into<String>,
+        hash: impl Into<String>,
+    ) -> Self {
+        self.decision_receipt_id = Some(receipt_id.into());
+        self.decision_hash = Some(hash.into());
+        self
+    }
+
     /// Build and validate the journal entry
     pub fn build(self) -> Result<JournalEntry> {
         // Validate double-entry invariant: Σ debits == Σ credits per currency
@@ -89,6 +111,8 @@ impl JournalEntryBuilder {
             parents: self.parents,
             signature: None, // Will be set by caller
             nonce: self.nonce,
+            decision_receipt_id: self.decision_receipt_id,
+            decision_hash: self.decision_hash,
         };
 
         // Compute the content hash
@@ -251,5 +275,65 @@ mod tests {
             "Unbalanced multi-currency entry should fail"
         );
         assert!(entry.unwrap_err().to_string().contains("USD"));
+    }
+
+    /// Golden-path test: JournalEntry with decision provenance
+    ///
+    /// This test verifies the pilot invariant:
+    /// - Ledger entries carry decision_receipt_id and decision_hash
+    /// - These fields are preserved through serialization
+    /// - The entry can be traced back to its authorizing decision
+    #[test]
+    fn test_entry_with_decision_provenance() {
+        let keypair = KeyPair::generate().unwrap();
+        let treasury = keypair.did().clone();
+        let recipient = KeyPair::generate().unwrap().did().clone();
+
+        let decision_receipt_id = "gov:proposal:2024-001:receipt:abc123";
+        let decision_hash = "sha256:def456789...";
+
+        let entry = JournalEntryBuilder::new(treasury.clone())
+            .debit(treasury.clone(), "HOURS".to_string(), 2500)
+            .credit(recipient.clone(), "HOURS".to_string(), 2500)
+            .with_decision_provenance(decision_receipt_id, decision_hash)
+            .build()
+            .expect("Entry with provenance should build successfully");
+
+        // Verify provenance fields are set
+        assert_eq!(
+            entry.decision_receipt_id.as_deref(),
+            Some(decision_receipt_id),
+            "decision_receipt_id must be preserved"
+        );
+        assert_eq!(
+            entry.decision_hash.as_deref(),
+            Some(decision_hash),
+            "decision_hash must be preserved"
+        );
+
+        // Verify entry is valid
+        assert!(entry.id.is_some(), "Entry should have computed hash");
+
+        // Verify serialization preserves provenance
+        let json = serde_json::to_string(&entry).expect("should serialize");
+        assert!(
+            json.contains(decision_receipt_id),
+            "JSON should contain decision_receipt_id"
+        );
+        assert!(
+            json.contains(decision_hash),
+            "JSON should contain decision_hash"
+        );
+
+        // Verify deserialization preserves provenance
+        let deserialized: JournalEntry = serde_json::from_str(&json).expect("should deserialize");
+        assert_eq!(
+            deserialized.decision_receipt_id, entry.decision_receipt_id,
+            "decision_receipt_id must survive round-trip"
+        );
+        assert_eq!(
+            deserialized.decision_hash, entry.decision_hash,
+            "decision_hash must survive round-trip"
+        );
     }
 }

@@ -267,7 +267,9 @@ impl Default for TaskManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ExecutionOutcome, ExecutorCapability, FuelLimit, TaskCode};
+    use crate::types::{
+        DeterminismClass, ExecutionOutcome, ExecutorCapability, FuelLimit, PrivacyClass, TaskCode,
+    };
 
     fn make_task(id: &str) -> ComputeTask {
         ComputeTask {
@@ -289,6 +291,14 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 

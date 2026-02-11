@@ -510,3 +510,22 @@ jobs:
         with:
           name: accessibility-report
           path: web/pilot-ui/test-results/
+
+  pilot-provenance:
+    name: Pilot Provenance Invariant
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build tools
+        uses: ./.github/actions/install-build-tools
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+
+      - name: Run pilot chain demo
+        run: ./scripts/pilot_chain_demo.sh

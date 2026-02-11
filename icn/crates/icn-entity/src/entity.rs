@@ -477,6 +477,37 @@ pub struct FederationProfile {
 
     /// Member entity IDs tracked by this federation.
     pub member_entities: Vec<EntityId>,
+
+    /// Parent federation for hierarchical nesting.
+    ///
+    /// When `Some`, this federation is nested within a larger parent federation.
+    /// Root (top-level) federations have `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<EntityId>,
+}
+
+impl FederationProfile {
+    /// Check if this federation has a parent federation.
+    pub fn has_parent(&self) -> bool {
+        self.parent_id.is_some()
+    }
+
+    /// Check if this is a top-level (root) federation.
+    pub fn is_root(&self) -> bool {
+        self.parent_id.is_none()
+    }
+
+    /// Get nesting depth (0 for root federations).
+    ///
+    /// Note: This returns 1 for any federation with a parent. Full depth
+    /// calculation requires registry lookup to traverse the parent chain.
+    pub fn depth(&self) -> usize {
+        if self.is_root() {
+            0
+        } else {
+            1
+        }
+    }
 }
 
 // ============================================================================
@@ -718,6 +749,7 @@ impl CooperativeEntity {
             kind: Some(EntityKind::Federation(FederationProfile {
                 governance_domain_id: domain_id.clone(),
                 member_entities: Vec::new(),
+                parent_id: None,
             })),
             status: EntityStatus::Forming,
             parent_id: None,
@@ -1302,5 +1334,68 @@ mod tests {
 
         assert_eq!(parsed.relationship, RelationType::FederatedWith);
         assert_eq!(parsed.metadata.get("reason").unwrap(), "joint purchasing");
+    }
+
+    #[test]
+    fn test_federation_profile_nesting() {
+        // Test root federation (no parent)
+        let root_fed =
+            CooperativeEntity::new_federation("root-fed", "Root Federation", "gov-domain").unwrap();
+        let root_profile = root_fed.federation_profile().unwrap();
+
+        assert!(root_profile.is_root());
+        assert!(!root_profile.has_parent());
+        assert_eq!(root_profile.depth(), 0);
+        assert!(root_profile.parent_id.is_none());
+
+        // Test nested federation (has parent)
+        let parent_id = EntityId::federation("parent-fed").unwrap();
+        let child_profile = FederationProfile {
+            governance_domain_id: "child-gov".to_string(),
+            member_entities: Vec::new(),
+            parent_id: Some(parent_id.clone()),
+        };
+
+        assert!(!child_profile.is_root());
+        assert!(child_profile.has_parent());
+        assert_eq!(child_profile.depth(), 1);
+        assert_eq!(child_profile.parent_id, Some(parent_id));
+    }
+
+    #[test]
+    fn test_federation_profile_serde_with_parent() {
+        // Test serialization with parent_id
+        let parent_id = EntityId::federation("parent-fed").unwrap();
+        let profile = FederationProfile {
+            governance_domain_id: "nested-gov".to_string(),
+            member_entities: vec![EntityId::cooperative("member-coop").unwrap()],
+            parent_id: Some(parent_id.clone()),
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        let parsed: FederationProfile = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.governance_domain_id, "nested-gov");
+        assert_eq!(parsed.member_entities.len(), 1);
+        assert_eq!(parsed.parent_id, Some(parent_id));
+    }
+
+    #[test]
+    fn test_federation_profile_serde_without_parent() {
+        // Test serialization without parent_id (should be skipped in JSON)
+        let profile = FederationProfile {
+            governance_domain_id: "root-gov".to_string(),
+            member_entities: Vec::new(),
+            parent_id: None,
+        };
+
+        let json = serde_json::to_string(&profile).unwrap();
+        // parent_id should not appear in JSON due to skip_serializing_if
+        assert!(!json.contains("parent_id"));
+
+        // But deserialization should still work with default
+        let parsed: FederationProfile = serde_json::from_str(&json).unwrap();
+        assert!(parsed.parent_id.is_none());
+        assert!(parsed.is_root());
     }
 }

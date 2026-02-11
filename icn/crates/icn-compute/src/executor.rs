@@ -120,6 +120,16 @@ impl LocalExecutor {
         // Create execution context for CCL
         let timestamp = icn_time::current_timestamp_secs();
 
+        // Propagate determinism class to CCL context (E3 enforcement)
+        let ccl_determinism = match task.determinism_class {
+            crate::types::DeterminismClass::Canonical => {
+                icn_kernel_api::compute::DeterminismClass::Canonical
+            }
+            crate::types::DeterminismClass::Advisory => {
+                icn_kernel_api::compute::DeterminismClass::Advisory
+            }
+        };
+
         let ccl_context = icn_ccl::ExecutionContext {
             caller: caller_did.clone(),
             timestamp,
@@ -127,6 +137,7 @@ impl LocalExecutor {
             fuel_limit: ctx.fuel_remaining,
             capabilities: vec![],
             participants: vec![caller_did],
+            determinism_class: ccl_determinism,
         };
 
         // Create contract state
@@ -267,6 +278,16 @@ impl Executor for LocalExecutor {
                 // Create execution context for CCL
                 let timestamp = icn_time::current_timestamp_secs();
 
+                // Propagate determinism class to CCL context (E3 enforcement)
+                let ccl_determinism = match task.determinism_class {
+                    crate::types::DeterminismClass::Canonical => {
+                        icn_kernel_api::compute::DeterminismClass::Canonical
+                    }
+                    crate::types::DeterminismClass::Advisory => {
+                        icn_kernel_api::compute::DeterminismClass::Advisory
+                    }
+                };
+
                 let ccl_context = icn_ccl::ExecutionContext {
                     caller: caller_did.clone(),
                     timestamp,
@@ -274,6 +295,7 @@ impl Executor for LocalExecutor {
                     fuel_limit: ctx.fuel_remaining,
                     capabilities: vec![],
                     participants: vec![caller_did],
+                    determinism_class: ccl_determinism,
                 };
 
                 // Create contract state
@@ -379,7 +401,7 @@ impl Executor for LocalExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FuelLimit;
+    use crate::types::{DeterminismClass, FuelLimit, PrivacyClass};
 
     /// Valid test DID (proper multibase-encoded Ed25519 public key)
     /// Generated from deterministic seed [1u8; 32]
@@ -453,6 +475,14 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            // E1: Workload manifest fields
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         }
     }
 
@@ -540,6 +570,13 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -567,6 +604,13 @@ mod tests {
             federation_constraints: None,
             estimated_value: None,
             verification: None,
+            inputs_hash: None,
+            policy_hash: None,
+            determinism_class: DeterminismClass::default(),
+            privacy_class: PrivacyClass::default(),
+            // E4: Storage specification fields
+            storage_class: None,
+            data_locality: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());

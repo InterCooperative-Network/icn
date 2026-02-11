@@ -26,6 +26,7 @@ pub mod membership;
 pub mod notifications;
 pub mod oracle;
 pub mod recurring_payments;
+pub mod registry;
 pub mod sdis;
 pub mod services;
 pub mod sessions;

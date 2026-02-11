@@ -11,6 +11,7 @@
 //! - The kernel enforces constraints without understanding their origin
 
 use crate::authz::PolicyOracle;
+use crate::compute::OperatorMode;
 use crate::scope::{CellId, ScopeLevel};
 use crate::types::Did;
 use std::sync::Arc;
@@ -545,6 +546,29 @@ pub trait LedgerService: Send + Sync {
     fn revoke_resource_access(&self, _req: &RevokeResourceAccessRequest) -> Result<(), String> {
         Err("Resource access revocation not supported".to_string())
     }
+
+    /// Submit a treasury entry to the ledger with decision provenance.
+    ///
+    /// This is the kernel-safe interface for treasury operations to write
+    /// ledger entries. The ledger service handles:
+    /// - Entry construction and validation
+    /// - Signature generation
+    /// - Gossip propagation
+    ///
+    /// Returns the content hash of the created entry.
+    ///
+    /// # Arguments
+    /// * `entry` - Treasury entry details (kernel-safe DTO)
+    ///
+    /// # Pilot Invariant
+    /// The resulting ledger entry MUST carry both `decision_receipt_id` and
+    /// `decision_hash` for provenance tracking.
+    fn submit_treasury_entry(
+        &self,
+        _entry: TreasuryEntryRequest,
+    ) -> Result<TreasuryEntryResult, String> {
+        Err("Treasury entry submission not supported".to_string())
+    }
 }
 
 // ============================================================================
@@ -588,6 +612,59 @@ pub struct RevokeResourceAccessRequest {
     pub reason: String,
 }
 
+// ============================================================================
+// Treasury Entry DTOs (kernel-safe ledger interface)
+// ============================================================================
+
+/// Request to submit a treasury entry to the ledger.
+///
+/// This is a kernel-safe DTO for treasury operations. The ledger service
+/// translates this into domain-specific journal entries.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TreasuryEntryRequest {
+    /// Treasury being operated on
+    pub treasury_id: String,
+    /// Type of treasury operation
+    pub operation_type: TreasuryOperationType,
+    /// Amount being transferred
+    pub amount: i64,
+    /// Currency code
+    pub currency: String,
+    /// Recipient DID (for spend operations)
+    pub recipient: Option<String>,
+    /// Human-readable memo
+    pub memo: String,
+
+    // Provenance fields (pilot-critical)
+    /// Decision receipt ID that authorized this entry (node-local reference)
+    pub decision_receipt_id: String,
+    /// Canonical decision hash (cross-node equality anchor)
+    pub decision_hash: String,
+}
+
+/// Type of treasury operation (mirrors TreasuryOperationType from governance.rs)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TreasuryOperationType {
+    Spend,
+    Allocate,
+    Transfer,
+    CreateBudget,
+    DistributeSurplus,
+    RedeemShares,
+    IssueBond,
+}
+
+/// Result of a treasury entry submission.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TreasuryEntryResult {
+    /// Content hash of the created ledger entry
+    pub entry_hash: String,
+    /// The decision_receipt_id echoed back for verification
+    pub decision_receipt_id: String,
+    /// The decision_hash echoed back for verification
+    pub decision_hash: String,
+}
+
 /// Ledger events that the kernel can report
 ///
 /// These are generic event types that don't expose ledger semantics.
@@ -613,6 +690,102 @@ pub enum LedgerEvent {
 }
 
 // ============================================================================
+// Federation Service
+// ============================================================================
+
+/// Request to join a federation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationJoinRequest {
+    /// DID of the cooperative requesting to join
+    pub coop_did: String,
+    /// Name of the cooperative
+    pub coop_name: String,
+    /// ID of the federation to join (or create)
+    pub federation_id: String,
+    /// Gateway endpoints for this cooperative
+    pub gateway_endpoints: Vec<String>,
+    /// Decision receipt ID that authorized this join
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this join
+    pub decision_hash: String,
+}
+
+/// Result of a federation join operation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationJoinResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to vouch for a cooperative
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationVouchRequest {
+    /// DID of the cooperative doing the vouching
+    pub voucher_did: String,
+    /// DID of the cooperative being vouched for
+    pub vouchee_did: String,
+    /// Trust score to assign (0.0-1.0)
+    pub trust_score: f64,
+    /// Decision receipt ID that authorized this vouch
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this vouch
+    pub decision_hash: String,
+}
+
+/// Result of a vouch operation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FederationVouchResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash (for verification)
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Abstract federation management service.
+///
+/// The kernel uses this to register cooperatives and vouches without
+/// knowing the underlying federation semantics. Apps implement this
+/// trait to provide actual federation registry operations.
+///
+/// # Provenance Tracking
+///
+/// All federation operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+pub trait FederationService: Send + Sync {
+    /// Register a cooperative joining a federation.
+    ///
+    /// This creates a durable record that can be queried later.
+    /// Returns state_change_hash for verification.
+    fn join_federation(
+        &self,
+        request: FederationJoinRequest,
+    ) -> Result<FederationJoinResult, anyhow::Error>;
+
+    /// Record a vouch from one cooperative to another.
+    ///
+    /// This creates a durable vouch record in the registry.
+    /// Returns state_change_hash for verification.
+    fn vouch_for_cooperative(
+        &self,
+        request: FederationVouchRequest,
+    ) -> Result<FederationVouchResult, anyhow::Error>;
+
+    /// Check if a cooperative is registered in the federation.
+    fn is_registered(&self, coop_did: &str) -> bool;
+
+    /// Get provenance info for a cooperative registration.
+    ///
+    /// Returns (decision_receipt_id, decision_hash) if available.
+    fn get_registration_provenance(&self, coop_did: &str) -> Option<(String, String)>;
+}
+
+// ============================================================================
 // Cell Service
 // ============================================================================
 
@@ -624,6 +797,19 @@ pub enum LedgerEvent {
 /// A "cell" is an HA clustering envelope — a named group of nodes that
 /// share identity, state, and capacity. The kernel treats `CellId` as
 /// an opaque identifier and `ScopeLevel` as an ordered integer.
+///
+/// # Operator Boundary Rule (E5)
+///
+/// **A cell is operated by exactly one entity** — a cooperative, community,
+/// federation, or individual. Mixed-operator cells are forbidden because:
+///
+/// - Trust within a cell is implicit (nodes share keys, state, workloads)
+/// - Cross-entity clustering belongs at federation scope, not cell scope
+/// - Mixed operators would break the security boundary (any node can act as the cell)
+///
+/// The `operator_entity` method returns the single entity that operates all
+/// nodes in this cell. Cell formation must validate that all joining nodes
+/// share the same operator entity ID.
 ///
 /// Apps implement this trait to provide cell lifecycle management with
 /// their own organizational semantics.
@@ -659,6 +845,381 @@ pub trait CellService: Send + Sync {
     /// Returns the narrowest scope that contains both the local node and
     /// the peer. If the peer is completely unknown, returns `Commons`.
     fn peer_scope(&self, did: &Did) -> ScopeLevel;
+
+    /// Get the operator DID for a cell (E5: Operator Boundary).
+    ///
+    /// Returns the DID of the single entity that operates this cell.
+    /// All nodes in a cell MUST share the same operator DID.
+    ///
+    /// # Cell Formation Validation
+    ///
+    /// When a node attempts to join a cell, the following must hold:
+    /// - the node's configured operator DID matches `cell.cell_operator()`
+    ///
+    /// Implementations should reject cell join attempts that would violate
+    /// the single-operator rule (i.e., when `cell.cell_operator()` is set and
+    /// does not match the joining node's operator DID).
+    ///
+    /// Returns `None` if the cell is unknown or the operator DID is not set.
+    fn cell_operator(&self, cell_id: &CellId) -> Option<Did> {
+        // Default: not implemented (for backward compatibility)
+        let _ = cell_id;
+        None
+    }
+
+    /// Get the operator mode for a cell (E6: Individual Node Ownership).
+    ///
+    /// Returns the operator mode of the cell, which determines whether it's
+    /// operated by an organization or an individual.
+    ///
+    /// Returns `None` if the cell is unknown or operator mode is not set.
+    fn cell_operator_mode(&self, cell_id: &CellId) -> Option<OperatorMode> {
+        // Default: not implemented (for backward compatibility)
+        let _ = cell_id;
+        None
+    }
+
+    /// Check if a node with the given operator mode can join a cell.
+    ///
+    /// This enforces the E6 operator mode compatibility rule:
+    /// - Nodes can only join cells with compatible operator modes
+    /// - Compatible means same mode variant AND same operator ID
+    ///
+    /// Returns `true` if:
+    /// - The cell has no operator mode set (backward compatibility)
+    /// - The cell's operator mode is compatible with the joining node's mode
+    ///
+    /// Returns `false` if the modes are incompatible.
+    fn can_join_cell(&self, cell_id: &CellId, node_mode: &OperatorMode) -> bool {
+        match self.cell_operator_mode(cell_id) {
+            Some(cell_mode) => cell_mode.is_compatible_with(node_mode),
+            None => true, // No mode set = backward compatible
+        }
+    }
+}
+
+// ============================================================================
+// Control Service (Governance Actions)
+// ============================================================================
+
+/// Request to veto a proposal
+#[derive(Debug, Clone)]
+pub struct VetoProposalRequest {
+    /// The proposal being vetoed
+    pub target_proposal_id: String,
+    /// Reason for the veto
+    pub veto_reason: String,
+    /// The governance domain where this proposal exists
+    pub domain_id: String,
+    /// The entity exercising the veto power
+    pub vetoer_did: String,
+    /// Links back to the veto proposal's governance decision
+    pub decision_receipt_id: String,
+    /// Canonical content hash for verification
+    pub decision_hash: String,
+}
+
+/// Result of vetoing a proposal
+#[derive(Debug, Clone)]
+pub struct VetoProposalResult {
+    /// Whether the veto was successful
+    pub success: bool,
+    /// Human-readable outcome message
+    pub message: String,
+    /// Hash of the state change (proposal status → Vetoed)
+    pub state_change_hash: Option<String>,
+    /// Timestamp of the veto
+    pub vetoed_at: u64,
+}
+
+/// Request to force close a proposal
+#[derive(Debug, Clone)]
+pub struct ForceCloseProposalRequest {
+    /// The proposal being force-closed
+    pub target_proposal_id: String,
+    /// Reason for force closing
+    pub close_reason: String,
+    /// The forced outcome (e.g., "Rejected", "Expired")
+    pub forced_outcome: String,
+    /// The governance domain
+    pub domain_id: String,
+    /// The entity forcing the close
+    pub closer_did: String,
+    /// Links back to the force-close proposal's governance decision
+    pub decision_receipt_id: String,
+    /// Canonical content hash for verification
+    pub decision_hash: String,
+}
+
+/// Result of force closing a proposal
+#[derive(Debug, Clone)]
+pub struct ForceCloseProposalResult {
+    /// Whether the force close was successful
+    pub success: bool,
+    /// Human-readable outcome message
+    pub message: String,
+    /// Hash of the state change (proposal status → ForceClosed)
+    pub state_change_hash: Option<String>,
+    /// The final outcome that was applied
+    pub final_outcome: String,
+    /// Timestamp of the close
+    pub closed_at: u64,
+}
+
+/// Abstract control service for governance actions.
+///
+/// The kernel uses this service to execute governance control effects
+/// (veto, force close) without knowing about the internal governance state.
+///
+/// Apps implement this trait to provide actual governance state mutations.
+///
+/// # Provenance Tracking
+///
+/// All control operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+pub trait ControlService: Send + Sync {
+    /// Veto a pending proposal.
+    ///
+    /// This transitions the target proposal to a Vetoed state.
+    /// Returns state_change_hash for verification.
+    fn veto_proposal(
+        &self,
+        request: VetoProposalRequest,
+    ) -> Result<VetoProposalResult, anyhow::Error>;
+
+    /// Force close a proposal with a specified outcome.
+    ///
+    /// This transitions the target proposal to a ForceClosed state
+    /// with the specified forced outcome.
+    /// Returns state_change_hash for verification.
+    fn force_close_proposal(
+        &self,
+        request: ForceCloseProposalRequest,
+    ) -> Result<ForceCloseProposalResult, anyhow::Error>;
+
+    /// Check if a proposal can be vetoed.
+    ///
+    /// Returns true if the proposal exists and is in a vetoable state.
+    fn can_veto(&self, target_proposal_id: &str, domain_id: &str) -> bool;
+
+    /// Check if a proposal can be force closed.
+    ///
+    /// Returns true if the proposal exists and can be force closed.
+    fn can_force_close(&self, target_proposal_id: &str, domain_id: &str) -> bool;
+}
+
+// ============================================================================
+// Membership Service
+// ============================================================================
+
+/// Request to add a new member to an entity (cooperative, community, etc.)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the new member
+    pub member_did: String,
+    /// Role assigned to the member (e.g., "Worker", "Member", "BoardMember")
+    pub role: String,
+    /// Membership tier (e.g., "Founder", "Standard", "Provisional")
+    pub tier: String,
+    /// Decision receipt ID that authorized this addition
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this addition
+    pub decision_hash: String,
+}
+
+/// Result of adding a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to remove a member from an entity
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RemoveMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to remove
+    pub member_did: String,
+    /// Reason for removal
+    pub reason: String,
+    /// Decision receipt ID that authorized this removal
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this removal
+    pub decision_hash: String,
+}
+
+/// Result of removing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RemoveMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to update a member's role or tier
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to update
+    pub member_did: String,
+    /// New role (if changing)
+    pub new_role: Option<String>,
+    /// New tier (if changing)
+    pub new_tier: Option<String>,
+    /// Decision receipt ID that authorized this update
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this update
+    pub decision_hash: String,
+}
+
+/// Result of updating a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to freeze a member (suspend rights temporarily)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FreezeMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to freeze
+    pub member_did: String,
+    /// Reason for freezing
+    pub reason: String,
+    /// Duration in seconds (None = indefinite)
+    pub duration_secs: Option<u64>,
+    /// Decision receipt ID that authorized this freeze
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this freeze
+    pub decision_hash: String,
+}
+
+/// Result of freezing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FreezeMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// When the freeze expires (if duration was specified)
+    pub expires_at: Option<u64>,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to unfreeze a member (restore rights)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnfreezeMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to unfreeze
+    pub member_did: String,
+    /// Decision receipt ID that authorized this unfreeze
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this unfreeze
+    pub decision_hash: String,
+}
+
+/// Result of unfreezing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnfreezeMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Abstract membership management service.
+///
+/// The kernel uses this to manage entity membership without knowing the
+/// underlying organizational semantics. Apps implement this trait to provide
+/// actual membership operations backed by their storage.
+///
+/// # Provenance Tracking
+///
+/// All membership operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+///
+/// # Durable State Changes
+///
+/// All operations must produce durable state changes that survive restarts.
+/// The `state_change_hash` in results allows verification of state transitions.
+pub trait MembershipService: Send + Sync {
+    /// Add a new member to an entity.
+    ///
+    /// This creates a durable membership record. The member starts in
+    /// a pending or active state depending on the entity's policies.
+    fn add_member(&self, request: AddMemberRequest) -> Result<AddMemberResult, anyhow::Error>;
+
+    /// Remove a member from an entity.
+    ///
+    /// This transitions the member to a removed state. The record is
+    /// kept for audit purposes but the member loses all rights.
+    fn remove_member(
+        &self,
+        request: RemoveMemberRequest,
+    ) -> Result<RemoveMemberResult, anyhow::Error>;
+
+    /// Update a member's role or tier.
+    ///
+    /// This modifies the member's role and/or tier while keeping their
+    /// membership active.
+    fn update_member(
+        &self,
+        request: UpdateMemberRequest,
+    ) -> Result<UpdateMemberResult, anyhow::Error>;
+
+    /// Freeze a member (suspend their rights temporarily).
+    ///
+    /// A frozen member retains their membership but cannot exercise
+    /// rights (voting, resource access, etc.) until unfrozen.
+    fn freeze_member(
+        &self,
+        request: FreezeMemberRequest,
+    ) -> Result<FreezeMemberResult, anyhow::Error>;
+
+    /// Unfreeze a member (restore their rights).
+    ///
+    /// This restores a frozen member to active status.
+    fn unfreeze_member(
+        &self,
+        request: UnfreezeMemberRequest,
+    ) -> Result<UnfreezeMemberResult, anyhow::Error>;
+
+    /// Check if a DID is a member of an entity.
+    fn is_member(&self, entity_id: &str, member_did: &str) -> bool;
+
+    /// Check if a DID is an active (non-frozen, non-removed) member.
+    fn is_active_member(&self, entity_id: &str, member_did: &str) -> bool;
+
+    /// Get provenance for a membership operation.
+    ///
+    /// Returns (decision_receipt_id, decision_hash) for the operation
+    /// that created/modified this membership.
+    fn get_membership_provenance(
+        &self,
+        entity_id: &str,
+        member_did: &str,
+    ) -> Option<(String, String)>;
 }
 
 // ============================================================================

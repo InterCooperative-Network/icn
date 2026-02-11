@@ -13,12 +13,17 @@
 # Every PR touching kernel code must check this inventory.
 
 [metadata]
-version = "0.1.0"
-last_updated = "2025-01-25"
-total_crates = 27
+version = "0.2.0"
+last_updated = "2026-02-10"
+total_crates = 28
 clean_crates = 8
 infected_crates = 11
-needs_review_crates = 8
+needs_review_crates = 9
+
+# Extraction Progress (updated 2026-02-10):
+# - icn-governance-actor: NEW - Governance actor extracted to apps/governance
+# - icn-core governance handlers remain for proposal dispatch (federation, protocol, treasury)
+# - icn-kernel-api provides GovernanceExecutor trait for kernel/app boundary
 
 # =============================================================================
 # CORE INFRASTRUCTURE CRATES
@@ -27,12 +32,23 @@ needs_review_crates = 8
 [crates.icn-core]
 description = "Actor runtime and supervisor"
 status = "infected"
-infection_severity = "high"
+infection_severity = "medium"
 infection_notes = """
-Runtime is entangled with governance policies. The GovernanceActor,
-ResourceAccessEnforcerActor, and upgrade coordination leak policy
-concerns into the base runtime. These should be apps, not kernel.
+Governance actor extracted to apps/governance (icn-governance-actor).
+icn-core now uses GovernanceExecutor adapter pattern from icn-kernel-api.
+
+Remaining infections (2026-02-10):
+- governance_handlers/: 55 icn_governance:: refs (proposal dispatch, treasury, protocol, federation)
+- icn_ledger:: refs: 31 (treasury integration, dispute manager)
+- icn_ccl:: refs: 32 (contract execution, dispute actor)
+
+These are being incrementally extracted to apps layer.
 """
+
+# Governance extraction pinned refs (from meaning_firewall.rs ratchet tests):
+governance_refs = 43
+ledger_refs = 31
+ccl_refs = 32
 
 [[crates.icn-core.exports]]
 name = "Runtime"
@@ -56,7 +72,7 @@ notes = "Event routing - should stay kernel"
 name = "GovernanceActor"
 kind = "struct"
 public_methods = ["spawn", "handle"]
-notes = "INFECTED: Governance is policy, should be app"
+notes = "EXTRACTED: Core actor now in apps/governance (icn-governance-actor). icn-core uses GovernanceExecutor adapter."
 
 [[crates.icn-core.exports]]
 name = "ResourceAccessEnforcerActor"
@@ -734,6 +750,32 @@ kind = "struct"
 notes = "Mock implementations"
 
 # =============================================================================
+# EXTRACTED APPS (governance extraction in progress)
+# =============================================================================
+
+[apps.icn-governance-actor]
+description = "Governance actor - extracted from icn-core"
+location = "apps/governance"
+status = "extracted"
+extraction_date = "2026-02-10"
+notes = """
+Core governance actor logic extracted from icn-core to apps/governance.
+Uses GovernanceExecutor trait from icn-kernel-api for kernel/app boundary.
+Handlers: domain_based, execution, federation, treasury, protocol, sdis.
+"""
+
+[[apps.icn-governance-actor.exports]]
+name = "GovernanceActor"
+kind = "struct"
+public_methods = ["spawn", "handle", "domain_router"]
+notes = "Main governance actor with domain-based proposal routing"
+
+[[apps.icn-governance-actor.exports]]
+name = "handlers module"
+kind = "module"
+notes = "Proposal execution handlers (execution, federation, treasury, protocol, sdis)"
+
+# =============================================================================
 # REFACTORING PRIORITY
 # =============================================================================
 
@@ -764,9 +806,16 @@ Balances become projections.
 phase = 3
 name = "Extract Governance"
 crates = ["icn-governance"]
+status = "in_progress"
 notes = """
 Move governance to icn-app-governance.
 Remove governance actors from icn-core.
+
+Progress (2026-02-10):
+- DONE: GovernanceActor extracted to apps/governance/icn-governance-actor
+- DONE: GovernanceExecutor trait in icn-kernel-api for kernel/app boundary
+- PENDING: Extract governance_handlers (federation, protocol, treasury) to apps/
+- PENDING: Remove remaining icn_governance:: refs from icn-core (43 refs)
 """
 
 [[refactoring_priority.phases]]

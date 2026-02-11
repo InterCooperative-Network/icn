@@ -8,8 +8,9 @@
 
 use icn_compute::{
     ActorCheckpoint, ActorId, ActorMode, CheckpointStore, ComputeActor, ComputeMessage,
-    ComputeTask, ExecutionOutcome, Executor, ExecutorCapability, FuelLimit, InMemoryBackend,
-    LocalExecutor, PauseReason, StatefulActorRegistry, StatefulActorState, TaskCode, TaskPriority,
+    ComputeTask, DeterminismClass, ExecutionOutcome, Executor, ExecutorCapability, FuelLimit,
+    InMemoryBackend, LocalExecutor, PauseReason, PrivacyClass, StatefulActorRegistry,
+    StatefulActorState, TaskCode, TaskPriority,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -55,6 +56,14 @@ fn create_test_task(id: &str, submitter: &str) -> ComputeTask {
         federation_constraints: None,
         estimated_value: None,
         verification: None,
+        // E1: Workload manifest fields
+        inputs_hash: None,
+        policy_hash: None,
+        determinism_class: DeterminismClass::default(),
+        privacy_class: PrivacyClass::default(),
+        // E4: Storage specification fields
+        storage_class: None,
+        data_locality: None,
     }
 }
 

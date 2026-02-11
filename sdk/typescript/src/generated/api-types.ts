@@ -228,6 +228,23 @@ export interface components {
             qr_data: components["schemas"]["SessionQrData"];
             session_id: string;
         };
+        /** @description Detailed component health with latency information */
+        DetailedComponentHealth: {
+            /** Format: int64 */
+            latency_ms?: number | null;
+            message?: string | null;
+            status: components["schemas"]["HealthStatus"];
+        };
+        /** @description Detailed health response with component-level status */
+        DetailedHealthResponse: {
+            components: {
+                [key: string]: components["schemas"]["DetailedComponentHealth"];
+            };
+            status: components["schemas"]["HealthStatus"];
+            /** Format: int64 */
+            uptime_seconds: number;
+            version: string;
+        };
         /** @description Device information in responses */
         DeviceInfo: {
             /** Format: int64 */
@@ -298,6 +315,11 @@ export interface components {
             status: string;
             version: string;
         };
+        /**
+         * @description Structured health status enum for typed responses
+         * @enum {string}
+         */
+        HealthStatus: "ok" | "degraded" | "unhealthy";
         /** @description In-app notification */
         InAppNotification: {
             /** @description Body */

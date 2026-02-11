@@ -37,8 +37,10 @@ pub mod bootstrap;
 pub mod comms;
 pub mod compute;
 pub mod coord;
+pub mod effects;
 pub mod error;
 pub mod events;
+pub mod governance;
 pub mod identity;
 pub mod naming;
 pub mod proofs;
@@ -46,6 +48,7 @@ pub mod protocol_params;
 pub mod scope;
 pub mod services;
 pub mod state;
+pub mod storage;
 pub mod time;
 pub mod types;
 pub mod version;
@@ -61,10 +64,20 @@ pub use bootstrap::{
     GenesisCapabilities, OracleRegistry,
 };
 pub use comms::{PubSub, RequestResponse, Streams};
-pub use compute::{ComputeEngine, Job, Trigger};
+pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
 pub use coord::Coordination;
+pub use effects::{
+    ControlEffect, DisputeEffect, EffectResult, FederationEffect, KernelEffect, MembershipEffect,
+    ProtocolEffect, ResourceEffect, SdisEffect, TreasuryEffect,
+};
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
+pub use governance::{
+    federation_effect_to_operation, DecisionReceiptId, DefaultEffectExecutor, EffectExecutor,
+    ExecutionOutcome, FederationExecutor, FederationOperation, FederationOperationType,
+    GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
+    TreasuryOperationType,
+};
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{
     Discovery, EndpointType, NamingService, ScopedDiscovery, ServiceEndpoint, ServiceEndpointId,
@@ -72,11 +85,22 @@ pub use naming::{
 pub use proofs::ArtifactReceipt;
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
-    CellService, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, SecurityService,
-    SecurityViolation, ServiceRegistry, TrustClass, TrustEvent, TrustService,
-    TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN, TRUST_THRESHOLD_PARTNER,
+    AddMemberRequest, AddMemberResult, CellService, ControlService, FederationJoinRequest,
+    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, MembershipService,
+    RemoveMemberRequest, RemoveMemberResult, SecurityService, SecurityViolation, ServiceRegistry,
+    TreasuryEntryRequest, TreasuryEntryResult,
+    TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
+    UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
+    VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,
+    TRUST_THRESHOLD_PARTNER,
 };
-pub use state::{BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy};
+pub use state::{
+    BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,
+    StateKey, StateOp, StateScope, StateValue,
+};
+pub use storage::{DataLocality, StorageClass, StorageValidationError};
 pub use time::TimeService;
 pub use version::Version;
 
