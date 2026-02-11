@@ -1170,3 +1170,58 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C5; continue through remaining active doc drift.
+## Changes applied (Batch C6 - deployment/config/perf active docs)
+
+1. `docs/deployment/DEPLOYMENT_GUIDE.md`
+- Updated stale metrics default in environment example from `9090` to `9100`.
+- Updated Prometheus endpoint reference to `http://localhost:9100/metrics`.
+- Added explicit note that `icnd` does not directly consume `ICN_DATA_DIR`/`ICN_QUIC_PORT`/`ICN_METRICS_PORT`; authoritative settings are CLI flags + config fields.
+
+2. `docs/reference/config/CONFIGURATION.md`
+- Replaced incorrect blanket env override table with currently supported runtime envs:
+  - `ICN_GATEWAY_JWT_SECRET`
+  - `OTEL_EXPORTER_OTLP_ENDPOINT`
+  - `OTEL_SERVICE_NAME`
+  - `ICN_KEYSTORE_PASSPHRASE` / legacy `ICN_PASSPHRASE`
+- Corrected precedence wording to avoid implying all config fields are env-overridable.
+- Updated troubleshooting debug example from `ICN_LOG_LEVEL=debug icnd` to `icnd --log-level debug`.
+
+3. `docs/examples/policies/README.md`
+- Updated metrics endpoint reference from `:9090` to `:9100`.
+
+4. `docs/performance/PROFILING.md`
+- Updated iftop port filter from `5600` to default QUIC port `7777`.
+
+5. `docs/guides/operations/operations-guide.md`
+- Corrected backup verification command to use `icnctl --data-dir ...` instead of unsupported `ICN_DATA_DIR=... icnctl ...`.
+
+## Verification updates (Batch C6)
+
+```bash
+rg -n "ICN_DATA_DIR|ICN_NETWORK_LISTEN_ADDR|ICN_LOG_LEVEL|:9090/metrics|port 5600|ICN_METRICS_PORT=9090" docs/deployment/DEPLOYMENT_GUIDE.md docs/reference/config/CONFIGURATION.md docs/examples/policies/README.md docs/performance/PROFILING.md docs/guides/operations/operations-guide.md
+```
+
+Result: remaining matches are explanatory notes about unsupported env usage; stale operational claims removed.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C6)
+
+- `docs/deployment/DEPLOYMENT_GUIDE.md | icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/mod.rs | rg -n "metrics_port|listen_addr|ICN_GATEWAY_JWT_SECRET" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/reference/config/CONFIGURATION.md | icn/bins/icnd/src/main.rs | rg -n "ICN_GATEWAY_JWT_SECRET|OTEL_EXPORTER_OTLP_ENDPOINT|OTEL_SERVICE_NAME|ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|--log-level" | aligned | reviewed_on(2026-02-11)`
+- `docs/examples/policies/README.md | icn/crates/icn-core/src/config/mod.rs | rg -n "metrics_port" | aligned | reviewed_on(2026-02-11)`
+- `docs/performance/PROFILING.md | icn/crates/icn-core/src/config/mod.rs | rg -n "listen_addr|7777" | aligned | reviewed_on(2026-02-11)`
+- `docs/guides/operations/operations-guide.md | icn/bins/icnctl/src/main.rs:get_data_dir | rg -n "get_data_dir|--data-dir" | aligned | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (Batch C6)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C6; continue with next active-doc drift slice.

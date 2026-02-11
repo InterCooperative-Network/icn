@@ -219,16 +219,15 @@ ICN_GATEWAY_CORS_ORIGINS=http://localhost:3000,https://your-domain.com
 # Logging
 RUST_LOG=info,icn_gateway=debug
 
-# Data directory
-ICN_DATA_DIR=/var/lib/icn
-
 # P2P networking
 ICN_QUIC_PORT=7777
 ICN_QUIC_BIND_ADDR=0.0.0.0
 
 # Metrics
-ICN_METRICS_PORT=9090
+ICN_METRICS_PORT=9100
 ```
+
+Note: `icnd` does not directly consume `ICN_DATA_DIR`/`ICN_QUIC_PORT`/`ICN_METRICS_PORT` in current runtime code. Set `--data-dir`, `--config`, and config file fields (for example `network.listen_addr`, `observability.metrics_port`) for authoritative behavior.
 
 ### Generate JWT Secret
 
@@ -325,7 +324,7 @@ curl http://localhost:8080/v1/health
 
 ### Prometheus Metrics
 
-Available at: http://localhost:9090/metrics
+Available at: http://localhost:9100/metrics
 
 Key metrics:
 - `gateway_requests_total` - Total API requests

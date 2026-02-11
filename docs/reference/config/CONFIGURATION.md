@@ -276,20 +276,22 @@ description = "A community cooperative"
 
 ## Environment Variables
 
-Environment variables override configuration file settings:
+Only selected runtime values are read from environment variables in current `icnd`:
 
 | Variable | Configuration | Example |
 |----------|---------------|---------|
-| `ICN_DATA_DIR` | `data_dir` | `/var/lib/icn` |
-| `ICN_NETWORK_LISTEN_ADDR` | `network.listen_addr` | `0.0.0.0:7777` |
 | `ICN_GATEWAY_JWT_SECRET` | `gateway.jwt_secret` | `<secret>` |
-| `ICN_LOG_LEVEL` | `observability.log_level` | `info` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `observability.tracing.otlp_endpoint` | `http://tempo:4317` |
+| `OTEL_SERVICE_NAME` | `observability.tracing.service_name` | `icn-node` |
+| `ICN_KEYSTORE_PASSPHRASE` | keystore unlock passphrase (preferred) | `<secret>` |
+| `ICN_PASSPHRASE` | keystore unlock passphrase (legacy fallback) | `<secret>` |
 
 **Precedence** (highest to lowest):
 1. Command-line arguments
-2. Environment variables
-3. Configuration file
-4. Default values
+2. Configuration file
+3. Default values
+
+Environment variables apply only where explicitly supported (for example gateway JWT and OpenTelemetry settings), not as a blanket override for all config fields.
 
 ---
 
@@ -478,7 +480,7 @@ When upgrading ICN:
 **Solutions**:
 1. Check file path: `icnd --config /path/to/config.toml`
 2. Verify file permissions: `ls -l /path/to/config.toml`
-3. Enable debug logging: `ICN_LOG_LEVEL=debug icnd`
+3. Enable debug logging: `icnd --log-level debug`
 
 ### Validation Fails
 

@@ -275,7 +275,7 @@ Policy enforcement emits Prometheus metrics:
 - `icn_compute_member_concurrent_tasks{coop_id, member_did}`
 - `icn_compute_member_credits_spent{coop_id, member_did}`
 
-Access metrics at `http://localhost:9090/metrics`
+Access metrics at `http://localhost:9100/metrics`
 
 ## Further Reading
 

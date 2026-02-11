@@ -285,7 +285,7 @@ mkdir /tmp/icn-restore-test
 cd /tmp/icn-restore-test
 icnctl restore ~/backups/icn-backup-latest.tar --data-dir /tmp/icn-restore-test
 # Verify keystore can be unlocked
-ICN_DATA_DIR=/tmp/icn-restore-test icnctl id show
+icnctl --data-dir /tmp/icn-restore-test id show
 ```
 
 ### Restoring from Backup
