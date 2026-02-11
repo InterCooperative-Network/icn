@@ -795,3 +795,143 @@ fn test_protocol_change_percentage_bounds() -> Result<()> {
     info!("✅ Percentage bounds test passed");
     Ok(())
 }
+
+// ============================================================================
+// Reload Durability Tests
+// ============================================================================
+
+/// Test that protocol parameters survive restart using Sled backend.
+///
+/// This test verifies the durability invariant: parameters written to
+/// SledParameterStore persist across store close/reopen cycles, simulating
+/// a daemon restart.
+#[test]
+fn test_protocol_parameter_reload_durability() -> Result<()> {
+    use icn_governance::SledParameterStore;
+    use std::sync::Arc;
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing protocol parameter reload durability ===");
+
+    // Create a temporary directory for the Sled database (not using temporary(true))
+    let tmpdir = std::env::temp_dir().join(format!(
+        "icn-protocol-durability-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&tmpdir)?;
+
+    let param_id = "governance.durability_test";
+    let expected_value = 500i64; // Within the 0-1000 constraint range
+    let proposal_id = "durable-proposal-001";
+    let expected_version = 1u64;
+
+    // Phase 1: Create store, write parameter, close
+    {
+        info!("Phase 1: Writing parameter to persistent store");
+
+        let db = sled::Config::new()
+            .path(&tmpdir)
+            .open()
+            .map_err(|e| anyhow::anyhow!("Failed to open Sled: {e}"))?;
+
+        let store = SledParameterStore::new(Arc::new(db))?;
+
+        // Initial parameter
+        let param = governance_test_param("durability_test", 1);
+        store.set(param.clone(), None, None)?;
+        info!("✓ Initial parameter set");
+
+        // Update parameter (this creates the value we want to verify after reload)
+        let mut updated = governance_test_param("durability_test", expected_value);
+        updated.version = 0;
+        updated.updated_by = Some(proposal_id.to_string()); // Set provenance on parameter
+        store.set(updated, Some(proposal_id.to_string()), None)?;
+        info!("✓ Updated parameter with proposal_id={}", proposal_id);
+
+        // Verify before closing
+        let before_close = store.get(param_id)?.expect("Should exist before close");
+        assert_eq!(before_close.value, ParameterValue::Integer(expected_value));
+        assert_eq!(before_close.version, expected_version);
+        assert_eq!(before_close.updated_by, Some(proposal_id.to_string()));
+        info!("✓ Verified value={}, version={} before close", expected_value, expected_version);
+
+        // Verify history exists
+        let history = store.get_history(param_id)?;
+        assert_eq!(history.len(), 1, "Should have one history entry");
+        assert_eq!(history[0].proposal_id, Some(proposal_id.to_string()));
+        info!("✓ History entry with proposal_id verified");
+
+        // Store goes out of scope, Sled flushes
+        info!("Phase 1 complete: store closed");
+    }
+
+    // Phase 2: Reopen store, verify parameter survived
+    {
+        info!("Phase 2: Reopening store and verifying durability");
+
+        let db = sled::Config::new()
+            .path(&tmpdir)
+            .open()
+            .map_err(|e| anyhow::anyhow!("Failed to reopen Sled: {e}"))?;
+
+        let store = SledParameterStore::new(Arc::new(db))?;
+
+        // Verify parameter exists and has correct values
+        let after_reload = store.get(param_id)?.expect("Parameter should survive reload");
+
+        assert_eq!(
+            after_reload.value,
+            ParameterValue::Integer(expected_value),
+            "Value should survive reload"
+        );
+        info!("✓ Value {} survived reload", expected_value);
+
+        assert_eq!(
+            after_reload.version, expected_version,
+            "Version should survive reload"
+        );
+        info!("✓ Version {} survived reload", expected_version);
+
+        assert_eq!(
+            after_reload.updated_by,
+            Some(proposal_id.to_string()),
+            "Provenance (updated_by) should survive reload"
+        );
+        info!("✓ Provenance (updated_by={}) survived reload", proposal_id);
+
+        // Verify history survived
+        let history = store.get_history(param_id)?;
+        assert_eq!(history.len(), 1, "History should survive reload");
+        assert_eq!(
+            history[0].proposal_id,
+            Some(proposal_id.to_string()),
+            "History entry proposal_id should survive reload"
+        );
+        info!("✓ History entry survived reload");
+
+        // Verify we can still update (store is functional after reload)
+        let mut final_update = governance_test_param("durability_test", 999);
+        final_update.version = expected_version;
+        store.set(final_update, Some("post-reload-update".to_string()), None)?;
+
+        let final_state = store.get(param_id)?.expect("Should exist after update");
+        assert_eq!(final_state.value, ParameterValue::Integer(999));
+        assert_eq!(final_state.version, 2);
+        info!("✓ Post-reload update succeeded");
+
+        info!("Phase 2 complete: durability verified");
+    }
+
+    // Cleanup
+    std::fs::remove_dir_all(&tmpdir).ok();
+
+    info!("✅ Reload durability test passed");
+    Ok(())
+}

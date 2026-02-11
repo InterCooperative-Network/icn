@@ -1011,6 +1011,220 @@ pub trait ControlService: Send + Sync {
 }
 
 // ============================================================================
+// Membership Service
+// ============================================================================
+
+/// Request to add a new member to an entity (cooperative, community, etc.)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the new member
+    pub member_did: String,
+    /// Role assigned to the member (e.g., "Worker", "Member", "BoardMember")
+    pub role: String,
+    /// Membership tier (e.g., "Founder", "Standard", "Provisional")
+    pub tier: String,
+    /// Decision receipt ID that authorized this addition
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this addition
+    pub decision_hash: String,
+}
+
+/// Result of adding a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AddMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to remove a member from an entity
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RemoveMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to remove
+    pub member_did: String,
+    /// Reason for removal
+    pub reason: String,
+    /// Decision receipt ID that authorized this removal
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this removal
+    pub decision_hash: String,
+}
+
+/// Result of removing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RemoveMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to update a member's role or tier
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to update
+    pub member_did: String,
+    /// New role (if changing)
+    pub new_role: Option<String>,
+    /// New tier (if changing)
+    pub new_tier: Option<String>,
+    /// Decision receipt ID that authorized this update
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this update
+    pub decision_hash: String,
+}
+
+/// Result of updating a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UpdateMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to freeze a member (suspend rights temporarily)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FreezeMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to freeze
+    pub member_did: String,
+    /// Reason for freezing
+    pub reason: String,
+    /// Duration in seconds (None = indefinite)
+    pub duration_secs: Option<u64>,
+    /// Decision receipt ID that authorized this freeze
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this freeze
+    pub decision_hash: String,
+}
+
+/// Result of freezing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FreezeMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// When the freeze expires (if duration was specified)
+    pub expires_at: Option<u64>,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Request to unfreeze a member (restore rights)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnfreezeMemberRequest {
+    /// Entity (cooperative/community) ID
+    pub entity_id: String,
+    /// DID of the member to unfreeze
+    pub member_did: String,
+    /// Decision receipt ID that authorized this unfreeze
+    pub decision_receipt_id: String,
+    /// Hash of the decision that authorized this unfreeze
+    pub decision_hash: String,
+}
+
+/// Result of unfreezing a member
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UnfreezeMemberResult {
+    /// Whether the operation succeeded
+    pub success: bool,
+    /// State change hash for verification
+    pub state_change_hash: String,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+/// Abstract membership management service.
+///
+/// The kernel uses this to manage entity membership without knowing the
+/// underlying organizational semantics. Apps implement this trait to provide
+/// actual membership operations backed by their storage.
+///
+/// # Provenance Tracking
+///
+/// All membership operations carry `decision_receipt_id` and `decision_hash`
+/// to maintain the audit chain from governance decisions to state changes.
+///
+/// # Durable State Changes
+///
+/// All operations must produce durable state changes that survive restarts.
+/// The `state_change_hash` in results allows verification of state transitions.
+pub trait MembershipService: Send + Sync {
+    /// Add a new member to an entity.
+    ///
+    /// This creates a durable membership record. The member starts in
+    /// a pending or active state depending on the entity's policies.
+    fn add_member(&self, request: AddMemberRequest) -> Result<AddMemberResult, anyhow::Error>;
+
+    /// Remove a member from an entity.
+    ///
+    /// This transitions the member to a removed state. The record is
+    /// kept for audit purposes but the member loses all rights.
+    fn remove_member(
+        &self,
+        request: RemoveMemberRequest,
+    ) -> Result<RemoveMemberResult, anyhow::Error>;
+
+    /// Update a member's role or tier.
+    ///
+    /// This modifies the member's role and/or tier while keeping their
+    /// membership active.
+    fn update_member(
+        &self,
+        request: UpdateMemberRequest,
+    ) -> Result<UpdateMemberResult, anyhow::Error>;
+
+    /// Freeze a member (suspend their rights temporarily).
+    ///
+    /// A frozen member retains their membership but cannot exercise
+    /// rights (voting, resource access, etc.) until unfrozen.
+    fn freeze_member(
+        &self,
+        request: FreezeMemberRequest,
+    ) -> Result<FreezeMemberResult, anyhow::Error>;
+
+    /// Unfreeze a member (restore their rights).
+    ///
+    /// This restores a frozen member to active status.
+    fn unfreeze_member(
+        &self,
+        request: UnfreezeMemberRequest,
+    ) -> Result<UnfreezeMemberResult, anyhow::Error>;
+
+    /// Check if a DID is a member of an entity.
+    fn is_member(&self, entity_id: &str, member_did: &str) -> bool;
+
+    /// Check if a DID is an active (non-frozen, non-removed) member.
+    fn is_active_member(&self, entity_id: &str, member_did: &str) -> bool;
+
+    /// Get provenance for a membership operation.
+    ///
+    /// Returns (decision_receipt_id, decision_hash) for the operation
+    /// that created/modified this membership.
+    fn get_membership_provenance(
+        &self,
+        entity_id: &str,
+        member_did: &str,
+    ) -> Option<(String, String)>;
+}
+
+// ============================================================================
 // Service Registry
 // ============================================================================
 

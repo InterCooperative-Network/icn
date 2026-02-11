@@ -245,3 +245,66 @@ fn tripwire_kernel_services_implemented() {
     // assert!(has_protocol_service, "ProtocolService should exist");
     // assert!(has_dispute_service, "DisputeService should exist");
 }
+
+// =============================================================================
+// RUNTIME TRIPWIRE: LEGACY PATH MUST NOT EXECUTE WITH EFFECT PATH ENABLED
+// =============================================================================
+
+/// Tripwire: When ICN_USE_EFFECT_PATH=1, the legacy handler must NEVER execute
+///
+/// This test uses a global atomic flag set in `governance_handlers::handle_proposal_accepted()`
+/// to detect if the legacy path was ever invoked. If the effect path gate is enabled,
+/// all proposal execution should route through the effect dispatcher instead.
+///
+/// **How it works:**
+/// 1. The legacy `handle_proposal_accepted()` sets `LEGACY_HANDLER_INVOKED = true`
+/// 2. This test checks `was_legacy_invoked()` at the end of a test run
+/// 3. If ICN_USE_EFFECT_PATH=1 and the flag is true, the test fails
+///
+/// **When to use:**
+/// - Run after integration tests that exercise proposal acceptance
+/// - CI should run this as a final check in the effect path test suite
+#[test]
+fn tripwire_legacy_not_invoked_with_effect_gate() {
+    use icn_core::supervisor::governance_handlers::{reset_legacy_invoked, was_legacy_invoked};
+
+    // Check if effect path is enabled via env var
+    let effect_path_enabled = std::env::var("ICN_USE_EFFECT_PATH")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    if effect_path_enabled {
+        // When effect path is enabled, the legacy handler should NEVER be invoked
+        let legacy_was_invoked = was_legacy_invoked();
+
+        println!("╔══════════════════════════════════════════════════════════════════╗");
+        println!("║         EFFECT PATH RUNTIME TRIPWIRE                             ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!("║ ICN_USE_EFFECT_PATH: ENABLED (=1)                                ║");
+        println!("║ Legacy handler invoked: {}                                     ║",
+            if legacy_was_invoked { "YES ❌" } else { "NO  ✅" }
+        );
+        println!("╚══════════════════════════════════════════════════════════════════╝");
+
+        assert!(
+            !legacy_was_invoked,
+            "TRIPWIRE FAILED: Legacy handle_proposal_accepted() was invoked \
+             while ICN_USE_EFFECT_PATH=1. All proposal execution should route \
+             through the effect dispatcher. Check lifecycle.rs wiring."
+        );
+
+        // Reset for subsequent test runs in the same process
+        reset_legacy_invoked();
+    } else {
+        // Effect path not enabled - legacy path is expected
+        println!("╔══════════════════════════════════════════════════════════════════╗");
+        println!("║         EFFECT PATH RUNTIME TRIPWIRE                             ║");
+        println!("╠══════════════════════════════════════════════════════════════════╣");
+        println!("║ ICN_USE_EFFECT_PATH: DISABLED (not set or =0)                   ║");
+        println!("║ Status: Legacy path is expected to be active                     ║");
+        println!("║                                                                  ║");
+        println!("║ To test effect path exclusively:                                 ║");
+        println!("║   ICN_USE_EFFECT_PATH=1 cargo test tripwire_legacy               ║");
+        println!("╚══════════════════════════════════════════════════════════════════╝");
+    }
+}

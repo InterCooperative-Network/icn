@@ -9,12 +9,13 @@
 //! - [`KernelProtocolExecutor`] for protocol parameter changes
 //! - [`KernelFederationExecutor`] for federation operations
 //! - [`KernelControlExecutor`] for governance control operations (veto, force close)
+//! - [`KernelMembershipExecutor`] for membership operations
 
 use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect};
+use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect, MembershipEffect};
 use icn_kernel_api::governance::{
     DecisionReceiptId, EffectExecutor, ExecutionOutcome, FederationExecutor, FederationOperation,
     GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
@@ -24,6 +25,7 @@ use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_kernel_api::{
     ControlService, ForceCloseProposalRequest, VetoProposalRequest,
 };
+use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
 /// Adapter that implements [`GovernanceExecutor`] by delegating to kernel services.
@@ -36,6 +38,7 @@ pub struct KernelGovernanceExecutor {
     protocol: Arc<KernelProtocolExecutor>,
     federation: Arc<KernelFederationExecutor>,
     control: Arc<KernelControlExecutor>,
+    membership: Arc<KernelMembershipExecutor>,
 }
 
 impl KernelGovernanceExecutor {
@@ -49,6 +52,7 @@ impl KernelGovernanceExecutor {
             protocol: Arc::new(KernelProtocolExecutor::new(protocol_param_store)),
             federation: Arc::new(KernelFederationExecutor::new()),
             control: Arc::new(KernelControlExecutor::new()),
+            membership: Arc::new(KernelMembershipExecutor::new()),
         }
     }
 
@@ -70,6 +74,15 @@ impl KernelGovernanceExecutor {
         service: Arc<dyn icn_kernel_api::FederationService>,
     ) -> Self {
         self.federation = Arc::new(KernelFederationExecutor::with_service(service));
+        self
+    }
+
+    /// Set the membership service for membership operations.
+    pub fn with_membership_service(
+        mut self,
+        service: Arc<dyn icn_kernel_api::MembershipService>,
+    ) -> Self {
+        self.membership = Arc::new(KernelMembershipExecutor::with_service(service));
         self
     }
 }
@@ -159,22 +172,17 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     decision_receipt_id,
                 ))
             }
-            // For other effect types (Membership, Dispute, Resource, Sdis), return FAILURE
-            // This ensures no silent success for unimplemented effect paths
-            _ => {
-                let effect_type = format!("{:?}", effect);
-                warn!(
-                    receipt_id = %decision_receipt_id,
-                    effect_type = %effect_type,
-                    "Effect type not yet implemented - returning failure"
-                );
-                Ok(EffectResult {
-                    effect_id: decision_receipt_id.to_string(),
-                    success: false,
-                    message: format!("Effect type not yet implemented: {}", effect_type),
-                    state_change_hash: None,
-                })
-            },
+            KernelEffect::Membership(membership_effect) => {
+                // Execute membership effect (add, remove, update, freeze, unfreeze)
+                let outcome = self
+                    .membership
+                    .execute_membership_operation(&receipt_id, membership_effect)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
         }
     }
 }
@@ -307,7 +315,8 @@ fn convert_operation_type(
 /// Protocol executor implementation.
 ///
 /// Executes protocol parameter changes by delegating to the kernel's
-/// protocol parameter store.
+/// protocol parameter store. Changes are durable (persisted to Sled)
+/// and include provenance tracking via decision receipt IDs.
 pub struct KernelProtocolExecutor {
     /// Protocol parameter store for reading/writing parameters
     param_store: Arc<dyn ProtocolParameterStore>,
@@ -317,6 +326,29 @@ impl KernelProtocolExecutor {
     /// Create a new protocol executor with the given parameter store.
     pub fn new(param_store: Arc<dyn ProtocolParameterStore>) -> Self {
         Self { param_store }
+    }
+
+    /// Compute a state change hash for a protocol parameter change.
+    ///
+    /// The hash includes: parameter name, old value, new value, receipt ID,
+    /// and effective_at timestamp to provide a unique, verifiable fingerprint
+    /// of the state transition.
+    fn compute_state_change_hash(
+        receipt_id: &DecisionReceiptId,
+        change: &ProtocolChange,
+    ) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"protocol:set_parameter:");
+        hasher.update(change.parameter_name.as_bytes());
+        hasher.update(b":");
+        hasher.update(change.old_value.as_bytes());
+        hasher.update(b"->");
+        hasher.update(change.new_value.as_bytes());
+        hasher.update(b":");
+        hasher.update(receipt_id.to_string().as_bytes());
+        hasher.update(b":");
+        hasher.update(change.effective_at.to_le_bytes());
+        format!("{:x}", hasher.finalize())
     }
 }
 
@@ -368,21 +400,25 @@ impl ProtocolExecutor for KernelProtocolExecutor {
         updated_param.updated_at = change.effective_at;
         updated_param.updated_by = Some(receipt_id.to_string());
 
-        // Apply the change to the parameter store
+        // Apply the change to the parameter store (durable via Sled)
         self.param_store
             .set(updated_param, Some(receipt_id.to_string()), None)?;
+
+        // Compute state change hash for provenance tracking
+        let state_change_hash = Self::compute_state_change_hash(receipt_id, &change);
 
         tracing::info!(
             parameter = %change.parameter_name,
             new_value = %change.new_value,
-            "Protocol parameter updated"
+            state_change_hash = %state_change_hash,
+            "Protocol parameter updated (durable)"
         );
 
         Ok(ExecutionOutcome::Success {
             receipt_id: receipt_id.clone(),
             effects: vec![format!(
-                "Changed {} from {} to {}",
-                change.parameter_name, change.old_value, change.new_value
+                "Changed {} from {} to {} -> state_hash={}",
+                change.parameter_name, change.old_value, change.new_value, state_change_hash
             )],
         })
     }
@@ -782,15 +818,30 @@ fn protocol_effect_to_change(
     }
 }
 
-/// Convert an ExecutionOutcome to an EffectResult
+/// Convert an ExecutionOutcome to an EffectResult.
+///
+/// Extracts state_change_hash from effects if present (embedded as `-> state_hash=XXX`
+/// by Protocol and Federation executors).
 fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str) -> EffectResult {
     match outcome {
-        ExecutionOutcome::Success { effects, .. } => EffectResult {
-            effect_id: effect_id.to_string(),
-            success: true,
-            message: effects.join("; "),
-            state_change_hash: None,
-        },
+        ExecutionOutcome::Success { effects, .. } => {
+            // Extract state_change_hash from effects if present
+            // Format: "... -> state_hash=<hash>"
+            let state_change_hash = effects
+                .iter()
+                .find_map(|e| {
+                    e.find("-> state_hash=").map(|pos| {
+                        e[pos + 14..].to_string() // Skip "-> state_hash="
+                    })
+                });
+
+            EffectResult {
+                effect_id: effect_id.to_string(),
+                success: true,
+                message: effects.join("; "),
+                state_change_hash,
+            }
+        }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: false,
@@ -964,6 +1015,256 @@ impl Default for KernelControlExecutor {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// =============================================================================
+// Membership Executor
+// =============================================================================
+
+/// Kernel executor for membership operations.
+///
+/// This executor translates [`MembershipEffect`] into calls to the [`MembershipService`].
+/// If no service is configured, operations will fail (no silent success).
+pub struct KernelMembershipExecutor {
+    /// Membership service for durable state operations
+    service: Option<Arc<dyn icn_kernel_api::MembershipService>>,
+}
+
+impl KernelMembershipExecutor {
+    /// Create a new membership executor (placeholder mode - no durable state).
+    pub fn new() -> Self {
+        Self { service: None }
+    }
+
+    /// Create a new membership executor with a real service.
+    pub fn with_service(service: Arc<dyn icn_kernel_api::MembershipService>) -> Self {
+        Self {
+            service: Some(service),
+        }
+    }
+
+    /// Set the membership service after construction.
+    pub fn set_service(&mut self, service: Arc<dyn icn_kernel_api::MembershipService>) {
+        self.service = Some(service);
+    }
+
+    /// Execute a membership operation.
+    pub async fn execute_membership_operation(
+        &self,
+        receipt_id: &DecisionReceiptId,
+        effect: MembershipEffect,
+    ) -> Result<ExecutionOutcome> {
+        tracing::info!(
+            receipt_id = %receipt_id,
+            effect = ?effect,
+            has_service = self.service.is_some(),
+            "Executing membership operation"
+        );
+
+        // If we have a real service, use it for durable state
+        if let Some(ref service) = self.service {
+            match effect {
+                MembershipEffect::AddMember {
+                    entity_id,
+                    member_did,
+                    role,
+                    tier,
+                } => {
+                    let request = icn_kernel_api::AddMemberRequest {
+                        entity_id: entity_id.clone(),
+                        member_did: member_did.clone(),
+                        role,
+                        tier,
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: compute_decision_hash(receipt_id),
+                    };
+
+                    let result = service.add_member(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Member added with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Added member {} to {} -> state_hash={}",
+                                member_did, entity_id, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                MembershipEffect::RemoveMember {
+                    entity_id,
+                    member_did,
+                    reason,
+                } => {
+                    let request = icn_kernel_api::RemoveMemberRequest {
+                        entity_id: entity_id.clone(),
+                        member_did: member_did.clone(),
+                        reason,
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: compute_decision_hash(receipt_id),
+                    };
+
+                    let result = service.remove_member(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Member removed with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Removed member {} from {} -> state_hash={}",
+                                member_did, entity_id, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                MembershipEffect::UpdateMember {
+                    entity_id,
+                    member_did,
+                    new_role,
+                    new_tier,
+                } => {
+                    let request = icn_kernel_api::UpdateMemberRequest {
+                        entity_id: entity_id.clone(),
+                        member_did: member_did.clone(),
+                        new_role,
+                        new_tier,
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: compute_decision_hash(receipt_id),
+                    };
+
+                    let result = service.update_member(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Member updated with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Updated member {} in {} -> state_hash={}",
+                                member_did, entity_id, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                MembershipEffect::FreezeMember {
+                    entity_id,
+                    member_did,
+                    reason,
+                    duration_secs,
+                } => {
+                    let request = icn_kernel_api::FreezeMemberRequest {
+                        entity_id: entity_id.clone(),
+                        member_did: member_did.clone(),
+                        reason,
+                        duration_secs,
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: compute_decision_hash(receipt_id),
+                    };
+
+                    let result = service.freeze_member(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            expires_at = ?result.expires_at,
+                            "Member frozen with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Froze member {} in {} -> state_hash={}",
+                                member_did, entity_id, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+                MembershipEffect::UnfreezeMember {
+                    entity_id,
+                    member_did,
+                } => {
+                    let request = icn_kernel_api::UnfreezeMemberRequest {
+                        entity_id: entity_id.clone(),
+                        member_did: member_did.clone(),
+                        decision_receipt_id: receipt_id.to_string(),
+                        decision_hash: compute_decision_hash(receipt_id),
+                    };
+
+                    let result = service.unfreeze_member(request)?;
+
+                    if result.success {
+                        tracing::info!(
+                            state_change_hash = %result.state_change_hash,
+                            "Member unfrozen with durable state"
+                        );
+                        Ok(ExecutionOutcome::Success {
+                            receipt_id: receipt_id.clone(),
+                            effects: vec![format!(
+                                "Unfroze member {} in {} -> state_hash={}",
+                                member_did, entity_id, result.state_change_hash
+                            )],
+                        })
+                    } else {
+                        Ok(ExecutionOutcome::Failed {
+                            receipt_id: receipt_id.clone(),
+                            reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        })
+                    }
+                }
+            }
+        } else {
+            // No service configured - return failure instead of lying
+            tracing::warn!(
+                "Membership executor has no service configured - cannot execute durable operation"
+            );
+            Ok(ExecutionOutcome::Failed {
+                receipt_id: receipt_id.clone(),
+                reason: "Membership service not configured".to_string(),
+            })
+        }
+    }
+}
+
+impl Default for KernelMembershipExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Compute a decision hash from the receipt ID (placeholder implementation).
+fn compute_decision_hash(receipt_id: &DecisionReceiptId) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(receipt_id.to_string().as_bytes());
+    let result = hasher.finalize();
+    hex::encode(result)
 }
 
 #[cfg(test)]

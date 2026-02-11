@@ -85,11 +85,14 @@ pub use naming::{
 pub use proofs::ArtifactReceipt;
 pub use scope::{CellId, MockCellService, ScopeLevel};
 pub use services::{
-    CellService, ControlService, FederationJoinRequest, FederationJoinResult, FederationService,
-    FederationVouchRequest, FederationVouchResult, ForceCloseProposalRequest,
-    ForceCloseProposalResult, GovernanceEvent, GovernanceService, LedgerEvent, LedgerService,
-    SecurityService, SecurityViolation, ServiceRegistry, TreasuryEntryRequest, TreasuryEntryResult,
+    AddMemberRequest, AddMemberResult, CellService, ControlService, FederationJoinRequest,
+    FederationJoinResult, FederationService, FederationVouchRequest, FederationVouchResult,
+    ForceCloseProposalRequest, ForceCloseProposalResult, FreezeMemberRequest, FreezeMemberResult,
+    GovernanceEvent, GovernanceService, LedgerEvent, LedgerService, MembershipService,
+    RemoveMemberRequest, RemoveMemberResult, SecurityService, SecurityViolation, ServiceRegistry,
+    TreasuryEntryRequest, TreasuryEntryResult,
     TreasuryOperationType as ServicesTreasuryOperationType, TrustClass, TrustEvent, TrustService,
+    UnfreezeMemberRequest, UnfreezeMemberResult, UpdateMemberRequest, UpdateMemberResult,
     VetoProposalRequest, VetoProposalResult, TRUST_THRESHOLD_FEDERATED, TRUST_THRESHOLD_KNOWN,
     TRUST_THRESHOLD_PARTNER,
 };

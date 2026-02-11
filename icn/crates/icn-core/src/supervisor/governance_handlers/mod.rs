@@ -12,7 +12,30 @@ mod federation;
 mod protocol;
 mod treasury;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+// =============================================================================
+// LEGACY PATH TRIPWIRE
+// =============================================================================
+// This flag is set when the legacy `handle_proposal_accepted()` path executes.
+// Tests can check this to ensure the legacy path is NOT used when
+// ICN_USE_EFFECT_PATH=1 is set.
+
+static LEGACY_HANDLER_INVOKED: AtomicBool = AtomicBool::new(false);
+
+/// Returns true if the legacy `handle_proposal_accepted()` was ever invoked.
+///
+/// This is used by tripwire tests to verify that when `ICN_USE_EFFECT_PATH=1`,
+/// no proposal execution routes through the legacy path.
+pub fn was_legacy_invoked() -> bool {
+    LEGACY_HANDLER_INVOKED.load(Ordering::SeqCst)
+}
+
+/// Resets the legacy invocation flag (for test isolation).
+pub fn reset_legacy_invoked() {
+    LEGACY_HANDLER_INVOKED.store(false, Ordering::SeqCst);
+}
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
@@ -172,6 +195,9 @@ impl GovernanceEventHandler {
         decided_at: u64,
         domain_id: String,
     ) {
+        // Set tripwire flag: this legacy path was invoked
+        LEGACY_HANDLER_INVOKED.store(true, Ordering::SeqCst);
+
         match payload {
             ProposalPayload::Budget {
                 amount,

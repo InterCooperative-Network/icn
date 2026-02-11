@@ -16,7 +16,9 @@
 mod control_service;
 mod federation_service;
 mod ledger_service;
+mod membership_service;
 
 pub use control_service::ControlServiceImpl;
 pub use federation_service::FederationServiceImpl;
 pub use ledger_service::LedgerServiceImpl;
+pub use membership_service::MembershipServiceImpl;
