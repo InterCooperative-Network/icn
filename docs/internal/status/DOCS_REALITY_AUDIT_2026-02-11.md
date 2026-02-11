@@ -907,3 +907,48 @@ Result:
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4; continue.
+
+## Changes applied (Batch D2 - slice 4: internal status snapshot framing)
+
+1. `docs/internal/status/gap-analysis.md`
+- Marked document as historical analysis snapshot (2025-11-18).
+- Reframed substrate readiness claim to explicit point-in-time assessment language.
+
+2. `docs/internal/status/strategic-gap-analysis.md`
+- Marked status as historical strategic analysis snapshot (2025-01-15).
+- Reframed completion/test-count/readiness statements to date-bounded wording.
+
+3. `docs/internal/status/multi-device-status.md`
+- Reframed summary and issue status claims as snapshot assessments.
+- Reworded production-ready language to historical status notation.
+
+4. `docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md`
+- Marked report as historical review snapshot (2025-12-17).
+- Reframed conclusion/recommendation and status labels to explicit review-time context.
+
+## Verification updates (Batch D2 - slice 4)
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh . | rg '^MISSING_LINK\|'
+rg -n "Historical|snapshot|Status at review time|production-ready|pilot-ready" docs/internal/status/gap-analysis.md docs/internal/status/strategic-gap-analysis.md docs/internal/status/multi-device-status.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md
+```
+
+Result:
+- Missing-link findings remain zero.
+- Targeted internal status and architecture review docs now use explicit snapshot framing.
+
+## Audit ledger updates (D2 slice 4)
+
+- `docs/internal/status/gap-analysis.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/internal/status/strategic-gap-analysis.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/internal/status/multi-device-status.md | status snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+- `docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md | architecture review snapshot framing policy | doc_reality_scan + stale-claim grep | pass | reviewed_on(2026-02-11)`
+
+## Recursive self-correction score (D2 slice 4)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4; continue.
