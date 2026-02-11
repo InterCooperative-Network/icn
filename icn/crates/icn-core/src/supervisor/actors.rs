@@ -43,7 +43,6 @@ pub struct ShutdownHandles {
 #[derive(Default)]
 pub struct EventSubscriptionHandles {
     pub governance_event_subscription: Option<crate::events::SubscriptionHandle>,
-    pub policy_governance_subscription: Option<crate::events::SubscriptionHandle>,
 }
 
 /// Typed handles for domain objects passed from daemon to supervisor.

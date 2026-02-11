@@ -26,10 +26,9 @@ use super::execution::{ExecutionCallback, ProposalExecutionContext, ProposalType
 ///
 /// # Note
 ///
-/// Currently this is a placeholder implementation. The actual federation logic
-/// remains in `icn-core/src/supervisor/governance_handlers/federation.rs` and
-/// is accessed via the executor callback. Future sprints will migrate the
-/// full implementation here.
+/// Federation proposal execution now routes through the effect path via
+/// `FederationService`. The legacy `governance_handlers/` has been deleted.
+/// This handler translates proposal payloads to effects.
 pub struct FederationHandler {
     /// Handler name for logging
     name: String,

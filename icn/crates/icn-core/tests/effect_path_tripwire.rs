@@ -1,31 +1,15 @@
 //! Effect Path Migration Tripwires
 //!
-//! These tests document and verify the state of the legacy → effect path migration.
+//! These tests document and verify the state of the effect path migration.
 //! They serve as:
 //! 1. Documentation of which paths are migrated
 //! 2. Tripwires that fail if migration state changes unexpectedly
 //! 3. Guard rails preventing regression
 //!
-//! The goal is to delete `governance_handlers/` entirely once all paths are migrated.
-//! Current state: 5,335 lines of legacy code to remove.
+//! The legacy `governance_handlers/` has been deleted.
+//! Effect path is now the only path for governance proposal execution.
 
 use std::path::PathBuf;
-
-/// Counts lines in a directory recursively
-fn count_lines_in_dir(dir: &PathBuf) -> usize {
-    let mut total = 0;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    total += content.lines().count();
-                }
-            }
-        }
-    }
-    total
-}
 
 /// Find the workspace root by looking for Cargo.toml with [workspace]
 fn find_workspace_root() -> PathBuf {
@@ -37,51 +21,31 @@ fn find_workspace_root() -> PathBuf {
 // LEGACY PATH TRIPWIRES
 // =============================================================================
 
-/// Tripwire: governance_handlers directory must exist (or migration is complete)
+/// Tripwire: governance_handlers directory must NOT exist
 ///
-/// This test documents that the legacy path still exists.
-/// When we finish migration, this test should be inverted to assert the directory is GONE.
+/// The legacy governance_handlers have been deleted. The effect path is now
+/// the only path for governance proposal execution.
 #[test]
-fn tripwire_legacy_governance_handlers_exists() {
+fn tripwire_legacy_governance_handlers_deleted() {
     let workspace = find_workspace_root();
     let handlers_dir = workspace.join("crates/icn-core/src/supervisor/governance_handlers");
 
-    if handlers_dir.exists() {
-        let line_count = count_lines_in_dir(&handlers_dir);
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║            LEGACY GOVERNANCE HANDLERS STATUS                     ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ Status: LEGACY PATH STILL ACTIVE                                 ║");
-        println!("║ Directory: governance_handlers/                                  ║");
-        println!("║ Line count: {:5} lines                                        ║", line_count);
-        println!("║                                                                  ║");
-        println!("║ To complete migration:                                           ║");
-        println!("║ 1. Implement remaining services (Membership, Control, Protocol)  ║");
-        println!("║ 2. Wire effect dispatcher into lifecycle.rs                      ║");
-        println!("║ 3. Delete governance_handlers/                                   ║");
-        println!("║ 4. Flip this test to assert directory is GONE                    ║");
-        println!("╚══════════════════════════════════════════════════════════════════╝");
+    // Legacy path removed - migration complete!
+    println!("╔══════════════════════════════════════════════════════════════════╗");
+    println!("║           🎉 LEGACY GOVERNANCE HANDLERS DELETED 🎉               ║");
+    println!("╠══════════════════════════════════════════════════════════════════╣");
+    println!("║ Status: EFFECT PATH IS NOW THE ONLY PATH                         ║");
+    println!("║ Directory: governance_handlers/ (DELETED)                        ║");
+    println!("║                                                                  ║");
+    println!("║ ✅ Migration complete                                            ║");
+    println!("║ ✅ Effect dispatcher is primary execution path                   ║");
+    println!("║ ✅ All proposals route through kernel-safe effects              ║");
+    println!("╚══════════════════════════════════════════════════════════════════╝");
 
-        // Document expected line counts per file
-        assert!(
-            line_count > 4000,
-            "Expected ~5335 lines in governance_handlers, got {}. \
-             If significantly lower, migration may be in progress - update test.",
-            line_count
-        );
-    } else {
-        // Legacy path removed - migration complete!
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║           🎉 LEGACY GOVERNANCE HANDLERS DELETED 🎉               ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ Status: EFFECT PATH IS NOW THE ONLY PATH                         ║");
-        println!("║ Directory: governance_handlers/ (DELETED)                        ║");
-        println!("║                                                                  ║");
-        println!("║ ✅ Migration complete                                            ║");
-        println!("║ ✅ Effect dispatcher is primary execution path                   ║");
-        println!("║ ✅ All proposals route through kernel-safe effects              ║");
-        println!("╚══════════════════════════════════════════════════════════════════╝");
-    }
+    assert!(
+        !handlers_dir.exists(),
+        "governance_handlers/ directory should be DELETED. Migration is complete."
+    );
 }
 
 /// Tripwire: Track which proposal types are handled by effect path
@@ -154,10 +118,10 @@ fn tripwire_effect_path_coverage() {
 // EFFECT DISPATCHER WIRING TRIPWIRES
 // =============================================================================
 
-/// Tripwire: Effect dispatcher should be in lifecycle.rs
+/// Tripwire: Effect dispatcher is the default in lifecycle.rs
 ///
 /// This test verifies the effect path wiring is in place.
-/// When ICN_USE_EFFECT_PATH=1, governance proposals route through effects.
+/// The effect path is now the default - no env gate required.
 #[test]
 fn tripwire_effect_dispatcher_in_lifecycle() {
     let workspace = find_workspace_root();
@@ -171,18 +135,18 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
     // Verify required components are present
     let has_kernel_executor = content.contains("KernelGovernanceExecutor");
     let has_effect_subscription = content.contains("create_effect_subscription");
-    let has_env_gate = content.contains("ICN_USE_EFFECT_PATH");
+    // Env gate has been removed - effect path is now the default
+    let has_no_env_gate = !content.contains("ICN_USE_EFFECT_PATH");
 
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║         🎉 EFFECT DISPATCHER WIRED INTO LIFECYCLE 🎉             ║");
+    println!("║         🎉 EFFECT DISPATCHER IS THE DEFAULT PATH 🎉              ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!("║ EffectDispatcher:           {}                           ║", if has_effect_dispatcher { "✅" } else { "❌" });
     println!("║ KernelGovernanceExecutor:   {}                           ║", if has_kernel_executor { "✅" } else { "❌" });
     println!("║ create_effect_subscription: {}                           ║", if has_effect_subscription { "✅" } else { "❌" });
-    println!("║ ICN_USE_EFFECT_PATH gate:   {}                           ║", if has_env_gate { "✅" } else { "❌" });
+    println!("║ Env gate removed:           {}                           ║", if has_no_env_gate { "✅" } else { "❌" });
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║ Status: Effect path is production-ready (env-gated)            ║");
-    println!("║ Enable: ICN_USE_EFFECT_PATH=1                                  ║");
+    println!("║ Status: Effect path is production-ready (always active)         ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     assert!(
@@ -198,8 +162,8 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
         "create_effect_subscription should be in lifecycle.rs"
     );
     assert!(
-        has_env_gate,
-        "ICN_USE_EFFECT_PATH gate should be in lifecycle.rs"
+        has_no_env_gate,
+        "ICN_USE_EFFECT_PATH env gate should be removed - effect path is now default"
     );
 }
 
@@ -247,64 +211,28 @@ fn tripwire_kernel_services_implemented() {
 }
 
 // =============================================================================
-// RUNTIME TRIPWIRE: LEGACY PATH MUST NOT EXECUTE WITH EFFECT PATH ENABLED
+// LEGACY PATH VERIFICATION
 // =============================================================================
 
-/// Tripwire: When ICN_USE_EFFECT_PATH=1, the legacy handler must NEVER execute
+/// Tripwire: Legacy governance_handlers module no longer exists
 ///
-/// This test uses a global atomic flag set in `governance_handlers::handle_proposal_accepted()`
-/// to detect if the legacy path was ever invoked. If the effect path gate is enabled,
-/// all proposal execution should route through the effect dispatcher instead.
-///
-/// **How it works:**
-/// 1. The legacy `handle_proposal_accepted()` sets `LEGACY_HANDLER_INVOKED = true`
-/// 2. This test checks `was_legacy_invoked()` at the end of a test run
-/// 3. If ICN_USE_EFFECT_PATH=1 and the flag is true, the test fails
-///
-/// **When to use:**
-/// - Run after integration tests that exercise proposal acceptance
-/// - CI should run this as a final check in the effect path test suite
+/// The legacy path has been removed. This test confirms there are no lingering
+/// references to the deleted module that would cause build failures.
 #[test]
-fn tripwire_legacy_not_invoked_with_effect_gate() {
-    use icn_core::supervisor::governance_handlers::{reset_legacy_invoked, was_legacy_invoked};
+fn tripwire_no_legacy_references() {
+    // The legacy governance_handlers module has been deleted.
+    // If this test compiles, it means there are no compile-time references
+    // to the deleted module. Runtime verification is no longer needed since
+    // the effect path is now the only path.
 
-    // Check if effect path is enabled via env var
-    let effect_path_enabled = std::env::var("ICN_USE_EFFECT_PATH")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(false);
-
-    if effect_path_enabled {
-        // When effect path is enabled, the legacy handler should NEVER be invoked
-        let legacy_was_invoked = was_legacy_invoked();
-
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║         EFFECT PATH RUNTIME TRIPWIRE                             ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ ICN_USE_EFFECT_PATH: ENABLED (=1)                                ║");
-        println!("║ Legacy handler invoked: {}                                     ║",
-            if legacy_was_invoked { "YES ❌" } else { "NO  ✅" }
-        );
-        println!("╚══════════════════════════════════════════════════════════════════╝");
-
-        assert!(
-            !legacy_was_invoked,
-            "TRIPWIRE FAILED: Legacy handle_proposal_accepted() was invoked \
-             while ICN_USE_EFFECT_PATH=1. All proposal execution should route \
-             through the effect dispatcher. Check lifecycle.rs wiring."
-        );
-
-        // Reset for subsequent test runs in the same process
-        reset_legacy_invoked();
-    } else {
-        // Effect path not enabled - legacy path is expected
-        println!("╔══════════════════════════════════════════════════════════════════╗");
-        println!("║         EFFECT PATH RUNTIME TRIPWIRE                             ║");
-        println!("╠══════════════════════════════════════════════════════════════════╣");
-        println!("║ ICN_USE_EFFECT_PATH: DISABLED (not set or =0)                   ║");
-        println!("║ Status: Legacy path is expected to be active                     ║");
-        println!("║                                                                  ║");
-        println!("║ To test effect path exclusively:                                 ║");
-        println!("║   ICN_USE_EFFECT_PATH=1 cargo test tripwire_legacy               ║");
-        println!("╚══════════════════════════════════════════════════════════════════╝");
-    }
+    println!("╔══════════════════════════════════════════════════════════════════╗");
+    println!("║         🎉 LEGACY PATH REMOVED 🎉                                ║");
+    println!("╠══════════════════════════════════════════════════════════════════╣");
+    println!("║ governance_handlers module: DELETED                              ║");
+    println!("║ Effect path: ACTIVE (always)                                     ║");
+    println!("║ Env gate ICN_USE_EFFECT_PATH: REMOVED                           ║");
+    println!("║                                                                  ║");
+    println!("║ All governance proposals now route through:                      ║");
+    println!("║   Decision → Effect → Service → Durable State                   ║");
+    println!("╚══════════════════════════════════════════════════════════════════╝");
 }

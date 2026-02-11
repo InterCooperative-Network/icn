@@ -14,7 +14,6 @@ pub mod background_tasks;
 pub mod bridge;
 pub mod effect_dispatcher;
 pub mod governance_executor;
-pub mod governance_handlers;
 pub mod init_bootstrap;
 pub mod init_community;
 pub mod init_compute;

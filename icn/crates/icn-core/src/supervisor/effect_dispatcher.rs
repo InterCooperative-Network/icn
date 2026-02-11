@@ -18,8 +18,8 @@
 //! EffectDispatcher::execute_effects(effects) → Vec<EffectResult>
 //! ```
 //!
-//! This runs **parallel to** the legacy `governance_handlers` path.
-//! Sprint 3+ will switch over and remove the old handlers.
+//! This is the production execution path for governance proposals.
+//! The legacy `governance_handlers` have been deleted.
 
 use std::sync::Arc;
 
