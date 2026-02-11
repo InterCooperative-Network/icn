@@ -35,8 +35,21 @@ Base route: **`/v1/sdis`**
 - ✅ `POST /v1/sdis/ephemeral/generate` - Generate ephemeral DID proof
 - ✅ `GET /v1/sdis/health` - Health check
 
-**Not wired via current route configuration:**
-- ⚠️ Anchor/recovery routes described in older docs (`/v1/sdis/anchors/*`, `/v1/sdis/recovery/*`) are present as module-level implementation work but are not registered by the current `sdis::configure` path.
+**Anchor management endpoints (wired):**
+- ✅ `GET /v1/sdis/anchor/{anchor_id}` - Get anchor details
+- ✅ `POST /v1/sdis/anchor/rotate-keys` - Rotate anchor keys
+- ✅ `GET /v1/sdis/anchor/{anchor_id}/history` - Rotation history
+- ✅ `POST /v1/sdis/anchor/devices/add` - Add device to anchor
+- ✅ `GET /v1/sdis/anchor/{anchor_id}/devices` - List anchor devices
+
+**Recovery endpoints (wired):**
+- ✅ `POST /v1/sdis/recovery/start` - Start recovery ceremony
+- ✅ `GET /v1/sdis/recovery/{recovery_id}` - Recovery status
+- ✅ `POST /v1/sdis/recovery/{recovery_id}/approve` - Steward approval
+- ✅ `POST /v1/sdis/recovery/{recovery_id}/complete` - Complete recovery
+
+**Known naming drift in older docs:**
+- ⚠️ Some older docs use `/v1/sdis/anchors/*` or `/v1/sdis/recovery/initiate`; current wired paths use `/v1/sdis/anchor/*` and `/v1/sdis/recovery/start`.
 
 **Verified Working:**
 ```bash
@@ -44,14 +57,14 @@ $ curl http://10.8.10.40:30080/v1/sdis/health
 {"status":"healthy","timestamp":"2025-12-12T22:00:00Z"}
 ```
 
-### 2. Backend Implementation (PARTIAL WIRING)
+### 2. Backend Implementation (WIRED WITH MIXED MATURITY)
 
 **Location:** `icn/crates/icn-gateway/src/api/sdis/`
 
 - ✅ `enrollment.rs` - Enrollment flow handlers
 - ✅ `verify.rs` - Multi-level verification
-- ✅ `anchor.rs` - Anchor device management module (not wired in current route config)
-- ✅ `recovery.rs` - Identity recovery handlers module (not wired in current route config)
+- ✅ `anchor.rs` - Anchor device management handlers (wired)
+- ✅ `recovery.rs` - Identity recovery handlers (wired)
 - ✅ `ephemeral.rs` - Ephemeral DID generation
 - ✅ `qr.rs` - QR code generation
 - ✅ `mod.rs` - Route configuration

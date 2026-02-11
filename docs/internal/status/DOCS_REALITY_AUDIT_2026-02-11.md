@@ -1738,16 +1738,18 @@ Changes:
 
 - Added explicit historical snapshot banner with truth-source pointers.
 - Replaced overbroad "all SDIS endpoints are live" framing with currently wired endpoint groups from `sdis::configure`.
-- Added explicit caveat that anchor/recovery routes described in older docs are module-level work not currently registered by route configuration.
-- Updated backend implementation section from "COMPLETE" to "PARTIAL WIRING" to reflect route exposure reality.
+- Corrected endpoint-shape drift for anchor/recovery routes:
+  - current wired paths use `/v1/sdis/anchor/*` and `/v1/sdis/recovery/start`
+  - older docs may still reference `/v1/sdis/anchors/*` or `/v1/sdis/recovery/initiate`
+- Updated backend implementation section language to reflect wired routes with mixed feature maturity.
 
 ## Verification updates (Batch C18)
 
 ```bash
-rg -n "Historical snapshot|Anchor/recovery routes described in older docs|PARTIAL WIRING|sdis::configure" docs/sdis/SDIS_STATUS.md
+rg -n "Historical snapshot|Known naming drift|/v1/sdis/anchor|/v1/sdis/recovery/start|WIRED WITH MIXED MATURITY" docs/sdis/SDIS_STATUS.md
 ```
 
-Result: snapshot framing and route-wiring caveats present.
+Result: snapshot framing and corrected route-shape caveats present.
 
 ```bash
 ./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
@@ -1757,7 +1759,7 @@ Result: no broken relative links; expected marker-only findings remain.
 
 ## Audit ledger additions (Batch C18)
 
-- `docs/sdis/SDIS_STATUS.md | icn/crates/icn-gateway/src/api/sdis/{mod.rs,simple_enrollment.rs} | rg -n "scope(\"/v1/sdis\")|service\\(simple_enrollment::configure\\)|enrollment/start|pending|vouch|steward/stats" + source review | aligned | reviewed_on(2026-02-11)`
+- `docs/sdis/SDIS_STATUS.md | icn/crates/icn-gateway/src/{server.rs,api/sdis/anchor.rs,api/sdis/recovery.rs,api/sdis/simple_enrollment.rs} | rg -n "scope\\(\"/sdis\"\\)|configure\\(api::sdis::recovery::configure\\)|configure\\(api::sdis::anchor::configure\\)|scope\\(\"/anchor\"\\)|scope\\(\"/recovery\"\\)" + source review | aligned | reviewed_on(2026-02-11)`
 
 ## Recursive self-correction score (Batch C18)
 
