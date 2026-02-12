@@ -302,6 +302,10 @@ See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for full details 
 
 Examples: `feat/gossip-compression`, `fix/trust-rate-limit-overflow`, `refactor/actor-message-routing`
 
+### Multi-Agent Parallel Work
+
+For running multiple agents simultaneously, use Git worktrees. Each agent gets an isolated working directory and branch. See `docs/dev/WORKTREES.md` for full documentation and `scripts/worktrees.sh` for the helper script.
+
 ### Daily Flow
 
 ```bash

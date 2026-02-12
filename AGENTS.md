@@ -245,6 +245,31 @@ See `.github/agents/README.md` for the full list and usage instructions.
 
 ---
 
+## Multi-agent worktree workflow
+
+When running multiple agents in parallel, each agent gets its own Git worktree with an isolated branch and working directory. See `docs/dev/WORKTREES.md` for full documentation.
+
+**Quick reference:**
+
+```bash
+# Create an agent worktree
+./scripts/worktrees.sh create agent-d
+
+# List all worktrees
+./scripts/worktrees.sh list
+
+# Remove when done
+./scripts/worktrees.sh remove agent-d
+```
+
+**Rules:**
+- One agent = one branch = one worktree
+- Never commit to `main` — all work on feature branches
+- Worktrees live in `../icn-wt/` (sibling to repo root)
+- Override defaults via `ICN_WT_DIR`, `ICN_WT_REMOTE`, `ICN_WT_BASE_REF`
+
+---
+
 ## Repo-provided agent rules (must follow)
 
 - **Copilot instructions**: `.github/copilot-instructions.md`

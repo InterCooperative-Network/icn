@@ -26,6 +26,7 @@ You have deep expertise in:
 - Avoid `unwrap()`/`expect()` outside tests
 - Use `thiserror` for crate-local errors, `anyhow` at service boundaries
 - Prefer message passing (mpsc/oneshot) over shared mutable state
+- **If running in a worktree** (`../icn-wt/<agent>/`): you are on your own branch; commit freely, push when ready. See `docs/dev/WORKTREES.md`.
 
 ## Mandatory Work Loop
 
