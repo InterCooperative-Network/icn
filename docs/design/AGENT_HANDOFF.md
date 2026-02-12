@@ -2,7 +2,9 @@
 
 **Branch**: `feature/deterministic-compute-core`  
 **Created**: 2026-02-11  
+**Updated**: 2026-02-12  
 **Purpose**: Enable any AI agent to continue this work
+**PR**: https://github.com/InterCooperative-Network/icn/pull/1151
 
 ---
 
@@ -12,14 +14,23 @@
 # Verify you're on the right branch
 git branch --show-current  # Should show: feature/deterministic-compute-core
 
+# Find repo root (docs live at repo root, not inside icn/)
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
 # Read the master plan first
-cat docs/design/DETERMINISTIC_COMPUTE_SPRINT.md
+cat "$REPO_ROOT/docs/design/DETERMINISTIC_COMPUTE_SPRINT.md"
 
 # Then read the specifications
-cat docs/design/compute-classes.md
-cat docs/design/scope-scheduling.md
-cat docs/design/deterministic-core.md
+cat "$REPO_ROOT/docs/design/compute-classes.md"
+cat "$REPO_ROOT/docs/design/scope-scheduling.md"
+cat "$REPO_ROOT/docs/design/deterministic-core.md"
+
+# Rust commands run from icn/ subdirectory
+cd "$REPO_ROOT/icn"
+cargo build -p icn-compute && cargo test -p icn-compute
 ```
+
+**Note**: The `docs/` directory is at repo root, not inside `icn/`. If `cat docs/...` fails, you're probably in `icn/` - use `cat ../docs/...` instead.
 
 ---
 
@@ -192,7 +203,22 @@ cargo test -p icn-compute test_deterministic_engine
 
 ### What about the credential scheme (Coconut)?
 
-**Keep current approach.** ICN uses Ed25519 + STARK + Merkle accumulators which are post-quantum safe. Coconut/BLS12-381 is not.
+**Keep current approach.** ICN currently uses Ed25519 for signatures. Ed25519 is **not** post-quantum safe. Post-quantum upgrade is future work tracked separately.
+
+The determinism sprint does not change crypto primitives. For PQ considerations:
+- Some proof systems (STARK, Merkle) are believed PQ-resistant
+- Signatures remain the weak link unless migrated to hybrid/PQ schemes
+- See `docs/design/icn-crypto-pq/` for future PQ roadmap
+
+---
+
+## For Deep Technical Details
+
+This handoff is intentionally brief. For full specifications, see:
+- `docs/design/deterministic-core.md` - ICN-DC profile, config rationale
+- `docs/design/compute-classes.md` - LC vs UC boundaries
+- `docs/design/scope-scheduling.md` - Capacity and preemption
+- `docs/design/DETERMINISTIC_COMPUTE_SPRINT.md` - Master implementation plan
 
 ---
 

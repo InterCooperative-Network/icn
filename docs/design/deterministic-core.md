@@ -38,6 +38,8 @@ pub const WASMTIME_VERSION_PIN: &str = "24.0.5";
 2. "Nondeterministic Nasties" test suite pass on both archs
 3. Protocol-level coordination (all nodes upgrade together)
 
+**Fail-Closed Rule**: If a config knob specified below is not available in Wasmtime 24.0.5, we DO NOT approximate it. LC execution is forbidden until the knob is available or we redesign. This prevents "imaginary determinism" where we claim a guarantee we can't deliver.
+
 ### Engine Configuration
 
 ```rust
@@ -55,16 +57,19 @@ pub fn create_deterministic_engine() -> anyhow::Result<(Engine, DeterminismManif
     config.consume_fuel(true);
     
     // 3. Sequential Compilation
-    // Disables parallel compilation for deterministic JIT artifacts
-    // Ensures same code generation across runs
+    // Reduces nondeterministic build variance and simplifies audit.
+    // NOTE: Determinism must not depend on JIT artifact identity.
     config.parallel_compilation(false);
     
     // 4. Memory Configuration
     // Static limits prevent OOM-dependent behavior
+    // NOTE: Verify these APIs exist in Wasmtime 24.0.5 before using
+    // If unavailable, fail closed (reject LC execution) until redesign
     let max_memory_bytes = 128 * 1024 * 1024; // 128 MiB
     config.static_memory_maximum_size(max_memory_bytes);
-    config.static_memory_guard_size(2 * 1024 * 1024);
-    config.dynamic_memory_reserved_for_growth(max_memory_bytes);
+    // These may not exist in 24.0.5 - verify before implementation:
+    // config.static_memory_guard_size(2 * 1024 * 1024);
+    // config.dynamic_memory_reserved_for_growth(max_memory_bytes);
     
     Ok((Engine::new(&config)?, manifest))
 }
@@ -76,7 +81,7 @@ pub fn create_deterministic_engine() -> anyhow::Result<(Engine, DeterminismManif
 |---------|-------|--------|
 | `cranelift_nan_canonicalization` | `true` | Different CPUs produce different NaN bit patterns |
 | `consume_fuel` | `true` | Wall-clock timeouts are non-deterministic |
-| `parallel_compilation` | `false` | Parallel JIT can produce different code |
+| `parallel_compilation` | `false` | Reduces build variance, simplifies audit (determinism must not depend on JIT identity) |
 | `static_memory_maximum_size` | 128 MiB | Prevents OOM-dependent behavior |
 
 ---
@@ -89,12 +94,15 @@ LC WASM modules are validated against a restricted subset. Modules violating the
 
 ### Import Allowlist
 
-Only these imports are allowed:
+Only these imports are allowed for LC modules:
 
-| Import | Signature | Behavior |
-|--------|-----------|----------|
-| `icn::log` | `(ptr: i32, len: i32)` | Log message (no side effects) |
-| `icn::timestamp` | `() -> i64` | Returns `task.created_at` (deterministic) |
+| Module | Function | Signature | Behavior |
+|--------|----------|-----------|----------|
+| `icn` | `log` | `(ptr: i32, len: i32)` | Log message (no side effects) |
+| `icn` | `timestamp` | `() -> i64` | Returns `task.created_at` (deterministic) |
+| `icn` | `entropy_seed` | `(ptr: i32)` | Writes 32-byte seed to ptr (optional) |
+
+**Canonical naming**: All host functions use module `"icn"` with function names like `"log"`, `"timestamp"`. In WASM: `(import "icn" "log" ...)`. In Rust linker: `icn::log`.
 
 ### Forbidden Imports
 
@@ -142,14 +150,22 @@ WASM contracts may need randomness (e.g., shuffling, sampling). Host `/dev/urand
 
 ```rust
 /// Derive deterministic seed from execution context
-pub fn derive_seed(block_hash: &[u8; 32], tx_hash: &[u8; 32]) -> [u8; 32] {
+/// 
+/// ICN-native anchors (not blockchain terminology):
+/// - scope_root: The Merkle root of the scope's ledger at task creation
+/// - decision_hash: The canonical hash of the decision/receipt that triggered this task
+pub fn derive_seed(scope_root: &[u8; 32], decision_hash: &[u8; 32]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"icn:entropy:v1");
-    hasher.update(block_hash);
-    hasher.update(tx_hash);
+    hasher.update(scope_root);
+    hasher.update(decision_hash);
     *hasher.finalize().as_bytes()
 }
 ```
+
+**Where these values come from**:
+- `scope_root`: Obtained from `Ledger::current_root()` at task creation time
+- `decision_hash`: Obtained from `GovernanceDecisionReceipt::canonical_hash()` (for governance LC) or `Task::decision_hash` field (for compute LC)
 
 **Policy**: 
 - Host entropy is BANNED

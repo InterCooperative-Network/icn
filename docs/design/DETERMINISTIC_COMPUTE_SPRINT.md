@@ -359,8 +359,9 @@ pub fn create_deterministic_engine() -> anyhow::Result<(Engine, DeterminismManif
     // Memory configuration (Pi-friendly)
     let max_memory_bytes = 128 * 1024 * 1024; // 128 MiB for LC v1
     config.static_memory_maximum_size(max_memory_bytes);
-    config.static_memory_guard_size(2 * 1024 * 1024);
-    config.dynamic_memory_reserved_for_growth(max_memory_bytes);
+    // NOTE: Verify these APIs exist in Wasmtime 24.0.5 before using
+    // config.static_memory_guard_size(2 * 1024 * 1024);
+    // config.dynamic_memory_reserved_for_growth(max_memory_bytes);
     
     let manifest = DeterminismManifest {
         wasmtime_version: WASMTIME_VERSION_PIN,
@@ -406,8 +407,12 @@ let (engine, manifest) = create_deterministic_engine()?;
 ```yaml
 - name: Ban Engine::default in LC paths
   run: |
-    if rg -q "Engine::default\(\)" icn/crates/icn-compute icn/crates/icn-core icn/crates/icn-governance; then
-      echo "ERROR: Engine::default() found in consensus-relevant code"
+    # Scope: only icn-compute/src (LC execution path)
+    # Allow: icn-compute/tests (test code can use default)
+    # Allow: UC executor paths if we keep a separate UC engine
+    if rg -q "Engine::default\(\)" icn/crates/icn-compute/src; then
+      echo "ERROR: Engine::default() found in icn-compute/src"
+      echo "LC execution must use create_deterministic_engine()"
       exit 1
     fi
 ```
@@ -502,11 +507,18 @@ impl WasmSubsetValidator {
 
 ### Phase 4: Trust Graph Hard Caps
 
-**Modify**: `icn-trust/src/graph.rs`
+**Modify**: `icn-trust/src/types.rs` (keep constants with other config constants)
 
 ```rust
+// In types.rs (or wherever config constants live):
 pub const MAX_LOCAL_NODES: usize = 10_000;
 pub const MAX_LOCAL_EDGES: usize = 50_000;
+```
+
+**Modify**: `icn-trust/src/graph.rs` (import from types, enforce in methods)
+
+```rust
+use crate::types::{MAX_LOCAL_NODES, MAX_LOCAL_EDGES};
 
 impl TrustGraph {
     pub fn add_edge(&mut self, source: &Did, target: &Did, weight: f64) -> Result<(), TrustError> {
