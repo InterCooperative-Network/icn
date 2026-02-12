@@ -1,7 +1,10 @@
 # ICN Complete Architecture Map
 **Generated:** 2025-12-17  
-**Status:** Comprehensive System Review  
-**Version:** 0.1.0 - PILOT-READY
+**Status:** Historical comprehensive system review  
+**Version:** 0.1.0 snapshot context
+
+> Historical architecture map snapshot from 2025-12-17.
+> For current architecture and status, use `docs/ARCHITECTURE.md` and `docs/STATE.md`.
 
 ---
 

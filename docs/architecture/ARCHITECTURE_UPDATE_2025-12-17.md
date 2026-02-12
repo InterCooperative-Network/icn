@@ -1,5 +1,8 @@
 # Architecture Update - December 17, 2025
 
+> Historical update snapshot from 2025-12-17.
+> Validate current implementation details against `docs/ARCHITECTURE.md` and current code before operational use.
+
 ## Post-Quantum Cryptography Integration - COMPLETE ✅
 
 ### Summary

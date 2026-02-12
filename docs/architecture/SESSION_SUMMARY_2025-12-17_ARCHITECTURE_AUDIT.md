@@ -1,5 +1,8 @@
 # Architecture Review & Gap Analysis Session - December 17, 2025
 
+> Historical session summary from 2025-12-17.
+> Findings and readiness language in this file are point-in-time and not current status guarantees.
+
 ## Session Goals
 - Perform full architecture review and mapping
 - Identify missing components and architectural gaps

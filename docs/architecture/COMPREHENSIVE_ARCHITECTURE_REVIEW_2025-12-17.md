@@ -1,9 +1,12 @@
 # Comprehensive Architecture Review
 **Date:** 2025-12-17  
-**Status:** PRODUCTION-READY ✅  
+**Status:** Historical architecture review snapshot (2025-12-17)  
 **Total Tests:** 760+ passing  
 **Codebase:** 175,808 lines of Rust  
 **Test Coverage:** All critical paths
+
+> Historical review document. Statements in this file reflect the 2025-12-17 assessment context.
+> For current architecture/runtime status, use `docs/ARCHITECTURE.md`, `docs/STATE.md`, and current CI checks.
 
 ---
 

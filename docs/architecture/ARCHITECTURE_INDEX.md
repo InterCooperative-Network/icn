@@ -1,6 +1,9 @@
 # ICN Architecture Documentation Index
 **Complete Architecture Review - December 2025**
 
+> This index references architecture review materials produced in December 2025.
+> For current architecture truth, start with `docs/ARCHITECTURE.md`.
+
 ---
 
 ## 📚 Documentation Overview

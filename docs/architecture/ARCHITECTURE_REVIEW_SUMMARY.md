@@ -3,6 +3,9 @@
 **Reviewed By:** GitHub Copilot  
 **Status:** Historical review snapshot (2025-12-17) ✅
 
+> Historical review summary. Use current architecture/status docs for present-day truth:
+> `docs/ARCHITECTURE.md`, `docs/STATE.md`, and `docs/ci/CI_CURRENT_STATUS.md`.
+
 ---
 
 ## 📋 Review Scope

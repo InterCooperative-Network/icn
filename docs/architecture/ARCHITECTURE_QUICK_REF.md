@@ -1,5 +1,8 @@
 # ICN Architecture Quick Reference Card
 
+> Historical quick-reference snapshot (December 2025).
+> Verify current defaults/endpoints/operational claims against active docs before use.
+
 ## 🎯 What is ICN?
 
 **Substrate daemon for cooperative internet coordination**

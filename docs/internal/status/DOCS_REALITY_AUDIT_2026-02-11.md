@@ -2564,3 +2564,48 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C36; continue targeted stale-claim cleanup.
+
+## Changes applied (Batch C37 - architecture historical-context banners)
+
+Touched files:
+
+1. `docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md`
+2. `docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md`
+3. `docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md`
+4. `docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md`
+5. `docs/architecture/ARCHITECTURE_INDEX.md`
+6. `docs/architecture/ARCHITECTURE_QUICK_REF.md`
+7. `docs/architecture/ARCHITECTURE_MAP.md`
+
+Changes:
+
+- Added explicit historical/snapshot banners at file tops for dated 2025 architecture review outputs.
+- Clarified that these documents are point-in-time analysis and pointed readers to current canonical docs.
+- Softened one status metadata line in `ARCHITECTURE_MAP.md` from pilot-readiness label to snapshot context wording.
+
+## Verification updates (Batch C37)
+
+```bash
+rg -n "Historical|snapshot|current architecture|current status" docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md docs/architecture/ARCHITECTURE_INDEX.md docs/architecture/ARCHITECTURE_QUICK_REF.md docs/architecture/ARCHITECTURE_MAP.md
+```
+
+Result: all touched architecture review docs now include explicit historical-context framing.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C37)
+
+- `docs/architecture/{COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md,ARCHITECTURE_REVIEW_SUMMARY.md,ARCHITECTURE_UPDATE_2025-12-17.md,SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md,ARCHITECTURE_INDEX.md,ARCHITECTURE_QUICK_REF.md,ARCHITECTURE_MAP.md} | snapshot language policy + current truth pointers (docs/ARCHITECTURE.md, docs/STATE.md, docs/ci/CI_CURRENT_STATUS.md) | historical-banner grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C37)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C37; continue targeted stale-claim cleanup.
