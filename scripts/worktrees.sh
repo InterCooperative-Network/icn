@@ -6,7 +6,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-WT_DIR="$(cd "${REPO_ROOT}/.." && pwd)/icn-wt"
+
+# Overridable via environment
+WT_DIR="${ICN_WT_DIR:-$(cd "${REPO_ROOT}/.." && pwd)/icn-wt}"
+WT_REMOTE="${ICN_WT_REMOTE:-origin}"
+WT_BASE_REF="${ICN_WT_BASE_REF:-${WT_REMOTE}/main}"
 
 usage() {
     cat <<EOF
@@ -23,9 +27,10 @@ Examples:
   $(basename "$0") list
   $(basename "$0") remove agent-d
 
-Worktrees are created at: ${WT_DIR}/<name>
-Branches are named:       feat/<name>
-Base branch:              origin/main
+Environment:
+  ICN_WT_DIR       Worktree base directory  (default: ${WT_DIR})
+  ICN_WT_REMOTE    Git remote name          (default: ${WT_REMOTE})
+  ICN_WT_BASE_REF  Base ref for new branches (default: ${WT_BASE_REF})
 EOF
     exit 1
 }
@@ -44,8 +49,8 @@ cmd_create() {
     local wt_path="${WT_DIR}/${name}"
     local branch="feat/${name}"
 
-    if [ -d "$wt_path" ]; then
-        echo "Error: worktree already exists at ${wt_path}" >&2
+    if [ -e "$wt_path" ]; then
+        echo "Error: path already exists at ${wt_path}" >&2
         exit 1
     fi
 
@@ -55,16 +60,17 @@ cmd_create() {
         exit 1
     fi
 
-    echo "Fetching origin..."
-    git -C "$REPO_ROOT" fetch origin
+    echo "Fetching ${WT_REMOTE}..."
+    git -C "$REPO_ROOT" fetch "$WT_REMOTE"
 
     mkdir -p "$WT_DIR"
-    git -C "$REPO_ROOT" worktree add "$wt_path" -b "$branch" origin/main
+    git -C "$REPO_ROOT" worktree add "$wt_path" -b "$branch" "$WT_BASE_REF"
 
     echo
     echo "Created worktree:"
     echo "  Path:   ${wt_path}"
     echo "  Branch: ${branch}"
+    echo "  Base:   ${WT_BASE_REF}"
     echo
     echo "Next steps:"
     echo "  cd ${wt_path}"
@@ -81,7 +87,7 @@ cmd_remove() {
     local wt_path="${WT_DIR}/${name}"
     local branch="feat/${name}"
 
-    if [ ! -d "$wt_path" ]; then
+    if [ ! -e "$wt_path" ]; then
         echo "Error: worktree not found at ${wt_path}" >&2
         exit 1
     fi
