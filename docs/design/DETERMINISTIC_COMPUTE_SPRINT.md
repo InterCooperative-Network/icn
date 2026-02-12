@@ -2,8 +2,9 @@
 
 **Branch**: `feature/deterministic-compute-core`
 **Status**: Planning Complete → Implementation Ready
-**Date**: 2026-02-11
+**Date**: 2026-02-12 (Updated)
 **Origin**: Research Sprint #3 (Security & Determinism Spec v1.1)
+**PR**: https://github.com/InterCooperative-Network/icn/pull/1151
 
 ---
 
@@ -12,6 +13,75 @@
 This document specifies the implementation of the **ICN Deterministic Core (ICN-DC)** - a hardened WASM execution environment that ensures bit-exact reproducibility across x86_64 and aarch64 architectures. This is required for the Legitimacy Compute (LC) path where governance decisions and ledger mutations must be verifiable by any node.
 
 **Key Insight**: Ethereum replicates execution to get truth. ICN can verify truth without replicating execution.
+
+---
+
+## How This Fits Into ICN Architecture
+
+### The Constraint Engine Model
+
+> **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CONSTRAINT ENFORCEMENT (Kernel)                   │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Transport  │  Replay  │  Rate     │  Capability │  Credit    │ ││
+│  │   Auth      │  Guard   │  Limiter  │   Gate      │  Gate      │ ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│   Kernel enforces ConstraintSet values. Kernel does NOT decide them. │
+└─────────────────────────────────────────────────────────────────────┘
+         ▲              ▲           ▲            ▲           ▲
+    ConstraintSet { rate_limit, credit_ceiling, capabilities }
+         │              │           │            │           │
+┌────────┴──────────────┴───────────┴────────────┴───────────┴────────┐
+│                      POLICY ORACLES (Apps)                           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │  Trust   │  │  Ledger  │  │Governance│  │Membership│            │
+│  │  Oracle  │  │  Oracle  │  │  Oracle  │  │  Oracle  │            │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Crate Structure & Where Determinism Fits
+
+```
+icn/crates/
+├── KERNEL (determinism infrastructure lives here)
+│   ├── icn-core           # Runtime, supervisor
+│   ├── icn-kernel-api     # DeterminismClass, PolicyOracle, ConstraintSet
+│   ├── icn-compute        # ← DETERMINISTIC ENGINE GOES HERE
+│   ├── icn-net            # QUIC/TLS networking
+│   ├── icn-gossip         # Topic-based replication
+│   └── icn-store          # Sled persistence
+│
+├── DOMAIN (policy oracles - extraction in progress)
+│   ├── icn-trust          # Trust computation
+│   ├── icn-governance     # Proposals, voting
+│   └── icn-ledger         # Mutual credit
+│
+└── SERVICES
+    ├── icn-gateway        # REST + WebSocket API
+    └── icn-api            # Shared types
+```
+
+### The Legitimacy Path (What Must Be Deterministic)
+
+```
+DecisionReceipt → translate_payload_to_effects() → KernelEffect → LedgerEntry
+       ↑                                                              ↑
+   canonical_hash()                                           ContentHash
+       ↓                                                              ↓
+   Any node can verify by replay                           Merkle-anchored
+```
+
+**What counts as LC (Legitimacy Compute)**:
+- Governance execution translator
+- Effect executor paths (treasury spend, membership)
+- Receipt hashing + canonical serialization
+- Any WASM/CCL execution producing effects
+
+**Everything else is UC (Utility Compute)** - sandboxed but not consensus-critical.
 
 ---
 
