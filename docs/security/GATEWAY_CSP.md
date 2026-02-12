@@ -120,7 +120,7 @@ The gateway includes tests to verify CSP configuration is secure for production.
 
 - `icn-gateway/src/security.rs` - Security middleware implementation
 - `icn-core/src/config/gateway.rs` - Gateway configuration
-- `docs/production-hardening.md` - Overall security hardening guide
+- `docs/security/production-hardening.md` - Overall security hardening guide
 
 ## References
 

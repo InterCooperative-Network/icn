@@ -722,7 +722,7 @@ Update documentation when you:
 | API reference | Code doc comments + OpenAPI |
 | Onboarding | `docs/onboarding/reference/` |
 | Deployment | `deploy/README.md`, `docs/HOMELAB_DEPLOYMENT.md` |
-| Security | `docs/security/`, `docs/production-hardening.md` |
+| Security | `docs/security/`, `docs/security/production-hardening.md` |
 | Changelog | `CHANGELOG.md` |
 
 ### Updating Onboarding Modules

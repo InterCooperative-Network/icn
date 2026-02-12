@@ -2341,3 +2341,51 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C31; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C32 - active docs path/status cleanup)
+
+Touched files:
+
+1. `docs/testing/TESTING_SUMMARY.md`
+2. `docs/pilots/hosted-approach.md`
+3. `docs/security/SECURITY_TESTING_GUIDE.md`
+4. `docs/security/GATEWAY_CSP.md`
+5. `docs/onboarding/reference/module-09-ops-deploy.md`
+6. `docs/onboarding/reference/module-10-contributor-workflow.md`
+7. `docs/onboarding/reference/module-12-observability.md`
+8. `docs/onboarding/reference/module-13-security-privacy.md`
+9. `docs/onboarding/reading-map.md`
+10. `docs/onboarding/workshops/workshop-04-identity-trust.md`
+11. `docs/performance/trust-service-performance.md`
+
+Changes:
+
+- Replaced stale references to `docs/production-hardening.md` with canonical `docs/security/production-hardening.md` in active docs.
+- Reworded one hard readiness conclusion and one pilot strategy statement to explicit snapshot context.
+
+## Verification updates (Batch C32)
+
+```bash
+rg -n "docs/production-hardening\\.md|production-ready substrate|ready for deployment\\.|Snapshot conclusion \\(2025-12-18\\)" docs/testing/TESTING_SUMMARY.md docs/pilots/hosted-approach.md docs/security/SECURITY_TESTING_GUIDE.md docs/security/GATEWAY_CSP.md docs/onboarding/reference/module-09-ops-deploy.md docs/onboarding/reference/module-10-contributor-workflow.md docs/onboarding/reference/module-12-observability.md docs/onboarding/reference/module-13-security-privacy.md docs/onboarding/reading-map.md docs/onboarding/workshops/workshop-04-identity-trust.md docs/performance/trust-service-performance.md
+```
+
+Result: stale `docs/production-hardening.md` references removed in touched active docs; snapshot wording applied in targeted status text.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C32)
+
+- `docs/testing/TESTING_SUMMARY.md + docs/pilots/hosted-approach.md + docs/security/SECURITY_TESTING_GUIDE.md + docs/security/GATEWAY_CSP.md + docs/onboarding/reference/module-09-ops-deploy.md + docs/onboarding/reference/module-10-contributor-workflow.md + docs/onboarding/reference/module-12-observability.md + docs/onboarding/reference/module-13-security-privacy.md + docs/onboarding/reading-map.md + docs/onboarding/workshops/workshop-04-identity-trust.md + docs/performance/trust-service-performance.md | docs/security/production-hardening.md + docs/ci/CI_CURRENT_STATUS.md + targeted grep checks | rg -n "production-hardening\\.md|production-ready|ready for deployment|snapshot" + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C32)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C32; continue active-doc content drift cleanup.

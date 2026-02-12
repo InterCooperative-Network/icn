@@ -20,7 +20,7 @@ By the end of this module, you will:
 
 - `deploy/README.md`
 - `config/README.md`
-- `docs/production-hardening.md`
+- `docs/security/production-hardening.md`
 - `docs/HOMELAB_DEPLOYMENT.md`
 
 ---
@@ -720,7 +720,7 @@ icnd --config /etc/icn/config.toml --log-level debug
 | `deploy/k8s/` | Kubernetes manifests |
 | `deploy/helm/` | Helm chart |
 | `config/icn.toml.example` | Configuration reference |
-| `docs/production-hardening.md` | Security guidance |
+| `docs/security/production-hardening.md` | Security guidance |
 
 ---
 

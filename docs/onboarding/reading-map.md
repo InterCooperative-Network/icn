@@ -53,7 +53,7 @@ This map links each module to the highest-signal files and docs.
 ## Module 9: Operations and deployment
 - `deploy/README.md`
 - `config/README.md`
-- `docs/production-hardening.md`
+- `docs/security/production-hardening.md`
 - `docs/ops/`
 
 ## Module 10: Contributor workflow
@@ -68,13 +68,13 @@ This map links each module to the highest-signal files and docs.
 ## Module 12: Observability and metrics
 - `icn/crates/icn-obs/`
 - `monitoring/`
-- `docs/production-hardening.md`
+- `docs/security/production-hardening.md`
 
 ## Module 13: Security and privacy
 - `icn/crates/icn-security/`
 - `icn/crates/icn-privacy/`
 - `icn/crates/icn-net/src/envelope.rs`
-- `docs/production-hardening.md`
+- `docs/security/production-hardening.md`
 
 ## Module 14: Governance and CCL deep dive
 - `icn/crates/icn-governance/`

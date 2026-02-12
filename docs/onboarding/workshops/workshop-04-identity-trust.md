@@ -126,7 +126,7 @@ Trust graph types:
 | Federated | > 0.7 | ? msg/sec |
 
 ### Expected values
-From `docs/production-hardening.md`:
+From `docs/security/production-hardening.md`:
 - Isolated: 10 msg/sec
 - Known: 50 msg/sec
 - Partner: 100 msg/sec
