@@ -1,5 +1,8 @@
 # ICN Demo Session - Final Summary
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18  
 **Duration:** ~90 minutes  
 **Status:** ✅ Backend Complete, ⚠️ Browser Connection Issue
@@ -107,7 +110,7 @@ The gateway might need to use a different port:
    ```bash
    cd icn
    ./target/release/icnd \
-     -d /home/matt/icn-demo-test/data \
+     -d <demo-data-dir>/data \
      -e 127.0.0.1:15602 \
      --gateway-enable \
      --gateway-bind "127.0.0.1:3080"

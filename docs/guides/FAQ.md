@@ -58,15 +58,15 @@ ICN uses **gossip** for eventual consistency, not global consensus. This is much
 
 ### Is ICN production-ready?
 
-**Current status (2025-11-21):**
-- ✅ **Substrate**: Production-ready (Phase 15 complete, 423 tests passing)
+**Status snapshot (2025-11-21):**
+- ✅ **Substrate**: assessed as production-capable at that time (Phase 15 complete, 423 tests passing)
 - ✅ **Security**: Three-layer architecture (transport, message, application)
 - ✅ **Economic Safety**: Dynamic credit limits, dispute resolution, new member throttling
 - ✅ **Operations**: Backup/restore, monitoring, graceful restart
-- 🚧 **Pilot Deployment**: Selecting first pilot community (Track C1)
-- ❌ **General Availability**: Not yet (need pilot learnings first)
+- 🚧 **Pilot Deployment**: first pilot community selection in progress (Track C1 at that time)
+- ❌ **General Availability**: not yet in this snapshot (pilot learnings required first)
 
-**Recommendation**: Wait for pilot results before deploying in production. You can experiment now, but expect rough edges.
+For current readiness, verify against the latest status docs and CI/workflow results rather than this dated snapshot.
 
 ---
 
@@ -115,7 +115,7 @@ ICN uses **mDNS for local discovery** and **QUIC for connections**. For internet
 
 1. **Manual peering** (easiest):
    ```bash
-   icnctl network add-peer <public-ip>:5600 <did>
+   icnctl network add-peer <public-ip>:7777 <did>
    ```
 
 2. **NAT traversal** (Phases 1-3 complete):
@@ -131,7 +131,7 @@ ICN uses **mDNS for local discovery** and **QUIC for connections**. For internet
    - Set up Tailscale/Wireguard
    - Use Tailscale IPs for peering
 
-See [nat-traversal-design.md](nat-traversal-design.md) for details.
+See [nat-traversal-design.md](../design/nat-traversal-design.md) for details.
 
 ### Can I run ICN in Docker?
 
@@ -145,25 +145,24 @@ RUN cd icn && cargo build --release
 FROM debian:bookworm-slim
 COPY --from=builder /icn/icn/target/release/icnd /usr/local/bin/
 COPY --from=builder /icn/icn/target/release/icnctl /usr/local/bin/
-EXPOSE 5600/tcp 5600/udp 8080/tcp 9100/tcp
+EXPOSE 7777/udp 8080/tcp 9100/tcp
 CMD ["icnd"]
 ```
 
 **Data persistence:**
-Mount `~/.icn` as a volume to persist identity and state.
+Mount the daemon data directory as a volume (`icnd --data-dir /path`). If using `--data-dir ~/.icn`, mount `~/.icn`.
 
 ### What ports does ICN use?
 
-- **5600/TCP+UDP**: QUIC networking (P2P connections)
+- **7777/UDP**: QUIC networking (P2P connections)
 - **8080/TCP**: Gateway API (REST + WebSocket)
 - **9100/TCP**: Prometheus metrics
 - **5353/UDP**: mDNS discovery (LAN only)
 
 **Firewall configuration:**
 ```bash
-# Allow ICN P2P
-sudo ufw allow 5600/tcp
-sudo ufw allow 5600/udp
+# Allow ICN P2P (QUIC)
+sudo ufw allow 7777/udp
 
 # Allow Gateway API (if hosting apps)
 sudo ufw allow 8080/tcp
@@ -178,7 +177,7 @@ sudo ufw allow 9100/tcp
 
 ### How is my identity secured?
 
-- **Private key**: Stored in Age-encrypted keystore (`~/.icn/keystore.age`)
+- **Private key**: Stored in Age-encrypted keystore (`{data_dir}/identity.age`)
 - **Passphrase**: You choose during `icnctl id init`
 - **Encryption**: Age encryption (ChaCha20-Poly1305)
 - **Backup**: Use `icnctl backup` to create encrypted backups
@@ -206,7 +205,7 @@ Use multiple devices so losing one doesn't lose your identity:
 icnctl device add --name "My Phone"
 ```
 
-See [multi-device-identity-design.md](multi-device-identity-design.md).
+See [multi-device-identity-design.md](../design/multi-device-identity-design.md).
 
 ### Is communication encrypted?
 
@@ -239,7 +238,7 @@ ICN provides tools for GDPR compliance:
 - Appoint data protection officer (if required)
 - Provide privacy policy to members
 
-See [legal-considerations.md](legal-considerations.md) for details.
+See [legal-considerations.md](../internal/legal-considerations.md) for details.
 
 ---
 
@@ -266,7 +265,7 @@ Credit limits are set by the **cooperative's credit policy**. Options:
    // See docs/economic-safety.md
    ```
 
-See [economic-safety.md](economic-safety.md) for details.
+See [economic-safety.md](../design/economics/economic-safety.md) for details.
 
 ### Can I use multiple currencies?
 
@@ -303,7 +302,7 @@ icnctl ledger pay <did> 10 USD "Grocery share"
 
 Outcomes: `Uphold` (keep entry), `Reverse` (cancel entry), `Adjust` (modify amount)
 
-See [economic-safety.md](economic-safety.md) for details.
+See [economic-safety.md](../design/economics/economic-safety.md) for details.
 
 ### Can I delete my transaction history?
 
@@ -344,7 +343,7 @@ ICN provides **governance primitives**, not a fixed system:
    icnctl gov proposal close --proposal-id <id>
    ```
 
-See [governance-primitives.md](governance-primitives.md) for details.
+See [governance-primitives.md](../design/governance/governance-primitives.md) for details.
 
 ---
 
@@ -359,7 +358,7 @@ icnctl network peers
 ```
 
 **Common causes:**
-1. **Firewall blocking port 5600**: Open firewall
+1. **Firewall blocking port 7777**: Open firewall
 2. **No peers on LAN**: Manually add peer with `icnctl network add-peer`
 3. **mDNS not working**: Use manual peering
 4. **NAT issues**: Configure STUN or use VPN
@@ -367,7 +366,7 @@ icnctl network peers
 **Solution:**
 ```bash
 # Manual peering (most reliable)
-icnctl network add-peer <ip>:5600 <did>
+icnctl network add-peer <ip>:7777 <did>
 ```
 
 ### Tests are failing - What's wrong?
@@ -402,9 +401,9 @@ RUST_LOG=debug icnd
 ```
 
 **Common issues:**
-1. **Port 5600 in use**: Another process using the port
+1. **Port 7777 in use**: Another process using the port
 2. **Keystore locked**: Wrong passphrase or corrupted keystore
-3. **Permissions**: Can't write to `~/.icn/`
+3. **Permissions**: Can't write to your configured data directory
 4. **Missing dependencies**: Reinstall ICN
 
 ### How do I reset everything and start fresh?
@@ -418,11 +417,11 @@ sudo systemctl stop icnd
 # Backup (optional)
 icnctl backup ~/icn-backup-before-reset.tar.gz.age
 
-# Delete data
+# Delete data (example if you run with --data-dir ~/.icn)
 rm -rf ~/.icn/
 
 # Start fresh
-icnctl id init
+icnctl --data-dir ~/.icn id init
 ```
 
 ---
@@ -431,7 +430,7 @@ icnctl id init
 
 ### What's next for ICN?
 
-See [ROADMAP.md](../ROADMAP.md) for detailed plans. Summary:
+See [ROADMAP.md](../development/sessions/undated/ROADMAP.md) for detailed plans. Summary:
 
 **Immediate (2025 Q1):**
 - Track C1: Select pilot community
@@ -484,15 +483,15 @@ If yes to all four, ICN is likely a good fit!
 ## Getting Help
 
 **Documentation:**
-- [Getting Started Guide](GETTING_STARTED.md)
-- [Architecture Overview](ARCHITECTURE.md)
-- [Operations Guide](operations-guide.md)
+- [Getting Started Guide](../GETTING_STARTED.md)
+- [Architecture Overview](../ARCHITECTURE.md)
+- [Operations Guide](operations/operations-guide.md)
 - [All docs](.) in `docs/` directory
 
 **Community:**
 - GitHub Issues: https://github.com/InterCooperative-Network/icn/issues
-- Roadmap: [ROADMAP.md](../ROADMAP.md)
-- Contributing: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- Roadmap: [ROADMAP.md](../development/sessions/undated/ROADMAP.md)
+- Contributing: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ---
 

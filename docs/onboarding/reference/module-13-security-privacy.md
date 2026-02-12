@@ -20,7 +20,7 @@ why trust-native systems still require rigorous security boundaries.
 - `icn/crates/icn-security/` - Security utilities
 - `icn/crates/icn-privacy/` - Privacy primitives
 - `icn/crates/icn-net/src/envelope.rs` - Signed envelopes
-- `docs/production-hardening.md` - Security hardening guidance
+- `docs/security/production-hardening.md` - Security hardening guidance
 
 ---
 

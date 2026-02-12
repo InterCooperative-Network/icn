@@ -1,5 +1,8 @@
 # 🎉 ICN Demo Preparation - Session Complete!
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18  
 **Time:** 20:52 - 21:42 UTC (50 minutes)  
 **Result:** ✅ **PHASE 1 & 2 COMPLETE - READY FOR TESTING**
@@ -107,7 +110,7 @@ python3 -m http.server 3000
 # Terminal 2: Get token
 cd icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
@@ -266,7 +269,7 @@ Beyond the roadmap, we also:
 
 ---
 
-## 🚦 Current Status
+## 🚦 Snapshot Status
 
 🟢 **GREEN - FULL STEAM AHEAD**
 
@@ -287,7 +290,7 @@ Beyond the roadmap, we also:
 ## 🎯 Next Command
 
 ```bash
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 # Then open: http://localhost:3000
 ```
@@ -303,7 +306,7 @@ python3 -m http.server 3000
 **Coop:** rochester-tool-library  
 **DID:** did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh  
 **Passphrase:** demo123  
-**Data:** /home/matt/icn-demo-test/data  
+**Data:** <demo-data-dir>/data  
 **RPC:** 127.0.0.1:15602
 
 **Docs:** All DEMO_*.md files in root  

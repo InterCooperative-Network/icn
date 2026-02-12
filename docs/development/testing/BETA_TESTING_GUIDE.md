@@ -206,4 +206,4 @@ After each testing session, please note:
 
 ---
 
-**Thank you for testing!** Your feedback is essential for making ICN production-ready.
+**Thank you for testing!** Your feedback is essential for improving ICN readiness for broader deployment.

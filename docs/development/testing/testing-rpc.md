@@ -29,9 +29,9 @@ In terminal 1:
 You should see output like:
 ```
 INFO icnd: ICNd starting
-INFO icnd: Data directory: "/home/user/.icn"
+INFO icnd: Data directory: "/home/user/.local/share/icn"
 INFO icn_core::supervisor: Supervisor starting
-INFO icn_core::supervisor: Network actor spawned on 0.0.0.0:4433
+INFO icn_core::supervisor: Network actor spawned on 0.0.0.0:7777
 INFO icn_core::supervisor: RPC server spawned on 127.0.0.1:5050
 ```
 
@@ -51,7 +51,7 @@ Expected output:
 Network Actor Status:
 
   Running:               true
-  Listener address:      0.0.0.0:4433
+  Listener address:      0.0.0.0:7777
 ```
 
 #### View Network Statistics
@@ -82,7 +82,7 @@ Tip: Ensure other ICN nodes are running on the network.
 
 #### Dial a Peer (Example)
 ```bash
-./target/debug/icnctl network dial did:icn:z6MkpTHR8VNs... --addr 192.168.1.100:4433
+./target/debug/icnctl network dial did:icn:z6MkpTHR8VNs... --addr 192.168.1.100:7777
 ```
 
 Note: This requires a valid peer DID and address.
@@ -135,7 +135,7 @@ Expected response:
   "jsonrpc": "2.0",
   "result": {
     "running": true,
-    "listen_addr": "0.0.0.0:4433"
+    "listen_addr": "0.0.0.0:7777"
   },
   "id": 1
 }

@@ -1,5 +1,8 @@
 # Fix "Session Expired" Error
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 ## The Problem
 
 The UI is loading an OLD token from localStorage (browser cache). That token has expired.

@@ -235,7 +235,7 @@ Primary goal: Fix all CI issues and get to green builds
 
 **Grade: A-** (would be A+ if tests were fixed)
 
-The security improvements are solid and production-ready. The test failures are a separate integration issue that needs focused debugging but don't block security deployment.
+The security improvements were strong in this snapshot and suitable for planned deployment scope. The test failures are a separate integration issue that needs focused debugging.
 
 ---
 

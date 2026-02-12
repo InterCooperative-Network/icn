@@ -2,6 +2,8 @@
 
 Quick reference guide for the ICN Gateway REST API.
 
+> Snapshot note: this file contains simplified examples. Authoritative route definitions are in `docs/api/openapi.yaml` and `docs/api/OPENAPI.md`.
+
 ## Base URL
 
 ```
@@ -11,10 +13,10 @@ https://gateway.icn.example # Production
 
 ## Authentication
 
-All endpoints (except `/health` and `/ready`) require Bearer token authentication:
+Most endpoints require Bearer token authentication. Public endpoints include `/v1/health`, `/v1/auth/challenge`, and `/v1/auth/verify`:
 
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" https://gateway.icn.example/identity/did
+curl -H "Authorization: Bearer YOUR_TOKEN" https://gateway.icn.example/v1/coops/my-coop
 ```
 
 ## Quick Start
@@ -22,7 +24,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" https://gateway.icn.example/identity/
 ### 1. Check Service Health
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8080/v1/health
 ```
 
 ### 2. Get Your DID
@@ -222,7 +224,7 @@ curl -X POST \
 Connect to WebSocket for real-time events:
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws', {
+const ws = new WebSocket('ws://localhost:8080/v1/ws/my-coop', {
   headers: {
     'Authorization': `Bearer ${token}`
   }

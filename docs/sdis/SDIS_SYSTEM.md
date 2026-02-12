@@ -1,5 +1,8 @@
 # SDIS: Secure Distributed Identity System
 
+> Design snapshot: this document mixes implemented flows and planned endpoint models.
+> For currently wired gateway routes, use `icn/crates/icn-gateway/src/api/sdis/mod.rs`.
+
 ## Overview
 
 SDIS is ICN's multi-device identity management and recovery system. It allows users to:
@@ -77,12 +80,15 @@ enum ClaimType {
 
 ## Enrollment Flow
 
+> Route note: some endpoint examples in this design section use legacy naming.
+> For currently wired route shapes, see `docs/sdis/SDIS_API_GUIDE.md` and `docs/sdis/SDIS_STATUS.md`.
+
 ### 1. Initiate Enrollment (New Device)
 
 The new device generates a keypair and requests enrollment:
 
 ```
-POST /api/v1/sdis/enroll
+POST /v1/sdis/enroll
 {
   "root_did": "did:icn:z6Mk...",
   "device_did": "did:icn:z6Mk...",
@@ -103,7 +109,7 @@ Response:
 User approves on an already-enrolled device:
 
 ```
-POST /api/v1/sdis/enroll/{enrollment_id}/approve
+POST /v1/sdis/enroll/{enrollment_id}/approve
 {
   "signature": "base64_ed25519_signature"
 }
@@ -120,7 +126,7 @@ Response:
 New device verifies and saves the approval:
 
 ```
-GET /api/v1/sdis/enroll/{enrollment_id}
+GET /v1/sdis/enroll/{enrollment_id}
 
 Response:
 {
@@ -137,7 +143,7 @@ Response:
 ### Add Recovery Anchor
 
 ```
-POST /api/v1/sdis/anchors
+POST /v1/sdis/anchors
 {
   "anchor_type": "device",          // or "contact"
   "label": "My Phone",
@@ -155,7 +161,7 @@ Response:
 ### List Anchors
 
 ```
-GET /api/v1/sdis/anchors
+GET /v1/sdis/anchors
 
 Response:
 {
@@ -176,7 +182,7 @@ Response:
 ### Revoke Anchor
 
 ```
-POST /api/v1/sdis/anchors/{anchor_id}/revoke
+POST /v1/sdis/anchors/{anchor_id}/revoke
 
 Response:
 {
@@ -192,7 +198,7 @@ Response:
 Lost device or new device initiates recovery:
 
 ```
-POST /api/v1/sdis/recover/initiate
+POST /v1/sdis/recover/initiate
 {
   "root_did": "did:icn:z6Mk...",
   "new_device_did": "did:icn:z6Mk...",
@@ -213,7 +219,7 @@ Response:
 Each recovery anchor approves:
 
 ```
-POST /api/v1/sdis/recover/{recovery_id}/approve
+POST /v1/sdis/recover/{recovery_id}/approve
 {
   "anchor_id": "anc_def456",
   "signature": "base64_signature"     // Sign recovery_id + new_device_did
@@ -232,7 +238,7 @@ Response:
 Once threshold is met, new device completes recovery:
 
 ```
-GET /api/v1/sdis/recover/{recovery_id}
+GET /v1/sdis/recover/{recovery_id}
 
 Response:
 {
@@ -292,10 +298,10 @@ Proofs are:
 
 ### Gateway API
 
-- **Enrollment**: `/api/v1/sdis/enroll/*`
-- **Anchors**: `/api/v1/sdis/anchors/*`
-- **Recovery**: `/api/v1/sdis/recover/*`
-- **Proofs**: `/api/v1/sdis/proofs/*`
+- **Enrollment**: `/v1/sdis/enrollment/*` and steward workflow routes (`/v1/sdis/status/*`, `/v1/sdis/vouch/*`, `/v1/sdis/reject/*`)
+- **Anchors**: `/v1/sdis/anchor/*`
+- **Recovery**: `/v1/sdis/recovery/*`
+- **Proofs**: `/v1/sdis/ephemeral/*` and verification routes (`/v1/sdis/verify/*`)
 
 ### Pilot UI
 
@@ -337,7 +343,7 @@ Proofs are:
 4. **Alert on Anomalies**: Detect unusual recovery patterns
 5. **Provide Support**: Help users with recovery failures
 
-## Current Status
+## Status Snapshot
 
 **Phase 1 Complete** ✅
 - [x] Data models defined
@@ -414,5 +420,5 @@ npm test -- sdis
 
 - [DID Specification](https://www.w3.org/TR/did-core/)
 - [Ed25519 Signatures](https://ed25519.cr.yp.to/)
-- [SDIS Design Doc](./sdis-design.md)
-- [Security Model](./security-model.md)
+- [SDIS Design Doc](../design/multi-device-identity-design.md)
+- [Security Model](../security/threat-model.md)

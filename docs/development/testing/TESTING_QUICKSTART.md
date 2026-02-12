@@ -65,7 +65,7 @@ curl http://localhost:9091/metrics | grep icn_system_actors_active
 
 **Expected output**: `icn_system_actors_active 7` (7 actors running on node1)
 
-**Note**: Without bootstrap peer configuration, nodes won't auto-discover each other (mDNS doesn't work in Docker bridge mode). See [DEPLOY_TEST_NETWORK.md](../DEPLOY_TEST_NETWORK.md) for peer connectivity setup.
+**Note**: Without bootstrap peer configuration, nodes won't auto-discover each other (mDNS doesn't work in Docker bridge mode). See [DEPLOY_TEST_NETWORK.md](../../deployment/DEPLOY_TEST_NETWORK.md) for peer connectivity setup.
 
 ### 4. Access Monitoring
 

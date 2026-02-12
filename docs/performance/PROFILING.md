@@ -201,7 +201,7 @@ Monitor network traffic:
 
 ```bash
 # Linux: iftop
-sudo iftop -i eth0 -f "port 5600"
+sudo iftop -i eth0 -f "port 7777"
 
 # Or nethogs for per-process
 sudo nethogs

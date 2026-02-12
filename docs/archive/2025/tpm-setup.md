@@ -1,5 +1,8 @@
 # TPM 2.0 Setup Guide
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 This guide explains how to set up and use the TPM 2.0 backend for ICN identity management.
 
 ## Overview

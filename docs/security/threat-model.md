@@ -903,7 +903,7 @@ The K3s homelab deployment introduces deployment-specific attack surfaces:
 - Grafana dashboards for gossip, ledger, trust, compute
 - Health endpoints monitored via liveness/readiness probes
 
-See [incident-response.md](incident-response.md) for K3s-specific incident procedures.
+See [incident-response.md](../operations/deployment/incident-response.md) for K3s-specific incident procedures.
 
 ---
 
@@ -944,7 +944,7 @@ See [incident-response.md](incident-response.md) for K3s-specific incident proce
 
 ### Internal Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 - [production-hardening.md](production-hardening.md) - Security fixes
 - [security-roadmap.md](security-roadmap.md) - Security implementation plan
 - [phase-10c-security-analysis.md](phase-10c-security-analysis.md) - Contract security

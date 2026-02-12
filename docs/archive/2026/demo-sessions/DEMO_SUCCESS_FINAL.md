@@ -1,7 +1,13 @@
 # 🎉 ICN Demo - Complete End-to-End Success!
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 17:46 UTC  
-**Status:** ✅ **FULLY OPERATIONAL - ALL SYSTEMS GO!**
+**Status:** Historical demo success snapshot
+
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
@@ -68,9 +74,9 @@ We successfully debugged, fixed, deployed, and tested the complete ICN stack fro
 
 ### Get JWT Token
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
@@ -99,7 +105,7 @@ curl http://localhost:8080/v1/health
 - **Running:** ✅ Session daemon-fixed
 - **Gateway:** http://localhost:8080
 - **RPC:** 127.0.0.1:15602
-- **Data:** /home/matt/icn-demo-test/data
+- **Data:** <demo-data-dir>/data
 
 ### Docker Stack
 - **icnd:** Up (healthy)

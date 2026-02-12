@@ -683,9 +683,9 @@ A: Partially. The gossip messages are visible to the network, but attestation ve
 
 ## Additional Resources
 
-- [Multi-Device Identity Design](multi-device-identity-design.md)
-- [ICN Identity Crate Documentation](../crates/icn-identity/src/recovery.rs)
-- [End-to-End Recovery Test](../crates/icn-core/tests/recovery_integration.rs)
+- [Multi-Device Identity Design](../multi-device-identity-design.md)
+- [ICN Identity Crate Documentation](../../../icn/crates/icn-identity/src/recovery.rs)
+- [End-to-End Recovery Test](../../../icn/crates/icn-core/tests/recovery_integration.rs)
 
 ## Changelog
 

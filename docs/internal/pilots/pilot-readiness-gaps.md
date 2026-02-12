@@ -264,7 +264,7 @@ contract_runtime.on_ledger_write(|tx| {
 - **Test Coverage**: 3 event bus tests + 2 integration tests = 5 total, all passing
 - **Critical Fix**: Corrected debit/credit semantics in ledger transactions
 
-See [docs/GOVERNANCE-LEDGER-INTEGRATION-COMPLETE.md](GOVERNANCE-LEDGER-INTEGRATION-COMPLETE.md) for complete details.
+See [governance-ledger integration session note](../../development/sessions/2026-01/2025-01-17-governance-ledger-integration.md) for complete details.
 
 ---
 

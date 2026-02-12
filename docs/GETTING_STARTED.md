@@ -45,7 +45,8 @@ icnd --version
 ICN uses decentralized identifiers (DIDs) instead of usernames. Let's create yours:
 
 ```bash
-icnctl id init
+# Use an explicit data dir so icnctl and icnd read the same identity state
+icnctl --data-dir ~/.icn id init
 ```
 
 You'll be prompted to:
@@ -56,7 +57,7 @@ Your DID will look like: `did:icn:5Xk8Y2r...` (based on your public key)
 
 **View your identity:**
 ```bash
-icnctl id show
+icnctl --data-dir ~/.icn id show
 ```
 
 ### 3. Start the Daemon
@@ -65,7 +66,7 @@ ICN runs as a background daemon (`icnd`):
 
 ```bash
 # Start manually (foreground, for testing)
-icnd
+icnd --data-dir ~/.icn
 
 # Or install as a system service
 sudo systemctl enable --now icnd  # Linux
@@ -74,7 +75,7 @@ sudo launchctl load /Library/LaunchDaemons/com.icn.icnd.plist  # macOS
 
 **Check daemon status:**
 ```bash
-icnctl status
+icnctl --data-dir ~/.icn status
 ```
 
 ### 4. Join a Cooperative
@@ -113,7 +114,7 @@ icnctl ledger history
 ### Identity & Trust
 
 - **DID (Decentralized Identifier)**: Your cryptographic identity (e.g., `did:icn:5Xk8Y...`)
-- **Keystore**: Encrypted file storing your private key (`~/.icn/keystore.age`)
+- **Keystore**: Encrypted file storing your private key (`{data_dir}/identity.age`, for example `~/.icn/identity.age` when using `--data-dir ~/.icn`)
 - **Trust Score**: How much the network trusts you (0.0 to 1.0)
 - **Trust Graph**: Web of trust relationships between members
 
@@ -213,9 +214,9 @@ Store backups:
 
 ### Monitor Your Node
 
-1. **Web Dashboard**:
-   ```
-   Open http://localhost:8080 in your browser
+1. **Gateway Health Endpoint**:
+   ```bash
+   curl http://localhost:8080/v1/health
    ```
 
 2. **Prometheus Metrics**:
@@ -225,7 +226,7 @@ Store backups:
 
 3. **Health Check**:
    ```bash
-   curl http://localhost:8080/health
+   curl http://localhost:8080/v1/health
    icnctl network status
    ```
 
@@ -264,7 +265,7 @@ ICN provides a **Gateway API** for building user-facing applications:
 
 3. **WebSocket for real-time updates**:
    ```javascript
-   const ws = new WebSocket('ws://localhost:8080/ws/my-coop');
+   const ws = new WebSocket('ws://localhost:8080/v1/ws/my-coop');
    ws.send(JSON.stringify({type: 'Auth', token: 'eyJ0eXAi...'}));
    ```
 

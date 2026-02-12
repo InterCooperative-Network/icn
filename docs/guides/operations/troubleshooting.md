@@ -5,8 +5,8 @@ This document provides step-by-step procedures for diagnosing and resolving comm
 **Audience**: ICN node operators, system administrators, SRE teams
 
 **Related Documents**:
-- [Incident Response Playbook](incident-response.md) - For security incidents and critical failures
-- [Production Hardening](production-hardening.md) - Security configuration reference
+- [Incident Response Playbook](../../operations/deployment/incident-response.md) - For security incidents and critical failures
+- [Production Hardening](../../security/production-hardening.md) - Security configuration reference
 
 > **Note**: Commands marked with "(future feature)" are planned but not yet implemented.
 > These are included for completeness and will be available in future ICN releases.
@@ -256,11 +256,11 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
 # Check network policies
 sudo kubectl -n icn get networkpolicies
 
-# Verify QUIC port is accessible (default 5600)
+# Verify QUIC port is accessible (default 7777)
 sudo kubectl -n icn get svc
 
 # Test peer reachability from pod
-sudo kubectl -n icn exec deploy/icn-daemon -- nc -zv <peer-ip> 5600
+sudo kubectl -n icn exec deploy/icn-daemon -- nc -zvu <peer-ip> 7777
 ```
 
 **If subscription issue**:
@@ -707,7 +707,7 @@ ssh atlas "ls -la /mnt/storage/k8s/icn-data/"
 **If port conflict**:
 ```bash
 # Check what's using the port
-sudo kubectl -n icn exec deploy/icn-daemon -- ss -tlnp | grep 5600
+sudo kubectl -n icn exec deploy/icn-daemon -- ss -ulnp | grep 7777
 
 # May need to kill stuck process or wait for cleanup
 ```

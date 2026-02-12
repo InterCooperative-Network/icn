@@ -26,18 +26,18 @@ cd icn/
 cargo build --release
 
 # Initialize identity
-./target/release/icnctl id init
+./target/release/icnctl --data-dir /var/lib/icn id init
 # Enter passphrase when prompted
 
 # Start daemon
-./target/release/icnd
+./target/release/icnd --data-dir /var/lib/icn
 ```
 
 The daemon will:
-1. Load identity from `~/.icn/keystore.age`
-2. Start QUIC listener on `0.0.0.0:4433` (default)
+1. Load identity from `{data_dir}/identity.age` (for this example: `/var/lib/icn/identity.age`)
+2. Start QUIC listener on `0.0.0.0:7777` (default)
 3. Enable mDNS discovery on LAN
-4. Expose Prometheus metrics on `:9090/metrics`
+4. Expose Prometheus metrics on `:9100/metrics`
 
 ---
 
@@ -94,10 +94,8 @@ COPY --from=builder /app/target/release/icnctl /usr/local/bin/
 
 # Data directory
 VOLUME ["/data"]
-ENV ICN_DATA_DIR=/data
-
-EXPOSE 4433/udp 9090/tcp
-ENTRYPOINT ["icnd"]
+EXPOSE 7777/udp 9100/tcp 8080/tcp
+ENTRYPOINT ["icnd", "--data-dir", "/data"]
 ```
 
 Build and run:
@@ -106,8 +104,9 @@ docker build -t icnd:latest .
 docker run -d \
   --name icnd \
   -v icn-data:/data \
-  -p 4433:4433/udp \
-  -p 9090:9090 \
+  -p 7777:7777/udp \
+  -p 9100:9100 \
+  -p 8080:8080 \
   icnd:latest
 ```
 
@@ -119,13 +118,13 @@ docker run -d \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ICN_DATA_DIR` | `~/.icn` | Data directory (keystore, ledger, state) |
-| `ICN_LISTEN_ADDR` | `0.0.0.0:4433` | QUIC listener address |
-| `ICN_METRICS_PORT` | `9090` | Prometheus metrics port |
-| `ICN_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
 | `ICN_KEYSTORE_PASSPHRASE` | (none) | Keystore passphrase for automated deployments (preferred) |
 | `ICN_PASSPHRASE` | (none) | Keystore passphrase (legacy, use ICN_KEYSTORE_PASSPHRASE) |
 | `ICN_GATEWAY_JWT_SECRET` | (none) | JWT secret for Gateway API authentication |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | Enable tracing export by setting OTLP endpoint |
+| `OTEL_SERVICE_NAME` | `icn-node` | Override OpenTelemetry service name |
+
+Note: `icnd` does not currently read `ICN_DATA_DIR`, `ICN_CONFIG`, `ICN_LISTEN_ADDR`, or `ICN_METRICS_PORT` directly from environment. Use `--data-dir`, `--config`, and config file fields.
 
 **Passphrase for Automated Deployments:**
 
@@ -134,7 +133,7 @@ For systemd, Docker, or Kubernetes deployments where interactive prompts aren't 
 ```bash
 # Option 1: Set in environment (preferred)
 export ICN_KEYSTORE_PASSPHRASE="your-secure-passphrase"
-icnd --config /etc/icn/icn.toml
+icnd --config /etc/icn/config.toml
 
 # Option 2: Use systemd EnvironmentFile
 # /etc/icn/icn.env (chmod 600)
@@ -148,33 +147,21 @@ docker run -e ICN_KEYSTORE_PASSPHRASE="$(cat /run/secrets/icn_passphrase)" icn:l
 
 ### Configuration File
 
-ICN supports TOML configuration files. See [../config/](../config/) for examples:
+ICN supports TOML configuration files. See [config/](../../../config/README.md) for examples:
 
 ```toml
-# ~/.icn/icn.toml
-data_dir = "/home/user/.icn"
+# /etc/icn/config.toml
+data_dir = "/var/lib/icn"
 
 [network]
-listen_addr = "0.0.0.0:4433"
+listen_addr = "0.0.0.0:7777"
 mdns_enabled = true
 bootstrap_peers = []
 
 [observability]
-metrics_port = 9090
+metrics_port = 9100
+health_port = 8080
 log_level = "info"
-
-[security]
-rate_limit_msg_per_sec = 100
-rate_limit_burst = 20
-quic_max_streams = 10
-
-[observability]
-metrics_port = 9090
-log_level = "info"
-log_format = "json"
-
-[storage]
-data_dir = "/var/lib/icn"
 ```
 
 ### CLI Flags
@@ -183,7 +170,7 @@ data_dir = "/var/lib/icn"
 icnd --help
 
 # Common flags:
-icnd --config /etc/icn/icn.toml
+icnd --config /etc/icn/config.toml
 icnd --data-dir /var/lib/icn
 icnd --log-level debug
 ```
@@ -206,7 +193,7 @@ Wants=network-online.target
 Type=simple
 User=icn
 Group=icn
-ExecStart=/usr/local/bin/icnd
+ExecStart=/usr/local/bin/icnd --data-dir /var/lib/icn --config /etc/icn/config.toml
 Restart=on-failure
 RestartSec=5s
 
@@ -218,8 +205,7 @@ ProtectHome=true
 ReadWritePaths=/var/lib/icn
 
 # Environment
-Environment="ICN_DATA_DIR=/var/lib/icn"
-Environment="ICN_LOG_LEVEL=info"
+Environment="ICN_KEYSTORE_PASSPHRASE=REPLACE_ME"
 Environment="RUST_LOG=icn=info"
 
 # Limits
@@ -252,7 +238,7 @@ sudo journalctl -u icnd -f
 
 ### Docker Compose
 
-See [../docker/](../docker/) for complete Docker Compose examples.
+See [docker/](../../../docker/README.md) for complete Docker Compose examples.
 
 ```yaml
 version: '3.9'
@@ -263,14 +249,12 @@ services:
     container_name: icn-alpha
     restart: unless-stopped
     ports:
-      - "4433:4433/udp"
-      - "5050:5050"
-      - "9090:9090"
+      - "7777:7777/udp"
+      - "9100:9100"
+      - "8080:8080"
     volumes:
       - icn-data:/data
-    environment:
-      - ICN_DATA_DIR=/data
-      - ICN_OBSERVABILITY_LOG_LEVEL=info
+    command: ["icnd", "--data-dir", "/data", "--log-level", "info"]
     networks:
       - icn-net
 
@@ -309,7 +293,7 @@ global:
 scrape_configs:
   - job_name: 'icn'
     static_configs:
-      - targets: ['icnd:9090']
+      - targets: ['icnd:9100']
 ```
 
 ### Key Metrics
@@ -407,7 +391,7 @@ journalctl -u icnd -o json > icnd-logs.json
 
 ```bash
 # Backup keystore (encrypted with passphrase)
-cp ~/.icn/keystore.age ~/backup/keystore-$(date +%F).age
+cp /var/lib/icn/identity.age ~/backup/identity.age
 
 # Or use icnctl
 icnctl id export ~/backup/identity-backup.age
@@ -424,8 +408,8 @@ icnctl id export ~/backup/identity-backup.age
 icnctl id import ~/backup/identity-backup.age
 
 # Or copy directly
-cp ~/backup/keystore.age ~/.icn/keystore.age
-chmod 600 ~/.icn/keystore.age
+cp ~/backup/identity.age /var/lib/icn/identity.age
+chmod 600 /var/lib/icn/identity.age
 ```
 
 ### Ledger Backup
@@ -434,12 +418,12 @@ The ledger is a Merkle-DAG synced via gossip, so data is distributed. However, l
 
 ```bash
 # Backup entire data directory
-tar czf icn-backup-$(date +%F).tar.gz ~/.icn/
+tar czf icn-backup-$(date +%F).tar.gz /var/lib/icn/
 
 # Exclude keystore if backing up separately
 tar czf icn-ledger-backup-$(date +%F).tar.gz \
-  --exclude='keystore.age' \
-  ~/.icn/
+  --exclude='identity.age' \
+  /var/lib/icn/
 ```
 
 **Automated backups (systemd timer):**
@@ -480,7 +464,7 @@ Enable: `sudo systemctl enable --now icn-backup.timer`
 
 **Checklist:**
 1. Identity initialized? Run `icnctl id init`
-2. Port already in use? Check with `sudo lsof -i :4433`
+2. Port already in use? Check with `sudo lsof -i :7777`
 3. Permissions? Ensure data directory is readable/writable
 4. Logs? Check `journalctl -u icnd -n 50`
 
@@ -502,13 +486,13 @@ Error: Permission denied
 
 **Checklist:**
 1. mDNS working? Check with `avahi-browse -a` (Linux) or `dns-sd -B` (macOS)
-2. Firewall blocking? Open UDP 4433
+2. Firewall blocking? Open UDP 7777
 3. Multiple networks? mDNS doesn't cross subnets
 4. Docker network mode? Use `host` mode for mDNS
 
 **Manual peer dialing:**
 ```bash
-icnctl network dial did:icn:abc123... 192.168.1.100:4433
+icnctl network dial did:icn:abc123... 192.168.1.100:7777
 ```
 
 ### High memory usage
@@ -546,7 +530,7 @@ icnctl network dial did:icn:abc123... 192.168.1.100:4433
 - Use strong passphrase (20+ characters, mix of types)
 - Store backup in encrypted location (KeePass, 1Password)
 - Use separate passphrase from system password
-- Restrict permissions: `chmod 600 ~/.icn/keystore.age`
+- Restrict permissions: `chmod 600 /var/lib/icn/identity.age`
 
 **DON'T:**
 - Share keystore file (contains identity)
@@ -563,7 +547,7 @@ icnctl network dial did:icn:abc123... 192.168.1.100:4433
 - Use VPN or WireGuard for WAN peers
 
 **DON'T:**
-- Expose metrics port (9090) publicly
+- Expose metrics port (9100) publicly
 - Disable rate limiting without good reason
 - Run as root (use dedicated user)
 
@@ -597,9 +581,9 @@ icnctl network dial did:icn:abc123... 192.168.1.100:4433
 
 ## Additional Resources
 
-- [Architecture Documentation](ARCHITECTURE.md)
-- [Production Hardening Details](production-hardening.md)
-- [Topic Subscriptions API](topic-subscriptions-api.md)
+- [Architecture Documentation](../../ARCHITECTURE.md)
+- [Production Hardening Details](../../security/production-hardening.md)
+- [Topic Subscriptions API](../../reference/api/topic-subscriptions-api.md)
 - [GitHub Repository](https://github.com/your-org/icn)
 - [Community Forum](https://forum.intercooperative.network) (future)
 

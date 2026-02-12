@@ -173,4 +173,4 @@ The ~21,700x slowdown in `trust_score_detailed()` (1000-node network) breaks dow
 - Issue #1001: Benchmark trust_score_detailed performance
 - PR #987: trust_score_detailed() implementation
 - Issue #877: Multi-graph trust implementation
-- docs/production-hardening.md: Network protections
+- docs/security/production-hardening.md: Network protections

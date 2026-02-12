@@ -332,6 +332,6 @@ pub fn shutdown_tracing();
 
 ## See Also
 
-- [Production Hardening Guide](production-hardening.md)
-- [Kubernetes Deployment](KUBERNETES_DEPLOYMENT.md)
-- [Architecture Overview](ARCHITECTURE.md)
+- [Production Hardening Guide](../../security/production-hardening.md)
+- [Kubernetes Deployment](../../../deploy/k8s/README.md)
+- [Architecture Overview](../../ARCHITECTURE.md)

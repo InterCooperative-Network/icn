@@ -1,5 +1,8 @@
 # Phase 16C: Locality Awareness - Implementation Plan
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Status**: ✅ COMPLETE (100%)
 **Start Date**: 2025-11-23
 **Completion Date**: 2025-11-24

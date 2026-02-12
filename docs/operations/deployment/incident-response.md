@@ -312,7 +312,7 @@ curl -s http://10.8.10.40:30093/api/v1/alerts | jq '.data[] | {labels: .labels, 
 1. **Check quarantine status**:
    ```bash
    # View quarantine size from dashboard
-   curl http://localhost:8080/health | jq '.ledger_quarantine_size'
+   curl http://localhost:8080/v1/health | jq '.ledger_quarantine_size'
 
    # Or check Prometheus metrics
    curl http://localhost:9100/metrics | grep icn_ledger_quarantine_size
@@ -607,7 +607,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 2. **Check ICN peer status**:
    ```bash
    # View peer count from dashboard
-   curl http://localhost:8080/health | jq '.active_connections'
+   curl http://localhost:8080/v1/health | jq '.active_connections'
 
    # Check network metrics
    curl http://localhost:9100/metrics | grep icn_network_connections_active
@@ -628,8 +628,8 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 2. **Check firewall rules**:
    ```bash
-   # Verify QUIC port is open (default: 5600)
-   sudo iptables -L -n | grep 5600
+   # Verify QUIC port is open (default: 7777/udp)
+   sudo iptables -L -n | grep 7777
 
    # Verify mDNS port is open (5353)
    sudo iptables -L -n | grep 5353
@@ -1209,7 +1209,7 @@ http://icn-node:8080/health
 WatchdogSec=60s
 
 # Nagios/Zabbix
-curl -f http://localhost:8080/health || exit 1
+curl -f http://localhost:8080/v1/health || exit 1
 ```
 
 ---
@@ -1258,7 +1258,7 @@ Detected: [Time UTC]
 Severity: [P0-P3]
 Initial Symptoms: [What was observed]
 
-Current Status:
+Status at this update:
 - [What we know so far]
 
 Immediate Actions:

@@ -6,7 +6,7 @@ This guide provides step-by-step instructions for setting up a new cooperative o
 
 Before setting up a cooperative, ensure you have:
 
-1. **ICN node running** - See [Getting Started](GETTING_STARTED.md) for installation
+1. **ICN node running** - See [Getting Started](../../GETTING_STARTED.md) for installation
 2. **Admin identity created** - You need a DID to become the founding admin
 3. **Gateway running** - For REST API access (member onboarding, payments)
 
@@ -355,17 +355,17 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/health
 After completing setup:
 
 1. **Invite members** - Share the cooperative ID and onboarding instructions
-2. **Set up backup procedures** - See [Backup and Recovery](backup-and-recovery.md)
-3. **Configure monitoring** - See [Observability Guide](ARCHITECTURE.md#observability)
+2. **Set up backup procedures** - See [Backup and Recovery](../operations/backup-and-recovery.md)
+3. **Configure monitoring** - See [Observability Guide](../../ARCHITECTURE.md#observability)
 4. **Plan governance cadence** - Regular meetings, proposal review cycles
 
 ---
 
 ## Related Documentation
 
-- [Getting Started](GETTING_STARTED.md) - Installation and first steps
-- [Governance Primitives](governance-primitives.md) - Detailed governance documentation
-- [Economic Safety](economic-safety.md) - Credit limits and financial safeguards
-- [Trust Threshold Configuration](trust-threshold-configuration.md) - Trust system details
-- [API Reference](API_REFERENCE.md) - Complete API documentation
-- [Glossary](glossary.md) - ICN terminology definitions
+- [Getting Started](../../GETTING_STARTED.md) - Installation and first steps
+- [Governance Primitives](../../design/governance/governance-primitives.md) - Detailed governance documentation
+- [Economic Safety](../../design/economics/economic-safety.md) - Credit limits and financial safeguards
+- [Trust Threshold Configuration](../../reference/config/trust-threshold-configuration.md) - Trust system details
+- [API Reference](../../reference/api/API_REFERENCE.md) - Complete API documentation
+- [Glossary](../../glossary.md) - ICN terminology definitions

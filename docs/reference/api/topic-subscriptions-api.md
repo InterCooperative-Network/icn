@@ -251,21 +251,28 @@ use icn_net::{MessagePayload, NetworkMessage};
 let incoming_handler = Arc::new(move |net_msg| {
     match net_msg.payload {
         MessagePayload::Subscribe { topics } => {
-            let mut gossip = gossip_handle.blocking_write();
-            let mut acked_topics = Vec::new();
+            let sender = net_msg.from.clone();
+            let gossip = gossip_handle.clone();
+            let net = network_handle.clone();
 
-            for topic in &topics {
-                match gossip.subscribe(topic, net_msg.from.clone()) {
-                    Ok(_) => acked_topics.push(topic.clone()),
-                    Err(e) => warn!("Subscription denied for {}: {}", topic, e),
+            // Keep callback non-blocking; do async state mutation in a spawned task.
+            tokio::spawn(async move {
+                let mut gossip = gossip.write().await;
+                let mut acked_topics = Vec::new();
+
+                for topic in &topics {
+                    match gossip.subscribe(topic, sender.clone()).await {
+                        Ok(_) => acked_topics.push(topic.clone()),
+                        Err(e) => warn!("Subscription denied for {}: {}", topic, e),
+                    }
                 }
-            }
 
-            // Send ack for successful subscriptions
-            if !acked_topics.is_empty() {
-                let ack = NetworkMessage::subscribe_ack(own_did, net_msg.from, acked_topics);
-                // Send ack via network_handle...
-            }
+                if !acked_topics.is_empty() {
+                    let ack = NetworkMessage::subscribe_ack(own_did, sender.clone(), acked_topics);
+                    // Send ack via network_handle...
+                    let _ = net.send_message(sender, ack).await;
+                }
+            });
         }
         _ => {}
     }
@@ -379,7 +386,7 @@ The subscription system exports Prometheus metrics:
 
 ```bash
 # View all subscription metrics
-curl http://localhost:9090/metrics | grep icn_gossip_subscribe
+curl http://localhost:9100/metrics | grep icn_gossip_subscribe
 
 # Example output:
 # icn_gossip_subscriptions_total 15
@@ -443,6 +450,6 @@ These limitations will be addressed in future releases.
 
 ## See Also
 
-- [ARCHITECTURE.md](ARCHITECTURE.md#66-topic-subscriptions) - Architecture documentation
-- [CLAUDE.md](../CLAUDE.md) - Development guide
+- [ARCHITECTURE.md](../../ARCHITECTURE.md#66-topic-subscriptions) - Architecture documentation
+- [CLAUDE.md](../../../CLAUDE.md) - Development guide
 - Integration test examples: `icn/crates/icn-core/tests/subscription_integration.rs`

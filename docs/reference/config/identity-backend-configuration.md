@@ -12,7 +12,7 @@ ICN supports multiple keystore backends for identity storage:
 
 ## Configuration
 
-Backend selection is configured in the `[identity]` section of `icn.toml`:
+Backend selection is configured in the `[identity]` section of your `icnd` config file (commonly `config.toml`):
 
 ```toml
 [identity]
@@ -21,7 +21,7 @@ backend = "age"  # Options: "age", "pkcs11", "tpm"
 
 ### Age Backend (Default)
 
-The Age backend stores encrypted keys in a file (default: `~/.icn/identity.age`). This is the recommended backend for most users and is production-ready.
+The Age backend stores encrypted keys in a file at `{data_dir}/identity.age` (for default `data_dir`, typically `~/.local/share/icn/identity.age` on Linux). This is the recommended backend for most users and is the most mature backend in current ICN deployments.
 
 **Configuration:**
 
@@ -33,7 +33,7 @@ backend = "age"
 No additional configuration required. The keystore file location is determined by the `data_dir` setting.
 
 **Features:**
-- ✅ Production-ready
+- ✅ Mature and widely used in current deployments
 - ✅ Cross-platform
 - ✅ Simple deployment
 - ✅ Passphrase protection
@@ -109,7 +109,7 @@ Key sealing/unsealing + hardware-keyed IdentityBundle required.
 
 The backend is selected when `icnd` starts:
 
-1. Configuration is loaded from `icn.toml`
+1. Configuration is loaded from the file passed to `--config` (or from runtime defaults if `--config` is omitted)
 2. The `identity.backend` value is validated
 3. The appropriate backend is initialized
 4. For Age: keystore file is opened
@@ -117,7 +117,7 @@ The backend is selected when `icnd` starts:
 
 Backend selection is logged during startup:
 ```
-INFO Identity keystore found at: "/home/user/.icn/identity.age"
+INFO Identity keystore found at: "/home/user/.local/share/icn/identity.age"
 INFO Using identity backend: age
 ```
 
@@ -166,7 +166,7 @@ Error: Invalid key_handle 0x1234 (must be in range 0x81000000-0x81FFFFFF)
 Use `icnd --validate-config` to check configuration without starting the daemon:
 
 ```bash
-$ icnd --config icn.toml --validate-config
+$ icnd --config /path/to/config.toml --validate-config
 Validating configuration...
 
 ✓ Configuration is valid
@@ -218,4 +218,4 @@ Key requirements:
 - [Age encryption specification](https://age-encryption.org/)
 - [PKCS#11 standard](https://docs.oasis-open.org/pkcs11/pkcs11-base/v3.0/pkcs11-base-v3.0.html)
 - [TPM 2.0 specification](https://trustedcomputinggroup.org/resource/tpm-library-specification/)
-- [ICN Identity Architecture](ARCHITECTURE.md#identity-layer)
+- [ICN Identity Architecture](../../ARCHITECTURE.md#identity-layer)

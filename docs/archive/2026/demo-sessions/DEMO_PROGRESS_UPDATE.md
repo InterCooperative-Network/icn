@@ -1,5 +1,8 @@
 # 🎯 ICN Demo Progress - Session Update
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Time:** 2025-12-18 21:40 UTC  
 **Session Duration:** ~25 minutes  
 **Status:** ✅ **MAJOR PROGRESS - UI INTEGRATION FIXED**
@@ -54,7 +57,7 @@
 
 ---
 
-## 📊 Current Status
+## 📊 Snapshot Status
 
 ### UI Integration: 95% ✅
 
@@ -97,13 +100,13 @@
 
 ```bash
 # Terminal 1: UI (if not running)
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Terminal 2: Get token (if needed)
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \

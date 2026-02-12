@@ -6,7 +6,7 @@
 
 ## The Problem
 
-We have a production-ready substrate (Phases 1-12) and will soon have a platform layer (Phase 14: gateway + SDK + reference app).
+In this 2025-01-15 planning snapshot, the substrate was assessed as production-capable (Phases 1-12), with a platform layer expected next (Phase 14: gateway + SDK + reference app).
 
 But we have **zero pilots**. We don't know:
 - What co-ops actually need

@@ -1,5 +1,8 @@
 # SDIS Quick Start Guide
 
+> Snapshot guidance: this document contains both currently wired endpoints and forward-looking flows.
+> Verify live behavior against `icn/crates/icn-gateway/src/api/sdis/mod.rs` and `docs/sdis/SDIS_STATUS.md`.
+
 ## 🚀 Getting Started with SDIS
 
 SDIS (Secure Distributed Identity System) enables secure multi-device identity management and recovery for ICN.
@@ -113,85 +116,84 @@ View your steward metrics:
 
 ```bash
 # Step 1: Request enrollment
-curl -X POST http://localhost:8080/api/v1/sdis/enroll \
+curl -X POST http://localhost:8080/v1/sdis/enrollment/start \
   -H "Content-Type: application/json" \
   -d '{
-    "root_did": "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
-    "device_did": "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktX",
-    "device_label": "My Laptop",
-    "device_pubkey": "MCowBQYDK2VwAyEA..."
+    "identity_name": "alice",
+    "coop_id": "my-coop"
   }'
 
 # Response:
 {
   "enrollment_id": "enr_abc123",
-  "challenge": "YXNkZmFzZGZhc2RmYXNkZg==",
-  "expires_at": 1704067200
+  "verification_code": "ABCD-1234",
+  "expires_at": "2026-02-12T12:34:56Z"
 }
 
-# Step 2: Approve (on existing device)
-curl -X POST http://localhost:8080/api/v1/sdis/enroll/enr_abc123/approve \
+# Step 2: Steward records a vouch
+curl -X POST http://localhost:8080/v1/sdis/vouch/enr_abc123 \
   -H "Content-Type: application/json" \
   -d '{
-    "signature": "base64_ed25519_signature"
+    "vouch_statement": "I can verify this member identity."
   }'
 
 # Response:
 {
-  "status": "approved",
-  "proof_id": "proof_xyz789"
+  "status": "vouched",
+  "enrollment_id": "enr_abc123",
+  "level": 2
 }
 
-# Step 3: Verify (on new device)
-curl http://localhost:8080/api/v1/sdis/enroll/enr_abc123
+# Step 3: Check enrollment status
+curl http://localhost:8080/v1/sdis/status/enr_abc123
 
 # Response:
 {
   "enrollment_id": "enr_abc123",
-  "approved": true,
-  "approved_at": 1704063600
+  "status": "ready_for_completion",
+  "level": 2
 }
 ```
 
 #### Add Recovery Anchor
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/anchors \
+curl -X POST http://localhost:8080/v1/sdis/anchor/devices/add \
   -H "Content-Type: application/json" \
   -d '{
-    "anchor_type": "device",
-    "label": "My Phone",
-    "pubkey": "MCowBQYDK2VwAyEA..."
+    "anchor_id": "anc_def456",
+    "device_name": "My Phone",
+    "device_pubkey": "MCowBQYDK2VwAyEA..."
   }'
 
 # Response:
 {
-  "anchor_id": "anc_def456",
-  "created_at": 1704063600
+  "device_id": "dev_123",
+  "device": {
+    "device_name": "My Phone"
+  }
 }
 ```
 
 #### List Anchors
 
 ```bash
-curl http://localhost:8080/api/v1/sdis/anchors
+curl http://localhost:8080/v1/sdis/anchor/anc_def456/devices
 
 # Response:
 {
-  "anchors": [
+  "devices": [
     {
-      "anchor_id": "anc_def456",
-      "owner_did": "did:icn:z6Mk...",
-      "anchor_type": "device",
-      "label": "My Phone",
-      "created_at": 1704063600,
-      "revoked_at": null
+      "device_id": "dev_123",
+      "device_name": "My Phone"
     }
   ]
 }
 ```
 
 ### JavaScript SDK
+
+The SDK surface evolves independently; treat the snippet below as conceptual and verify against current `sdk/typescript` exports.
 
 ```javascript
 import { ICNClient } from '@icn/sdk';
@@ -375,15 +377,15 @@ User needs: Recover identity
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/v1/sdis/enroll` | POST | Start enrollment |
-| `/api/v1/sdis/enroll/{id}/approve` | POST | Approve enrollment |
-| `/api/v1/sdis/enroll/{id}` | GET | Check status |
-| `/api/v1/sdis/anchors` | POST | Add anchor |
-| `/api/v1/sdis/anchors` | GET | List anchors |
-| `/api/v1/sdis/anchors/{id}/revoke` | POST | Revoke anchor |
-| `/api/v1/sdis/recover/initiate` | POST | Start recovery |
-| `/api/v1/sdis/recover/{id}/approve` | POST | Approve recovery |
-| `/api/v1/sdis/recover/{id}` | GET | Check recovery |
+| `/v1/sdis/anchor/{id}` | GET | Get anchor details |
+| `/v1/sdis/anchor/rotate-keys` | POST | Rotate anchor keys |
+| `/v1/sdis/anchor/{id}/history` | GET | Key rotation history |
+| `/v1/sdis/anchor/devices/add` | POST | Add trusted device |
+| `/v1/sdis/anchor/{id}/devices` | GET | List trusted devices |
+| `/v1/sdis/recovery/start` | POST | Start recovery ceremony |
+| `/v1/sdis/recovery/{id}/approve` | POST | Approve recovery |
+| `/v1/sdis/recovery/{id}` | GET | Check recovery status |
+| `/v1/sdis/recovery/{id}/complete` | POST | Complete recovery |
 
 ---
 
@@ -400,9 +402,9 @@ User needs: Recover identity
 
 ## Resources
 
-📖 **Full Documentation**: `docs/SDIS_SYSTEM.md`  
+📖 **Full Documentation**: `docs/sdis/SDIS_SYSTEM.md`  
 🏗️ **Architecture**: `docs/ARCHITECTURE.md`  
-🔐 **Security Model**: `docs/security-model.md`  
+🔐 **Security Model**: `docs/security/SDIS_THREAT_MODEL.md`  
 🐛 **Report Issues**: `github.com/InterCooperative-Network/icn/issues`  
 💬 **Get Help**: Join ICN Discord #sdis channel
 

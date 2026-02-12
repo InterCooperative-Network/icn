@@ -2,16 +2,19 @@
 
 **Date**: 2025-12-04
 **Last Updated**: 2025-12-04
-**Status**: Pre-Pilot Assessment
+**Status**: Historical pre-pilot assessment snapshot
 **Recommendation**: CONDITIONAL GO
+
+> Historical note (2025-12-04): This document records a point-in-time gap assessment.
+> For current status, use the latest status/audit documents and live CI results.
 
 ---
 
 ## Executive Summary
 
-Comprehensive analysis of the ICN codebase identified **23 gaps** across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, **9 are high severity** and should be addressed before or during early pilot.
+Comprehensive analysis of the ICN codebase identified **23 gaps** (as of 2025-12-04) across test coverage, documentation, feature completeness, monitoring, and configuration. Of these, **9 were high severity** and recommended for resolution before or during early pilot.
 
-**Progress**: ✅ All 4 pilot-blocking items resolved on 2025-12-04! Contract gossip complete (Gap #18/Issue #40). **23/23 gaps fixed (100%)**.
+**Historical progress update (2025-12-04)**: all 4 pilot-blocking items were marked resolved in this assessment, including contract gossip (Gap #18/Issue #40). The table below reflects that same snapshot.
 
 | Category | High | Medium | Low | Total | Fixed |
 |----------|------|--------|-----|-------|-------|
@@ -257,6 +260,6 @@ Progress on gap remediation will be tracked in:
 
 ## References
 
-- [CLAUDE.md](../CLAUDE.md) - Project architecture
-- [ROADMAP.md](../ROADMAP.md) - Strategic roadmap
-- [INTERNAL_TESTING_PLAN.md](INTERNAL_TESTING_PLAN.md) - Test scenarios
+- [CLAUDE.md](../../../CLAUDE.md) - Project architecture
+- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Strategic roadmap
+- [INTERNAL_TESTING_PLAN.md](../../development/testing/INTERNAL_TESTING_PLAN.md) - Test scenarios

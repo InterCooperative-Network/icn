@@ -18,7 +18,7 @@ the system and why it is critical for distributed coordination.
 ## Key Reading
 - `icn/crates/icn-obs/` - Observability crate
 - `monitoring/README.md` - Metrics and dashboard setup
-- `docs/production-hardening.md` - Production concerns
+- `docs/security/production-hardening.md` - Production concerns
 - `docs/onboarding/patterns.md` - Metrics integration pattern
 
 ---

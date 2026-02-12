@@ -7,7 +7,7 @@ This document contains detailed history of all completed development phases. For
 **Current Focus**: Kernel/App Separation Architecture
 **Tracking Issue**: [#856](https://github.com/InterCooperative-Network/icn/issues/856)
 
-**Architecture Reset** (2026-01-26): Previous roadmap superseded by kernel/app separation initiative. See [KERNEL_APP_SEPARATION.md](KERNEL_APP_SEPARATION.md) for details.
+**Architecture Reset** (2026-01-26): Previous roadmap superseded by kernel/app separation initiative. See [KERNEL_APP_SEPARATION.md](architecture/KERNEL_APP_SEPARATION.md) for details.
 
 ---
 
@@ -277,7 +277,7 @@ Five-phase incremental evolution:
 - **16D**: Actor State & Migration
 - **16E**: Cooperative Policies
 
-See [docs/scheduler-evolution-plan.md](scheduler-evolution-plan.md) for complete design.
+See [docs/scheduler-evolution-plan.md](design/scheduler-evolution-plan.md) for complete design.
 
 ---
 
@@ -363,7 +363,7 @@ See [sims/mutual-credit/RESULTS_SUMMARY.md](../sims/mutual-credit/RESULTS_SUMMAR
 - Identity sync protocol via gossip
 - 33 tests pass
 
-See [docs/multi-device-identity-design.md](multi-device-identity-design.md).
+See [docs/multi-device-identity-design.md](design/multi-device-identity-design.md).
 
 ---
 
@@ -418,7 +418,7 @@ See [docs/multi-device-identity-design.md](multi-device-identity-design.md).
 - Backward Compatibility for legacy nodes
 - 16 tests
 
-See [docs/capability-based-features.md](capability-based-features.md).
+See [docs/capability-based-features.md](design/capability-based-features.md).
 
 ---
 
@@ -449,4 +449,4 @@ See [docs/capability-based-features.md](capability-based-features.md).
 - Result types with context
 - Graceful degradation
 
-See [docs/production-hardening.md](production-hardening.md) for complete details.
+See [docs/production-hardening.md](security/production-hardening.md) for complete details.

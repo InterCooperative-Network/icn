@@ -1,6 +1,9 @@
 # ICN Architecture Documentation Index
 **Complete Architecture Review - December 2025**
 
+> This index references architecture review materials produced in December 2025.
+> For current architecture truth, start with `docs/ARCHITECTURE.md`.
+
 ---
 
 ## 📚 Documentation Overview
@@ -38,7 +41,7 @@ This architecture review produced three comprehensive documents:
 
 **Read this for:** Quick visual reference and flow diagrams
 
-### 3. **docs/ARCHITECTURE.md** (Existing, 69KB)
+### 3. **../ARCHITECTURE.md** (Existing, 69KB)
 **Design Rationale & Deep Dive**
 - Design principles and philosophy
 - Detailed component specifications
@@ -154,7 +157,7 @@ P2P coordination layer with:
 KeyPair::generate() 
   → DID (did:icn:<base58-pubkey>)
   → Age-encrypt with passphrase
-  → Save to $ICN_DATA_DIR/identity/keypair.age
+  → Save to {data_dir}/identity.age
   → Startup: Unlock keystore → Spawn actors
 ```
 
@@ -373,7 +376,7 @@ icn/
 | S1-S5 | ✅ Complete | SDIS identity (anchors, post-quantum, ZKP) |
 | 21+ | 📋 Planned | Mobile SDKs, production hardening, pilot deployments |
 
-**Current Status:** PILOT-READY (Q4 2025)  
+**Status at Review Time:** Pilot-ready assessment (Q4 2025)  
 **Target:** Production-ready Q1 2026
 
 ---
@@ -383,29 +386,29 @@ icn/
 ### Primary Documentation
 - [ARCHITECTURE_MAP.md](./ARCHITECTURE_MAP.md) - Complete system map (51KB)
 - [ARCHITECTURE_VISUAL.md](./ARCHITECTURE_VISUAL.md) - Visual diagrams (38KB)
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Design rationale (69KB)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Design rationale (69KB)
 - [KERNEL_APP_SEPARATION.md](./KERNEL_APP_SEPARATION.md) - Meaning Firewall architecture (NEW)
 
 ### Getting Started
-- [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md) - New contributor guide
-- [docs/QUICK_REFERENCE.md](./docs/QUICK_REFERENCE.md) - Command cheatsheet
-- [docs/FAQ.md](./docs/FAQ.md) - Common questions
+- [GETTING_STARTED.md](../GETTING_STARTED.md) - New contributor guide
+- [guides/QUICK_REFERENCE.md](../guides/QUICK_REFERENCE.md) - Command cheatsheet
+- [guides/FAQ.md](../guides/FAQ.md) - Common questions
 
 ### Specialized Topics
-- [docs/production-hardening.md](./docs/production-hardening.md) - Security best practices
-- [docs/governance-primitives.md](./docs/governance-primitives.md) - Governance design
-- [docs/scheduler-evolution-plan.md](./docs/scheduler-evolution-plan.md) - Compute scheduler
-- [docs/backup-and-recovery.md](./docs/backup-and-recovery.md) - Disaster recovery
-- [docs/threat-model.md](./docs/threat-model.md) - Security analysis
+- [security/production-hardening.md](../security/production-hardening.md) - Security best practices
+- [design/governance/governance-primitives.md](../design/governance/governance-primitives.md) - Governance design
+- [design/scheduler-evolution-plan.md](../design/scheduler-evolution-plan.md) - Compute scheduler
+- [guides/operations/backup-and-recovery.md](../guides/operations/backup-and-recovery.md) - Disaster recovery
+- [security/threat-model.md](../security/threat-model.md) - Security analysis
 
 ### API Documentation
-- [docs/api/](./docs/api/) - REST API specification
+- [reference/api/](../reference/api/README.md) - REST API specification
 - Cargo docs: `cargo doc --open --workspace`
 
 ### Development
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
-- [CHANGELOG.md](./CHANGELOG.md) - Release notes
-- [ROADMAP.md](./ROADMAP.md) - Feature timeline
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) - Contribution guidelines
+- [CHANGELOG.md](../../CHANGELOG.md) - Release notes
+- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Feature timeline (historical session roadmap)
 
 ---
 
@@ -478,7 +481,7 @@ MIT OR Apache-2.0 (dual-licensed)
 
 **Last Updated:** December 17, 2025  
 **Review Completed By:** GitHub Copilot  
-**System Status:** PILOT-READY ✅
+**System Status (Historical):** Pilot-ready assessment ✅
 
 ---
 

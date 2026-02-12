@@ -275,10 +275,10 @@ Policy enforcement emits Prometheus metrics:
 - `icn_compute_member_concurrent_tasks{coop_id, member_did}`
 - `icn_compute_member_credits_spent{coop_id, member_did}`
 
-Access metrics at `http://localhost:9090/metrics`
+Access metrics at `http://localhost:9100/metrics`
 
 ## Further Reading
 
 - [Cooperative Scheduling Design](../../ARCHITECTURE.md#phase-16e-cooperative-scheduling)
-- [Governance Primitives](../../governance-primitives.md)
+- [Governance Primitives](../../design/governance/governance-primitives.md)
 - [Economic Safety Rails](../../ARCHITECTURE.md#phase-12-economic-safety)

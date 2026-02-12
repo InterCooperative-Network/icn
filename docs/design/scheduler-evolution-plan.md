@@ -72,7 +72,7 @@ Executor runs CCL contract → TaskResult (gossip)
 Payment settled via ledger
 ```
 
-**Claiming Logic** ([icn-compute/src/actor.rs:499-569](icn/crates/icn-compute/src/actor.rs#L499-L569)):
+**Claiming Logic** ([icn-compute/src/actor/mod.rs](../../icn/crates/icn-compute/src/actor/mod.rs)):
 1. Check trust: `MIN_TRUST_EXECUTE = 0.3`
 2. Check capacity: `at_capacity()` (max_concurrent_tasks)
 3. Check capabilities: `executor.can_execute(&task)`
@@ -93,7 +93,7 @@ Payment settled via ledger
 
 ### New Types
 
-[icn-compute/src/scheduler.rs](icn/crates/icn-compute/src/scheduler.rs) introduces:
+[icn-compute/src/scheduler.rs](../../icn/crates/icn-compute/src/scheduler.rs) introduces:
 
 #### `ResourceProfile`
 Describes what a task needs:
@@ -216,7 +216,7 @@ Executors announce capacity every 30 seconds. Submitters see available resources
 
 #### Scoring Algorithm
 
-[icn-compute/src/scheduler.rs:464-533](icn/crates/icn-compute/src/scheduler.rs#L464-L533):
+[icn-compute/src/scheduler.rs](../../icn/crates/icn-compute/src/scheduler.rs):
 
 ```rust
 pub trait PlacementPolicy {
@@ -1036,11 +1036,11 @@ compute_handle.submit_with_placement(training_task, placement_req).await?;
 
 ## References
 
-- [Phase 15 Compute Layer](../icn/crates/icn-compute/) - Current implementation
-- [ROADMAP.md](../ROADMAP.md) - Overall project roadmap
-- [CLAUDE.md](../CLAUDE.md) - Project guidance
-- [Scheduler Module](../icn/crates/icn-compute/src/scheduler.rs) - Phase 16A foundation types
-- [Strategic Gap Analysis](strategic-gap-analysis.md) - Missing pieces for pilot deployment
+- [Phase 15 Compute Layer](../../icn/crates/icn-compute/) - Current implementation
+- [ROADMAP.md](../development/sessions/undated/ROADMAP.md) - Overall project roadmap
+- [CLAUDE.md](../../CLAUDE.md) - Project guidance
+- [Scheduler Module](../../icn/crates/icn-compute/src/scheduler.rs) - Phase 16A foundation types
+- [Strategic Gap Analysis](../development/sessions/2026-01/2025-01-15-strategic-gap-analysis.md) - Missing pieces for pilot deployment
 
 ---
 

@@ -2,6 +2,9 @@
 
 Complete end-to-end ICN system deployment with all components wired together.
 
+> Historical deployment recipe snapshot.
+> For current API surface, verify `docs/api/openapi.yaml` and `icn/crates/icn-gateway/src/server.rs`.
+
 ## Architecture Overview
 
 ```
@@ -134,10 +137,12 @@ docker compose -f docker-compose.full.yml logs -f icn-node1
 curl http://localhost:9100/metrics
 
 # Gateway API health
-curl http://localhost:8080/health
+curl http://localhost:8080/v1/health
 
-# Gateway API whoami
-curl http://localhost:8080/api/v1/whoami
+# Gateway auth challenge (public endpoint)
+curl -X POST http://localhost:8080/v1/auth/challenge \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:icn:YOUR_DID"}'
 ```
 
 **Web UI:**
@@ -160,7 +165,7 @@ open http://localhost:3000
 ```bash
 # Use wscat to test WebSocket
 npm install -g wscat
-wscat -c ws://localhost:8080/ws
+wscat -c ws://localhost:8080/v1/ws/YOUR_COOP_ID
 ```
 
 ### 5. Mobile App Development
@@ -236,52 +241,48 @@ DIDs are configured in `config/node{1,2,3}.toml`
 docker compose -f docker-compose.full.yml up
 
 # Terminal 2: Connect to WebSocket
-wscat -c ws://localhost:8080/ws
+wscat -c ws://localhost:8080/v1/ws/YOUR_COOP_ID
 
 # Terminal 3: Create a transaction (triggers notification)
-curl -X POST http://localhost:8080/api/v1/ledger/entries \
+curl -X POST http://localhost:8080/v1/ledger/YOUR_COOP_ID/payment \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "from": "did:icn:...",
     "to": "did:icn:...",
     "amount": 100,
+    "currency": "USD",
     "memo": "Test transaction"
   }'
 ```
 
 ### Test Trust Attestation
 ```bash
-# Attest trust
-curl -X POST http://localhost:8080/api/v1/trust/attest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "subject": "did:icn:...",
-    "score": 0.8,
-    "context": "cooperative_member"
-  }'
-
-# Get trust score
-curl http://localhost:8080/api/v1/trust/score/did:icn:...
+# Trust routes vary by deployment/configuration and may not be present in OpenAPI.
+# Use your running gateway OpenAPI to confirm available trust paths:
+curl -s http://localhost:8080/api-docs/openapi.json | jq '.paths | keys[]' | grep trust
 ```
 
 ### Create and Vote on Proposals
 ```bash
 # Create proposal
-curl -X POST http://localhost:8080/api/v1/governance/proposals \
+curl -X POST http://localhost:8080/v1/gov/proposals \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
+    "domain_id": "membership",
     "title": "Add new member",
     "description": "Proposal to add Alice",
-    "domain": "membership",
-    "action": {"type": "add_member", "member": "did:icn:..."}
+    "payload": {"type": "text", "body": "Proposal text body"}
   }'
 
 # Vote on proposal
-curl -X POST http://localhost:8080/api/v1/governance/proposals/{id}/vote \
+curl -X POST http://localhost:8080/v1/gov/proposals/{id}/vote \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "vote": "approve",
-    "reason": "Strong trust relationship"
+    "choice": "for",
+    "comment": "Strong trust relationship"
   }'
 ```
 
@@ -337,7 +338,7 @@ lsof -i :9090
 ### WebSocket Connection Failed
 ```bash
 # Verify Gateway is running
-curl http://localhost:8080/health
+curl http://localhost:8080/v1/health
 
 # Check CORS configuration
 # Ensure NEXT_PUBLIC_API_URL matches your client origin

@@ -3,7 +3,7 @@
 Comprehensive security documentation, threat models, audit reports, and hardening guides.
 
 **Last Updated**: 2026-02-10  
-**Security Status**: ✅ Production-Ready (as of 2025-12-18)
+**Security Status**: Historical assessment snapshot (as of 2025-12-18)
 
 ## 🚨 Quick Links
 
@@ -24,7 +24,7 @@ This directory contains all security-related documentation for ICN, including:
 
 ## 📊 Production Security
 
-### Current Status
+### Status Snapshot
 
 | Document | Status | Description |
 |----------|--------|-------------|

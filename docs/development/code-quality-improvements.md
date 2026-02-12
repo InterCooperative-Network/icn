@@ -92,7 +92,7 @@ This document tracks code quality improvements for the ICN project.
 **Effort**: Low (ongoing)
 
 ### Tools
-- `cargo-deny` configuration added ([deny.toml](../icn/deny.toml))
+- `cargo-deny` configuration added ([deny.toml](../../icn/deny.toml))
 - Run `cargo deny check` in CI
 - Review advisories quarterly
 

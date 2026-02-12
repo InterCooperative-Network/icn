@@ -1,7 +1,10 @@
 # ICN Deployment - Complete Guide
 
 **Date:** 2025-12-12
-**Status:** ✅ Production Ready
+**Status:** Historical Snapshot (not current deployment truth)
+
+> Historical deployment snapshot from 2025-12-12.
+> Validate current status with live checks and `docs/ci/CI_CURRENT_STATUS.md` before using this as an operational runbook.
 
 ## 🎯 What We've Built
 
@@ -505,11 +508,11 @@ sudo systemctl start icnd
 
 ## 📚 Additional Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Getting Started](docs/GETTING_STARTED.md)
-- [API Reference](docs/api/)
-- [Security Hardening](docs/production-hardening.md)
-- [Mobile Integration](MOBILE_APP_STATUS.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Getting Started](../GETTING_STARTED.md)
+- [API Reference](../reference/api/README.md)
+- [Security Hardening](../security/production-hardening.md)
+- [Mobile Integration](../mobile/MOBILE_APP_STATUS.md)
 
 ---
 

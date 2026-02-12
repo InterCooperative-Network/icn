@@ -1,9 +1,15 @@
 # ICN Demo Preparation - Document Index
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Created:** 2025-12-18  
 **Purpose:** Comprehensive audit and action plan for demo readiness  
 **Status:** Foundation solid, integration and polish needed  
 **Confidence:** 7/10 → 10/10 in 7-9 hours
+
+> This index points to a 2025-12-18 demo planning snapshot.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
@@ -34,7 +40,7 @@ This repository contains a comprehensive assessment of ICN's demo readiness and 
    - Decision points and risk mitigation
    - 5-day roadmap to demo-ready
 
-4. **[scripts/quick-start-test.sh](./scripts/quick-start-test.sh)** ⚡ **VALIDATION**
+4. **[scripts/quick-start-test.sh](../../scripts/quick-start-test.sh)** ⚡ **VALIDATION**
    - Automated validation script
    - Tests basic stack functionality
    - Creates test environment

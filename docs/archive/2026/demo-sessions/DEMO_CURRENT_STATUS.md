@@ -1,14 +1,20 @@
 # ICN Demo Preparation - Current Status & Next Steps
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 21:15 UTC  
 **Based on:** Previous session work + New demo infrastructure  
-**Status:** 🟢 **EXCELLENT FOUNDATION - READY FOR DEMO BUILDING**
+**Status:** Historical demo preparation snapshot
+
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
 ## 🎉 What's Already Working (From Previous Sessions)
 
-### ✅ Backend & API - FULLY OPERATIONAL
+### ✅ Backend & API - Operational in Snapshot Environment
 
 **Status:** 100% Working (verified Dec 18, 17:46 UTC)
 
@@ -128,9 +134,9 @@ demo/
 **Priority 1: Verify UI → API Integration**
 ```bash
 # 1. Start daemon (already know this works)
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   --gateway-bind "127.0.0.1:8080" \
   --gateway-enable
 
@@ -223,9 +229,9 @@ Create script to populate the cooperative with 12 members:
 
 **Terminal 1: Start Daemon**
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   --gateway-enable \
   --gateway-bind "127.0.0.1:8080" \
@@ -235,9 +241,9 @@ cd /home/matt/projects/icn/icn
 
 **Terminal 2: Get Auth Token**
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
@@ -259,7 +265,7 @@ curl "http://localhost:8080/v1/ledger/did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptk
 
 **Terminal 4: Start UI**
 ```bash
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 # Open: http://localhost:3000
 ```
@@ -370,7 +376,7 @@ python3 -m http.server 3000
 4. Passphrase requires interactive terminal
 
 ### Critical Learnings
-1. System is production-ready at backend level
+1. Backend was operational for the recorded demo flow at snapshot time
 2. Gateway API is comprehensive
 3. UI exists and is well-built
 4. Integration is the remaining gap
@@ -381,7 +387,7 @@ python3 -m http.server 3000
 
 ```bash
 # Test the UI connection to gateway
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 
 # Check what API endpoints it expects
 grep -r "localhost:8080" . || grep -r "gateway" . || grep -r "/api" . | head -20

@@ -1,5 +1,8 @@
 # ICN Demo - Immediate Pivot
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 ## Current Situation (After 2 hours)
 
 **Problem:** Daemon fails to start with "Address already in use" error, even though:
@@ -25,7 +28,7 @@ Instead of trying to get the daemon running, let's test the system using the exi
 ps aux | grep icnd
 
 # Try connecting to one with icnctl
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 
 # Test connection to existing daemon (likely on port 5601)
 ./target/release/icnctl status
@@ -158,7 +161,7 @@ icnctl gov proposal show 1
 ## Immediate Next Command
 
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl --help
 ./target/release/icnctl status
 ```

@@ -1,7 +1,10 @@
 # ICN Complete Architecture Map
 **Generated:** 2025-12-17  
-**Status:** Comprehensive System Review  
-**Version:** 0.1.0 - PILOT-READY
+**Status:** Historical comprehensive system review  
+**Version:** 0.1.0 snapshot context
+
+> Historical architecture map snapshot from 2025-12-17.
+> For current architecture and status, use `docs/ARCHITECTURE.md` and `docs/STATE.md`.
 
 ---
 
@@ -882,12 +885,12 @@ jwt_secret = ""
 
 [observability]
 log_level = "info"
-metrics_port = 9090
+metrics_port = 9100
 ```
 
 ### Environment Variables
 
-- `ICN_DATA_DIR` - Override data directory
+- Use `--data-dir` CLI flag to set the daemon data directory
 - `ICN_GATEWAY_JWT_SECRET` - Gateway JWT secret
 - `RUST_LOG` - Logging filter (overrides config)
 
@@ -1671,11 +1674,13 @@ python plot_scenarios.py  # Generate visualizations
 
 **Environment Variables:**
 ```bash
-ICN_DATA_DIR=/data
-ICN_LOG_LEVEL=info
-ICN_GATEWAY_ENABLE=true
+ICN_KEYSTORE_PASSPHRASE=<secret>
 ICN_GATEWAY_JWT_SECRET=<secret>
+RUST_LOG=info
 ```
+
+Start with explicit runtime flags in compose/entrypoint:
+`icnd --data-dir /data --gateway-enable`
 
 ---
 
@@ -6356,4 +6361,3 @@ auto_escalate = true
 - **Community Concepts:** Cooperatives, circles, membership tiers, shared resources
 
 **Status:** Production-ready, pilot-tested, standards-compliant (NIST PQC)
-

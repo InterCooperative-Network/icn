@@ -1,8 +1,14 @@
 # 🎊 ICN Demo Preparation - FINAL STATUS
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 21:50 UTC  
 **Total Time:** 60 minutes  
-**Status:** ✅ **FULLY COMPLETE - READY TO DEMO**
+**Status:** Historical demo completion snapshot
+
+> Historical snapshot from 2025-12-18.
+> For current project/CI status, use `docs/status/CURRENT_SYSTEM_STATUS.md` and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
@@ -326,7 +332,7 @@
 5. **Achieved 98% readiness** in 60 minutes
 
 ### Quality Wins ✅
-1. **All scripts are production-ready** (tested, documented)
+1. **All scripts were validated for the snapshot demo flow** (tested, documented)
 2. **Sample data is realistic** (12 members, 10 transactions)
 3. **Configuration is correct** (CORS, ports, paths)
 4. **Error handling is robust** (cleanup, checks, fallbacks)

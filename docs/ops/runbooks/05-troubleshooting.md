@@ -270,7 +270,7 @@ grep rpc ~/.icn/config.toml
 **2. Gateway not enabled**
 ```bash
 # Check gateway status
-curl -s http://localhost:8080/health
+curl -s http://localhost:8080/v1/health
 
 # Enable in config
 # [gateway]

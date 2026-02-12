@@ -96,13 +96,13 @@ curl http://localhost:8080/v1/coops
 
 **2. Initialize Test Cooperative**
 ```bash
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl init-coop
 ```
 
 **3. Test Pilot UI**
 ```bash
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000 &
 
 # Open http://localhost:3000
@@ -184,8 +184,8 @@ Could mean same process binding twice - check timing in logs!
 
 ### Daemon Configuration
 ```toml
-# /home/matt/icn-demo-test/demo.toml
-data_dir = "/home/matt/icn-demo-test/data"
+# <demo-data-dir>/demo.toml
+data_dir = "<demo-data-dir>/data"
 
 [network]
 listen_addr = "0.0.0.0:19777"  # QUIC
@@ -208,7 +208,7 @@ health_port = 8081  # Not actually used by current code
 ### Identity
 ```
 DID: did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh
-Keystore: /home/matt/icn-demo-test/data/identity.age
+Keystore: <demo-data-dir>/data/identity.age
 Passphrase: demo123
 ```
 
@@ -216,7 +216,7 @@ Passphrase: demo123
 
 ## 🚀 Ready for Next Phase
 
-**Status:** PILOT-READY FOR API TESTING
+**Status (Snapshot):** Pilot-ready for API testing
 
 **Daemon:** ✅ Running stably  
 **Gateway:** ✅ Responding to requests  

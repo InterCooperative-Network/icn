@@ -508,7 +508,7 @@ After completing steps 1-6, you should have:
 Once the network is running successfully:
 
 1. **Baseline Testing** (Week 1)
-   - Run 10 baseline test scenarios from [INTERNAL_TESTING_PLAN.md](docs/INTERNAL_TESTING_PLAN.md)
+   - Run 10 baseline test scenarios from [INTERNAL_TESTING_PLAN.md](../development/testing/INTERNAL_TESTING_PLAN.md)
    - Document results in test execution log
 
 2. **Byzantine Testing** (Week 2)
@@ -568,9 +568,9 @@ Once the network is running successfully:
 
 ## Documentation
 
-- **[INTERNAL_TESTING_PLAN.md](docs/INTERNAL_TESTING_PLAN.md)** - 38 test scenarios with success criteria
-- **[TESTING_QUICKSTART.md](docs/TESTING_QUICKSTART.md)** - Quick reference guide for getting started
-- **[CLAUDE.md](CLAUDE.md)** - Project overview and architecture
+- **[INTERNAL_TESTING_PLAN.md](../development/testing/INTERNAL_TESTING_PLAN.md)** - 38 test scenarios with success criteria
+- **[TESTING_QUICKSTART.md](../development/testing/TESTING_QUICKSTART.md)** - Quick reference guide for getting started
+- **[CLAUDE.md](../../CLAUDE.md)** - Project overview and architecture
 
 ---
 

@@ -900,9 +900,9 @@ pub trait GovernanceOps: Send + Sync {
 - `icn-gateway/src/api/governance.rs` - REST API endpoints (`/v1/gov/*`)
 
 **Related Documentation:**
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Overall ICN architecture
-- [social-recovery.md](social-recovery.md) - Similar gossip-based coordination pattern
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - Overall ICN architecture
+- [social-recovery.md](../sdis/social-recovery.md) - Similar gossip-based coordination pattern
 
 **External Context:**
-- [ROADMAP.md](../ROADMAP.md) - Phase 13 objectives and next steps
+- [ROADMAP.md](../../development/sessions/undated/ROADMAP.md) - Phase 13 objectives and next steps
 - [../economics/econ-modeling.md](../economics/econ-modeling.md) - Economic safety mechanisms (Phase 12)

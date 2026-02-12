@@ -507,7 +507,7 @@ async fn main() -> Result<()> {
                 // Return explicit error instead of calling unimplemented factory
                 anyhow::bail!(
                     "Hardware identity backend '{}' is not yet implemented. \
-                     See docs/identity-backend-configuration.md for status.",
+                     See docs/reference/config/identity-backend-configuration.md for status.",
                     config.identity.backend
                 );
             }

@@ -138,28 +138,26 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
 
 ### 4. Anchor Device Management
 
-#### List Anchors
+#### List Anchor Devices
 
-Get all anchor devices for your identity.
+Get all trusted devices for a specific anchor.
 
-**GET** `/v1/sdis/anchors`
+**GET** `/v1/sdis/anchor/{anchor_id}/devices`
 
 ```bash
-curl http://10.8.10.40:30080/v1/sdis/anchors \
+curl http://10.8.10.40:30080/v1/sdis/anchor/anchor_123/devices \
   -H "Authorization: Bearer <your-token>"
 ```
 
 **Response:**
 ```json
 {
-  "anchors": [
+  "devices": [
     {
       "device_id": "device_001",
       "device_name": "Primary Phone",
-      "device_type": "smartphone",
-      "added_at": "2025-12-01T10:00:00Z",
-      "last_seen": "2025-12-12T22:00:00Z",
-      "is_primary": true
+      "added_at": 1765065600,
+      "last_seen": 1765141200
     }
   ]
 }
@@ -169,40 +167,50 @@ curl http://10.8.10.40:30080/v1/sdis/anchors \
 
 Add a new anchor device.
 
-**POST** `/v1/sdis/anchors`
+**POST** `/v1/sdis/anchor/devices/add`
 
 ```bash
-curl -X POST http://10.8.10.40:30080/v1/sdis/anchors \
+curl -X POST http://10.8.10.40:30080/v1/sdis/anchor/devices/add \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{
+    "anchor_id": "anchor_123",
     "device_name": "Backup Phone",
-    "device_type": "smartphone",
-    "ephemeral_did": "did:icn:z...",
-    "ephemeral_signature": "base64-signature"
+    "device_pubkey": "base64-pubkey"
   }'
 ```
 
-#### Remove Anchor
+#### Get Anchor Details
 
-Remove an anchor device.
+Get anchor metadata and rotation/device information.
 
-**DELETE** `/v1/sdis/anchors/{device_id}`
+**GET** `/v1/sdis/anchor/{anchor_id}`
 
 ```bash
-curl -X DELETE http://10.8.10.40:30080/v1/sdis/anchors/device_001 \
+curl http://10.8.10.40:30080/v1/sdis/anchor/anchor_123 \
   -H "Authorization: Bearer <your-token>"
 ```
 
-#### Promote Anchor
+#### Rotate Anchor Keys
 
-Promote an anchor to primary.
+Rotate keys for an existing anchor.
 
-**POST** `/v1/sdis/anchors/{device_id}/promote`
+**POST** `/v1/sdis/anchor/rotate-keys`
 
 ```bash
-curl -X POST http://10.8.10.40:30080/v1/sdis/anchors/device_001/promote \
-  -H "Authorization: Bearer <your-token>"
+curl -X POST http://10.8.10.40:30080/v1/sdis/anchor/rotate-keys \
+  -H "Authorization: Bearer <your-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "anchor_id": "anchor_123",
+    "current_did": "did:icn:z...",
+    "new_keybundle": {
+      "ed25519_pub": "base64-ed25519",
+      "ml_dsa_pub": "base64-mldsa",
+      "x25519_pub": "base64-x25519"
+    },
+    "reason": "scheduled-rotation"
+  }'
 ```
 
 ---
@@ -211,17 +219,21 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/anchors/device_001/promote \
 
 #### Initiate Recovery
 
-Start identity recovery process using recovery codes.
+Start identity recovery ceremony using anchor/vui context and verification data.
 
-**POST** `/v1/sdis/recovery/initiate`
+**POST** `/v1/sdis/recovery/start`
 
 ```bash
-curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/initiate \
+curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/start \
   -H "Content-Type: application/json" \
   -d '{
-    "recovery_code": "CODE1",
-    "new_device_did": "did:icn:z...",
-    "new_device_signature": "base64-signature"
+    "anchor_id": "anchor_123",
+    "verification_data": {"method": "selfie", "proof": "..."},
+    "new_keybundle": {
+      "ed25519_pub": "base64-ed25519",
+      "ml_dsa_pub": "base64-mldsa",
+      "x25519_pub": "base64-x25519"
+    }
   }'
 ```
 
@@ -229,23 +241,31 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/initiate \
 ```json
 {
   "recovery_id": "recovery_xyz...",
-  "challenge": "base64-challenge",
-  "expires_at": "2025-12-12T23:00:00Z"
+  "status": "pending_steward_verification",
+  "required_stewards": 3
 }
+```
+
+#### Check Recovery Status
+
+**GET** `/v1/sdis/recovery/{recovery_id}`
+
+```bash
+curl http://10.8.10.40:30080/v1/sdis/recovery/recovery_xyz... \
+  -H "Authorization: Bearer <your-token>"
 ```
 
 #### Complete Recovery
 
 Finalize recovery with challenge response.
 
-**POST** `/v1/sdis/recovery/complete`
+**POST** `/v1/sdis/recovery/{recovery_id}/complete`
 
 ```bash
-curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/complete \
+curl -X POST http://10.8.10.40:30080/v1/sdis/recovery/recovery_xyz.../complete \
   -H "Content-Type: application/json" \
   -d '{
-    "recovery_id": "recovery_xyz...",
-    "challenge_response": "base64-response"
+    "recovery_share": "optional-share-fragment"
   }'
 ```
 
@@ -365,7 +385,7 @@ Common errors:
 ### Device Recovery
 
 1. User lost primary device
-2. User enters recovery code → `POST /recovery/initiate`
+2. User enters recovery data → `POST /recovery/start`
 3. System provides challenge
 4. User's other anchor signs challenge
 5. Complete recovery → `POST /recovery/complete`
@@ -377,7 +397,7 @@ Common errors:
 2. Generate QR on primary device
 3. Scan QR with new device
 4. New device generates ephemeral DID
-5. Add anchor → `POST /anchors`
+5. Add anchor device → `POST /anchor/devices/add`
 6. New device becomes trusted anchor
 
 ---

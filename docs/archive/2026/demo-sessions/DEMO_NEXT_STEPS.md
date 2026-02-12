@@ -1,5 +1,8 @@
 # ICN Demo - Immediate Next Steps
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Status:** Foundation is solid, need to connect the pieces  
 **Confidence:** 7/10 → 10/10 in 7-9 hours  
 **Goal:** Working end-to-end transaction demo by end of week
@@ -55,17 +58,17 @@ mkdir -p ~/icn-demo-test
 cd ~/icn-demo-test
 
 # 2. Initialize identity
-/home/matt/projects/icn/icn/target/release/icnctl id init
+<repo-root>/icn/target/release/icnctl id init
 
 # 3. Copy and customize config
-cp /home/matt/projects/icn/config/icn-alpha.toml ./demo-node.toml
+cp <repo-root>/config/icn-alpha.toml ./demo-node.toml
 
 # Edit demo-node.toml:
 #   - data_dir = "~/icn-demo-test/data"
 #   - Enable gateway (if not already)
 
 # 4. Start daemon with gateway
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd --config ~/icn-demo-test/demo-node.toml --gateway-enable --gateway-bind "127.0.0.1:8080"
 
 # 5. Verify it's running
@@ -149,7 +152,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/members/rocheste
 
 ```bash
 # 1. Start simple HTTP server for UI
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Open browser: http://localhost:3000
@@ -195,11 +198,11 @@ Based on what we find in Phase 4, fix issues:
 #### If API paths don't match:
 ```bash
 # Compare UI expectations vs gateway routes
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 grep -n "fetch.*api/" app.js | head -20
 
 # Compare with gateway routes
-cd /home/matt/projects/icn/icn/crates/icn-gateway/src
+cd <repo-root>/icn/crates/icn-gateway/src
 grep -rn "\.service\|\.route" . | grep -E "members|ledger|balance"
 
 # Document discrepancies

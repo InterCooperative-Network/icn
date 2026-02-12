@@ -21,7 +21,7 @@ ICN's production hardening focuses on three primary threat vectors:
 2. **Resource exhaustion**: Memory/CPU attacks via unbounded allocations or streams
 3. **Operational failures**: Edge cases like clock skew, malformed data, blocking operations
 
-All critical and high-priority security issues have been resolved as of Phase 7 completion.
+Historical claim from the Phase 7 cycle: critical and high-priority issues in that cycle were marked resolved at the time.
 
 ---
 
@@ -30,7 +30,7 @@ All critical and high-priority security issues have been resolved as of Phase 7 
 ### 1. Unbounded Message Allocation DoS
 
 **Severity**: Critical
-**File**: [`icn-net/src/protocol.rs:143-167`](../icn/crates/icn-net/src/protocol.rs#L143-L167)
+**File**: [`icn-net/src/protocol.rs:143-167`](../../icn/crates/icn-net/src/protocol.rs#L143-L167)
 
 **Vulnerability**: Malicious peer could send a network message with an extremely large length prefix, causing the victim to allocate gigabytes of memory before validating content.
 
@@ -62,7 +62,7 @@ let mut buf = vec![0u8; len];
 ### 2. Blocking Operations in Async Context
 
 **Severity**: Critical
-**File**: [`icn-core/src/supervisor.rs:86-162`](../icn/crates/icn-core/src/supervisor.rs#L86-L162)
+**File**: [`icn-core/src/supervisor/mod.rs`](../../icn/crates/icn-core/src/supervisor/mod.rs)
 
 **Vulnerability**: The incoming message handler used `blocking_write()` to acquire RwLock on shared state (GossipActor). Under high message load, this blocks Tokio worker threads, causing thread starvation and degraded performance across the entire runtime.
 
@@ -91,7 +91,7 @@ tokio::spawn(async move {
 ### 3. TLS Certificate Verification Disabled
 
 **Severity**: Critical
-**File**: [`icn-net/src/tls.rs:81-195`](../icn/crates/icn-net/src/tls.rs#L81-L195)
+**File**: [`icn-net/src/tls.rs:81-195`](../../icn/crates/icn-net/src/tls.rs#L81-L195)
 
 **Vulnerability**: Custom `DidCertificateVerifier` accepted all certificates without validation, enabling trivial MITM attacks and peer impersonation.
 
@@ -154,7 +154,7 @@ impl DidCertificateVerifier {
 ### 8. Social Recovery Ledger Transfer Bug
 
 **Severity**: Critical
-**File**: [`icn-ledger/src/ledger.rs:469-484`](../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
+**File**: [`icn-ledger/src/ledger.rs:469-484`](../../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
 **Status**: Fixed (2025-11-17)
 
 **Vulnerability**: The `transfer_balances_for_recovery()` function had inverted debit/credit logic, causing ALL social recovery operations to incorrectly transfer balances.
@@ -222,8 +222,8 @@ let entry = if *balance > 0 {
 
 **Severity**: High
 **Files**:
-- [`icn-ledger/src/entry.rs:68-73`](../icn/crates/icn-ledger/src/entry.rs#L68-L73)
-- [`icn-gossip/src/gossip.rs:127-131`](../icn/crates/icn-gossip/src/gossip.rs#L127-L131)
+- [`icn-ledger/src/entry.rs:68-73`](../../icn/crates/icn-ledger/src/entry.rs#L68-L73)
+- [`icn-gossip/src/gossip.rs:127-131`](../../icn/crates/icn-gossip/src/gossip.rs#L127-L131)
 
 **Vulnerability**: Unchecked cast from `u128` (Duration::as_millis) to `u64` causes silent wraparound if system clock is set far in the future (post year 2262).
 
@@ -249,7 +249,7 @@ let timestamp = SystemTime::now()
 ### 5. Bloom Filter Index Out of Bounds
 
 **Severity**: High
-**File**: [`icn-gossip/src/bloom.rs:103-149`](../icn/crates/icn-gossip/src/bloom.rs#L103-L149)
+**File**: [`icn-gossip/src/bloom.rs:103-149`](../../icn/crates/icn-gossip/src/bloom.rs#L103-L149)
 
 **Vulnerability**: `BloomFilter::from_data()` didn't validate that claimed size matched actual data, allowing malicious peer to trigger index panic via crafted `BloomFilterData`.
 
@@ -298,8 +298,8 @@ pub fn from_data(data: &BloomFilterData) -> Self {
 
 **Severity**: High
 **Files**:
-- [`icn-net/src/rate_limit.rs`](../icn/crates/icn-net/src/rate_limit.rs) (new module)
-- [`icn-net/src/actor.rs:436-478`](../icn/crates/icn-net/src/actor.rs#L436-L478)
+- [`icn-net/src/rate_limit.rs`](../../icn/crates/icn-net/src/rate_limit.rs) (new module)
+- [`icn-net/src/actor/mod.rs`](../../icn/crates/icn-net/src/actor/mod.rs)
 
 **Vulnerability**: No rate limiting allowed malicious peer to flood victim with messages, exhausting CPU and memory.
 
@@ -311,7 +311,7 @@ pub fn from_data(data: &BloomFilterData) -> Self {
 - Each message consumes 1 token
 - Messages are dropped (not queued) when bucket empty
 
-**Configuration** ([`RateLimitConfig`](../icn/crates/icn-net/src/rate_limit.rs)):
+**Configuration** ([`RateLimitConfig`](../../icn/crates/icn-net/src/rate_limit.rs)):
 ```rust
 pub struct RateLimitConfig {
     pub max_messages_per_second: u32,  // Default: 100
@@ -360,7 +360,7 @@ async fn handle_connection(
 ### 7. Bounded QUIC Stream Limits
 
 **Severity**: High
-**File**: [`icn-net/src/session.rs:20-44`](../icn/crates/icn-net/src/session.rs#L20-L44)
+**File**: [`icn-net/src/session.rs:20-44`](../../icn/crates/icn-net/src/session.rs#L20-L44)
 
 **Vulnerability**: Default QUIC configuration allowed 100+ concurrent streams per connection, enabling resource exhaustion via stream flooding.
 
@@ -400,7 +400,7 @@ fn create_transport_config() -> quinn::TransportConfig {
 ### 8. Ledger Recovery Transfer Bug (BUG #30)
 
 **Severity**: Critical
-**File**: [`icn-ledger/src/ledger.rs:469-484`](../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
+**File**: [`icn-ledger/src/ledger.rs:469-484`](../../icn/crates/icn-ledger/src/ledger.rs#L469-L484)
 
 **Vulnerability**: The `transfer_balances_for_recovery()` function had inverted debit/credit operations, causing balance transfers during social recovery to **double the old DID's balance** instead of transferring it to the new DID. This would have allowed users to create unlimited credit by repeatedly initiating fake recoveries.
 
@@ -599,7 +599,7 @@ grep "Message too large\|Invalid message" /var/log/icnd.log
 **Metrics** (added in PR #962):
 - `icn_compute_task_scope_map_size` (gauge): Number of active task→scope mappings. Tracks memory overhead of scope queue tracking. Alert if >500 (warning) or >2000 (critical, possible leak).
 
-**Alert rules**: See `deploy/prometheus/scope-capacity-alerts.yml` for production-ready Prometheus rules.
+**Alert rules**: See `deploy/prometheus/scope-capacity-alerts.yml` for the rule set used by this hardening pass.
 
 **Operational notes**:
 
@@ -657,7 +657,7 @@ The following issues were identified but not yet addressed:
 ### Trust-Gated TLS Verification (✓ Implemented - Phase 8B)
 
 **Status**: COMPLETE (2025-01-12)
-**File**: [`icn-net/src/tls.rs`](../icn/crates/icn-net/src/tls.rs)
+**File**: [`icn-net/src/tls.rs`](../../icn/crates/icn-net/src/tls.rs)
 
 The TLS certificate verifier now integrates with the trust graph to enforce trust-based access control:
 
@@ -719,14 +719,14 @@ Run the full test suite:
 cargo test -p icn-net -p icn-gossip -p icn-ledger -p icn-obs
 ```
 
-Expected results: 64 tests passed (27 + 18 + 16 + 0)
+Historical result (2025-11-17 snapshot): 64 tests passed (27 + 18 + 16 + 0)
 
 ---
 
 ## References
 
-- [Architecture Documentation](ARCHITECTURE.md)
-- [Topic Subscriptions API](topic-subscriptions-api.md)
+- [Architecture Documentation](../ARCHITECTURE.md)
+- [Topic Subscriptions API](../reference/api/topic-subscriptions-api.md)
 - [QUIC Transport RFC 9000](https://www.rfc-editor.org/rfc/rfc9000.html)
 - [Token Bucket Algorithm](https://en.wikipedia.org/wiki/Token_bucket)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)

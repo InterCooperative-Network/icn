@@ -33,7 +33,8 @@
   - Pilot UI Receipts tab with sorted verification badge
   - icnctl receipts commands (chain/allocation/intent)
   - Demo scripts and E2E tests for cross-node determinism
-- Roadmap (docs/dev-journal/ROADMAP.md): Phase 18 complete, Phase 19 (Release Infrastructure) next; implementation ~75% (272K LOC, 2,287 tests).
+- Historical roadmap reference: `docs/development/sessions/undated/ROADMAP.md` (point-in-time planning document).
+- Current architecture and migration direction: `docs/PHASE_HISTORY.md` and `docs/architecture/KERNEL_APP_SEPARATION.md`.
 - CI status docs (docs/ci/CI_CURRENT_STATUS.md) last updated 2026-01-20.
 - Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).
 - K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.
@@ -68,7 +69,8 @@
   - crates/icn-core/src/supervisor/governance_handlers.rs (4243 lines)
 
 ## References
-- docs/dev-journal/ROADMAP.md
+- docs/development/sessions/undated/ROADMAP.md
+- docs/architecture/KERNEL_APP_SEPARATION.md
 - docs/ci/CI_CURRENT_STATUS.md
 - docs/status/TESTS_FIXED_STATUS.md
 - docs/status/CURRENT_SYSTEM_STATUS.md

@@ -1,5 +1,8 @@
 # ICN Architecture Quick Reference Card
 
+> Historical quick-reference snapshot (December 2025).
+> Verify current defaults/endpoints/operational claims against active docs before use.
+
 ## 🎯 What is ICN?
 
 **Substrate daemon for cooperative internet coordination**
@@ -207,12 +210,12 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
     │
     ├─ ARCHITECTURE_VISUAL.md  ← Diagrams & flows
     ├─ ARCHITECTURE_MAP.md     ← Complete inventory
-    └─ docs/ARCHITECTURE.md    ← Design rationale
+    └─ ../ARCHITECTURE.md      ← Design rationale
 ```
 
-## 🚦 Current Status
+## 🚦 Status Snapshot
 
-**PILOT-READY** (December 2025)
+**Pilot-ready assessment** (December 2025)
 
 - ✅ 1,134+ tests passing
 - ✅ 25 crates (40K lines Rust)
@@ -230,8 +233,8 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
 1. Read [ARCHITECTURE_INDEX.md](./ARCHITECTURE_INDEX.md)
 2. Browse [ARCHITECTURE_VISUAL.md](./ARCHITECTURE_VISUAL.md)
 3. Study [ARCHITECTURE_MAP.md](./ARCHITECTURE_MAP.md)
-4. Deep-dive [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-5. Get started [docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)
+4. Deep-dive [ARCHITECTURE.md](../ARCHITECTURE.md)
+5. Get started [GETTING_STARTED.md](../GETTING_STARTED.md)
 
 ## 📞 Resources
 
@@ -242,4 +245,4 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
 ---
 
 **Last Updated:** December 17, 2025  
-**System Version:** 0.1.0 - PILOT-READY ✅
+**System Version (Snapshot):** 0.1.0 - Pilot-ready assessment ✅

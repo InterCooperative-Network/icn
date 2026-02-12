@@ -2,9 +2,9 @@
 
 ## Overview
 
-This document outlines the security architecture and implementation plan for ICN. It addresses critical vulnerabilities in the current implementation and provides a phased approach to building a secure, production-ready cooperative network.
+This document outlines the security architecture and implementation plan for ICN. It captures a phased hardening approach and should be interpreted as roadmap guidance rather than a current-state readiness declaration.
 
-**Status:** In Progress - Phases 7-9 Complete
+**Status (snapshot):** In Progress - Phases 7-9 marked complete in this roadmap revision
 
 **Latest:** Phase 9 - Message & Identity Integrity (Complete)
 **Target:** Phase 10 - Payload Encryption & Forward Secrecy
@@ -2501,6 +2501,6 @@ async fn test_flap_detection() {
 
 ## References
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
 - [production-hardening.md](production-hardening.md) - Production hardening measures
-- [CLAUDE.md](../CLAUDE.md) - Development guidance
+- [CLAUDE.md](../../CLAUDE.md) - Development guidance

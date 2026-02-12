@@ -1,6 +1,9 @@
 # ICN Deployment Guide
 
-**Status:** Production-ready backend with enhanced mobile app
+**Status:** Reference guide (validate against current runtime and CI before deployment)
+
+> This guide captures deployment patterns that may vary by environment and release.
+> Before production use, verify ports/endpoints/config against current code and `docs/ci/CI_CURRENT_STATUS.md`.
 
 This guide covers deploying the ICN gateway backend for your mobile app and web pilots.
 
@@ -219,16 +222,15 @@ ICN_GATEWAY_CORS_ORIGINS=http://localhost:3000,https://your-domain.com
 # Logging
 RUST_LOG=info,icn_gateway=debug
 
-# Data directory
-ICN_DATA_DIR=/var/lib/icn
-
 # P2P networking
 ICN_QUIC_PORT=7777
 ICN_QUIC_BIND_ADDR=0.0.0.0
 
 # Metrics
-ICN_METRICS_PORT=9090
+ICN_METRICS_PORT=9100
 ```
+
+Note: `icnd` does not directly consume `ICN_DATA_DIR`/`ICN_QUIC_PORT`/`ICN_METRICS_PORT` in current runtime code. Set `--data-dir`, `--config`, and config file fields (for example `network.listen_addr`, `observability.metrics_port`) for authoritative behavior.
 
 ### Generate JWT Secret
 
@@ -325,7 +327,7 @@ curl http://localhost:8080/v1/health
 
 ### Prometheus Metrics
 
-Available at: http://localhost:9090/metrics
+Available at: http://localhost:9100/metrics
 
 Key metrics:
 - `gateway_requests_total` - Total API requests
@@ -587,14 +589,14 @@ server {
 
 ## 📚 Additional Resources
 
-- [Architecture Documentation](docs/ARCHITECTURE.md)
-- [API Reference](docs/api/)
-- [Mobile App Status](MOBILE_APP_STATUS.md)
-- [Security Hardening](docs/production-hardening.md)
-- [Governance Primitives](docs/governance-primitives.md)
+- [Architecture Documentation](../ARCHITECTURE.md)
+- [API Reference](../reference/api/README.md)
+- [Mobile App Status](../mobile/MOBILE_APP_STATUS.md)
+- [Security Hardening](../security/production-hardening.md)
+- [Governance Primitives](../design/governance/governance-primitives.md)
 
 ---
 
-**Ready to Deploy!** 🚀
+**Deployment Snapshot Guidance** 🚀
 
-The backend is production-ready. Mobile app just needs FCM integration for full push notification support. Start with Docker Compose for quick testing, then move to native installation or Kubernetes for production.
+As of this guide revision, the backend was treated as production-capable for pilot deployments, while the mobile app still required FCM integration for full push notification support. Start with Docker Compose for quick testing, then move to native installation or Kubernetes for production.

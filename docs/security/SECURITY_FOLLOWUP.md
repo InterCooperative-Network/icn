@@ -14,7 +14,7 @@
 
 ### 1. Full Mutual TLS with Client Certificates - TOFU Mode (In Progress)
 
-**Current Status**: Implemented with Trust-on-First-Use (TOFU) semantics - **functionally complete, tests need updating**.
+**Status Snapshot (2025-12-18)**: Implemented with Trust-on-First-Use (TOFU) semantics - **functionally complete, tests need updating**.
 
 **Architecture Decision - RESOLVED**: ICN uses **TOFU (Trust-on-First-Use)** semantics:
 1. **TLS layer**: Accept all valid DID certificates (verify cryptographic validity only)

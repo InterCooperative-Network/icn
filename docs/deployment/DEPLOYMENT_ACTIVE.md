@@ -1,7 +1,11 @@
 # ICN Deployment Active
 
 **Date:** December 12, 2025
-**Status:** 🟢 LIVE
+**Status:** Historical Snapshot (not current operational status)
+
+> This document captures a point-in-time environment from December 12, 2025.
+> Runtime defaults, ports, and service health may have changed since then.
+> For current status, use live checks and see `docs/ci/CI_CURRENT_STATUS.md`.
 
 ## Deployment Summary
 
@@ -235,7 +239,7 @@ For physical device testing, update `baseUrl` to use your server's IP address in
 2. **Web UI 403**: Nginx configuration may need adjustment
 3. **Grafana Not Started**: Depends on Prometheus
 
-None of these issues block core functionality - the ICN daemon and gateway API are fully operational.
+In the recorded snapshot environment, none of these issues blocked core functionality; the ICN daemon and gateway API remained operational.
 
 ## Support
 

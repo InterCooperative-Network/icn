@@ -316,7 +316,7 @@ We're excited to announce ICN v0.2.0, featuring:
 - [Linux x86_64](https://github.com/icn/icn/releases/download/v0.2.0/icn-v0.2.0-linux-x86_64.tar.gz)
 - [Changelog](https://github.com/icn/icn/blob/main/CHANGELOG.md)
 
-📚 **Upgrade Guide**: See [UPGRADING.md](docs/UPGRADING.md)
+📚 **Upgrade Guide**: See [version-upgrades.md](../migration-guides/version-upgrades.md)
 
 Questions? Ask in #support
 ```
@@ -335,7 +335,7 @@ A security vulnerability was discovered that could allow [brief description].
 
 **Action Required**: Upgrade immediately
 - Download: [v0.2.1](https://github.com/icn/icn/releases/tag/v0.2.1)
-- Upgrade guide: [UPGRADING.md](docs/UPGRADING.md)
+- Upgrade guide: [version-upgrades.md](../migration-guides/version-upgrades.md)
 
 **Details**: [Security Advisory](https://github.com/icn/icn/security/advisories/GHSA-XXXX)
 

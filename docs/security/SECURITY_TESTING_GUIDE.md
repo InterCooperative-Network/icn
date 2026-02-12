@@ -330,7 +330,7 @@ Add these tests to CI/CD:
 
 - `SECURITY_FIXES_2025-12-18.md` - Detailed fix descriptions
 - `docs/ARCHITECTURE.md` - Overall system architecture
-- `docs/production-hardening.md` - Production security guide
+- `docs/security/production-hardening.md` - Production security guide
 - `icn/crates/icn-net/src/tls.rs` - TLS implementation
 - `icn/crates/icn-gateway/src/validation.rs` - Scope validation
 

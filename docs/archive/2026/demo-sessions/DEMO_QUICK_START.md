@@ -1,8 +1,15 @@
 # 🚀 ICN Demo - Quick Start Card
 
-**Status:** ✅ Phase 1 Complete - Backend Working  
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
+**Date:** 2025-12-18 snapshot  
+**Status:** Historical demo quick-start snapshot  
 **Next:** Test UI Integration  
 **Time:** 2-4 hours to working transaction
+
+> This card documents a 2025-12-18 demo environment.
+> Verify current runtime and CI state before following it: `docs/status/CURRENT_SYSTEM_STATUS.md`, `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
@@ -11,16 +18,16 @@
 ### Start Everything
 ```bash
 # Terminal 1: Backend (if not running)
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnd \
-  -d /home/matt/icn-demo-test/data \
+  -d <demo-data-dir>/data \
   -e 127.0.0.1:15602 \
   --gateway-enable \
   --gateway-bind "127.0.0.1:8080"
 # Passphrase: demo123
 
 # Terminal 2: UI
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Browser: http://localhost:3000
@@ -143,12 +150,12 @@ curl http://localhost:8080/v1/health
 
 ## 📞 Resources
 
-**Docs:** /home/matt/projects/icn/docs/  
-**UI:** /home/matt/projects/icn/web/pilot-ui/  
-**Config:** /home/matt/projects/icn/config/  
-**Demo:** /home/matt/projects/icn/demo/
+**Docs:** <repo-root>/docs/  
+**UI:** <repo-root>/web/pilot-ui/  
+**Config:** <repo-root>/config/  
+**Demo:** <repo-root>/demo/
 
-**Data Dir:** /home/matt/icn-demo-test/data  
+**Data Dir:** <demo-data-dir>/data  
 **DID:** did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh  
 **Passphrase:** demo123
 

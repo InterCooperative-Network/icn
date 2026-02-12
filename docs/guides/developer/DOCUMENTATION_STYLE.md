@@ -108,7 +108,7 @@ Brief description of what was accomplished.
 
 ### 1. Component Name
 
-**Location**: [file.rs:L1-L100](../path/to/file.rs#L1-L100)
+**Location**: `file.rs:L1-L100`
 
 Description of implementation...
 

@@ -51,14 +51,16 @@ icnctl id show
 ### 3. Configure & Start (2 min)
 
 ```bash
-# Edit config
-nano ~/.icn/icn.toml
+# Prepare config from repo example
+mkdir -p ~/.icn
+cp icn/config/icn.toml.example ~/.icn/config.toml
+nano ~/.icn/config.toml
 
 # Add bootstrap peer
 # bootstrap_peers = ["icn://did:icn:BOOTSTRAP_DID@IP:7777"]
 
 # Start daemon
-icnd
+icnd --config ~/.icn/config.toml --data-dir ~/.icn
 ```
 
 ### 4. Join Network (5 min)
@@ -333,10 +335,7 @@ icnctl --version
 icnd --version
 
 # Validate configuration
-icnd --validate --config ~/.icn/icn.toml
-
-# Test daemon startup
-icnd --dry-run
+icnd --config ~/.icn/config.toml --validate-config
 ```
 
 ---
@@ -363,7 +362,7 @@ Output:
 ```
 DID: did:icn:5Xk8Y2rQm7nPqKjL...
 Public Key: 5Xk8Y2rQm7nPqKjL...
-Keystore: ~/.icn/keystore.age
+Keystore: ~/.icn/identity.age
 Created: 2025-12-14T10:30:00Z
 ```
 
@@ -900,21 +899,19 @@ icnctl gov role list --domain-id coop:my-coop
 # Create configuration directory
 mkdir -p ~/.icn
 
-# Generate default config
-icnd --generate-config > ~/.icn/icn.toml
+# Copy default config template from the repository
+cp icn/config/icn.toml.example ~/.icn/config.toml
 
 # Edit configuration
-nano ~/.icn/icn.toml
+nano ~/.icn/config.toml
 ```
 
 ### Configuration Options
 
-Key configuration sections in `~/.icn/icn.toml`:
+Key configuration sections in `~/.icn/config.toml`:
 
 ```toml
-[node]
-data_dir = "~/.icn/data"
-log_level = "info"
+data_dir = "~/.icn"
 
 [network]
 listen_addr = "0.0.0.0:7777"
@@ -925,12 +922,13 @@ bootstrap_peers = [
 
 [gateway]
 enabled = true
-listen_addr = "127.0.0.1:8080"
+bind_addr = "127.0.0.1:8080"
 jwt_secret = "your-secret-here"
 
-[metrics]
-enabled = true
-listen_addr = "127.0.0.1:9100"
+[observability]
+metrics_port = 9100
+health_port = 8080
+log_level = "info"
 ```
 
 ### Port Reference
@@ -940,8 +938,7 @@ listen_addr = "127.0.0.1:9100"
 | P2P Network | 7777 | UDP (QUIC) | Node-to-node communication |
 | Gateway API | 8080 | HTTP/WS | REST API and WebSocket events |
 | Metrics | 9100 | HTTP | Prometheus metrics endpoint |
-
-Note: The daemon exposes no public TCP RPC by default; `icnctl` communicates via local IPC or the gateway when enabled.
+| RPC (local) | 5050 | TCP | Local JSON-RPC endpoint used by `icnctl` |
 
 ### Monitoring
 
@@ -970,10 +967,10 @@ icn_fuel_consumed_total
 
 ```bash
 # API health endpoint
-curl http://localhost:8080/health
+curl http://localhost:8080/v1/health
 
 # Detailed health
-curl http://localhost:8080/health/detailed
+curl http://localhost:8080/v1/health/detailed
 ```
 
 ---
@@ -1109,7 +1106,7 @@ Wrong passphrase. Try again or restore from backup.
 sudo ufw allow 7777/udp
 
 # Verify bootstrap peers in config
-grep bootstrap ~/.icn/icn.toml
+grep bootstrap ~/.icn/config.toml
 
 # Manually add peer
 icnctl network add-peer 192.168.1.100:7777 did:icn:PEER_DID
@@ -1352,12 +1349,12 @@ curl -X POST http://localhost:8080/v1/auth/challenge \
   -d '{"did": "did:icn:YOUR_DID"}'
 
 # Sign challenge and get token
-curl -X POST http://localhost:8080/v1/auth/token \
+curl -X POST http://localhost:8080/v1/auth/verify \
   -d '{"did": "did:icn:YOUR_DID", "signature": "...", "challenge": "..."}'
 
 # Use token
 curl -H "Authorization: Bearer TOKEN" \
-  http://localhost:8080/v1/ledger/balance
+  http://localhost:8080/v1/coops/YOUR_COOP_ID
 ```
 
 ### TypeScript SDK
@@ -1388,7 +1385,7 @@ const task = await client.submitTask({
 ### WebSocket Events
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws/coop:my-coop');
+const ws = new WebSocket('ws://localhost:8080/v1/ws/coop:my-coop');
 
 ws.onopen = () => {
   ws.send(JSON.stringify({ type: 'Auth', token: 'JWT_TOKEN' }));
@@ -1487,15 +1484,8 @@ icnctl status                     # Daemon status
 ### Complete icn.toml
 
 ```toml
-[node]
 # Data directory for all persistent state
-data_dir = "~/.icn/data"
-
-# Logging level: trace, debug, info, warn, error
-log_level = "info"
-
-# Node identity (defaults to keystore identity)
-# identity = "did:icn:..."
+data_dir = "~/.icn"
 
 [network]
 # Listen address for P2P connections (QUIC/UDP)
@@ -1510,31 +1500,23 @@ bootstrap_peers = [
 # Enable mDNS for local network discovery
 mdns_enabled = true
 
-# Maximum number of peer connections
-max_peers = 50
-
 [gateway]
 # Enable Gateway API
 enabled = true
 
 # Listen address for HTTP/WebSocket
-listen_addr = "127.0.0.1:8080"
+bind_addr = "127.0.0.1:8080"
 
 # JWT secret for authentication (generate securely!)
 jwt_secret = "your-256-bit-secret-here"
 
-# JWT token expiry
-token_expiry = "24h"
-
-# Rate limiting per DID
-rate_limit_per_did = 100
-
-[metrics]
-# Enable Prometheus metrics
-enabled = true
-
-# Listen address for metrics endpoint
-listen_addr = "127.0.0.1:9100"
+[observability]
+# Logging level: trace, debug, info, warn, error
+log_level = "info"
+# Prometheus metrics endpoint port
+metrics_port = 9100
+# Health endpoint port
+health_port = 8080
 
 [gossip]
 # Maximum entries in gossip store
@@ -1568,10 +1550,11 @@ max_concurrent_jobs = 10
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ICN_CONFIG` | Config file path | `~/.icn/icn.toml` |
-| `ICN_DATA_DIR` | Data directory | `~/.icn/data` |
-| `ICN_LOG_LEVEL` | Log level | `info` |
-| `ICN_KEYSTORE_PASSPHRASE` | Keystore passphrase | (prompt) |
+| `ICN_KEYSTORE_PASSPHRASE` | Daemon keystore passphrase (preferred) | (prompt) |
+| `ICN_PASSPHRASE` | CLI passphrase, daemon legacy fallback | (prompt) |
+| `ICN_GATEWAY_JWT_SECRET` | Gateway JWT secret | (none) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry export endpoint | (none) |
+| `OTEL_SERVICE_NAME` | OpenTelemetry service name | `icn-node` |
 
 ---
 
@@ -1582,17 +1565,17 @@ max_concurrent_jobs = 10
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/v1/auth/challenge` | POST | No | Get auth challenge |
-| `/v1/auth/token` | POST | No | Exchange signature for token |
-| `/v1/identity` | GET | Yes | Current identity |
-| `/v1/ledger/balance` | GET | Yes | Account balances |
-| `/v1/ledger/transfer` | POST | Yes | Create transfer |
-| `/v1/ledger/history` | GET | Yes | Transaction history |
-| `/v1/governance/proposals` | GET | Yes | List proposals |
-| `/v1/governance/proposals` | POST | Yes | Create proposal |
+| `/v1/auth/verify` | POST | No | Exchange signature for token |
+| `/v1/identity/resolve/{did}` | GET | No | Resolve DID metadata |
+| `/v1/ledger/{coop_id}/balance/{did}` | GET | Yes | Account balances |
+| `/v1/ledger/{coop_id}/payment` | POST | Yes | Create transfer/payment |
+| `/v1/ledger/{coop_id}/history` | GET | Yes | Transaction history |
+| `/v1/gov/proposals` | GET | Yes | List proposals |
+| `/v1/gov/proposals` | POST | Yes | Create proposal |
 | `/v1/governance/vote` | POST | Yes | Cast vote |
 | `/v1/trust/score` | GET | Yes | Query trust score |
-| `/health` | GET | No | Health check |
-| `/health/detailed` | GET | No | Detailed health |
+| `/v1/health` | GET | No | Health check |
+| `/v1/health/detailed` | GET | No | Detailed health |
 
 ---
 

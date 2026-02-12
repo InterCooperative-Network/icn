@@ -261,13 +261,13 @@ Brief description of what belongs in this category.
 
 ## Contents
 
-- [document.md](document.md) - Brief description
-- [subdirectory/](subdirectory/) - Brief description
+- `document.md` - Brief description
+- `subdirectory/` - Brief description
 
 ## Related Documentation
 
-- [Link to related category](../other-category/)
-- [Link to INDEX.md](../INDEX.md)
+- `Link to related category` (`./other-category/`)
+- `Link to INDEX.md` (`./INDEX.md`)
 ```
 
 **Update when:**
@@ -301,9 +301,9 @@ Brief description of what belongs in this category.
 ### Internal Links
 
 **Use relative paths:**
-- ✅ `[Architecture](../architecture/ARCHITECTURE_MAP.md)`
+- ✅ `[Architecture](./architecture/ARCHITECTURE_MAP.md)`
 - ✅ `[Getting Started](./GETTING_STARTED.md)`
-- ❌ `[Architecture](/docs/architecture/ARCHITECTURE_MAP.md)` (absolute)
+- ❌ Example absolute-path link syntax (avoid): `/docs/architecture/ARCHITECTURE_MAP.md`
 - ❌ `[Architecture](https://github.com/.../ARCHITECTURE_MAP.md)` (external)
 
 **Check links when:**
@@ -314,11 +314,11 @@ Brief description of what belongs in this category.
 
 **Tools:**
 ```bash
-# Find all markdown links in docs
-grep -r "\[.*\](.*\.md)" docs/
+# Find markdown links in docs (fallback heuristic)
+rg -n "\\]\\([^)]*\\.md\\)" docs/
 
-# Check for broken links (manual verification)
-find docs/ -name "*.md" -exec grep -H "\[.*\](.*\.md)" {} \;
+# Check for markdown link targets ending in .md
+find docs/ -name "*.md" -exec rg -n "\\]\\([^)]*\\.md\\)" {} \;
 ```
 
 ### External Links
@@ -347,21 +347,21 @@ find docs/ -name "*.md" -exec grep -H "\[.*\](.*\.md)" {} \;
 **Example:**
 ```markdown
 ICN uses Tokio for its actor runtime. For details on actor communication 
-patterns, see [Actor Architecture](../architecture/ACTOR_PATTERNS.md).
+patterns, see [Architecture Overview](./architecture/README.md).
 
-For API usage examples, see the [Developer Guide](../guides/developer/README.md).
+For API usage examples, see the [Developer Guide](./guides/developer/README.md).
 ```
 
 ### Cross-Reference Format
 
 **Use descriptive link text:**
-- ✅ `[Actor Architecture Guide](../architecture/ACTOR_PATTERNS.md)`
-- ❌ `[here](../architecture/ACTOR_PATTERNS.md)`
-- ❌ `[click here](../architecture/ACTOR_PATTERNS.md)`
+- ✅ `[Architecture Overview](./architecture/README.md)`
+- ❌ `[here](./architecture/README.md)`
+- ❌ `[click here](./architecture/README.md)`
 
 **Include section anchors when relevant:**
-- ✅ `[Trust Graph Computation](../ARCHITECTURE.md#trust-graph)`
-- ✅ `[API Versioning Strategy](../reference/api/api-versioning.md#semver-approach)`
+- ✅ `[Trust Graph Computation](./ARCHITECTURE.md#trust-graph)`
+- ✅ `[API Versioning Strategy](./reference/api/api-versioning.md#semver-approach)`
 
 ---
 

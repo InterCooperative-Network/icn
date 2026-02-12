@@ -1,7 +1,10 @@
 # 🎉 ICN Demo Infrastructure - COMPLETE!
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 21:17 UTC  
-**Status:** ✅ **PHASE 1 COMPLETE - READY FOR PHASE 2**
+**Status:** Historical demo infrastructure snapshot (Phase 1 complete at snapshot time)
 
 ---
 
@@ -144,7 +147,7 @@ $ curl http://localhost:8080/v1/health
 
 1. **Start UI** (Terminal 1)
    ```bash
-   cd /home/matt/projects/icn/web/pilot-ui
+   cd <repo-root>/web/pilot-ui
    python3 -m http.server 3000
    ```
 
@@ -190,7 +193,7 @@ $ curl http://localhost:8080/v1/health
 ## 💡 Key Findings from Today
 
 ### What's Solid ✅
-1. **Backend is production-ready** - All systems working
+1. **Backend was operational for the snapshot demo flow** - All systems working
 2. **Gateway API is comprehensive** - Full CRUD available
 3. **Sample data is realistic** - 12 members, 10 transactions
 4. **Verification passes** - 13/13 checks green
@@ -335,7 +338,7 @@ Total: 9 files, ~24KB
 
 ```bash
 # Test the UI integration NOW
-cd /home/matt/projects/icn/web/pilot-ui
+cd <repo-root>/web/pilot-ui
 python3 -m http.server 3000
 
 # Then open: http://localhost:3000

@@ -1,8 +1,11 @@
 # ICN Demo - Current System Status
 
 **Date:** 2025-12-18 17:25
-**Status:** ✅ **FULLY OPERATIONAL**
+**Status:** Historical demo snapshot
 **Readiness:** 90% for full stack demo
+
+> Historical demo-environment snapshot from 2025-12-18.
+> For current CI posture, use `docs/ci/CI_CURRENT_STATUS.md` and re-run runtime checks.
 
 ---
 
@@ -18,7 +21,7 @@
 - **Status:** ✅ Running
 - **Process:** PID from daemon-fixed session
 - **DID:** `did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh`
-- **Data Directory:** `/home/matt/icn-demo-test/data`
+- **Data Directory:** `<demo-data-dir>/data`
 
 ### Gateway API
 - **Status:** ✅ Operational
@@ -96,7 +99,7 @@ curl http://localhost:8080/v1/ledger
 
 ```bash
 # Option A: Via icnctl
-cd /home/matt/projects/icn/icn
+cd <repo-root>/icn
 ./target/release/icnctl -e 127.0.0.1:15602 init-coop
 
 # Option B: Via Gateway API

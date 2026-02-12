@@ -1,6 +1,10 @@
 # ICN Deployment Ready - December 12, 2025
 
-## 🎉 Status: READY FOR DEPLOYMENT
+> Historical readiness snapshot from December 12, 2025.
+> Treat this as archival context, not current deployment truth.
+> For current readiness, rely on live CI/runtime verification and `docs/ci/CI_CURRENT_STATUS.md`.
+
+## 🎉 Status at Snapshot Date: Deployment-ready assessment
 
 All systems operational and tested. Backend has **1134+ passing tests**. Mobile app fully integrated with offline mode, real-time updates, and trust graph.
 
@@ -445,9 +449,9 @@ After deployment, verify:
 
 - [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Comprehensive deployment guide
 - [DEPLOY_TEST_NETWORK.md](DEPLOY_TEST_NETWORK.md) - Test network setup
-- [MOBILE_APP_STATUS.md](MOBILE_APP_STATUS.md) - Mobile integration status
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [docs/production-hardening.md](docs/production-hardening.md) - Security hardening
+- [MOBILE_APP_STATUS.md](../mobile/MOBILE_APP_STATUS.md) - Mobile integration status
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - System architecture
+- [production-hardening.md](../security/production-hardening.md) - Security hardening
 
 ---
 

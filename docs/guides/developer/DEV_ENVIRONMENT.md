@@ -22,7 +22,7 @@ ssh ubuntu@10.8.10.45
 
 # Web VSCode (code-server)
 http://10.8.10.45:8443
-# Password: 264a2290faa81c3b6d19fa4b
+# Access credential: retrieve from secure channel (vault/team secret manager)
 ```
 
 ### Installed Tools
@@ -124,6 +124,6 @@ Workstation (matt)
 
 ## Related Documentation
 
-- [HOMELAB_DEPLOYMENT.md](./HOMELAB_DEPLOYMENT.md) - K3s cluster details
-- [GETTING_STARTED.md](./GETTING_STARTED.md) - ICN quickstart guide
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
+- [HOMELAB_DEPLOYMENT.md](../../operations/deployment/HOMELAB_DEPLOYMENT.md) - K3s cluster details
+- [GETTING_STARTED.md](../../GETTING_STARTED.md) - ICN quickstart guide
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - System architecture

@@ -1,7 +1,10 @@
 # ICN Deployment System - Status & Verification
 
 **Date:** 2025-12-18 17:32  
-**Status:** ✅ **FULLY OPERATIONAL WITH FIX APPLIED**
+**Status:** Historical deployment snapshot (fix applied in snapshot environment)
+
+> Historical deployment snapshot from 2025-12-18.
+> For current status, run live deployment checks and consult `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
@@ -152,21 +155,21 @@ $ docker-compose logs --tail=10 icnd
 
 #### 1. Docker Compose (Current - Working)
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 docker-compose up -d
 ```
 **Status:** ✅ Running
 
 #### 2. Quick Start Script
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 ./quickstart.sh "Demo Timebank"
 ```
 **Status:** ✅ Ready to use
 
 #### 3. Native Installation
 ```bash
-cd /home/matt/projects/icn
+cd <repo-root>
 sudo deploy/install.sh
 ```
 **Status:** ✅ Available (not tested today)
@@ -273,7 +276,7 @@ sudo deploy/install.sh
 
 ### Start/Stop
 ```bash
-cd /home/matt/projects/icn/deploy
+cd <repo-root>/deploy
 
 # Start all services
 docker-compose up -d
@@ -324,13 +327,13 @@ docker-compose up -d --force-recreate icnd
 ## 📊 System Comparison
 
 ### Native Daemon (Our Test)
-- **Location:** `/home/matt/icn-demo-test/`
+- **Location:** `<demo-data-dir>/`
 - **Status:** ✅ Running in terminal
 - **Ports:** 19777 (QUIC), 8080 (Gateway), 15602 (RPC)
 - **Purpose:** Development and testing
 
 ### Docker Deployment (Production-Ready)
-- **Location:** `/home/matt/projects/icn/deploy/`
+- **Location:** `<repo-root>/deploy/`
 - **Status:** ✅ Running in containers
 - **Ports:** 7777 (QUIC), 8080 (Gateway), 5601 (RPC), 3000 (UI)
 - **Purpose:** Demo and production deployment
@@ -382,10 +385,10 @@ docker-compose up -d --force-recreate icnd
 - Test API endpoints (15 min)
 - Verify UI connection (10 min)
 
-**Confidence:** VERY HIGH - deployment system is production-ready!
+**Confidence (snapshot):** Very high for the recorded environment and checks.
 
 ---
 
 **Status:** DEPLOYMENT SYSTEM VERIFIED AND OPERATIONAL ✅
 
-The deployment infrastructure is solid and ready for demo or production use!
+In the snapshot environment, the deployment infrastructure was validated for demo usage.

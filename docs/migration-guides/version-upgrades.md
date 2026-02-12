@@ -266,7 +266,7 @@ journalctl -u icnd -f
 
 ### 5. Metrics
 ```bash
-curl http://localhost:9090/metrics | grep icn_network_connections_active
+curl http://localhost:9100/metrics | grep icn_network_connections_active
 # Expected: > 0 connections
 ```
 
@@ -444,7 +444,7 @@ icnctl status || {
 **Solution**:
 1. Wait 5-10 minutes for anti-entropy
 2. Force sync: Restart daemon
-3. Check gossip metrics: `curl localhost:9090/metrics | grep gossip`
+3. Check gossip metrics: `curl localhost:9100/metrics | grep gossip`
 
 ---
 
@@ -466,7 +466,7 @@ icnctl status || {
 If upgrade fails and you need help:
 
 1. **GitHub Issues**: https://github.com/InterCooperative-Network/icn/issues
-2. **Emergency rollback**: Use backups (see [Backup & Recovery](../backup-and-recovery.md))
+2. **Emergency rollback**: Use backups (see [Backup & Recovery](../guides/operations/backup-and-recovery.md))
 3. **Community support**: Check community channels
 
 ---
@@ -475,8 +475,8 @@ If upgrade fails and you need help:
 
 - [CHANGELOG.md](../../CHANGELOG.md) - Version history
 - [Keystore Migration](keystore-versions.md) - Identity format changes
-- [Backup & Recovery](../backup-and-recovery.md) - Backup strategies
-- [Operations Guide](../operations-guide.md) - Day-to-day management
+- [Backup & Recovery](../guides/operations/backup-and-recovery.md) - Backup strategies
+- [Operations Guide](../guides/operations/operations-guide.md) - Day-to-day management
 
 ---
 

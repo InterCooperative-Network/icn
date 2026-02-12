@@ -1,7 +1,10 @@
 # ICN Invite System - Deployment Guide
 
 **Date:** 2025-12-12  
-**Status:** ✅ READY FOR DEPLOYMENT
+**Status:** Historical deployment snapshot
+
+> Historical deployment snapshot from 2025-12-12.
+> Validate current invite-system readiness with live checks and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ## Pre-Deployment Checklist
 

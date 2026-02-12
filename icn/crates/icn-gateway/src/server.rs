@@ -149,13 +149,12 @@ impl GatewayServer {
         data_dir: std::path::PathBuf,
     ) -> Self {
         // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
-        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
-            || std::env::var("ICN_CORS_ORIGINS").is_ok()
-        {
-            SecurityConfig::development()
-        } else {
-            SecurityConfig::production()
-        };
+        let security_config =
+            if std::env::var("ICN_DEV_MODE").is_ok() || std::env::var("ICN_CORS_ORIGINS").is_ok() {
+                SecurityConfig::development()
+            } else {
+                SecurityConfig::production()
+            };
 
         GatewayServer {
             bind_addr,
@@ -191,13 +190,12 @@ impl GatewayServer {
         event_broadcaster: Arc<EventBroadcaster>,
     ) -> Self {
         // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
-        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
-            || std::env::var("ICN_CORS_ORIGINS").is_ok()
-        {
-            SecurityConfig::development()
-        } else {
-            SecurityConfig::production()
-        };
+        let security_config =
+            if std::env::var("ICN_DEV_MODE").is_ok() || std::env::var("ICN_CORS_ORIGINS").is_ok() {
+                SecurityConfig::development()
+            } else {
+                SecurityConfig::production()
+            };
 
         GatewayServer {
             bind_addr,
@@ -1061,36 +1059,8 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Recurring payments endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::recurring_payments::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
-                        // Escrow endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::escrow::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
-                        // Budget endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::budgets::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
                         // Protected governance endpoints (auth + rate limiting)
-                        // NOTE: Requires GovernanceHandle from daemon supervisor
-                        //       See governance integration in icnd for wiring
+                        // NOTE: Must be BEFORE empty scopes for routing to work
                         .service(
                             web::scope("/gov")
                                 .service(api::governance::create_domain)
@@ -1130,7 +1100,34 @@ impl GatewayServer {
                                 .service(api::governance::delete_comment)
                                 .service(api::governance::add_reaction)
                                 .service(api::governance::remove_reaction)
-                                // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                // Apply auth first, then rate limiting
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Recurring payments endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::recurring_payments::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Escrow endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::escrow::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Budget endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::budgets::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

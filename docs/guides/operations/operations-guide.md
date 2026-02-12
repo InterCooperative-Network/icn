@@ -20,7 +20,7 @@ Comprehensive operational procedures and workflows for running ICN nodes in prod
 ## Overview
 
 This guide provides operational procedures for ICN node operators. It assumes you have already:
-- Deployed ICN following [deployment-guide.md](deployment-guide.md)
+- Deployed ICN following [deployment-guide.md](../../operations/deployment/deployment-guide.md)
 - Configured systemd service (or equivalent)
 - Set up monitoring dashboard and Prometheus
 
@@ -48,11 +48,11 @@ icnctl id show
 icnctl status
 ```
 
-**2. Review monitoring dashboard:**
-- Navigate to `http://localhost:8080/` (or your configured monitoring port)
-- Verify status is "Healthy" (green banner)
+**2. Review health + metrics:**
+- Check `http://localhost:8080/v1/health`
+- Verify status is healthy/ok
 - Check active peer count (should be > 0 for connected nodes)
-- Review gossip topics and entries
+- Review gossip metrics and entries
 
 **3. Check metrics endpoint:**
 ```bash
@@ -76,7 +76,7 @@ journalctl -u icnd --since "1 hour ago" | grep -i warn
 
 **Action if issues found:**
 - See [Troubleshooting Workflows](#troubleshooting-workflows)
-- For critical issues, see [Incident Response](incident-response.md)
+- For critical issues, see [Incident Response](../../operations/deployment/incident-response.md)
 
 ---
 
@@ -161,9 +161,9 @@ git log --oneline HEAD..origin/main
 
 ## Monitoring & Health Checks
 
-### Dashboard Overview
+### Health Overview
 
-The monitoring dashboard (`http://localhost:8080/`) provides real-time visibility into:
+Use gateway health (`http://localhost:8080/v1/health`) and metrics (`http://localhost:9100/metrics`) for real-time visibility into:
 
 **Status Banner:**
 - **Healthy** (green): All systems operational
@@ -178,11 +178,11 @@ The monitoring dashboard (`http://localhost:8080/`) provides real-time visibilit
 
 ### Health Check Endpoint
 
-The `/health` endpoint returns JSON status for external monitoring:
+The `/v1/health` endpoint returns JSON status for external monitoring:
 
 ```bash
 # Check health status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # Example healthy response:
 {
@@ -250,10 +250,10 @@ groups:
 icnctl backup ~/backups/icn-backup-$(date +%Y%m%d).tar
 
 # Backup includes:
-# - Identity keystore (~/.icn/keystore.age)
-# - Persistent store (~/.icn/store/)
-# - Configuration (~/.icn/config.toml)
-# - Device documents (~/.icn/devices/)
+# - Identity keystore ({data_dir}/identity.age)
+# - Persistent store ({data_dir}/store/)
+# - Configuration ({data_dir}/config.toml or related runtime config)
+# - Device documents ({data_dir}/devices/)
 ```
 
 **Emergency backup (before risky operations):**
@@ -285,7 +285,7 @@ mkdir /tmp/icn-restore-test
 cd /tmp/icn-restore-test
 icnctl restore ~/backups/icn-backup-latest.tar --data-dir /tmp/icn-restore-test
 # Verify keystore can be unlocked
-ICN_DATA_DIR=/tmp/icn-restore-test icnctl id show
+icnctl --data-dir /tmp/icn-restore-test id show
 ```
 
 ### Restoring from Backup
@@ -319,8 +319,8 @@ icnctl restore ~/backups/icn-backup-20250114.tar --keystore-only
 ```
 
 **See also:**
-- [Incident Response: Ledger Corruption](incident-response.md#ledger-corruption-detected-p1)
-- [Deployment Guide: Backup & Recovery](deployment-guide.md#backup--recovery)
+- [Incident Response: Ledger Corruption](../../operations/deployment/incident-response.md#ledger-corruption-detected-p1)
+- [Deployment Guide: Backup & Recovery](../../operations/deployment/deployment-guide.md#backup--recovery)
 
 ---
 
@@ -367,8 +367,8 @@ sudo systemctl start icnd
 icnctl status
 journalctl -u icnd -f  # Watch logs for errors
 
-# 9. Check monitoring dashboard
-# Navigate to http://localhost:8080/ and verify status is "Healthy"
+# 9. Check health endpoint
+curl http://localhost:8080/v1/health | jq
 ```
 
 **Rollback if issues occur:**
@@ -423,7 +423,7 @@ icnctl upgrade --to v0.2.0
 
 ## Incident Response
 
-For emergency situations, see the comprehensive [Incident Response Playbook](incident-response.md).
+For emergency situations, see the comprehensive [Incident Response Playbook](../../operations/deployment/incident-response.md).
 
 **Quick reference:**
 
@@ -693,7 +693,7 @@ ICN nodes automatically preserve critical runtime state across restarts, enablin
 ```bash
 # 1. Check node health before restart
 icnctl status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # 2. Check recent metrics (optional)
 curl -s http://localhost:9100/metrics | grep icn_snapshot
@@ -707,7 +707,7 @@ journalctl -u icnd --since "1 minute ago" | grep -E "(snapshot|restored)"
 
 # 5. Verify health after restart
 icnctl status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
 # 6. Check that subscriptions were restored
 icnctl gossip topics
@@ -891,10 +891,10 @@ curl http://localhost:9100/metrics
 curl -s http://localhost:9100/metrics | grep icn_network_connections_active
 
 # Check health status
-curl http://localhost:8080/health | jq
+curl http://localhost:8080/v1/health | jq
 
-# Open monitoring dashboard
-xdg-open http://localhost:8080/
+# Open metrics in browser if needed
+xdg-open http://localhost:9100/metrics
 ```
 
 ---
@@ -914,17 +914,17 @@ journalctl -u icnd -n 50
 
 # Common issues:
 # 1. Port already in use
-sudo netstat -tulpn | grep 4433
+sudo netstat -ulnp | grep 7777
 
 # 2. Keystore file missing or corrupted
-ls -la ~/.icn/keystore.age
+ls -la ~/.icn/identity.age
 
 # 3. Permissions issue
 ls -la ~/.icn/
 ```
 
 **Solutions:**
-1. **Port conflict**: Change port in `~/.icn/config.toml` or kill conflicting process
+1. **Port conflict**: Change `network.listen_addr` in your daemon config (or kill conflicting process)
 2. **Missing keystore**: Restore from backup or run `icnctl id init`
 3. **Permissions**: Fix with `chown -R icn:icn ~/.icn/`
 
@@ -940,7 +940,7 @@ ls -la ~/.icn/
 icnctl status
 
 # Check firewall
-sudo iptables -L -n | grep 4433
+sudo iptables -L -n | grep 7777
 
 # Check if port is accessible
 sudo netstat -tulpn | grep icnd
@@ -948,7 +948,7 @@ sudo netstat -tulpn | grep icnd
 
 **Solutions:**
 1. **mDNS not working**: Manually dial peers with `icnctl peers connect <did> <address>`
-2. **Firewall blocking**: Open UDP port 4433: `sudo ufw allow 4433/udp`
+2. **Firewall blocking**: Open UDP port 7777: `sudo ufw allow 7777/udp`
 3. **Wrong network interface**: Check `bind_addr` in config
 4. **TLS certificate issue**: Check logs for certificate verification errors
 
@@ -973,7 +973,7 @@ icnctl ledger quarantine list --format json | jq '.[] | .account' | sort | uniq 
 3. **Network partition**: Check connectivity to peers
 4. **Attack/malicious entries**: Investigate and potentially block peer
 
-**See also:** [Incident Response: Quarantine Growth](incident-response.md#quarantine-growth-p2)
+**See also:** [Incident Response: Quarantine Growth](../../operations/deployment/incident-response.md#quarantine-growth-p2)
 
 ### High Memory Usage
 
@@ -1021,11 +1021,11 @@ icnctl gossip stats
 
 ## Additional Resources
 
-- **Deployment Guide**: [deployment-guide.md](deployment-guide.md)
-- **Incident Response**: [incident-response.md](incident-response.md)
+- **Deployment Guide**: [deployment-guide.md](../../operations/deployment/deployment-guide.md)
+- **Incident Response**: [incident-response.md](../../operations/deployment/incident-response.md)
 - **Architecture**: [ARCHITECTURE.md](../../ARCHITECTURE.md)
-- **Changelog**: [CHANGELOG.md](../CHANGELOG.md)
-- **Roadmap**: [ROADMAP.md](../ROADMAP.md)
+- **Changelog**: [CHANGELOG.md](../../../CHANGELOG.md)
+- **Roadmap**: [ROADMAP.md](../../development/sessions/undated/ROADMAP.md)
 
 ---
 

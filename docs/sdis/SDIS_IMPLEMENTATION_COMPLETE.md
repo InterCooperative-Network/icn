@@ -5,6 +5,10 @@
 **Date:** December 12, 2025  
 **Total Lines:** 5,781 production code (Gateway + UI)
 
+> Historical implementation snapshot from 2025-12-12.
+> Verify current endpoint wiring in `icn/crates/icn-gateway/src/api/sdis/mod.rs` before relying on endpoint lists here.
+> Legacy endpoint naming may appear in examples below; prefer `docs/sdis/SDIS_API_GUIDE.md` for currently wired route shapes.
+
 ---
 
 ## 🎯 What is SDIS?
@@ -26,19 +30,19 @@
 **13 REST Endpoints:**
 
 ```
-POST   /api/v1/sdis/enroll              - Start enrollment
-GET    /api/v1/sdis/ceremony/:id        - Check ceremony status
-POST   /api/v1/sdis/ceremony/:id/approve - Steward approves
-POST   /api/v1/sdis/ceremony/:id/reject  - Steward rejects
-GET    /api/v1/sdis/identity/:did       - Get identity info
-POST   /api/v1/sdis/anchors              - Add identity anchor
-GET    /api/v1/sdis/anchors/:did        - List anchors
-POST   /api/v1/sdis/anchors/:id/verify  - Verify anchor
-DELETE /api/v1/sdis/anchors/:id         - Remove anchor
-POST   /api/v1/sdis/proofs               - Generate proof
-GET    /api/v1/sdis/proofs               - List proofs
-POST   /api/v1/sdis/proofs/verify        - Verify proof
-GET    /api/v1/sdis/credentials/:did    - List credentials
+POST   /v1/sdis/enroll              - Start enrollment
+GET    /v1/sdis/ceremony/:id        - Check ceremony status
+POST   /v1/sdis/ceremony/:id/approve - Steward approves
+POST   /v1/sdis/ceremony/:id/reject  - Steward rejects
+GET    /v1/sdis/identity/:did       - Get identity info
+POST   /v1/sdis/anchors              - Add identity anchor
+GET    /v1/sdis/anchors/:did        - List anchors
+POST   /v1/sdis/anchors/:id/verify  - Verify anchor
+DELETE /v1/sdis/anchors/:id         - Remove anchor
+POST   /v1/sdis/proofs               - Generate proof
+GET    /v1/sdis/proofs               - List proofs
+POST   /v1/sdis/proofs/verify        - Verify proof
+GET    /v1/sdis/credentials/:did    - List credentials
 ```
 
 **15 Unit Tests:**
@@ -275,7 +279,7 @@ Lost Access → Choose Method
 ### Enroll New Identity
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/enroll \
+curl -X POST http://localhost:8080/v1/sdis/enroll \
   -H "Content-Type: application/json" \
   -d '{
     "pathway": "new_member",
@@ -305,7 +309,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/enroll \
 ### Add Identity Anchor
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/anchors \
+curl -X POST http://localhost:8080/v1/sdis/anchors \
   -H "Content-Type: application/json" \
   -d '{
     "did": "did:icn:z9AWguvsTEkAVXkpQrHWthPuK86Tw3c8DunToVWLJeP4s",
@@ -318,7 +322,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/anchors \
 ### Generate Proof
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/proofs \
+curl -X POST http://localhost:8080/v1/sdis/proofs \
   -H "Content-Type: application/json" \
   -d '{
     "type": "membership",
@@ -336,7 +340,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/proofs \
 ### Verify Proof
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/sdis/proofs/verify \
+curl -X POST http://localhost:8080/v1/sdis/proofs/verify \
   -H "Content-Type: application/json" \
   -d '{
     "id": "proof_xyz789",
@@ -432,7 +436,7 @@ curl -X POST http://localhost:8080/api/v1/sdis/proofs/verify \
 
 ## 📚 Documentation
 
-- **API Docs:** See `/api/v1/sdis` endpoints
+- **API Docs:** See `/v1/sdis` endpoints
 - **User Guide:** See UI help sections
 - **Security Model:** See SDIS specification
 - **Recovery Guide:** See `/sdis-recovery.html`

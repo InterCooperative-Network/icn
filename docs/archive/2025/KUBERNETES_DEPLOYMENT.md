@@ -1,5 +1,8 @@
 ⚠️ **SUPERSEDED** - This document has been superseded.
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 See current deployment guide: [HOMELAB_DEPLOYMENT.md](../../operations/deployment/HOMELAB_DEPLOYMENT.md)
 
 ---
