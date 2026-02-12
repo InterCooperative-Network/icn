@@ -148,12 +148,21 @@ impl GatewayServer {
         jwt_secret: Vec<u8>,
         data_dir: std::path::PathBuf,
     ) -> Self {
+        // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
+        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
+            || std::env::var("ICN_CORS_ORIGINS").is_ok()
+        {
+            SecurityConfig::development()
+        } else {
+            SecurityConfig::production()
+        };
+
         GatewayServer {
             bind_addr,
             jwt_secret,
             data_dir: Some(data_dir),
             event_broadcaster: None,
-            security_config: SecurityConfig::production(), // Strict for production
+            security_config,
             rate_limit_config: None,
 
             compute_handle: None,
@@ -181,12 +190,21 @@ impl GatewayServer {
         data_dir: Option<std::path::PathBuf>,
         event_broadcaster: Arc<EventBroadcaster>,
     ) -> Self {
+        // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
+        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
+            || std::env::var("ICN_CORS_ORIGINS").is_ok()
+        {
+            SecurityConfig::development()
+        } else {
+            SecurityConfig::production()
+        };
+
         GatewayServer {
             bind_addr,
             jwt_secret,
             data_dir,
             event_broadcaster: Some(event_broadcaster),
-            security_config: SecurityConfig::production(),
+            security_config,
             rate_limit_config: None,
 
             compute_handle: None,
