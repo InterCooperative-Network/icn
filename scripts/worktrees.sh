@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Multi-agent Git worktree helper for ICN.
 # Creates, lists, and removes agent worktrees in a sibling directory.
 
@@ -30,13 +30,28 @@ EOF
     exit 1
 }
 
+validate_name() {
+    local name="$1"
+    if ! [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "Error: name must match [A-Za-z0-9._-]+ (got '${name}')" >&2
+        exit 1
+    fi
+}
+
 cmd_create() {
     local name="$1"
+    validate_name "$name"
     local wt_path="${WT_DIR}/${name}"
     local branch="feat/${name}"
 
     if [ -d "$wt_path" ]; then
         echo "Error: worktree already exists at ${wt_path}" >&2
+        exit 1
+    fi
+
+    if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/${branch}" 2>/dev/null; then
+        echo "Error: local branch '${branch}' already exists" >&2
+        echo "  To use the existing branch: git worktree add ${wt_path} ${branch}" >&2
         exit 1
     fi
 
@@ -53,7 +68,6 @@ cmd_create() {
     echo
     echo "Next steps:"
     echo "  cd ${wt_path}"
-    echo "  export CARGO_TARGET_DIR=\"\$PWD/target\""
     echo "  cd icn && cargo build"
 }
 
@@ -63,6 +77,7 @@ cmd_list() {
 
 cmd_remove() {
     local name="$1"
+    validate_name "$name"
     local wt_path="${WT_DIR}/${name}"
     local branch="feat/${name}"
 
@@ -75,7 +90,7 @@ cmd_remove() {
     git -C "$REPO_ROOT" worktree remove "$wt_path"
 
     # Delete local branch if it exists and is fully merged
-    if git -C "$REPO_ROOT" branch --list "$branch" | grep -q "$branch"; then
+    if git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/${branch}" 2>/dev/null; then
         echo "Deleting local branch ${branch}..."
         git -C "$REPO_ROOT" branch -d "$branch" 2>/dev/null || \
             echo "Warning: branch ${branch} not fully merged; use 'git branch -D ${branch}' to force delete"

@@ -35,23 +35,13 @@ $REPO_ROOT/../icn-wt/           # Worktree workspace (sibling directory)
 
 ## Rust Build Isolation
 
-By default all worktrees share the same `target/` path resolution, which causes lock contention and corrupted incremental builds when two agents compile simultaneously.
+Each worktree has its own directory tree, so the default `icn/target/` is already separate per worktree. However, if your environment sets a global `CARGO_TARGET_DIR` or the workspace `config.toml` specifies a shared `build.target-dir`, multiple agents will collide.
 
-**Fix: set `CARGO_TARGET_DIR` in each worktree.**
+**Check:** if `cargo metadata --format-version=1 | jq -r .target_directory` returns a path outside the worktree, you need to override it:
 
 ```bash
-# In each agent's shell (or .envrc if using direnv)
+# Force per-worktree target (only needed if a shared target is configured)
 export CARGO_TARGET_DIR="$PWD/target"
-```
-
-This gives each worktree its own `target/` directory. Disk cost is higher but builds are safe.
-
-Alternatively, add a per-worktree (not committed) cargo config:
-
-```toml
-# <worktree>/icn/.cargo/config.toml (DO NOT commit — per-worktree only)
-[build]
-target-dir = "target"  # relative to icn/, so each worktree gets its own
 ```
 
 ## Commands Reference
