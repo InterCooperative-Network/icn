@@ -1,5 +1,8 @@
 # ICN Demo - Login Credentials
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 ## Quick Access
 
 **UI:** http://localhost:3000  

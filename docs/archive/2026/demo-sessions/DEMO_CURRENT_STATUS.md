@@ -1,5 +1,8 @@
 # ICN Demo Preparation - Current Status & Next Steps
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 21:15 UTC  
 **Based on:** Previous session work + New demo infrastructure  
 **Status:** Historical demo preparation snapshot

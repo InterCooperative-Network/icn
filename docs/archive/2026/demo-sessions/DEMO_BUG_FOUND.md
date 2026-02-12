@@ -1,5 +1,8 @@
 # 🎉 ICN Demo Wiring - ROOT CAUSE FOUND!
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18 17:21  
 **Time to Discovery:** 2.5 hours  
 **Status:** ✅ **BUG IDENTIFIED - FIX AVAILABLE**

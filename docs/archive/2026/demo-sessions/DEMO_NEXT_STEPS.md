@@ -1,5 +1,8 @@
 # ICN Demo - Immediate Next Steps
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Status:** Foundation is solid, need to connect the pieces  
 **Confidence:** 7/10 → 10/10 in 7-9 hours  
 **Goal:** Working end-to-end transaction demo by end of week

@@ -1,5 +1,8 @@
 # ✅ ICN Demo - All Systems Green Report
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Generated:** 2025-12-18 21:52 UTC  
 **Status:** 🟢 ALL GREEN - PRODUCTION READY
 

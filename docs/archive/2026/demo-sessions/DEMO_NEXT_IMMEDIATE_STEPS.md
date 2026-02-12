@@ -1,5 +1,8 @@
 # ICN Demo - Immediate Pivot
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 ## Current Situation (After 2 hours)
 
 **Problem:** Daemon fails to start with "Address already in use" error, even though:

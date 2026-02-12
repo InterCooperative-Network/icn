@@ -1,5 +1,8 @@
 # 🎯 ICN Demo Progress - Session Update
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Time:** 2025-12-18 21:40 UTC  
 **Session Duration:** ~25 minutes  
 **Status:** ✅ **MAJOR PROGRESS - UI INTEGRATION FIXED**

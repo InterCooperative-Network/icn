@@ -2389,3 +2389,44 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C32; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C33 - archive labeling hardening)
+
+Touched files:
+
+1. `docs/archive/README.md` (new)
+2. `docs/archive/2026/README.md` (new)
+3. `docs/archive/2026/demo-sessions/*.md` (20 files)
+
+Changes:
+
+- Added top-level archive policy documentation to clearly mark archived material as non-authoritative.
+- Added 2026 archive README with scope and current-truth pointers.
+- Added a standardized "Archived Document Notice (2026-02-12)" banner to every archived demo-session markdown file.
+
+## Verification updates (Batch C33)
+
+```bash
+rg -n "Archived Document Notice" docs/archive/2026/demo-sessions/*.md | wc -l
+```
+
+Result: `20` archived demo-session files contain explicit archive warnings.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C33)
+
+- `docs/archive/README.md + docs/archive/2026/README.md + docs/archive/2026/demo-sessions/*.md | archive policy + current truth map (docs/INDEX.md, docs/STATE.md, docs/ci/CI_CURRENT_STATUS.md) | rg -n "Archived Document Notice|historical|authoritative" + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C33)
+
+- Accuracy: 5/5
+- Completeness: 5/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C33; continue targeted stale-claim cleanup.

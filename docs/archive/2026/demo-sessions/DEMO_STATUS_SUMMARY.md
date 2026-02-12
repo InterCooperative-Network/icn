@@ -1,5 +1,8 @@
 # ICN Demo Prep - Current Status Summary
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Date:** 2025-12-18  
 **Time Investment:** ~2 hours audit  
 **Confidence Level:** 7/10 → 10/10 achievable in 7-9 hours
