@@ -4,7 +4,7 @@ Git worktrees let multiple agents work in parallel on the same repository withou
 
 ## How Worktrees Work
 
-- The primary repo at `/home/ubuntu/projects/icn` contains the `.git/` directory.
+- The primary repo (`$REPO_ROOT`) contains the `.git/` directory.
 - Each worktree gets its own directory with a `.git` **pointer file** (not a directory) that references the shared database.
 - Each worktree must be on a **different branch** — Git enforces this.
 - Commits, branches, and refs are shared instantly across all worktrees.
@@ -12,18 +12,18 @@ Git worktrees let multiple agents work in parallel on the same repository withou
 ## Directory Layout
 
 ```
-/home/ubuntu/projects/
-├── icn/                    # Primary repo (main checkout)
-│   ├── .git/               # Shared git database
-│   ├── icn/                # Cargo workspace
+$REPO_ROOT/                     # Primary repo (main checkout)
+├── .git/                       # Shared git database
+├── icn/                        # Cargo workspace
+└── ...
+
+$REPO_ROOT/../icn-wt/           # Worktree workspace (sibling directory)
+├── agent-a/                    # Worktree on feat/agent-a
+│   ├── .git                    # Pointer file → $REPO_ROOT/.git/worktrees/agent-a
+│   ├── icn/
 │   └── ...
-└── icn-wt/                 # Worktree workspace (sibling directory)
-    ├── agent-a/            # Worktree on feat/agent-a
-    │   ├── .git            # Pointer file → ../icn/.git/worktrees/agent-a
-    │   ├── icn/
-    │   └── ...
-    ├── agent-b/            # Worktree on feat/agent-b
-    └── agent-c/            # Worktree on feat/agent-c
+├── agent-b/                    # Worktree on feat/agent-b
+└── agent-c/                    # Worktree on feat/agent-c
 ```
 
 ## Rules
@@ -46,12 +46,12 @@ export CARGO_TARGET_DIR="$PWD/target"
 
 This gives each worktree its own `target/` directory. Disk cost is higher but builds are safe.
 
-Alternatively, add to `icn/.cargo/config.toml` per-worktree:
+Alternatively, add a per-worktree (not committed) cargo config:
 
 ```toml
-# This file is NOT committed — it's per-worktree only
+# <worktree>/icn/.cargo/config.toml (DO NOT commit — per-worktree only)
 [build]
-target-dir = "/home/ubuntu/projects/icn-wt/agent-a/icn/target"
+target-dir = "target"  # relative to icn/, so each worktree gets its own
 ```
 
 ## Commands Reference
@@ -59,7 +59,7 @@ target-dir = "/home/ubuntu/projects/icn-wt/agent-a/icn/target"
 ### Create a worktree
 
 ```bash
-# From primary repo
+# From primary repo root
 git worktree add ../icn-wt/<agent-name> -b feat/<agent-name> origin/main
 ```
 
@@ -100,7 +100,7 @@ git worktree prune
 
 ```bash
 # 1. Agent is assigned a worktree (already on its branch)
-cd /home/ubuntu/projects/icn-wt/agent-a
+cd ../icn-wt/agent-a        # relative to $REPO_ROOT
 
 # 2. Set build isolation
 export CARGO_TARGET_DIR="$PWD/target"
