@@ -385,10 +385,10 @@ docker-compose up -d --force-recreate icnd
 - Test API endpoints (15 min)
 - Verify UI connection (10 min)
 
-**Confidence:** VERY HIGH - deployment system is production-ready!
+**Confidence (snapshot):** Very high for the recorded environment and checks.
 
 ---
 
 **Status:** DEPLOYMENT SYSTEM VERIFIED AND OPERATIONAL ✅
 
-The deployment infrastructure is solid and ready for demo or production use!
+In the snapshot environment, the deployment infrastructure was validated for demo usage.

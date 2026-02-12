@@ -3,6 +3,8 @@
 > Historical snapshot from 2024-12-12.
 > For current readiness, validate current CI and runtime behavior via `docs/ci/CI_CURRENT_STATUS.md`.
 
+**Status:** Historical integration snapshot (not a current readiness guarantee)
+
 ## 🎉 COMPLETE: Three Full Phases
 
 All three phases are now **fully implemented end-to-end** including mobile integration!
