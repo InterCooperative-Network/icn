@@ -29,23 +29,17 @@ pub async fn jwt_auth(
     };
 
     let token = credentials.token();
-    
-    // Debug: log token signature for troubleshooting
-    let token_parts: Vec<&str> = token.split('.').collect();
-    if token_parts.len() == 3 {
-        tracing::debug!(
-            "JWT auth attempt - signature: {}...",
-            &token_parts[2][..std::cmp::min(20, token_parts[2].len())]
-        );
-    }
 
-    // Debug: log token signature for troubleshooting
-    let token_parts: Vec<&str> = token.split('.').collect();
-    if token_parts.len() == 3 {
-        tracing::debug!(
-            "JWT auth attempt - signature: {}...",
-            &token_parts[2][..std::cmp::min(20, token_parts[2].len())]
-        );
+    // Debug-only: log truncated token signature for local troubleshooting.
+    #[cfg(debug_assertions)]
+    {
+        let token_parts: Vec<&str> = token.split('.').collect();
+        if token_parts.len() == 3 {
+            tracing::debug!(
+                "JWT auth attempt - signature: {}...",
+                &token_parts[2][..std::cmp::min(20, token_parts[2].len())]
+            );
+        }
     }
 
     match auth_manager.verify_token(token) {

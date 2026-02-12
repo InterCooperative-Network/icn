@@ -18,7 +18,7 @@ UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
 COOP_ID="${ICN_DEMO_COOP_ID:-rochester-tool-library}"
 DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
 RPC_ENDPOINT="${ICN_DEMO_RPC_ENDPOINT:-127.0.0.1:15602}"
-JWT_SECRET="${ICN_GATEWAY_JWT_SECRET:-0123456789abcdef0123456789abcdef}"
+JWT_SECRET="${ICN_GATEWAY_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | head -c 32 | xxd -p)}"
 DEFAULT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
 MDNS_ENABLED="${ICN_DEMO_MDNS_ENABLED:-false}"
 RUNTIME_CONFIG="/tmp/icn-demo-runtime.toml"
@@ -91,6 +91,8 @@ read -r
 
 require_command curl
 require_command python3
+require_command cargo
+require_command lsof
 
 mkdir -p "$DATA_DIR"
 
@@ -185,11 +187,10 @@ else
     echo "Starting ICN daemon..."
     (
         cd "$ICN_DIR"
-        ICN_PASSPHRASE=demo123 ./target/release/icnd \
+        ICN_PASSPHRASE=demo123 ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" ./target/release/icnd \
             --config "$RUNTIME_CONFIG" \
             --gateway-enable \
             --gateway-bind "$GATEWAY_HOST:$GATEWAY_PORT" \
-            --gateway-jwt-secret "$JWT_SECRET" \
             > /tmp/icnd-demo.log 2>&1
     ) &
 

@@ -280,13 +280,12 @@ tail -f /tmp/pilot-ui-demo.log
 ```bash
 # Get fresh token
 cd icn
-./target/release/icnctl \
+ICN_PASSPHRASE=demo123 ./target/release/icnctl \
   -d "$(pwd)/.demo-data/tool-library" \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
-  --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-  --passphrase demo123
+  --scopes "coop:write,coop:read,ledger:read,ledger:write"
 ```
 
 ### "Can't create transaction"
