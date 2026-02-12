@@ -95,3 +95,4 @@ You have deep expertise in:
 - Include rollback strategy for risky changes
 - Be specific about file paths and crate names
 - Include exact verification commands
+- When assigning parallel tasks, use separate worktrees (`./scripts/worktrees.sh create <name>`). See `docs/dev/WORKTREES.md`.
