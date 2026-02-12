@@ -2087,3 +2087,46 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C25; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C26 - deployment/demo snapshot framing normalization)
+
+Touched files:
+
+1. `docs/deployment/DEPLOYMENT_COMPLETE.md`
+2. `docs/deployment/DEPLOYMENT_GUIDE.md`
+3. `docs/deployment/QUICK_DEPLOY.md`
+4. `docs/status/CURRENT_SYSTEM_STATUS.md`
+5. `docs/demo/DEMO_QUICK_START.md`
+
+Changes:
+
+- Converted undated "production-ready/current" framing to explicit historical or reference framing.
+- Added explicit guidance to validate runtime truth via live checks and `docs/ci/CI_CURRENT_STATUS.md`.
+- Preserved command examples while clarifying they are point-in-time references, not current guarantees.
+
+## Verification updates (Batch C26)
+
+```bash
+rg -n "Historical snapshot|Historical quick-reference snapshot|validate against current runtime|current deployment truth|2025-12-18 snapshot" docs/deployment/DEPLOYMENT_COMPLETE.md docs/deployment/DEPLOYMENT_GUIDE.md docs/deployment/QUICK_DEPLOY.md docs/status/CURRENT_SYSTEM_STATUS.md docs/demo/DEMO_QUICK_START.md
+```
+
+Result: snapshot/reference framing present in all touched docs.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C26)
+
+- `docs/deployment/DEPLOYMENT_COMPLETE.md + docs/deployment/DEPLOYMENT_GUIDE.md + docs/deployment/QUICK_DEPLOY.md + docs/status/CURRENT_SYSTEM_STATUS.md + docs/demo/DEMO_QUICK_START.md | icn/crates/icn-core/src/config/gateway.rs + icn/bins/icnd/src/main.rs + docs/ci/CI_CURRENT_STATUS.md | rg -n "default_gateway_bind_addr|init_gateway_port|gateway_port|Status:|Historical" + doc_reality_scan.sh | aligned-with-explicit-snapshot-context | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C26)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C26; continue active-doc content drift cleanup.

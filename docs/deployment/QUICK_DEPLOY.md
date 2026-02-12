@@ -1,7 +1,10 @@
 # ICN Quick Deploy Reference Card
 
 **Last Updated:** December 12, 2025  
-**Status:** ✅ DEPLOYMENT READY
+**Status:** Historical quick-reference snapshot
+
+> Historical quick-deploy snapshot from 2025-12-12.
+> Confirm current operational status via live checks and `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 

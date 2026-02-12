@@ -1,7 +1,7 @@
 # ICN Demo - Current System Status
 
 **Date:** 2025-12-18 17:25
-**Status:** ✅ **FULLY OPERATIONAL**
+**Status:** Historical demo snapshot
 **Readiness:** 90% for full stack demo
 
 > Historical demo-environment snapshot from 2025-12-18.

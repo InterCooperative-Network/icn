@@ -1,6 +1,9 @@
 # ICN Deployment Guide
 
-**Status:** Production-ready backend with enhanced mobile app
+**Status:** Reference guide (validate against current runtime and CI before deployment)
+
+> This guide captures deployment patterns that may vary by environment and release.
+> Before production use, verify ports/endpoints/config against current code and `docs/ci/CI_CURRENT_STATUS.md`.
 
 This guide covers deploying the ICN gateway backend for your mobile app and web pilots.
 

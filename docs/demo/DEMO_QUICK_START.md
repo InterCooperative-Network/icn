@@ -1,8 +1,12 @@
 # 🚀 ICN Demo - Quick Start Card
 
-**Status:** ✅ Phase 1 Complete - Backend Working  
+**Date:** 2025-12-18 snapshot  
+**Status:** Historical demo quick-start snapshot  
 **Next:** Test UI Integration  
 **Time:** 2-4 hours to working transaction
+
+> This card documents a 2025-12-18 demo environment.
+> Verify current runtime and CI state before following it: `docs/status/CURRENT_SYSTEM_STATUS.md`, `docs/ci/CI_CURRENT_STATUS.md`.
 
 ---
 
