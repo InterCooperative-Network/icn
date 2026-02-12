@@ -753,8 +753,14 @@ async function loadProposals() {
         state.proposals = proposals;
 
         // Split into open and closed
-        const openProposals = proposals.filter(p => p.state === 'Open');
-        const closedProposals = proposals.filter(p => p.state === 'Closed');
+        // Handle both string state ("Open") and object state ({ "Open": {...} })
+        const getStateKey = (state) => {
+            if (typeof state === 'string') return state;
+            if (typeof state === 'object' && state !== null) return Object.keys(state)[0];
+            return '';
+        };
+        const openProposals = proposals.filter(p => getStateKey(p.state) === 'Open');
+        const closedProposals = proposals.filter(p => getStateKey(p.state) === 'Closed');
 
         // Render lists
         await renderProposalList(openProposals, elements.proposalList, true);
@@ -785,7 +791,11 @@ async function renderProposalList(proposals, container, showVoteButtons) {
             // Votes might not be available
         }
 
-        const stateClass = proposal.state.toLowerCase();
+        // Handle both string state ("Open") and object state ({ "Open": {...} })
+        const stateKey = typeof proposal.state === 'string' 
+            ? proposal.state 
+            : (typeof proposal.state === 'object' && proposal.state !== null ? Object.keys(proposal.state)[0] : 'Unknown');
+        const stateClass = stateKey.toLowerCase();
 
         let actionsHtml = '';
         if (showVoteButtons) {
@@ -832,7 +842,7 @@ async function renderProposalList(proposals, container, showVoteButtons) {
             <div class="proposal-item">
                 <div class="proposal-header">
                     <div class="proposal-title">${escapeHtml(proposal.title)}</div>
-                    <div class="proposal-state ${stateClass}">${proposal.state}</div>
+                    <div class="proposal-state ${stateClass}">${stateKey}</div>
                 </div>
                 ${proposal.description ? `<div class="proposal-description">${escapeHtml(proposal.description)}</div>` : ''}
                 ${deadlineHtml}

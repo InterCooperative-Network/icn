@@ -1260,7 +1260,8 @@ impl GovernanceActor {
                 info!("Creating governance domain: {}", domain_id.0);
 
                 let profile_id = GovernanceProfileId::builtin(&config.profile);
-                let domain = GovernanceDomain::new(
+                let domain = GovernanceDomain::with_id(
+                    domain_id.clone(),
                     name,
                     GovernanceConfig::new(profile_id, config.membership, config.params),
                 );

@@ -88,26 +88,21 @@ impl TrustPolicyOracleTokio {
 
 impl PolicyOracle for TrustPolicyOracleTokio {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
-        // Use block_in_place to safely access tokio lock from sync context.
-        // This requires a multi-threaded runtime (flavor = "multi_thread").
-        let score = tokio::task::block_in_place(|| {
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(async {
-                // Try non-blocking read first
-                match self.graph.try_read() {
-                    Ok(graph) => compute_score(&graph, &request.core.actor),
-                    Err(_) => {
-                        // Lock contention - fall back to blocking read
-                        tracing::debug!(
-                            actor = %request.core.actor,
-                            "Trust oracle lock contention, using blocking read"
-                        );
-                        let graph = self.graph.read().await;
-                        compute_score(&graph, &request.core.actor)
-                    }
-                }
-            })
-        });
+        // Use try_read() for non-blocking access. If lock is contended,
+        // fall back to a default "known" score. This avoids block_in_place
+        // which requires a multi-threaded runtime (actix workers are single-threaded).
+        let score = match self.graph.try_read() {
+            Ok(graph) => compute_score(&graph, &request.core.actor),
+            Err(_) => {
+                // Lock contention - use default "known" score instead of blocking.
+                // This allows the request to proceed with reasonable limits.
+                tracing::debug!(
+                    actor = %request.core.actor,
+                    "Trust oracle lock contention, using default score 0.3"
+                );
+                0.3 // "Known" class - reasonable default under contention
+            }
+        };
 
         // Enforce any policy threshold hints from the kernel
         if let Some(required) = Self::required_trust_threshold(request) {
