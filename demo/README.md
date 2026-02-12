@@ -5,7 +5,8 @@ This directory contains everything needed to run ICN demos.
 ## Canonical Demo Ports
 
 - **Local single-node**: Gateway http://localhost:8080, UI http://localhost:3000
-- **Devnet (3 nodes)**: node-a :8000, node-b :8001, node-c :8002
+- **Devnet (3 nodes)**: node-a http://localhost:8000, node-b http://localhost:8001, node-c http://localhost:8002
+- **LAN mode**: Gateway http://\<lan-ip\>:8080, UI http://\<lan-ip\>:3000 (set `ICN_CORS_ORIGINS`)
 
 ## Quick Start
 

@@ -9,7 +9,8 @@
 | Mode | Gateway | UI | Notes |
 |------|---------|----|----|
 | **Local single-node** | http://localhost:8080 | http://localhost:3000 | One-click demo |
-| **Devnet (3 nodes)** | :8000, :8001, :8002 | - | Docker cluster |
+| **Devnet (3 nodes)** | http://localhost:8000, http://localhost:8001, http://localhost:8002 | - | Docker cluster |
+| **LAN mode** | http://\<lan-ip\>:8080 | http://\<lan-ip\>:3000 | Cross-machine access |
 
 ---
 
@@ -58,7 +59,7 @@ make status   # verify all healthy
 make demo     # run demo against node-a
 ```
 
-Nodes: node-a :8000, node-b :8001, node-c :8002
+Nodes: node-a http://localhost:8000, node-b http://localhost:8001, node-c http://localhost:8002
 
 ### Reset Everything
 
@@ -78,11 +79,49 @@ Nodes: node-a :8000, node-b :8001, node-c :8002
 ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" ./target/release/icnd --gateway-enable
 ```
 
-All `curl` examples require:
+API endpoints require auth header (except `/v1/health`):
 
 ```bash
--H "Authorization: Bearer $TOKEN"
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/coops
 ```
+
+---
+
+## LAN Mode (Workstation Access)
+
+To access the demo from another machine on your network:
+
+### 1. Bind gateway to all interfaces
+
+```bash
+./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
+```
+
+### 2. Set CORS origins for your LAN IP
+
+```bash
+export ICN_CORS_ORIGINS="http://10.8.10.45:3000,http://10.8.10.45:8080"
+```
+
+### 3. Start UI server on all interfaces
+
+```bash
+cd web/pilot-ui
+python3 -m http.server 3000 --bind 0.0.0.0
+```
+
+### 4. Open firewall ports (if needed)
+
+```bash
+sudo ufw allow 8080/tcp
+sudo ufw allow 3000/tcp
+```
+
+### 5. Access from workstation
+
+- UI: `http://<server-lan-ip>:3000`
+- Gateway: `http://<server-lan-ip>:8080`
+- In UI login, use LAN IP for gateway URL
 
 ---
 

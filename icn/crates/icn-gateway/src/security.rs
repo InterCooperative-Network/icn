@@ -85,15 +85,27 @@ impl SecurityConfig {
 
     /// Development configuration (permissive CORS for local development)
     pub fn development() -> Self {
+        // Check for LAN mode via environment variable
+        let mut origins = vec![
+            "http://localhost:3000".to_string(),
+            "http://localhost:8080".to_string(),
+            "http://localhost:5173".to_string(), // Vite default
+            "http://127.0.0.1:3000".to_string(),
+            "http://127.0.0.1:8080".to_string(),
+            "http://127.0.0.1:5173".to_string(), // Vite on 127.0.0.1
+        ];
+
+        // Add custom origins from ICN_CORS_ORIGINS env var (comma-separated)
+        if let Ok(extra) = std::env::var("ICN_CORS_ORIGINS") {
+            for origin in extra.split(',').map(|s| s.trim().to_string()) {
+                if !origin.is_empty() {
+                    origins.push(origin);
+                }
+            }
+        }
+
         Self {
-            cors_mode: CorsMode::AllowedOrigins(vec![
-                "http://localhost:3000".to_string(),
-                "http://localhost:8080".to_string(),
-                "http://localhost:5173".to_string(), // Vite default
-                "http://127.0.0.1:3000".to_string(),
-                "http://127.0.0.1:8080".to_string(),
-                "http://127.0.0.1:5173".to_string(), // Vite on 127.0.0.1
-            ]),
+            cors_mode: CorsMode::AllowedOrigins(origins),
             enable_security_headers: true,
             csp_directive: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss: http://localhost:* ws://localhost:*".to_string(),
         }

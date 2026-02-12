@@ -56,7 +56,14 @@ cargo build --release
 ### Step 3: Start Daemon
 
 ```bash
-./target/release/icnd --gateway-enable
+ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" \
+  ./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
+```
+
+For LAN access, also set CORS origins:
+
+```bash
+export ICN_CORS_ORIGINS="http://<your-lan-ip>:3000"
 ```
 
 ### Step 4: Start UI
@@ -64,7 +71,7 @@ cargo build --release
 ```bash
 # New terminal
 cd ../web/pilot-ui
-python3 -m http.server 3000
+python3 -m http.server 3000 --bind 0.0.0.0
 ```
 
 ### Step 5: Get Auth Token
