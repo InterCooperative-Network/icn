@@ -2655,3 +2655,52 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C38; continue targeted stale-claim cleanup.
+
+## Changes applied (Batch C39 - architecture/CI/demo stale-language refinement)
+
+Touched files:
+
+1. `docs/ci/CI_ALL_GREEN_REPORT.md`
+2. `docs/status/FINAL_DEMO_SUCCESS.md`
+3. `docs/architecture/ARCHITECTURE_AUDIT_2025-12-17.md`
+4. `docs/architecture/ARCHITECTURE_REVIEW_AND_PQ_SESSION.md`
+5. `docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md`
+6. `docs/architecture/ARCHITECTURE_INDEX.md`
+7. `docs/architecture/ARCHITECTURE_QUICK_REF.md`
+8. `docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md`
+9. `docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md`
+10. `docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md`
+11. `docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md`
+
+Changes:
+
+- Converted lingering absolute readiness/status phrases to explicit snapshot assessments in dated architecture/CI/demo reports.
+- Kept historical conclusions intact while clarifying they are point-in-time evaluations.
+- Normalized remaining pilot-ready labels to "pilot-ready assessment" wording in targeted files.
+
+## Verification updates (Batch C39)
+
+```bash
+rg -n "production-ready|fully operational|PILOT-READY|Current Status|READY TO DEPLOY" docs/ci/CI_ALL_GREEN_REPORT.md docs/status/FINAL_DEMO_SUCCESS.md docs/architecture/ARCHITECTURE_AUDIT_2025-12-17.md docs/architecture/ARCHITECTURE_REVIEW_AND_PQ_SESSION.md docs/architecture/ARCHITECTURE_COMPLETION_STATUS_OLD.md docs/architecture/ARCHITECTURE_INDEX.md docs/architecture/ARCHITECTURE_QUICK_REF.md docs/architecture/ARCHITECTURE_REVIEW_SUMMARY.md docs/architecture/ARCHITECTURE_UPDATE_2025-12-17.md docs/architecture/COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md
+```
+
+Result: direct stale-language hits reduced to accepted historical/contextual phrasing only.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C39)
+
+- `docs/ci/CI_ALL_GREEN_REPORT.md + docs/status/FINAL_DEMO_SUCCESS.md + docs/architecture/{ARCHITECTURE_AUDIT_2025-12-17.md,ARCHITECTURE_REVIEW_AND_PQ_SESSION.md,ARCHITECTURE_COMPLETION_STATUS_OLD.md,ARCHITECTURE_INDEX.md,ARCHITECTURE_QUICK_REF.md,ARCHITECTURE_REVIEW_SUMMARY.md,ARCHITECTURE_UPDATE_2025-12-17.md,COMPREHENSIVE_ARCHITECTURE_REVIEW_2025-12-17.md,SESSION_SUMMARY_2025-12-17_ARCHITECTURE_AUDIT.md} | snapshot language policy + current truth pointers | stale-language grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C39)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C39; continue targeted stale-claim cleanup.

@@ -376,7 +376,7 @@ icn/
 | S1-S5 | ✅ Complete | SDIS identity (anchors, post-quantum, ZKP) |
 | 21+ | 📋 Planned | Mobile SDKs, production hardening, pilot deployments |
 
-**Current Status:** PILOT-READY (Q4 2025)  
+**Status at Review Time:** Pilot-ready assessment (Q4 2025)  
 **Target:** Production-ready Q1 2026
 
 ---
@@ -481,7 +481,7 @@ MIT OR Apache-2.0 (dual-licensed)
 
 **Last Updated:** December 17, 2025  
 **Review Completed By:** GitHub Copilot  
-**System Status:** PILOT-READY ✅
+**System Status (Historical):** Pilot-ready assessment ✅
 
 ---
 

@@ -297,7 +297,7 @@ These are implementation notes for future enhancements, not architectural gaps:
 
 ## Conclusion
 
-**Historical conclusion (2025-12-17): the report assessed the architecture as complete and production-ready.**
+**Historical conclusion (2025-12-17): the report assessed the architecture as complete and production-capable.**
 
 All 20 phases of the original roadmap are implemented:
 - Phases 1-8: Core infrastructure ✅
@@ -310,9 +310,9 @@ The system demonstrates:
 - **Completeness**: All architectural components integrated
 - **Security**: Multi-layer defense with post-quantum crypto
 - **Scalability**: Gossip protocol tested to 100+ nodes
-- **Governance**: Democratic primitives fully operational
+- **Governance**: Democratic primitives were assessed as operational in this snapshot
 
-**Status**: ✅ **PILOT-READY**
+**Status (Historical)**: ✅ **Pilot-ready assessment**
 
 ---
 

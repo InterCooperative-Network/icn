@@ -216,7 +216,7 @@ Passphrase: demo123
 
 ## 🚀 Ready for Next Phase
 
-**Status:** PILOT-READY FOR API TESTING
+**Status (Snapshot):** Pilot-ready for API testing
 
 **Daemon:** ✅ Running stably  
 **Gateway:** ✅ Responding to requests  

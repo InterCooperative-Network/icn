@@ -197,7 +197,7 @@ A comprehensive architecture review and documentation of the entire ICN (Interco
 | F1-F6 | ✅ Complete | Federation layer |
 | S1-S5 | ✅ Complete | SDIS identity |
 
-**Status at review time (Q4 2025):** PILOT-READY
+**Status at review time (Q4 2025):** Pilot-ready assessment
 
 ---
 
@@ -381,7 +381,7 @@ A comprehensive architecture review and documentation of the entire ICN (Interco
 
 ## 📝 Conclusion
 
-In this 2025-12-17 review snapshot, ICN was assessed as a **well-architected, comprehensively tested, production-ready substrate** for cooperative coordination. The system demonstrated:
+In this 2025-12-17 review snapshot, ICN was assessed as a **well-architected, comprehensively tested, production-capable substrate** for cooperative coordination. The system demonstrated:
 
 - **Strong foundations:** Identity, trust, and network layers
 - **Solid architecture:** Actor-based runtime with clear patterns
@@ -390,7 +390,7 @@ In this 2025-12-17 review snapshot, ICN was assessed as a **well-architected, co
 - **Excellent coverage:** 1,134+ tests, 85+ integration scenarios
 - **Thorough documentation:** 198 files, 111KB new architecture docs
 
-**Historical status (2025-12-17):** PILOT-READY ✅  
+**Historical status (2025-12-17):** Pilot-ready assessment ✅  
 **Historical recommendation:** Proceed to pilot deployment phase
 
 ---
@@ -510,11 +510,11 @@ All directories, all components, all layers documented.
 1. ~~Complete architecture review~~ ✅ DONE
 2. Security audit (external)
 3. Pilot deployment (3-5 cooperatives)
-4. ~~Mobile SDK maturity~~ ✅ DONE (React Native SDK production-ready)
+4. ~~Mobile SDK maturity~~ ✅ DONE (React Native SDK assessed as production-capable in that snapshot)
 
 **Short-Term (Q2 2026):**
 1. Performance optimization (test at 1000+ nodes)
-2. ~~Web UI refinement~~ ✅ DONE (pilot-ui production-ready)
+2. ~~Web UI refinement~~ ✅ DONE (pilot-ui assessed as production-capable in that snapshot)
 3. Federation protocol v2
 4. API stability guarantees (v1.0)
 

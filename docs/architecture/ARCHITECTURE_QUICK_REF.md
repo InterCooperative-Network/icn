@@ -213,9 +213,9 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
     └─ ../ARCHITECTURE.md      ← Design rationale
 ```
 
-## 🚦 Current Status
+## 🚦 Status Snapshot
 
-**PILOT-READY** (December 2025)
+**Pilot-ready assessment** (December 2025)
 
 - ✅ 1,134+ tests passing
 - ✅ 25 crates (40K lines Rust)
@@ -245,4 +245,4 @@ ARCHITECTURE_INDEX.md       ← Start here (navigation)
 ---
 
 **Last Updated:** December 17, 2025  
-**System Version:** 0.1.0 - PILOT-READY ✅
+**System Version (Snapshot):** 0.1.0 - Pilot-ready assessment ✅
