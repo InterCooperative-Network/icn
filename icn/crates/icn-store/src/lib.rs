@@ -610,7 +610,11 @@ impl SledStore {
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
         let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let unique = format!("icn-sled-{}-{}", std::process::id(), seq);
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let unique = format!("icn-sled-{}-{}-{}", std::process::id(), seq, ts);
         let path = base.join(unique);
         std::fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create temporary sled directory: {:?}", path))?;

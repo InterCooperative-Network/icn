@@ -18,10 +18,10 @@ UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
 COOP_ID="${ICN_DEMO_COOP_ID:-rochester-tool-library}"
 DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
 RPC_ENDPOINT="${ICN_DEMO_RPC_ENDPOINT:-127.0.0.1:15602}"
-JWT_SECRET="${ICN_GATEWAY_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | head -c 32 | xxd -p)}"
+JWT_SECRET="${ICN_GATEWAY_JWT_SECRET:-}"
 DEFAULT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
 MDNS_ENABLED="${ICN_DEMO_MDNS_ENABLED:-false}"
-RUNTIME_CONFIG="/tmp/icn-demo-runtime.toml"
+RUNTIME_CONFIG="$(mktemp /tmp/icn-demo-runtime.XXXXXX.toml)"
 RPC_PORT="${RPC_ENDPOINT##*:}"
 
 # Colors
@@ -60,6 +60,7 @@ cleanup() {
         kill "$DAEMON_PID" 2>/dev/null || true
     fi
 
+    rm -f "$RUNTIME_CONFIG"
     echo "Demo stopped."
 }
 
@@ -93,8 +94,14 @@ require_command curl
 require_command python3
 require_command cargo
 require_command lsof
+require_command openssl
 
 mkdir -p "$DATA_DIR"
+
+# Generate JWT secret after dependency checks (openssl is now verified)
+if [ -z "$JWT_SECRET" ]; then
+    JWT_SECRET="$(openssl rand -hex 32)"
+fi
 
 if [ "${#JWT_SECRET}" -lt 32 ]; then
     echo -e "${RED}✗${NC} ICN_GATEWAY_JWT_SECRET must be at least 32 bytes"

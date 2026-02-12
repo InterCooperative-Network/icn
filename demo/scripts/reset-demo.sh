@@ -54,8 +54,9 @@ else
     echo "UI server not running"
 fi
 
-# Stop daemon (check gateway port 8080)
-DAEMON_PIDS=$(lsof -Pi :8080 -sTCP:LISTEN -t 2>/dev/null || true)
+# Stop daemon (check gateway port)
+GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
+DAEMON_PIDS=$(lsof -Pi :"$GATEWAY_PORT" -sTCP:LISTEN -t 2>/dev/null || true)
 if [ -n "$DAEMON_PIDS" ]; then
     for pid in $DAEMON_PIDS; do
         echo "Stopping daemon (PID: $pid)..."
