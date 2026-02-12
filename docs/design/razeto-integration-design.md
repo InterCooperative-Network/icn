@@ -35,7 +35,7 @@ From Razeto's analysis, these principles guide our implementation:
 | Bilateral clearing | `icn-federation/clearing.rs` | Foundation for multilateral |
 | Entity model | Recursive individuals→coops→federations | Matches Razeto hierarchy |
 | Governance | Proposals, voting, domains | Democratic control preserved |
-| Demurrage | Designed in contribution-credits-design.md | Anti-speculation |
+| Demurrage | Designed in economics/contribution-credits-design.md | Anti-speculation |
 
 ### Gaps to Fill
 
@@ -1041,7 +1041,7 @@ impl Supervisor {
 | `icn-governance/src/proposal.rs` | Add ProposalPayload variants |
 | `icn-ccl/src/ast.rs` | Trigger type exists; needs executor |
 | `icn-core/src/supervisor.rs` | Actor spawning for scheduler |
-| `docs/contribution-credits-design.md` | Maintain economic principles |
+| `docs/design/economics/contribution-credits-design.md` | Maintain economic principles |
 
 ---
 

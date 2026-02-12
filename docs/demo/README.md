@@ -1,110 +1,189 @@
-# ICN Demo Guide
+# ICN Demo: Start Here
 
-**ICN** is a P2P coordination layer for cooperatives, communities, and federations to coordinate without central servers.
+**Last Updated**: 2026-02-11
 
-## What You'll See
+---
 
-A cooperative is created, members join, they govern democratically (propose/vote/close with cryptographic proof), exchange mutual credit, register trust attestations, deploy WASM modules, and discover services -- all through a single daemon with a REST API.
+## Canonical Demo Ports
 
-## Prerequisites
+| Mode | Gateway | UI | Notes |
+|------|---------|----|----|
+| **Local single-node** | http://localhost:8080 | http://localhost:3000 | One-click demo |
+| **Devnet (3 nodes)** | http://localhost:8000, http://localhost:8001, http://localhost:8002 | - | Docker cluster |
+| **LAN mode** | http://\<lan-ip\>:8080 | http://\<lan-ip\>:3000 | Cross-machine access |
+
+---
+
+## Fastest Path: One-Click Demo
 
 ```bash
-# Build the daemon (from repo root)
-cd icn && cargo build --release --features wasm
+# From repository root
+./demo/scripts/run-tool-library-demo.sh
 ```
 
-## Single-Node Demo (5 minutes)
+Then open:
+- **UI**: http://localhost:3000
+- **Gateway**: http://localhost:8080/v1/health
 
-Start a daemon with an empty data directory:
+Use the credentials printed by the script.
+
+---
+
+## What This Demo Proves
+
+| Feature | What You'll See |
+|---------|-----------------|
+| **Identity** | Member-controlled DID + keys (no corporate account) |
+| **Governance** | Proposals → votes → close → cryptographic proof |
+| **Ledger** | Mutual credit journaling + deterministic receipts |
+| **Trust** | Attestations → trust-gated access/resource policy |
+
+---
+
+## Demo Modes
+
+### Local Single-Node (5 minutes)
 
 ```bash
-# Initialize identity + config
-./target/release/icnd --init --data-dir /tmp/icn-demo
-
-# Start daemon with gateway
-ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" \
-  ./target/release/icnd \
-    --config /tmp/icn-demo/config.toml \
-    --gateway-enable &
-
-# Run the comprehensive demo script (exercises 10 subsystems)
-ICN_GATEWAY=http://localhost:8000 bash ../scripts/demo-single-node.sh
+./demo/scripts/run-tool-library-demo.sh
 ```
 
-The demo script exercises: health, identity, cooperative lifecycle, governance (full propose/vote/close with proof), mutual credit ledger, treasury, service discovery, WASM upload, trust attestations, and entity management.
+Starts daemon + gateway + UI. Displays credentials. Press Ctrl+C to stop.
 
-Add `--json` for machine-readable output, or `--skip wasm,trust` to skip specific sections.
-
-## Devnet: 3-Node Cluster (10 minutes)
+### Devnet 3-Node Cluster (10 minutes)
 
 ```bash
 cd deploy/devnet
-
-# Build Docker images and start 3 nodes
-make build
-make up
-
-# Check all nodes are healthy
-make status
-
-# Run demo against node-a
-make demo
+make build && make up
+make status   # verify all healthy
+make demo     # run demo against node-a
 ```
 
-Node ports: **node-a** localhost:8000, **node-b** localhost:8001, **node-c** localhost:8002.
+Nodes: node-a http://localhost:8000, node-b http://localhost:8001, node-c http://localhost:8002
 
-Nodes bootstrap via explicit peer URLs (`icn://node-a:9000`). DIDs are learned from the QUIC/TLS handshake.
-
-## The Flagship Demo: Governance Proof
-
-This is the money shot -- a proposal that produces a cryptographic proof of its outcome:
+### Reset Everything
 
 ```bash
-GW=http://localhost:8000
-
-# 1. Create a cooperative
-COOP=$(curl -s -X POST $GW/v1/coops \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Demo Coop"}' | jq -r '.coop_id // .id')
-
-# 2. Create a governance domain
-DOMAIN=$(curl -s -X POST $GW/v1/gov/domains \
-  -H 'Content-Type: application/json' \
-  -d "{\"name\":\"policy\",\"coop_id\":\"$COOP\"}" | jq -r '.domain_id // .id')
-
-# 3. Propose a budget allocation
-PROP=$(curl -s -X POST $GW/v1/gov/proposals \
-  -H 'Content-Type: application/json' \
-  -d "{\"domain_id\":\"$DOMAIN\",\"title\":\"Fund community garden\",\"description\":\"Allocate 500 hours to community garden project\",\"payload\":{\"Text\":{\"body\":\"Allocate 500 hours\"}}}" \
-  | jq -r '.proposal_id // .id')
-
-# 4. Vote yes
-curl -s -X POST $GW/v1/gov/proposals/$PROP/vote \
-  -H 'Content-Type: application/json' \
-  -d '{"vote":"For"}'
-
-# 5. Close the proposal
-curl -s -X POST $GW/v1/gov/proposals/$PROP/close
-
-# 6. Retrieve the cryptographic proof
-curl -s $GW/v1/gov/proposals/$PROP/proof | jq .
+./demo/scripts/reset-demo.sh
 ```
 
-The proof contains: proposal hash, outcome, tally, signer DID, Ed25519 signature, and timestamp. Anyone can verify it independently.
+---
 
-## TUI Console
+## Authentication
+
+**Demo mode**: The one-click script generates a JWT token and displays it.
+
+**Manual mode**: Set `ICN_GATEWAY_JWT_SECRET` env var (min 32 bytes):
 
 ```bash
-./target/release/icn-console --gateway http://localhost:8000 --coop-id $COOP
+ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" ./target/release/icnd --gateway-enable
 ```
 
-5 tabs: Dashboard, Members, Ledger (journal entries), Governance, Trust. Press `r` to refresh, `Tab` to switch, `q` to quit.
+API endpoints require auth header (except `/v1/health`):
 
-## Known Limitations
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/coops
+```
 
-- **WASM execution** requires `--features wasm` at build time (wasmtime)
-- **mDNS discovery** is disabled in Docker; devnet uses explicit bootstrap peers
-- **JWT auth** is required for gateway; use `ICN_GATEWAY_JWT_SECRET` env var
-- **No persistence across `make clean`** -- identities regenerated from scratch
-- **Federation governance** requires 2+ nodes; single-node demo shows local governance only
-- **Trust scores** start at 0.0 for new peers; build up through attestations
+---
+
+## LAN Mode (Workstation Access)
+
+To access the demo from another machine on your network:
+
+### 1. Bind gateway to all interfaces
+
+```bash
+./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
+```
+
+### 2. Set CORS origins for your LAN IP
+
+```bash
+export ICN_CORS_ORIGINS="http://10.8.10.45:3000,http://10.8.10.45:8080"
+```
+
+### 3. Start UI server on all interfaces
+
+```bash
+cd web/pilot-ui
+python3 -m http.server 3000 --bind 0.0.0.0
+```
+
+### 4. Open firewall ports (if needed)
+
+```bash
+sudo ufw allow 8080/tcp
+sudo ufw allow 3000/tcp
+```
+
+### 5. Access from workstation
+
+- UI: `http://<server-lan-ip>:3000`
+- Gateway: `http://<server-lan-ip>:8080`
+- In UI login, use LAN IP for gateway URL
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | 20-minute presenter walkthrough with timing |
+| [QUICK_START.md](QUICK_START.md) | 5-minute clone-to-running |
+| [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) | Visual diagrams for all subsystems |
+| [FAQ.md](FAQ.md) | Talking points for all audiences |
+
+---
+
+## Troubleshooting
+
+### Gateway not responding
+
+```bash
+curl http://localhost:8080/v1/health
+# Should return {"status":"ok"}
+```
+
+If not, check if daemon is running or restart the demo.
+
+### Port already in use
+
+```bash
+lsof -i :8080
+lsof -i :3000
+```
+
+Stop conflicting processes or use `./demo/scripts/reset-demo.sh`.
+
+### Build fails
+
+```bash
+rustc --version  # Needs 1.88+
+rustup update
+```
+
+### Full reset
+
+```bash
+./demo/scripts/reset-demo.sh
+./demo/scripts/run-tool-library-demo.sh
+```
+
+---
+
+## System Requirements
+
+- **OS**: Linux or macOS
+- **RAM**: 2 GB minimum
+- **Rust**: 1.88.0+
+- **Python**: 3.x (for UI server)
+
+---
+
+## Further Reading
+
+- **Full Architecture**: `docs/ARCHITECTURE.md`
+- **Getting Started**: `docs/GETTING_STARTED.md`
+- **API Reference**: `docs/api/`
+- **Demo Infrastructure**: `demo/README.md`

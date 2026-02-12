@@ -2,6 +2,12 @@
 
 This directory contains everything needed to run ICN demos.
 
+## Canonical Demo Ports
+
+- **Local single-node**: Gateway http://localhost:8080, UI http://localhost:3000
+- **Devnet (3 nodes)**: node-a http://localhost:8000, node-b http://localhost:8001, node-c http://localhost:8002
+- **LAN mode**: Gateway http://\<lan-ip\>:8080, UI http://\<lan-ip\>:3000 (set `ICN_CORS_ORIGINS`)
+
 ## Quick Start
 
 ```bash
@@ -10,6 +16,18 @@ This directory contains everything needed to run ICN demos.
 ```
 
 Then open http://localhost:3000 and login with the displayed credentials.
+
+---
+
+## Demo Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [Start Here](../docs/demo/README.md) | Front door - what to run, which mode |
+| [DEMO_SCRIPT.md](../docs/demo/DEMO_SCRIPT.md) | 20-minute presenter walkthrough |
+| [QUICK_START.md](../docs/demo/QUICK_START.md) | 5-minute setup guide |
+| [ARCHITECTURE_OVERVIEW.md](../docs/demo/ARCHITECTURE_OVERVIEW.md) | Visual architecture diagrams |
+| [FAQ.md](../docs/demo/FAQ.md) | Common questions & talking points |
 
 ---
 
