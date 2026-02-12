@@ -239,7 +239,7 @@ For physical device testing, update `baseUrl` to use your server's IP address in
 2. **Web UI 403**: Nginx configuration may need adjustment
 3. **Grafana Not Started**: Depends on Prometheus
 
-None of these issues block core functionality - the ICN daemon and gateway API are fully operational.
+In the recorded snapshot environment, none of these issues blocked core functionality; the ICN daemon and gateway API remained operational.
 
 ## Support
 

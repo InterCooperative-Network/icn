@@ -59,7 +59,7 @@ ICN uses **gossip** for eventual consistency, not global consensus. This is much
 ### Is ICN production-ready?
 
 **Status snapshot (2025-11-21):**
-- ✅ **Substrate**: assessed as production-ready at that time (Phase 15 complete, 423 tests passing)
+- ✅ **Substrate**: assessed as production-capable at that time (Phase 15 complete, 423 tests passing)
 - ✅ **Security**: Three-layer architecture (transport, message, application)
 - ✅ **Economic Safety**: Dynamic credit limits, dispute resolution, new member throttling
 - ✅ **Operations**: Backup/restore, monitoring, graceful restart

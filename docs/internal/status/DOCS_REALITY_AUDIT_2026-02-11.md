@@ -2430,3 +2430,42 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C33; continue targeted stale-claim cleanup.
+
+## Changes applied (Batch C34 - final active-area stale-claim trim)
+
+Touched files:
+
+1. `docs/deployment/DEPLOYMENT_ACTIVE.md`
+2. `docs/guides/FAQ.md`
+
+Changes:
+
+- Reworded one remaining active deployment claim from absolute present-tense to snapshot-context wording.
+- Softened FAQ substrate phrasing from "production-ready" to "production-capable" while retaining explicit snapshot context.
+
+## Verification updates (Batch C34)
+
+```bash
+rg -n "\\bproduction-ready\\b|\\bfully operational\\b|\\bready for deployment\\b" docs/testing docs/pilots docs/deployment docs/status docs/security docs/mobile docs/operations docs/sdis docs/guides --glob '*.md'
+```
+
+Result: only the FAQ section title phrase remains (`Is ICN production-ready?`), with body content now snapshot-qualified.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C34)
+
+- `docs/deployment/DEPLOYMENT_ACTIVE.md + docs/guides/FAQ.md | snapshot language policy + current-status docs | rg stale-claim scan + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C34)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C34; continue active-doc sweep as needed.
