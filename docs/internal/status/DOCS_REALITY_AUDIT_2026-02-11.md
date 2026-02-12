@@ -2218,3 +2218,48 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C28; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C29 - remaining active wording normalization)
+
+Touched files:
+
+1. `docs/demo/DEMO_FINAL_STATUS.md`
+2. `docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md`
+3. `docs/demo/DEMO_PROGRESS_UPDATE.md`
+4. `docs/demo/DEMO_SESSION_COMPLETE.md`
+5. `docs/mobile/MOBILE_APP_STATUS.md`
+6. `docs/operations/deployment/incident-response.md`
+7. `docs/status/FINAL_SESSION_STATUS.md`
+
+Changes:
+
+- Replaced remaining "production-ready/current status" phrases in active-facing docs with snapshot-aware wording.
+- Updated section labels from "Current Status" to "Snapshot Status" where content is historical.
+- Kept operational meaning while avoiding present-tense readiness assertions.
+
+## Verification updates (Batch C29)
+
+```bash
+rg -n "Historical demo completion snapshot|validated for the snapshot demo flow|operational for the snapshot demo flow|production-capable for pilot scope|Snapshot Status|Status at this update" docs/demo/DEMO_FINAL_STATUS.md docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md docs/demo/DEMO_PROGRESS_UPDATE.md docs/demo/DEMO_SESSION_COMPLETE.md docs/mobile/MOBILE_APP_STATUS.md docs/operations/deployment/incident-response.md docs/status/FINAL_SESSION_STATUS.md
+```
+
+Result: snapshot-normalized wording present across all touched docs.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C29)
+
+- `docs/demo/DEMO_FINAL_STATUS.md + docs/demo/DEMO_INFRASTRUCTURE_COMPLETE.md + docs/demo/DEMO_PROGRESS_UPDATE.md + docs/demo/DEMO_SESSION_COMPLETE.md + docs/mobile/MOBILE_APP_STATUS.md + docs/operations/deployment/incident-response.md + docs/status/FINAL_SESSION_STATUS.md | docs/ci/CI_CURRENT_STATUS.md + snapshot date headers in touched docs | rg -n "Status|snapshot|production-ready|current status" + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C29)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C29; proceed with branch sync against main.

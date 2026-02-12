@@ -1258,7 +1258,7 @@ Detected: [Time UTC]
 Severity: [P0-P3]
 Initial Symptoms: [What was observed]
 
-Current Status:
+Status at this update:
 - [What we know so far]
 
 Immediate Actions:

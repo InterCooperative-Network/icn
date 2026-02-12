@@ -322,7 +322,7 @@ const { data } = useTrustNetwork(client, myDid, 2);
 
 ## 🎊 Conclusion
 
-**The ICN mobile app is now production-ready!**
+**Snapshot conclusion (2024-12-12): the mobile app was assessed as production-capable for pilot scope.**
 
 All three major features are implemented end-to-end:
 1. **Offline Mode** - Works beautifully, auto-retries

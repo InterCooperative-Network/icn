@@ -266,7 +266,7 @@ Beyond the roadmap, we also:
 
 ---
 
-## 🚦 Current Status
+## 🚦 Snapshot Status
 
 🟢 **GREEN - FULL STEAM AHEAD**
 
