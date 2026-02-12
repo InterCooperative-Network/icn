@@ -132,3 +132,12 @@ When an agent's work is merged:
 - [ ] `git push origin --delete feat/<agent-name>` — delete the remote branch (if not auto-deleted by PR merge)
 - [ ] `git worktree prune` — clean up stale refs
 - [ ] Remove any per-worktree `target/` directory if disk space is needed
+
+## Line Endings
+
+This repo enforces LF everywhere via `.gitattributes` (`* text=auto eol=lf`). If you see phantom diffs (files showing as modified with no real content changes), the cause is usually CRLF contamination.
+
+**Prevention:**
+- **Windows:** set `git config core.autocrlf false` and let `.gitattributes` handle normalization
+- **Editors:** configure to save files with LF line endings
+- **If phantom diffs appear:** run `git add --renormalize .` and commit the result
