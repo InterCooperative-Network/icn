@@ -281,12 +281,12 @@ tail -f /tmp/pilot-ui-demo.log
 # Get fresh token
 cd icn
 ./target/release/icnctl \
-  -d /home/matt/icn-demo-test/data \
+  -d "$(pwd)/.demo-data/tool-library" \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
-  --scopes "coop:write,coop:read,ledger:read,ledger:write"
-# Enter passphrase: demo123
+  --scopes "coop:write,coop:read,ledger:read,ledger:write" \
+  --passphrase demo123
 ```
 
 ### "Can't create transaction"
@@ -303,11 +303,20 @@ Ensure you have multiple members in the cooperative. The founder can log hours, 
 ## Environment
 
 ### Default Locations
-- **ICN Directory:** `/home/matt/projects/icn`
-- **Data Directory:** `/home/matt/icn-demo-test/data`
+- **Repo root:** `<this-repo>`
+- **Data Directory:** `<repo>/.demo-data/tool-library`
 - **RPC Endpoint:** `127.0.0.1:15602`
 - **Gateway:** `http://localhost:8080`
 - **UI:** `http://localhost:3000`
+
+You can override defaults with:
+- `ICN_DEMO_DATA_DIR`
+- `ICN_DEMO_GATEWAY_HOST`
+- `ICN_DEMO_GATEWAY_PORT`
+- `ICN_DEMO_UI_PORT`
+- `ICN_DEMO_COOP_ID`
+- `ICN_DEMO_RPC_ENDPOINT`
+- `ICN_DEMO_MDNS_ENABLED` (default `false` for constrained environments)
 
 ### Default Credentials
 - **Cooperative:** `rochester-tool-library`
@@ -347,12 +356,6 @@ Ensure you have multiple members in the cooperative. The founder can log hours, 
 ### In This Directory
 - `docs/API_INTEGRATION.md` - Complete API reference
 - `docs/UI_FIXES_APPLIED.md` - Recent bug fixes
-
-### In Repository Root
-- `DEMO_CURRENT_STATUS.md` - Overall status
-- `DEMO_QUICK_START.md` - Quick reference
-- `DEMO_PROGRESS_UPDATE.md` - Recent progress
-- `DEMO_SESSION_COMPLETE.md` - Session summaries
 
 ### In Main Docs
 - `/docs/ARCHITECTURE.md` - System architecture

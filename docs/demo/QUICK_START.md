@@ -56,7 +56,7 @@ cargo build --release
 ### Step 3: Start Daemon
 
 ```bash
-ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" \
+ICN_GATEWAY_JWT_SECRET="0123456789abcdef0123456789abcdef" \
   ./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
 ```
 

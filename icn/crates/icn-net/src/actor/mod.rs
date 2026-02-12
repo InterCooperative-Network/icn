@@ -915,12 +915,14 @@ impl NetworkActor {
 
         info!("Network actor starting for DID: {}", did);
 
-        // Start discovery
+        // Start discovery (best-effort in constrained environments)
         let mut discovery = Discovery::new();
-        discovery
-            .start(did.clone(), listen_addr)
-            .await
-            .context("Failed to start discovery")?;
+        if let Err(e) = discovery.start(did.clone(), listen_addr).await {
+            warn!(
+                error = %e,
+                "Discovery startup failed; continuing without mDNS peer discovery"
+            );
+        }
 
         // Start session manager (no TLS trust gating anymore - handled by PolicyOracle in protocol)
         let mut session_manager = SessionManager::new();

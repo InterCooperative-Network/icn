@@ -1,17 +1,28 @@
 #!/bin/bash
 # ICN Tool Library Demo - Automated Run Script
-# This script starts everything needed for the demo and keeps it running
+# This script starts everything needed for the demo and keeps it running.
 
-set -e
+set -euo pipefail
 
-# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+ICN_DIR="${REPO_ROOT}/icn"
+UI_DIR="${REPO_ROOT}/web/pilot-ui"
+
+# Configuration (override with env vars as needed)
 DEMO_NAME="Rochester Tool Library Demo"
-GATEWAY="http://localhost:8080"
-UI_PORT=3000
-COOP_ID="rochester-tool-library"
-DATA_DIR="/home/matt/icn-demo-test/data"
-RPC_ENDPOINT="127.0.0.1:15602"
-ICN_DIR="/home/matt/projects/icn"
+GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-127.0.0.1}"
+GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
+GATEWAY="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
+UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
+COOP_ID="${ICN_DEMO_COOP_ID:-rochester-tool-library}"
+DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
+RPC_ENDPOINT="${ICN_DEMO_RPC_ENDPOINT:-127.0.0.1:15602}"
+JWT_SECRET="${ICN_GATEWAY_JWT_SECRET:-0123456789abcdef0123456789abcdef}"
+DEFAULT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
+MDNS_ENABLED="${ICN_DEMO_MDNS_ENABLED:-false}"
+RUNTIME_CONFIG="/tmp/icn-demo-runtime.toml"
+RPC_PORT="${RPC_ENDPOINT##*:}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -24,25 +35,32 @@ NC='\033[0m'
 DAEMON_PID=""
 UI_PID=""
 
+require_command() {
+    local command="$1"
+    if ! command -v "$command" >/dev/null 2>&1; then
+        echo -e "${RED}✗${NC} Required command not found: $command"
+        exit 1
+    fi
+}
+
 # Cleanup function
 cleanup() {
     echo
     echo "========================================="
     echo "Cleaning up..."
     echo "========================================="
-    
-    if [ -n "$UI_PID" ]; then
+
+    if [ -n "$UI_PID" ] && [[ "$UI_PID" =~ ^[0-9]+$ ]]; then
         echo "Stopping UI (PID: $UI_PID)..."
-        kill $UI_PID 2>/dev/null || true
+        kill "$UI_PID" 2>/dev/null || true
     fi
-    
-    if [ -n "$DAEMON_PID" ]; then
+
+    if [ -n "$DAEMON_PID" ] && [[ "$DAEMON_PID" =~ ^[0-9]+$ ]]; then
         echo "Stopping daemon (PID: $DAEMON_PID)..."
-        kill $DAEMON_PID 2>/dev/null || true
+        kill "$DAEMON_PID" 2>/dev/null || true
     fi
-    
+
     echo "Demo stopped."
-    exit 0
 }
 
 # Set up trap for cleanup
@@ -61,8 +79,97 @@ echo "  3. Start the pilot UI"
 echo "  4. Display access information"
 echo "  5. Keep everything running until Ctrl+C"
 echo
+echo "Configuration:"
+echo "  Repo root: $REPO_ROOT"
+echo "  Data dir:  $DATA_DIR"
+echo "  Gateway:   $GATEWAY"
+echo "  UI:        http://localhost:$UI_PORT"
+echo "  mDNS:      $MDNS_ENABLED"
+echo
 echo "Press Enter to continue or Ctrl+C to cancel..."
-read
+read -r
+
+require_command curl
+require_command python3
+
+mkdir -p "$DATA_DIR"
+
+if [ "${#JWT_SECRET}" -lt 32 ]; then
+    echo -e "${RED}✗${NC} ICN_GATEWAY_JWT_SECRET must be at least 32 bytes"
+    exit 1
+fi
+
+if [ ! -x "$ICN_DIR/target/release/icnd" ] || [ ! -x "$ICN_DIR/target/release/icnctl" ]; then
+    echo "Release binaries missing; building icnd and icnctl..."
+    (
+        cd "$ICN_DIR"
+        cargo build --release -p icnd -p icnctl
+    )
+fi
+
+if [ ! -f "$DATA_DIR/identity.age" ]; then
+    echo "No demo identity found; initializing one in $DATA_DIR..."
+    (
+        cd "$ICN_DIR"
+        ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id init >/tmp/icn-demo-id-init.log 2>&1
+    )
+fi
+
+cat > "$RUNTIME_CONFIG" <<EOF
+data_dir = "$DATA_DIR"
+
+[network]
+listen_addr = "127.0.0.1:7777"
+rpc_port = $RPC_PORT
+mdns_enabled = $MDNS_ENABLED
+bootstrap_peers = []
+min_trust_threshold = 0.0
+
+[observability]
+metrics_port = 9100
+health_port = 8081
+log_level = "info"
+
+[rate_limiting]
+enabled = true
+refill_interval_ms = 100
+
+[rate_limiting.isolated]
+max_messages_per_second = 10
+burst_capacity = 2
+
+[rate_limiting.known]
+max_messages_per_second = 50
+burst_capacity = 10
+
+[rate_limiting.partner]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[rate_limiting.federated]
+max_messages_per_second = 200
+burst_capacity = 50
+
+[rate_limiting.fallback]
+max_messages_per_second = 100
+burst_capacity = 20
+
+[topology]
+region = "demo-local"
+cluster_id = "demo-node"
+role = "edge"
+
+[topology.neighbor_limits]
+max_local_cluster = 10
+max_regional = 10
+max_backbone = 5
+max_trusted = 20
+
+[topology.fanout]
+local_cluster = 8
+regional = 6
+global = 4
+EOF
 
 # Step 1: Check if daemon is already running
 echo
@@ -71,39 +178,38 @@ echo "Step 1: Checking daemon status"
 echo "========================================="
 echo
 
-if curl -s "$GATEWAY/v1/health" > /dev/null 2>&1; then
+if curl -fsS "$GATEWAY/v1/health" >/dev/null 2>&1; then
     echo -e "${YELLOW}⚠${NC} Daemon appears to be already running"
     echo "Using existing daemon at $GATEWAY"
-    DAEMON_PID="existing"
 else
     echo "Starting ICN daemon..."
-    cd "$ICN_DIR/icn"
-    
-    # Start daemon in background
-    ./target/release/icnd \
-        -d "$DATA_DIR" \
-        -e "$RPC_ENDPOINT" \
-        --gateway-enable \
-        --gateway-bind "127.0.0.1:8080" \
-        --gateway-jwt-secret "demo-secret-key-change-in-production" \
-        > /tmp/icnd-demo.log 2>&1 &
-    
+    (
+        cd "$ICN_DIR"
+        ICN_PASSPHRASE=demo123 ./target/release/icnd \
+            --config "$RUNTIME_CONFIG" \
+            --gateway-enable \
+            --gateway-bind "$GATEWAY_HOST:$GATEWAY_PORT" \
+            --gateway-jwt-secret "$JWT_SECRET" \
+            > /tmp/icnd-demo.log 2>&1
+    ) &
+
     DAEMON_PID=$!
-    
+
     echo "Daemon starting (PID: $DAEMON_PID)..."
     echo "Waiting for services to be ready..."
-    
-    # Wait for gateway to respond (max 30 seconds)
-    for i in {1..30}; do
-        if curl -s "$GATEWAY/v1/health" > /dev/null 2>&1; then
+
+    # Wait for gateway to respond (max 45 seconds)
+    for _ in {1..45}; do
+        if curl -fsS "$GATEWAY/v1/health" >/dev/null 2>&1; then
             echo -e "${GREEN}✓${NC} Gateway ready!"
             break
         fi
         echo -n "."
         sleep 1
     done
-    
-    if ! curl -s "$GATEWAY/v1/health" > /dev/null 2>&1; then
+
+    if ! curl -fsS "$GATEWAY/v1/health" >/dev/null 2>&1; then
+        echo
         echo -e "${RED}✗${NC} Gateway failed to start"
         echo "Check logs: tail -f /tmp/icnd-demo.log"
         exit 1
@@ -117,22 +223,24 @@ echo "Step 2: Getting authentication token"
 echo "========================================="
 echo
 
-cd "$ICN_DIR/icn"
-
-echo "Generating JWT token..."
-TOKEN=$(./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ./target/release/icnctl \
     -d "$DATA_DIR" \
     -e "$RPC_ENDPOINT" \
     auth token \
     --coop-id "$COOP_ID" \
     --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-    --passphrase demo123 2>&1 | grep -v "Enter passphrase" | tr -d '\n' || true)
+    --passphrase demo123 2>/dev/null | tr -d '\n' || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${YELLOW}⚠${NC} Could not auto-generate token"
-    echo "You'll need to get it manually when you login"
+    echo "You may need to initialize identity and/or create the cooperative first"
 else
     echo -e "${GREEN}✓${NC} Token generated"
+fi
+
+CURRENT_DID=$(cd "$ICN_DIR" && ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+if [ -z "$CURRENT_DID" ]; then
+    CURRENT_DID="$DEFAULT_DID"
 fi
 
 # Step 3: Get cooperative info
@@ -142,19 +250,21 @@ echo "Step 3: Verifying cooperative"
 echo "========================================="
 echo
 
+COOP_NAME="Rochester Tool Library"
 if [ -n "$TOKEN" ]; then
     COOP_INFO=$(curl -s "$GATEWAY/v1/coops/$COOP_ID" \
         -H "Authorization: Bearer $TOKEN" 2>/dev/null || echo "{}")
-    
+
     if echo "$COOP_INFO" | grep -q "\"id\":\"$COOP_ID\""; then
         echo -e "${GREEN}✓${NC} Cooperative '$COOP_ID' verified"
         COOP_NAME=$(echo "$COOP_INFO" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
         echo "Name: $COOP_NAME"
     else
-        echo -e "${YELLOW}⚠${NC} Could not verify cooperative"
+        echo -e "${YELLOW}⚠${NC} Cooperative '$COOP_ID' not found yet"
+        echo "Create it first, then rerun the script for fully automated login"
     fi
 else
-    echo -e "${YELLOW}⚠${NC} Skipping verification (no token)"
+    echo -e "${YELLOW}⚠${NC} Skipping cooperative verification (no token)"
 fi
 
 # Step 4: Start UI
@@ -164,21 +274,21 @@ echo "Step 4: Starting Pilot UI"
 echo "========================================="
 echo
 
-cd "$ICN_DIR/web/pilot-ui"
+cd "$UI_DIR"
 
 # Check if UI is already running
-if lsof -Pi :$UI_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+if lsof -Pi :"$UI_PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo -e "${YELLOW}⚠${NC} Port $UI_PORT already in use"
-    UI_PID=$(lsof -Pi :$UI_PORT -sTCP:LISTEN -t)
-    echo "Using existing UI server"
+    UI_PID=$(lsof -Pi :"$UI_PORT" -sTCP:LISTEN -t | head -1)
+    echo "Using existing UI server (PID: $UI_PID)"
 else
     echo "Starting UI server on port $UI_PORT..."
-    python3 -m http.server $UI_PORT > /tmp/pilot-ui-demo.log 2>&1 &
+    python3 -m http.server "$UI_PORT" > /tmp/pilot-ui-demo.log 2>&1 &
     UI_PID=$!
-    
+
     sleep 2
-    
-    if ps -p $UI_PID > /dev/null 2>&1; then
+
+    if ps -p "$UI_PID" >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} UI server started (PID: $UI_PID)"
     else
         echo -e "${RED}✗${NC} UI server failed to start"
@@ -189,32 +299,34 @@ fi
 # Step 5: Display information
 echo
 echo "========================================="
-echo "🎉 DEMO IS READY!"
+echo "DEMO IS READY"
 echo "========================================="
 echo
 echo -e "${BLUE}Access Information:${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
-echo "  📱 Pilot UI:"
+echo "  Pilot UI:"
 echo "     http://localhost:$UI_PORT"
 echo
-echo "  🔌 Gateway API:"
+echo "  Gateway API:"
 echo "     $GATEWAY"
 echo
-echo "  🏛️  Cooperative:"
+echo "  Cooperative:"
 echo "     ID: $COOP_ID"
-echo "     Name: ${COOP_NAME:-Rochester Tool Library}"
+echo "     Name: ${COOP_NAME}"
 echo
-echo "  👤 Login Credentials:"
+echo "  Login Credentials:"
 echo "     Gateway URL: $GATEWAY"
 echo "     Coop ID: $COOP_ID"
-echo "     DID: did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
+echo "     DID: $CURRENT_DID"
 
 if [ -n "$TOKEN" ]; then
     echo "     Token: ${TOKEN:0:40}..."
     echo
-    echo "  🔑 Full Token (copy this):"
+    echo "  Full Token (copy this):"
     echo "     $TOKEN"
+else
+    echo "     Token: Not generated automatically"
 fi
 
 echo
@@ -226,15 +338,6 @@ echo "  2. Click 'Sign In'"
 echo "  3. Fill in the form with the credentials above"
 echo "  4. Copy/paste the token"
 echo "  5. Click 'Sign In' to access the dashboard"
-echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
-echo -e "${BLUE}Demo Scenario:${NC}"
-echo "  • View your balance (currently 0.0 hours)"
-echo "  • Check transaction history"
-echo "  • Log hours for other members"
-echo "  • View member directory"
-echo "  • Test governance features"
 echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo

@@ -41,7 +41,7 @@ echo
 
 # Build checks
 echo "Build Checks:"
-check "Backend builds" "cd icn && cargo build --release --quiet"
+check "Backend builds" "cd icn && RUSTC_WRAPPER= cargo build --release --quiet -p icnd -p icnctl"
 check "icnd binary exists" "[ -x icn/target/release/icnd ]"
 check "icnctl binary exists" "[ -x icn/target/release/icnctl ]"
 
