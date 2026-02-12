@@ -13,6 +13,17 @@ Then open http://localhost:3000 and login with the displayed credentials.
 
 ---
 
+## Demo Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [DEMO_SCRIPT.md](../docs/demo/DEMO_SCRIPT.md) | 20-minute presenter walkthrough |
+| [QUICK_START.md](../docs/demo/QUICK_START.md) | 5-minute setup guide |
+| [ARCHITECTURE_OVERVIEW.md](../docs/demo/ARCHITECTURE_OVERVIEW.md) | Visual architecture diagrams |
+| [FAQ.md](../docs/demo/FAQ.md) | Common questions & talking points |
+
+---
+
 ## Directory Structure
 
 ```
