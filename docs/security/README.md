@@ -24,7 +24,7 @@ This directory contains all security-related documentation for ICN, including:
 
 ## 📊 Production Security
 
-### Current Status
+### Status Snapshot
 
 | Document | Status | Description |
 |----------|--------|-------------|

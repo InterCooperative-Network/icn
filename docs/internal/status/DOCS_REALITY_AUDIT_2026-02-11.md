@@ -2263,3 +2263,44 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C29; proceed with branch sync against main.
+
+## Changes applied (Batch C30 - post-merge active wording cleanup)
+
+Touched files:
+
+1. `docs/deployment/DEPLOYMENT_READY.md`
+2. `docs/security/README.md`
+3. `docs/security/SECURITY_FOLLOWUP.md`
+4. `docs/mobile/MOBILE_TODO.md`
+
+Changes:
+
+- Normalized residual "current status/deployment ready" phrasing to explicit snapshot framing.
+- Preserved historical context and technical content; removed implied present-tense readiness assertions.
+
+## Verification updates (Batch C30)
+
+```bash
+rg -n "Current Status|READY FOR DEPLOYMENT|Status Snapshot \\(2025-12-18\\)|Status Snapshot|Deployment-ready assessment" docs/deployment/DEPLOYMENT_READY.md docs/security/README.md docs/security/SECURITY_FOLLOWUP.md docs/mobile/MOBILE_TODO.md
+```
+
+Result: status framing normalized in touched docs.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C30)
+
+- `docs/deployment/DEPLOYMENT_READY.md + docs/security/README.md + docs/security/SECURITY_FOLLOWUP.md + docs/mobile/MOBILE_TODO.md | docs/ci/CI_CURRENT_STATUS.md + local snapshot date headers | rg -n "Status|snapshot|ready" + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C30)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C30; continue active-doc content drift cleanup.
