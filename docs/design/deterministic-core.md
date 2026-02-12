@@ -63,13 +63,11 @@ pub fn create_deterministic_engine() -> anyhow::Result<(Engine, DeterminismManif
     
     // 4. Memory Configuration
     // Static limits prevent OOM-dependent behavior
-    // NOTE: Verify these APIs exist in Wasmtime 24.0.5 before using
-    // If unavailable, fail closed (reject LC execution) until redesign
+    // VERIFIED: All these APIs exist in Wasmtime 24.0.5 (config.rs:1356, 1427, 1498)
     let max_memory_bytes = 128 * 1024 * 1024; // 128 MiB
     config.static_memory_maximum_size(max_memory_bytes);
-    // These may not exist in 24.0.5 - verify before implementation:
-    // config.static_memory_guard_size(2 * 1024 * 1024);
-    // config.dynamic_memory_reserved_for_growth(max_memory_bytes);
+    config.static_memory_guard_size(2 * 1024 * 1024);
+    config.dynamic_memory_reserved_for_growth(max_memory_bytes);
     
     Ok((Engine::new(&config)?, manifest))
 }

@@ -264,8 +264,9 @@ let engine = Engine::default();
 - ✅ Wasmtime version pinned to 24.0.5 (Cargo.toml line 52)
 
 **Host Functions Exposed** (lines 228-261):
-- `icn::log(ptr, len)` - Log message
-- `icn::timestamp() -> i64` - **Non-deterministic** (uses SystemTime::now)
+- `icn::log(ptr, len)` - Log message (safe, no side effects)
+- `icn::timestamp() -> i64` - **CURRENT BUG**: Uses `SystemTime::now()` (non-deterministic)
+  - **Fix in Phase 1/2**: Replace with `task.created_at` for LC execution
 
 ### Trust Graph (icn-trust/src/)
 
@@ -357,11 +358,11 @@ pub fn create_deterministic_engine() -> anyhow::Result<(Engine, DeterminismManif
     config.parallel_compilation(false);
     
     // Memory configuration (Pi-friendly)
+    // 4. Memory Configuration (VERIFIED: All exist in Wasmtime 24.0.5)
     let max_memory_bytes = 128 * 1024 * 1024; // 128 MiB for LC v1
     config.static_memory_maximum_size(max_memory_bytes);
-    // NOTE: Verify these APIs exist in Wasmtime 24.0.5 before using
-    // config.static_memory_guard_size(2 * 1024 * 1024);
-    // config.dynamic_memory_reserved_for_growth(max_memory_bytes);
+    config.static_memory_guard_size(2 * 1024 * 1024);
+    config.dynamic_memory_reserved_for_growth(max_memory_bytes);
     
     let manifest = DeterminismManifest {
         wasmtime_version: WASMTIME_VERSION_PIN,
@@ -500,10 +501,12 @@ impl WasmSubsetValidator {
 
 | Category | Allowed | Forbidden |
 |----------|---------|-----------|
-| Imports | `icn_log`, `icn_timestamp` (mocked) | `clock`, `random`, `fs`, `net` |
+| Imports | `icn::log`, `icn::timestamp` (deterministic) | `clock`, `random`, `fs`, `net`, WASI |
 | Opcodes | Integer ops, memory, control flow | All f32/f64 ops, SIMD |
 | Control | Depth ≤ 100 | Unbounded recursion |
 | Memory | `memory.grow` under limit | `memory.copy` > 1MB |
+
+**Import naming convention**: WASM `(import "icn" "log" ...)`, Rust linker `icn::log`.
 
 ### Phase 4: Trust Graph Hard Caps
 
