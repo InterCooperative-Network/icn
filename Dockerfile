@@ -14,10 +14,15 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy workspace files (build context is already ./icn from docker-compose.yml)
-COPY Cargo.toml Cargo.lock ./
-COPY crates ./crates
-COPY bins ./bins
+# Copy workspace files from repo root build context.
+# Some crates in icn/ depend on top-level apps/* via relative paths.
+COPY icn/Cargo.toml icn/Cargo.lock ./icn/
+COPY icn/crates ./icn/crates
+COPY icn/bins ./icn/bins
+COPY icn/apps ./icn/apps
+COPY apps ./apps
+
+WORKDIR /app/icn
 
 # Build release binaries
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
@@ -41,8 +46,8 @@ RUN useradd -m -u 1000 -s /bin/bash icn
 RUN mkdir -p /data && chown icn:icn /data
 
 # Copy binaries from builder
-COPY --from=builder /app/target/release/icnd /usr/local/bin/
-COPY --from=builder /app/target/release/icnctl /usr/local/bin/
+COPY --from=builder /app/icn/target/release/icnd /usr/local/bin/
+COPY --from=builder /app/icn/target/release/icnctl /usr/local/bin/
 
 # Set permissions
 RUN chmod +x /usr/local/bin/icnd /usr/local/bin/icnctl

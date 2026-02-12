@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - 'icn/**'
+      - 'apps/**'
       - 'Dockerfile'
       - '.github/workflows/docker-build-deploy.yml'
   workflow_dispatch:
@@ -92,7 +93,7 @@ jobs:
       - name: Build Docker image
         run: |
           echo "Building image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
-          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f Dockerfile ./icn
+          docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f Dockerfile .
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.IMAGE_NAME }}:latest
           echo "✓ Image built successfully"
 
