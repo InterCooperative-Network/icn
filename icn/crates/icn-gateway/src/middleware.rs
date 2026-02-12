@@ -29,7 +29,7 @@ pub async fn jwt_auth(
     };
 
     let token = credentials.token();
-    
+
     // Debug: log token signature for troubleshooting
     let token_parts: Vec<&str> = token.split('.').collect();
     if token_parts.len() == 3 {

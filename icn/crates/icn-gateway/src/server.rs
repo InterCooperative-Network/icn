@@ -149,13 +149,12 @@ impl GatewayServer {
         data_dir: std::path::PathBuf,
     ) -> Self {
         // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
-        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
-            || std::env::var("ICN_CORS_ORIGINS").is_ok()
-        {
-            SecurityConfig::development()
-        } else {
-            SecurityConfig::production()
-        };
+        let security_config =
+            if std::env::var("ICN_DEV_MODE").is_ok() || std::env::var("ICN_CORS_ORIGINS").is_ok() {
+                SecurityConfig::development()
+            } else {
+                SecurityConfig::production()
+            };
 
         GatewayServer {
             bind_addr,
@@ -191,13 +190,12 @@ impl GatewayServer {
         event_broadcaster: Arc<EventBroadcaster>,
     ) -> Self {
         // Use development security config if ICN_DEV_MODE or ICN_CORS_ORIGINS is set
-        let security_config = if std::env::var("ICN_DEV_MODE").is_ok()
-            || std::env::var("ICN_CORS_ORIGINS").is_ok()
-        {
-            SecurityConfig::development()
-        } else {
-            SecurityConfig::production()
-        };
+        let security_config =
+            if std::env::var("ICN_DEV_MODE").is_ok() || std::env::var("ICN_CORS_ORIGINS").is_ok() {
+                SecurityConfig::development()
+            } else {
+                SecurityConfig::production()
+            };
 
         GatewayServer {
             bind_addr,
