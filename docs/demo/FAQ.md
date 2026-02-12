@@ -1,7 +1,7 @@
 # ICN FAQ & Talking Points
 
 **For**: Demo Q&A, investor meetings, cooperative conversations
-**Last Updated**: 2026-02-12
+**Last Updated**: 2026-02-11
 
 ---
 

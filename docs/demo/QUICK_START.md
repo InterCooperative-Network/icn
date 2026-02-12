@@ -2,6 +2,14 @@
 
 **Time to running**: 5 minutes
 **Prerequisites**: Git, Rust toolchain (1.88+), Python 3
+**Last Updated**: 2026-02-11
+
+---
+
+## Canonical Demo Ports
+
+- **Gateway**: http://localhost:8080
+- **UI**: http://localhost:3000
 
 ---
 

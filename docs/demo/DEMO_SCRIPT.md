@@ -2,7 +2,7 @@
 
 **Duration**: 20 minutes
 **Audience**: All (cooperative members, developers, funders, other coops)
-**Last Updated**: 2026-02-12
+**Last Updated**: 2026-02-11
 
 ---
 
