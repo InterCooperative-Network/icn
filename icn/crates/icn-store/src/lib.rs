@@ -604,18 +604,13 @@ impl SledStore {
     ///
     /// The database path is created under `ICN_TEST_TMPDIR`, `TMPDIR`, or `/tmp`.
     pub fn temporary() -> Result<Self> {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let base = std::env::var_os("ICN_TEST_TMPDIR")
             .or_else(|| std::env::var_os("TMPDIR"))
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let unique = format!(
-            "icn-sled-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        );
+        let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let unique = format!("icn-sled-{}-{}", std::process::id(), seq);
         let path = base.join(unique);
         std::fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create temporary sled directory: {:?}", path))?;

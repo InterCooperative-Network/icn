@@ -304,7 +304,13 @@ else
     ok "Service withdrawn"
 
     step "Verify withdrawal (expect 404 or 401)"
-    HTTP_CODE=$(http_status_code GET "$GATEWAY/v1/services/$SVC_ID")
+    sleep 0.5  # allow gateway to process deletion
+    HTTP_CODE="000"
+    for _retry in 1 2 3; do
+      HTTP_CODE=$(http_status_code GET "$GATEWAY/v1/services/$SVC_ID")
+      [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "401" ] && break
+      sleep 0.3
+    done
     if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "401" ]; then
       ok "Service gone ($HTTP_CODE)"
     else
