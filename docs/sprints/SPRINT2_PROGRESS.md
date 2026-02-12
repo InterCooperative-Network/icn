@@ -203,6 +203,6 @@ Dashboard connects directly to node's Gateway API. For production:
 
 ## Conclusion
 
-Dashboard and API documentation both complete and production-ready. Sprint 2 is 67% complete and ahead of schedule. Moving forward with mobile app assembly to finish the sprint.
+Dashboard and API documentation were complete and assessed as production-capable in this sprint snapshot. Sprint 2 was 67% complete and ahead of schedule. Moving forward with mobile app assembly to finish the sprint.
 
 **Next Session**: Assemble mobile app from existing UI components.

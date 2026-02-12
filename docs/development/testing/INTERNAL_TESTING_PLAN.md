@@ -56,7 +56,7 @@ Validate the ICN system in realistic multi-node scenarios before pilot deploymen
 
 **Option 1: Docker Compose (Recommended for Development)**
 
-Use the production-ready configuration in `docker-compose.test.yml`:
+Use the production-like configuration in `docker-compose.test.yml`:
 
 ```bash
 # Build and start

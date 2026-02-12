@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document tracks the implementation of three major feature sets to transform ICN from proof-of-concept to production-ready federation system:
+This document tracks the implementation of three major feature sets to evolve ICN from proof-of-concept toward a production-capable federation system:
 
 1. **Topology + NeighborSets** - Regional/cluster-based networking
 2. **TrustPolicy + Resource Limits** - Centralized security enforcement
@@ -820,7 +820,7 @@ API:
 
 ---
 
-## Current Status
+## Status Snapshot
 
 ✅ Phase 1A: Topology config foundation (commit `fb8f5d4`)
 🔄 Phase 1B: NeighborSets data structure (NEXT - see implementation above)

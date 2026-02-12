@@ -106,7 +106,7 @@ Features:
 
 #### Helm Charts
 - **Location**: `deploy/helm/icn/`
-- **Status**: Complete production-ready chart
+- **Status**: Complete chart assessed as production-capable in this snapshot
 - **Version**: 1.0.0
 - **Components**:
   - ICN node deployment
@@ -337,7 +337,7 @@ docker-compose -f deploy/docker-compose.yml up -d
 
 ### Status: PILOT-READY ✅
 
-The ICN system is production-ready for pilot deployment:
+In this status snapshot, the ICN system was assessed as pilot-deployment capable:
 
 **Strengths**:
 - Solid core infrastructure (1,144+ tests)

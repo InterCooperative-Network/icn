@@ -2517,3 +2517,50 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C35; continue targeted stale-claim cleanup.
+
+## Changes applied (Batch C36 - sprint/testing readiness wording normalization)
+
+Touched files:
+
+1. `docs/development/testing/DR_TEST_RESULTS.md`
+2. `docs/development/testing/INTERNAL_TESTING_PLAN.md`
+3. `docs/development/testing/BETA_TESTING_GUIDE.md`
+4. `docs/development/federation-roadmap-implementation.md`
+5. `docs/onboarding/reference/module-09-ops-deploy.md`
+6. `docs/sprints/SPRINT2_PROGRESS.md`
+7. `docs/sprints/SPRINT2_COMPLETE.md`
+8. `docs/sprints/SPRINT3_COMPLETE.md`
+9. `docs/sprints/SPRINT3_STATUS.md`
+
+Changes:
+
+- Replaced absolute present-tense "production-ready / ready to deploy" phrasing with snapshot-qualified or production-capable wording.
+- Kept historical meaning and quantitative evidence while removing implied current-state guarantees.
+- Renamed one lingering "Current Status" section header to "Status Snapshot" in federation roadmap documentation.
+
+## Verification updates (Batch C36)
+
+```bash
+rg -n "production-ready|fully operational|READY TO DEPLOY|ready for deployment|Current Status|current status" docs/development/testing/DR_TEST_RESULTS.md docs/development/testing/INTERNAL_TESTING_PLAN.md docs/development/testing/BETA_TESTING_GUIDE.md docs/development/federation-roadmap-implementation.md docs/onboarding/reference/module-09-ops-deploy.md docs/sprints/SPRINT2_PROGRESS.md docs/sprints/SPRINT2_COMPLETE.md docs/sprints/SPRINT3_COMPLETE.md docs/sprints/SPRINT3_STATUS.md
+```
+
+Result: stale-claim matches cleared from these targeted files.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C36)
+
+- `docs/development/testing/{DR_TEST_RESULTS.md,INTERNAL_TESTING_PLAN.md,BETA_TESTING_GUIDE.md} + docs/development/federation-roadmap-implementation.md + docs/onboarding/reference/module-09-ops-deploy.md + docs/sprints/{SPRINT2_PROGRESS.md,SPRINT2_COMPLETE.md,SPRINT3_COMPLETE.md,SPRINT3_STATUS.md} | snapshot language policy + docs/ci/CI_CURRENT_STATUS.md | stale-claim grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C36)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C36; continue targeted stale-claim cleanup.

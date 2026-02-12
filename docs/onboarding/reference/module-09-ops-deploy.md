@@ -5,7 +5,7 @@
 By the end of this module, you will:
 - Understand configuration layering and validation
 - Deploy ICN using native, Docker, or Kubernetes methods
-- Configure production-ready secrets and security settings
+- Configure production-grade secrets and security settings
 - Set up monitoring with Prometheus and Grafana
 - Perform backup and recovery operations
 - Troubleshoot common deployment issues
