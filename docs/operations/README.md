@@ -25,7 +25,8 @@ Deployment guides and operational procedures:
 
 ## Deployment Status
 
-**Current Status**: ICN daemon running on K3s cluster (deployed 2025-12-03, automated 2025-12-04).
+**Status Snapshot (2025-12-04)**: ICN daemon running on K3s cluster (deployed 2025-12-03, automated 2025-12-04).
+For current runtime status, use live checks and `../ci/CI_CURRENT_STATUS.md`.
 
 See [HOMELAB_DEPLOYMENT.md](deployment/HOMELAB_DEPLOYMENT.md) for:
 - Cluster details and node identity

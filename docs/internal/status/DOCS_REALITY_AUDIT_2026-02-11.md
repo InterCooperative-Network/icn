@@ -2130,3 +2130,46 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C26; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C27 - active status/readiness language normalization)
+
+Touched files:
+
+1. `docs/deployment/DEPLOYMENT_READY.md`
+2. `docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md`
+3. `docs/status/DEPLOYMENT_VERIFICATION.md`
+4. `docs/operations/README.md`
+5. `docs/security/README.md`
+
+Changes:
+
+- Reframed remaining present-tense readiness claims in active operational docs to explicit snapshot wording.
+- Added guidance to consult `docs/ci/CI_CURRENT_STATUS.md` for current posture where missing.
+- Preserved historical context while removing implied "current" assertions.
+
+## Verification updates (Batch C27)
+
+```bash
+rg -n "Status at Snapshot Date|Historical deployment snapshot|Historical assessment snapshot|Status Snapshot \\(2025-12-04\\)|current invite-system readiness" docs/deployment/DEPLOYMENT_READY.md docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md docs/status/DEPLOYMENT_VERIFICATION.md docs/operations/README.md docs/security/README.md
+```
+
+Result: normalized status framing present in all touched docs.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C27)
+
+- `docs/deployment/DEPLOYMENT_READY.md + docs/deployment/DEPLOYMENT_INVITE_SYSTEM.md + docs/status/DEPLOYMENT_VERIFICATION.md + docs/operations/README.md + docs/security/README.md | docs/ci/CI_CURRENT_STATUS.md + icn/bins/icnd/src/main.rs + icn/crates/icn-core/src/config/gateway.rs | rg -n "Status|Historical|snapshot|CI_CURRENT_STATUS" + doc_reality_scan.sh | aligned-with-snapshot-policy | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C27)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C27; continue active-doc content drift cleanup.

@@ -1,7 +1,7 @@
 # ICN Deployment System - Status & Verification
 
 **Date:** 2025-12-18 17:32  
-**Status:** ✅ **FULLY OPERATIONAL WITH FIX APPLIED**
+**Status:** Historical deployment snapshot (fix applied in snapshot environment)
 
 > Historical deployment snapshot from 2025-12-18.
 > For current status, run live deployment checks and consult `docs/ci/CI_CURRENT_STATUS.md`.
