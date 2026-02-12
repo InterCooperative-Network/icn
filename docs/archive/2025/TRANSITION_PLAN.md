@@ -1,5 +1,8 @@
 # ICN Kernel/App Separation Transition Plan
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 ## Overview
 
 Transform ICN from a tightly-coupled 27-crate system to a clean kernel/app architecture where:

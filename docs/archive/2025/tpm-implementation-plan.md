@@ -1,5 +1,8 @@
 # TPM 2.0 Implementation Plan
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 **Status:** Planned - Not Yet Implemented  
 **Target:** Production-ready TPM key sealing and signing
 

@@ -2469,3 +2469,51 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C34; continue active-doc sweep as needed.
+
+## Changes applied (Batch C35 - archive 2025 warning coverage completion)
+
+Touched files:
+
+1. `docs/archive/2025/KUBERNETES_DEPLOYMENT.md`
+2. `docs/archive/2025/PRODUCTION_DEPLOYMENT_GUIDE.md`
+3. `docs/archive/2025/TRANSITION_PLAN.md`
+4. `docs/archive/2025/hsm-tpm-follow-up-issues.md`
+5. `docs/archive/2025/hsm-tpm-roadmap.md`
+6. `docs/archive/2025/phase-16c-plan.md`
+7. `docs/archive/2025/tpm-implementation-plan.md`
+8. `docs/archive/2025/tpm-setup.md`
+
+Changes:
+
+- Added standardized `Archived Document Notice (2026-02-12)` banner to every previously unmarked 2025 archive markdown file.
+- Ensured archive corpus communicates non-authoritative status consistently across years.
+
+## Verification updates (Batch C35)
+
+```bash
+for f in docs/archive/2025/*.md; do
+  [ \"$(basename \"$f\")\" = \"README.md\" ] && continue
+  rg -qi \"ARCHIVED|historical snapshot|Archived Document Notice\" \"$f\" || echo \"$f\"
+done
+```
+
+Result: no unmarked 2025 archive markdown files remain.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C35)
+
+- `docs/archive/2025/{KUBERNETES_DEPLOYMENT.md,PRODUCTION_DEPLOYMENT_GUIDE.md,TRANSITION_PLAN.md,hsm-tpm-follow-up-issues.md,hsm-tpm-roadmap.md,phase-16c-plan.md,tpm-implementation-plan.md,tpm-setup.md} | archive labeling policy + docs/archive/README.md | archive-marker scan + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C35)
+
+- Accuracy: 5/5
+- Completeness: 5/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C35; continue targeted stale-claim cleanup.

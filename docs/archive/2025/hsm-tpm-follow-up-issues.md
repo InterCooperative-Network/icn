@@ -1,5 +1,8 @@
 # Follow-Up Issues for HSM/TPM Backend Implementation
 
+> **Archived Document Notice (2026-02-12):** This file is retained for historical context and may not reflect current code, APIs, runtime defaults, CI status, or deployment posture.
+> Use active documentation under `docs/` as authoritative.
+
 This document tracks the follow-up issues needed after completing the IdentityBundle refactor (Phase A).
 
 ## Issue Template
