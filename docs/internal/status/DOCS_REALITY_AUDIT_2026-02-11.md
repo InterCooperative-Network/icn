@@ -1507,7 +1507,7 @@ Trigger status: all scores >= 4 for Batch C12; continue active-doc drift cleanup
 ## Changes applied (Batch C13 - PR review feedback fixes)
 
 1. `scripts/pilot_receipt_chain_demo.sh`
-- Fixed gateway connectivity check path from `/v1/healthz` to `/healthz` (actual liveness endpoint).
+- Set gateway connectivity check path to `/v1/healthz` (gateway liveness under `/v1` scope).
 
 2. `docs/guides/developer/DEV_ENVIRONMENT.md`
 - Removed exposed code-server password and replaced with secure-channel retrieval guidance.
@@ -2304,3 +2304,40 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C30; continue active-doc content drift cleanup.
+
+## Changes applied (Batch C31 - post-merge audit correction for liveness path)
+
+Touched files:
+
+1. `docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md`
+
+Changes:
+
+- Corrected historical Batch C13 note to reflect actual gateway liveness route wiring (`/v1/healthz`), matching current `scripts/pilot_receipt_chain_demo.sh` and gateway server scope.
+
+## Verification updates (Batch C31)
+
+```bash
+rg -n "/v1/healthz|/healthz" scripts/pilot_receipt_chain_demo.sh scripts/demo-single-node.sh icn/crates/icn-gateway/src/server.rs icn/crates/icn-gateway/src/api/health.rs docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md
+```
+
+Result: liveness endpoint references align on `/v1/healthz` for gateway-scoped checks; no contradictory statement remains in the audit note.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C31)
+
+- `docs/internal/status/DOCS_REALITY_AUDIT_2026-02-11.md | scripts/pilot_receipt_chain_demo.sh + icn/crates/icn-gateway/src/{server.rs,api/health.rs} | rg -n "/v1/healthz|scope\\(\"/v1\"\\)|\\[get\\(\"/healthz\"\\)\\]" + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C31)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C31; continue active-doc content drift cleanup.
