@@ -1,9 +1,12 @@
 # SDIS & Steward System Implementation Status
 ## Session Date: December 12, 2025
 
+> Historical implementation snapshot from 2025-12-12.
+> API routes and readiness claims here are point-in-time and may differ from current code.
+
 ## 🎯 Mission Accomplished
 
-We've successfully built out the complete **SDIS (Secure Distributed Identity System)** and **Steward System** foundation for ICN. Both systems are now integrated into the Gateway API and Pilot UI, ready for production use.
+In this session snapshot, we built out the **SDIS (Secure Distributed Identity System)** and **Steward System** foundation for ICN. Both systems were integrated into the Gateway API and Pilot UI for pilot evaluation.
 
 ---
 
@@ -66,7 +69,7 @@ GET    /api/v1/sdis/proofs/{id}               # Get proof details
 
 ---
 
-## 📊 Current Status
+## 📊 Status Snapshot
 
 ### Completed ✅
 - [x] SDIS data models

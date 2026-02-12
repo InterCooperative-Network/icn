@@ -181,7 +181,7 @@ The mobile app (React Native) is ready but not yet deployed. It includes:
 
 ## Production Readiness
 
-**Status**: 🟡 PILOT-READY, NOT PRODUCTION-READY
+**Status (Snapshot)**: 🟡 Assessed pilot-ready, not production-ready
 
 Before production deployment:
 - [ ] Change all default passwords

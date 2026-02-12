@@ -7,7 +7,7 @@
 
 ### 1. Kubernetes Deployment ✅ (12 files)
 
-Complete production-ready Kubernetes manifests:
+Complete production-grade Kubernetes manifests for the sprint snapshot:
 
 **Core Manifests**:
 - `namespace.yaml` - Isolated namespace

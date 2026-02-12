@@ -335,7 +335,7 @@ docker-compose -f deploy/docker-compose.yml up -d
 
 ## Conclusion
 
-### Status: PILOT-READY ✅
+### Status (Snapshot): Pilot-ready assessment ✅
 
 In this status snapshot, the ICN system was assessed as pilot-deployment capable:
 

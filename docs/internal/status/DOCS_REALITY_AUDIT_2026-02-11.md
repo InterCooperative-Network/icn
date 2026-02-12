@@ -2609,3 +2609,49 @@ Result: no broken relative links; expected marker-only findings remain.
 - Verifiability: 5/5
 
 Trigger status: all scores >= 4 for Batch C37; continue targeted stale-claim cleanup.
+
+## Changes applied (Batch C38 - SDIS/sprint/deployment snapshot wording pass)
+
+Touched files:
+
+1. `docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md`
+2. `docs/sprints/SPRINT2_COMPLETE.md`
+3. `docs/sprints/SPRINT3_STATUS.md`
+4. `docs/sprints/SPRINT3_DAY1_COMPLETE.md`
+5. `docs/sprints/SPRINT_COMPLETE_2025-12-16.md`
+6. `docs/sdis/SDIS_SYSTEM.md`
+7. `docs/sdis/SDIS_STEWARD_ROADMAP.md`
+8. `docs/sdis/SDIS_SESSION_COMPLETE_20251212.md`
+
+Changes:
+
+- Reframed residual pilot-readiness language in dated deployment/sprint docs to explicit snapshot assessments.
+- Renamed remaining "Current Status" headings to "Status Snapshot" in targeted SDIS docs.
+- Added historical snapshot banner and wording adjustments to `SDIS_SESSION_COMPLETE_20251212.md` to avoid present-tense readiness interpretation.
+
+## Verification updates (Batch C38)
+
+```bash
+rg -n "production-ready|fully operational|PILOT-READY|Current Status|current status" docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md docs/sprints/SPRINT2_COMPLETE.md docs/sprints/SPRINT3_STATUS.md docs/sprints/SPRINT3_DAY1_COMPLETE.md docs/sprints/SPRINT_COMPLETE_2025-12-16.md docs/sdis/SDIS_SYSTEM.md docs/sdis/SDIS_STEWARD_ROADMAP.md docs/sdis/SDIS_SESSION_COMPLETE_20251212.md
+```
+
+Result: target files now use snapshot framing; remaining matches are contextual references (for example, "For current status..." pointers and roadmap action text), not unqualified current-state assertions.
+
+```bash
+./.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh .
+```
+
+Result: no broken relative links; expected marker-only findings remain.
+
+## Audit ledger additions (Batch C38)
+
+- `docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md + docs/sprints/{SPRINT2_COMPLETE.md,SPRINT3_STATUS.md,SPRINT3_DAY1_COMPLETE.md,SPRINT_COMPLETE_2025-12-16.md} + docs/sdis/{SDIS_SYSTEM.md,SDIS_STEWARD_ROADMAP.md,SDIS_SESSION_COMPLETE_20251212.md} | snapshot language policy + current-status pointer policy | targeted stale-claim grep + doc_reality_scan.sh | aligned | reviewed_on(2026-02-12)`
+
+## Recursive self-correction score (Batch C38)
+
+- Accuracy: 5/5
+- Completeness: 4/5
+- Consistency: 5/5
+- Verifiability: 5/5
+
+Trigger status: all scores >= 4 for Batch C38; continue targeted stale-claim cleanup.
