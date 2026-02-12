@@ -27,6 +27,7 @@ icn/.cargo/config.user.toml
 
 # ICN data directories
 /data/
+.demo-data/
 *.db
 *.db-*
 
