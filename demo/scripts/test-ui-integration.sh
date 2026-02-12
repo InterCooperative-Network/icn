@@ -21,7 +21,7 @@ echo
 echo "Step 1: Verify UI uses canonical ledger routes"
 echo
 
-rg -n "`/ledger/\$\{state.coopId\}/(balance|history|payment)" "$UI_DIR/app.js" || {
+grep -nE "/ledger/\\\$\{state\.coopId\}/(balance|history|payment)" "$UI_DIR/app.js" || {
     echo "Route patterns not found in app.js"
     exit 1
 }

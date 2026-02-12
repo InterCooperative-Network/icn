@@ -38,19 +38,19 @@ echo
 
 # Get JWT token
 echo "Getting JWT token..."
-TOKEN=$(cd "$ICN_DIR" && ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
   -d "$DATA_DIR" \
   -e "$RPC_ENDPOINT" \
   auth token \
   --coop-id "$COOP_ID" \
   --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-  --passphrase demo123 2>/dev/null | tr -d '\n' || true)
+  2>/dev/null | tr -d '\n' || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${RED}✗${NC} Failed to get token"
     echo "Try manually:"
     echo "  cd $ICN_DIR"
-    echo "  ./target/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\" --passphrase demo123"
+    echo "  ICN_PASSPHRASE=demo123 ./target/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\""
     exit 1
 fi
 echo -e "${GREEN}✓${NC} Got JWT token"

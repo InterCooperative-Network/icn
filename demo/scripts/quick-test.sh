@@ -88,13 +88,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 CURRENT_DID=$(cd "$ICN_DIR" && ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 
-TOKEN=$(cd "$ICN_DIR" && ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     -d "$DATA_DIR" \
     -e "$RPC_ENDPOINT" \
     auth token \
     --coop-id "$COOP_ID" \
     --scopes "coop:read,ledger:read" \
-    --passphrase demo123 2>/dev/null | tr -d '\n' || true)
+    2>/dev/null | tr -d '\n' || true)
 
 if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
     run_check "Get auth token" "[ -n '$TOKEN' ]"

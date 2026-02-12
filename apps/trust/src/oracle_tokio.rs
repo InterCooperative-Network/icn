@@ -8,9 +8,9 @@
 //! # Note
 //!
 //! Since `PolicyOracle::evaluate()` is synchronous, this implementation
-//! uses `tokio::task::block_in_place` to safely access the tokio lock
-//! from a sync context. This should be called from a multi-threaded
-//! tokio runtime.
+//! uses `try_read()` for non-blocking access to the tokio lock. If the
+//! lock is contended, it falls back to a default score of 0.3 ("Known"
+//! trust class) rather than blocking.
 
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,

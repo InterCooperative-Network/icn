@@ -223,13 +223,13 @@ echo "Step 2: Getting authentication token"
 echo "========================================="
 echo
 
-TOKEN=$(cd "$ICN_DIR" && ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     -d "$DATA_DIR" \
     -e "$RPC_ENDPOINT" \
     auth token \
     --coop-id "$COOP_ID" \
     --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-    --passphrase demo123 2>/dev/null | tr -d '\n' || true)
+    2>/dev/null | tr -d '\n' || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${YELLOW}⚠${NC} Could not auto-generate token"

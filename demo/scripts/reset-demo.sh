@@ -117,10 +117,9 @@ mkdir -p "$DATA_DIR"
 cd "$ICN_DIR"
 
 echo "Creating fresh identity..."
-echo "demo123" | ./target/release/icnctl \
+ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     -d "$DATA_DIR" \
-    id init \
-    --passphrase-stdin > /tmp/icn-reset-init.log 2>&1
+    id init > /tmp/icn-reset-init.log 2>&1
 
 if [ $? -eq 0 ]; then
     NEW_DID=$(grep -oE 'did:icn:[a-zA-Z0-9]+' /tmp/icn-reset-init.log | head -1)
