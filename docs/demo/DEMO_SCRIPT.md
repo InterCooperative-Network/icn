@@ -2,7 +2,7 @@
 
 **Duration**: 20 minutes
 **Audience**: All (cooperative members, developers, funders, other coops)
-**Last Updated**: 2026-02-11
+**Last Updated**: 2026-02-13
 
 ---
 
@@ -89,7 +89,9 @@ cd icn && cargo build --release
    - Token: (copy from terminal)
 4. Click "Sign In"
 
-**Say:** "This is the Rochester Tool Library - a real cooperative that lends tools to community members."
+**After login**, the dashboard shows your display name (e.g. "Demo User") instead of a raw DID.
+
+**Say:** "This is the Rochester Tool Library - a real cooperative that lends tools to community members. Notice you see your name, not a cryptographic identifier."
 
 ---
 
@@ -98,19 +100,26 @@ cd icn && cargo build --release
 ### Show the Dashboard
 
 **Point out:**
+- Your display name (e.g. "Demo User") — not a raw cryptographic ID
 - Balance (hours in the timebank)
-- Member name and role
 - Cooperative context
 
-**Say:** "Every member has a decentralized identifier - a DID. This is like a username, but you own it. No company can take it away or track you with it."
+**Say:** "Every member has a decentralized identifier - a DID - but you don't have to look at raw crypto strings. The system resolves names so it feels like any normal app."
 
-### Show the Profile
+### Edit Your Display Name
 
-1. Click "Profile" in sidebar
-2. Point out:
-   - Skills (what you can contribute)
-   - Availability
-   - Contact info
+1. Click the pencil icon next to your name (top-right)
+2. Enter a new name (e.g. your real name)
+3. Notice it updates everywhere immediately
+
+**Say:** "Members control their own profile. Names are stored locally and resolved on demand - no central directory."
+
+### Show the Members Tab
+
+1. Click "Members" in sidebar
+2. Point out the 4 pre-seeded members with real names:
+   - Sarah Chen, Marcus Rivera, Priya Patel, James Okafor
+3. Note: names appear throughout - transactions, governance, member list
 
 **Say:** "This information is stored locally and shared only with your cooperative. Not with advertisers or data brokers."
 
@@ -132,7 +141,7 @@ cd icn && cargo build --release
    - Description: "Currently tools are due in 1 week. Proposing we extend to 2 weeks for member convenience."
 4. Submit
 
-**Say:** "Any member can propose changes. This creates a formal record that everyone can see."
+**Say:** "Any member can propose changes. Notice the 'Proposed by' line shows your name - not a cryptographic hash. This creates a formal record that everyone can see."
 
 ### Vote on the Proposal
 
@@ -156,6 +165,7 @@ cd icn && cargo build --release
 1. Click "Transactions" in sidebar
 2. Click "Log Hours" or "New Transaction"
 3. Fill in:
+   - Recipient: Select from dropdown — names shown, not DIDs
    - Activity: "Tool maintenance"
    - Hours: 2.0
    - Description: "Cleaned and oiled power tools"
@@ -167,12 +177,12 @@ cd icn && cargo build --release
 
 1. Scroll through transactions
 2. Point out:
-   - Date/time
-   - Activity type
+   - Sender/recipient shown as **names** (Sarah Chen, Marcus Rivera, etc.)
+   - Date/time and activity type
    - Hours credited
-   - Verification status
+   - The pre-seeded transactions between named members
 
-**Say:** "Every transaction is cryptographically signed and linked to the previous one. It's tamper-evident - any change would be visible."
+**Say:** "Every transaction is cryptographically signed and linked to the previous one. It's tamper-evident - any change would be visible. And notice - you see people's names, not cryptographic hashes."
 
 ### Show Receipts Tab
 
@@ -278,7 +288,12 @@ The demo script displays fresh credentials. If needed:
 
 ```bash
 cd icn
-./target/release/icnctl auth token --coop-id rochester-tool-library
+ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+  -d ../.demo-data/tool-library \
+  -e 127.0.0.1:15602 \
+  auth token \
+  --coop-id rochester-tool-library \
+  --scopes "coop:write,coop:read,coop:admin,ledger:read,ledger:write,gov:read,gov:write"
 ```
 
 ### UI shows errors

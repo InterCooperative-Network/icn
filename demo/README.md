@@ -169,19 +169,15 @@ demo/
 
 ### tool-library-members.json
 
-**12 realistic members:**
-- Alice Chen (Tool Coordinator)
-- Bob Martinez (Member)
-- Carol Johnson (Member)
-- David Lee (Treasurer)
-- Elena Rodriguez (Member)
-- Frank Wilson (Member)
-- Grace Park (Board Member)
-- Henry Brown (Member)
-- Isabel Garcia (Member)
-- Jack Thompson (Member)
-- Kelly O'Brien (Member)
-- Luis Sanchez (Member)
+**12 realistic members** (static JSON for reference):
+- Alice Chen, Bob Martinez, Carol Johnson, David Lee, Elena Rodriguez,
+  Frank Wilson, Grace Park, Henry Brown, Isabel Garcia, Jack Thompson,
+  Kelly O'Brien, Luis Sanchez
+
+**Auto-seeded members** (created by `run-tool-library-demo.sh` on startup):
+- Sarah Chen, Marcus Rivera, Priya Patel, James Okafor
+- Each gets a unique DID and display name via the gateway API
+- Names appear throughout the UI (transactions, members, governance)
 
 **Data includes:**
 - Names and roles
@@ -234,11 +230,12 @@ demo/
 5. Click "Sign In"
 
 ### Step 4: Demo Features
-- View balance (0.0 hours initially)
-- Browse transaction history
-- Check member directory
-- Test transaction creation
-- Explore governance features
+- View dashboard with your display name (not raw DID)
+- Browse pre-seeded members (Sarah Chen, Marcus Rivera, Priya Patel, James Okafor)
+- Browse transaction history (names shown, not DIDs)
+- Create transactions (member dropdown shows names)
+- Explore governance proposals (shows "Proposed by" with names)
+- Edit your display name (pencil icon next to your name)
 
 ### Step 5: Stop Demo
 Press Ctrl+C in terminal running demo script
@@ -278,14 +275,14 @@ tail -f /tmp/pilot-ui-demo.log
 
 ### "Token expired" or "Authentication failed"
 ```bash
-# Get fresh token
+# Get fresh token (from repo root)
 cd icn
 ICN_PASSPHRASE=demo123 ./target/release/icnctl \
-  -d "$(pwd)/.demo-data/tool-library" \
+  -d "../.demo-data/tool-library" \
   -e 127.0.0.1:15602 \
   auth token \
   --coop-id rochester-tool-library \
-  --scopes "coop:write,coop:read,ledger:read,ledger:write"
+  --scopes "coop:write,coop:read,coop:admin,ledger:read,ledger:write,gov:read,gov:write"
 ```
 
 ### "Can't create transaction"
@@ -382,10 +379,11 @@ You can override defaults with:
 
 ## Status
 
-**Created:** 2025-12-18  
-**Version:** 1.0  
-**Completeness:** 95%  
-**Ready for:** Demo testing and use
+**Created:** 2025-12-18
+**Updated:** 2026-02-13
+**Version:** 2.0 (with human-readable names)
+**Completeness:** 98%
+**Ready for:** Conference presentations
 
 **Complete:**
 - ✅ All core scripts
@@ -394,9 +392,13 @@ You can override defaults with:
 - ✅ Documentation
 - ✅ Verification
 
+**Recently Completed:**
+- ✅ Automated member addition (4 named members seeded on startup)
+- ✅ Historical transaction creation (4 transactions between named members)
+- ✅ Human-readable names throughout UI (replaces raw DIDs)
+- ✅ Self-service display name editing (PUT profile endpoint)
+
 **TODO:**
-- ⏳ Automated member addition
-- ⏳ Historical transaction creation
 - ⏳ Multi-node demo script
 
 ---
