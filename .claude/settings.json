@@ -1,8 +1,7 @@
 {
   "enabledPlugins": {
     "feature-dev@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true
+    "code-review@claude-plugins-official": true
   },
   "permissions": {
     "allow": [
@@ -67,6 +66,25 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/panic-guard.sh",
             "timeout": 10,
             "statusMessage": "Checking for panics..."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/dep-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking dependency hygiene..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/openapi-sync-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking API sync..."
           }
         ]
       }
