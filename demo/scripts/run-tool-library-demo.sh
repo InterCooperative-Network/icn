@@ -274,15 +274,51 @@ if [ -n "$TOKEN" ]; then
         -H "Authorization: Bearer $TOKEN" 2>/dev/null || echo "{}")
 
     if echo "$COOP_INFO" | grep -q "\"id\":\"$COOP_ID\""; then
-        echo -e "${GREEN}✓${NC} Cooperative '$COOP_ID' verified"
+        echo -e "${GREEN}✓${NC} Cooperative '$COOP_ID' exists"
         COOP_NAME=$(echo "$COOP_INFO" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)
         echo "Name: $COOP_NAME"
     else
-        echo -e "${YELLOW}⚠${NC} Cooperative '$COOP_ID' not found yet"
-        echo "Create it first, then rerun the script for fully automated login"
+        echo "Cooperative not found — creating '$COOP_ID'..."
+        CREATE_RESULT=$(curl -s -X POST "$GATEWAY/v1/coops" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME\"}" 2>/dev/null || echo "{}")
+
+        if echo "$CREATE_RESULT" | grep -q "\"id\":\"$COOP_ID\""; then
+            echo -e "${GREEN}✓${NC} Created cooperative '$COOP_ID'"
+        else
+            echo -e "${YELLOW}⚠${NC} Could not create cooperative: $CREATE_RESULT"
+        fi
     fi
 else
     echo -e "${YELLOW}⚠${NC} Skipping cooperative verification (no token)"
+fi
+
+# Step 3b: Seed minimal demo data so the dashboard isn't empty
+if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
+    echo
+    echo "Seeding demo data..."
+
+    # Create governance domain
+    curl -s -X POST "$GATEWAY/v1/gov/domains" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME Governance\",\"description\":\"Democratic decision-making\",\"members\":[\"$CURRENT_DID\"]}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Governance domain" || echo -e "  ${YELLOW}⚠${NC} Governance domain (may already exist)"
+
+    # Create a sample proposal
+    curl -s -X POST "$GATEWAY/v1/gov/proposals" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Welcome new members for Spring 2026\",\"description\":\"Open enrollment for the spring cohort\",\"proposal_type\":\"membership\"}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Sample proposal" || true
+
+    # Create a sample ledger entry
+    curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"from_did\":\"$CURRENT_DID\",\"to_did\":\"did:icn:zBobExample456\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Garden bed construction\"}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Sample transaction" || true
 fi
 
 # Step 4: Start UI
