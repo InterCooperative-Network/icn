@@ -1352,9 +1352,16 @@ impl GatewayServer {
                 // Static files and root route
                 .service(web::redirect("/", "/static/index.html"))
                 .service(
-                    fs::Files::new("/static", get_static_dir())
-                        .prefer_utf8(true)
-                        .use_last_modified(true),
+                    web::scope("/static")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .add(("Cache-Control", "no-store, no-cache, must-revalidate")),
+                        )
+                        .service(
+                            fs::Files::new("/", get_static_dir())
+                                .prefer_utf8(true)
+                                .use_last_modified(true),
+                        ),
                 )
         })
         // Production-ready HTTP timeout configuration

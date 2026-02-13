@@ -874,15 +874,14 @@ async function renderProposalList(proposals, container, showVoteButtons) {
             : (typeof proposal.state === 'object' && proposal.state !== null ? Object.keys(proposal.state)[0] : 'Unknown');
         const stateClass = stateKey.toLowerCase();
 
+        const encodedId = encodeURIComponent(String(proposal.id));
         let actionsHtml = '';
         if (showVoteButtons) {
-            // Use data attributes to prevent XSS from proposal.id
-            const escapedId = escapeHtml(proposal.id);
             actionsHtml = `
                 <div class="proposal-actions">
-                    <button class="btn-vote for" data-proposal-id="${escapedId}" data-vote="for">For</button>
-                    <button class="btn-vote against" data-proposal-id="${escapedId}" data-vote="against">Against</button>
-                    <button class="btn-vote abstain" data-proposal-id="${escapedId}" data-vote="abstain">Abstain</button>
+                    <button class="btn-vote for" data-proposal-id="${encodedId}" data-vote="for">For</button>
+                    <button class="btn-vote against" data-proposal-id="${encodedId}" data-vote="against">Against</button>
+                    <button class="btn-vote abstain" data-proposal-id="${encodedId}" data-vote="abstain">Abstain</button>
                 </div>
             `;
         } else if (proposal.outcome) {
@@ -916,7 +915,7 @@ async function renderProposalList(proposals, container, showVoteButtons) {
         }
 
         return `
-            <div class="proposal-item">
+            <div class="proposal-item proposal-clickable" data-proposal-id="${encodedId}" style="cursor:pointer;">
                 <div class="proposal-header">
                     <div class="proposal-title">${escapeHtml(proposal.title)}</div>
                     <div class="proposal-state ${stateClass}">${stateKey}</div>
@@ -935,6 +934,15 @@ async function renderProposalList(proposals, container, showVoteButtons) {
     }));
 
     container.innerHTML = html.join('');
+
+    // Make proposal cards clickable to open detail view
+    container.querySelectorAll('.proposal-clickable').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-vote')) return; // Don't navigate on vote button click
+            const proposalId = decodeURIComponent(el.dataset.proposalId || '');
+            showProposalDetail(proposalId);
+        });
+    });
 }
 
 async function castVote(proposalId, choice) {
@@ -963,6 +971,519 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
+
+// ============================================================================
+// Proposal Detail View
+// ============================================================================
+
+// Safe DOM-id key from arbitrary string (URL-encode, then replace % with _)
+function domKey(s) {
+    return encodeURIComponent(String(s)).replace(/%/g, '_');
+}
+
+// Currently displayed proposal ID (for re-rendering after vote/comment)
+let currentDetailProposalId = null;
+
+function showProposalDetail(proposalId) {
+    currentDetailProposalId = proposalId;
+
+    // Hide proposals subtab, show detail subtab
+    document.getElementById('governance-proposals').classList.add('hidden');
+    document.getElementById('governance-action-items').classList.add('hidden');
+    document.getElementById('governance-proposal-detail').classList.remove('hidden');
+
+    // Hide the governance tab buttons while in detail view
+    const govTabs = document.querySelector('.governance-tabs');
+    if (govTabs) govTabs.style.display = 'none';
+
+    loadProposalDetail(proposalId);
+}
+
+function returnToProposalList() {
+    currentDetailProposalId = null;
+
+    document.getElementById('governance-proposal-detail').classList.add('hidden');
+    document.getElementById('governance-proposals').classList.remove('hidden');
+
+    // Restore the governance tab buttons
+    const govTabs = document.querySelector('.governance-tabs');
+    if (govTabs) govTabs.style.display = '';
+
+    // Reload proposals to reflect any votes cast while in detail
+    loadProposals();
+}
+
+async function loadProposalDetail(proposalId) {
+    const encodedId = encodeURIComponent(proposalId);
+
+    // Show loading state
+    const header = document.getElementById('proposal-detail-header');
+    const body = document.getElementById('proposal-detail-body');
+    const votesEl = document.getElementById('proposal-detail-votes');
+    const discussionEl = document.getElementById('proposal-detail-discussion');
+    const metaEl = document.getElementById('proposal-detail-meta');
+    const timelineEl = document.getElementById('proposal-detail-timeline');
+
+    header.innerHTML = '<p class="loading">Loading proposal...</p>';
+    body.innerHTML = '';
+    votesEl.innerHTML = '';
+    discussionEl.innerHTML = '';
+    metaEl.innerHTML = '';
+    timelineEl.innerHTML = '';
+
+    try {
+        // Fetch proposal, votes, and discussion in parallel
+        const [proposal, votes, discussion] = await Promise.all([
+            apiRequest('GET', `/gov/proposals/${encodedId}`),
+            apiRequest('GET', `/gov/proposals/${encodedId}/votes`).catch(() => ({ for_votes: 0, against_votes: 0, abstain_votes: 0 })),
+            apiRequest('GET', `/gov/proposals/${encodedId}/discussion`).catch(() => ({ comments: [], participant_count: 0 })),
+        ]);
+
+        // Resolve names for proposer and comment authors
+        const dids = [proposal.proposer];
+        if (discussion.comments) {
+            dids.push(...discussion.comments.map(c => c.author));
+        }
+        await resolveNames(dids.filter(Boolean));
+
+        renderProposalDetailHeader(proposal);
+        renderProposalDetailBody(proposal);
+        renderProposalVotes(votes, proposalId, proposal.state);
+        renderProposalDiscussion(discussion, proposalId);
+        renderProposalSidebar(proposal, votes, discussion);
+        renderProposalTimeline(proposal);
+
+    } catch (error) {
+        header.innerHTML = `<p class="error-message">Failed to load proposal: ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+function getStateKeyGlobal(st) {
+    if (typeof st === 'string') return st;
+    if (typeof st === 'object' && st !== null) return Object.keys(st)[0];
+    return 'Unknown';
+}
+
+function renderProposalDetailHeader(proposal) {
+    const el = document.getElementById('proposal-detail-header');
+    const stateKey = getStateKeyGlobal(proposal.state);
+    const stateClass = stateKey.toLowerCase();
+    const proposerName = getNameSync(proposal.proposer);
+
+    el.innerHTML = `
+        <div class="proposal-detail-title">${escapeHtml(proposal.title)}</div>
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem;">
+            <div class="proposal-state ${stateClass}">${stateKey}</div>
+            <div class="proposal-detail-proposer">Proposed by <strong>${escapeHtml(proposerName)}</strong></div>
+        </div>
+    `;
+}
+
+function renderProposalDetailBody(proposal) {
+    const el = document.getElementById('proposal-detail-body');
+    let html = '<h3 style="margin-bottom:0.75rem;">Description</h3>';
+
+    if (proposal.description) {
+        html += `<p style="line-height:1.6;color:var(--text-secondary);">${escapeHtml(proposal.description)}</p>`;
+    } else {
+        html += '<p class="empty-state">No description provided</p>';
+    }
+
+    // Render payload
+    if (proposal.payload) {
+        html += renderPayload(proposal.payload);
+    }
+
+    el.innerHTML = html;
+}
+
+function renderPayload(payload) {
+    if (!payload) return '';
+
+    let html = '<div class="payload-card">';
+
+    // Payload can be a string type or object { Type: data }
+    let payloadType, payloadData;
+    if (typeof payload === 'string') {
+        payloadType = payload;
+        payloadData = null;
+    } else if (typeof payload === 'object') {
+        payloadType = Object.keys(payload)[0];
+        payloadData = payload[payloadType];
+    }
+
+    html += `<div class="payload-type-badge">${escapeHtml(payloadType || 'Custom')}</div>`;
+
+    switch (payloadType) {
+        case 'Text':
+            html += `<p style="margin-top:0.5rem;">${escapeHtml(typeof payloadData === 'string' ? payloadData : (payloadData?.body || ''))}</p>`;
+            break;
+        case 'Budget':
+            if (payloadData) {
+                html += `<div class="payload-field"><label>Amount:</label> ${escapeHtml(String(payloadData.amount || ''))} ${escapeHtml(payloadData.currency || '')}</div>`;
+                if (payloadData.purpose) html += `<div class="payload-field"><label>Purpose:</label> ${escapeHtml(payloadData.purpose)}</div>`;
+            }
+            break;
+        case 'Membership':
+            if (payloadData) {
+                html += `<div class="payload-field"><label>Action:</label> ${escapeHtml(payloadData.action || '')}</div>`;
+                if (payloadData.member) html += `<div class="payload-field"><label>Member:</label> ${escapeHtml(getNameSync(payloadData.member))}</div>`;
+            }
+            break;
+        case 'ConfigChange':
+            if (payloadData) {
+                html += `<div class="payload-field"><label>Key:</label> ${escapeHtml(payloadData.key || '')}</div>`;
+                if (payloadData.old_value !== undefined) html += `<div class="payload-field"><label>Old Value:</label> ${escapeHtml(String(payloadData.old_value))}</div>`;
+                if (payloadData.new_value !== undefined) html += `<div class="payload-field"><label>New Value:</label> ${escapeHtml(String(payloadData.new_value))}</div>`;
+            }
+            break;
+        case 'Treasury':
+            if (payloadData) {
+                html += `<div class="payload-field"><label>Operation:</label> ${escapeHtml(payloadData.operation || '')}</div>`;
+                if (payloadData.amount !== undefined) html += `<div class="payload-field"><label>Amount:</label> ${escapeHtml(String(payloadData.amount))}</div>`;
+            }
+            break;
+        default:
+            // Fallback: JSON pretty-print for federation or unknown types
+            if (payloadData) {
+                html += `<pre style="margin-top:0.5rem;font-size:0.85rem;overflow-x:auto;white-space:pre-wrap;">${escapeHtml(JSON.stringify(payloadData, null, 2))}</pre>`;
+            }
+            break;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function renderProposalVotes(votes, proposalId, proposalState) {
+    const el = document.getElementById('proposal-detail-votes');
+    const total = (votes.for_votes || 0) + (votes.against_votes || 0) + (votes.abstain_votes || 0);
+    const forPct = total > 0 ? ((votes.for_votes || 0) / total * 100) : 0;
+    const againstPct = total > 0 ? ((votes.against_votes || 0) / total * 100) : 0;
+    const abstainPct = total > 0 ? ((votes.abstain_votes || 0) / total * 100) : 0;
+
+    const stateKey = getStateKeyGlobal(proposalState);
+    const canVote = stateKey === 'Open' || stateKey === 'Draft';
+
+    let html = '<h3 style="margin-bottom:0.75rem;">Votes</h3>';
+
+    if (total === 0) {
+        html += '<p class="empty-state" style="padding:1rem 0;">No votes cast yet</p>';
+    } else {
+        html += `
+            <div class="vote-bar-container">
+                <div class="vote-bar">
+                    ${forPct > 0 ? `<div class="vote-bar-segment vote-bar-for" style="width:${forPct}%">${Math.round(forPct)}%</div>` : ''}
+                    ${againstPct > 0 ? `<div class="vote-bar-segment vote-bar-against" style="width:${againstPct}%">${Math.round(againstPct)}%</div>` : ''}
+                    ${abstainPct > 0 ? `<div class="vote-bar-segment vote-bar-abstain" style="width:${abstainPct}%">${Math.round(abstainPct)}%</div>` : ''}
+                </div>
+                <div class="vote-summary">
+                    <span style="color:var(--success);">For: ${votes.for_votes || 0}</span>
+                    <span style="color:var(--danger);">Against: ${votes.against_votes || 0}</span>
+                    <span style="color:var(--gray-500);">Abstain: ${votes.abstain_votes || 0}</span>
+                    <span><strong>Total: ${total}</strong></span>
+                </div>
+            </div>
+        `;
+    }
+
+    if (canVote) {
+        const pid = encodeURIComponent(String(proposalId));
+        html += `
+            <div class="proposal-actions" style="margin-top:1rem;">
+                <button class="btn-vote for" data-vote="for" onclick="castVoteAndReload('${pid}', 'for')">Vote For</button>
+                <button class="btn-vote against" data-vote="against" onclick="castVoteAndReload('${pid}', 'against')">Vote Against</button>
+                <button class="btn-vote abstain" data-vote="abstain" onclick="castVoteAndReload('${pid}', 'abstain')">Abstain</button>
+            </div>
+        `;
+    }
+
+    el.innerHTML = html;
+}
+
+async function castVoteAndReload(proposalIdEncoded, choice) {
+    const proposalId = decodeURIComponent(proposalIdEncoded);
+    await castVote(proposalId, choice);
+    // Reload detail view to show updated votes
+    if (currentDetailProposalId) {
+        loadProposalDetail(currentDetailProposalId);
+    }
+}
+
+function renderProposalTimeline(proposal) {
+    const el = document.getElementById('proposal-detail-timeline');
+    const stateKey = getStateKeyGlobal(proposal.state);
+
+    const phases = [
+        { label: 'Created', key: 'created' },
+        { label: 'Deliberation', key: 'deliberation' },
+        { label: 'Open for Voting', key: 'open' },
+        { label: 'Closed', key: 'closed' },
+    ];
+
+    // Determine which phases are completed based on current state
+    const stateOrder = { 'Draft': 0, 'Deliberation': 1, 'Open': 2, 'Closed': 3, 'Accepted': 3, 'Rejected': 3 };
+    const currentIdx = stateOrder[stateKey] !== undefined ? stateOrder[stateKey] : 0;
+
+    let html = '<h3 style="margin-bottom:1rem;">Timeline</h3>';
+    html += '<div class="proposal-timeline">';
+
+    phases.forEach((phase, idx) => {
+        let className = 'timeline-item';
+        if (idx < currentIdx) className += ' completed';
+        else if (idx === currentIdx) className += ' active';
+
+        let dateStr = '';
+        if (idx === 0 && proposal.created_at) {
+            dateStr = formatDateSafe(proposal.created_at);
+        } else if (idx === 3 && proposal.closes_at && currentIdx >= 3) {
+            dateStr = formatDateSafe(proposal.closes_at);
+        }
+
+        html += `
+            <div class="${className}">
+                <div class="timeline-label">${phase.label}</div>
+                ${dateStr ? `<div class="timeline-date">${dateStr}</div>` : ''}
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function formatDateSafe(dateVal) {
+    if (!dateVal) return '';
+    try {
+        // Handle unix timestamps (seconds) vs ISO strings
+        const d = typeof dateVal === 'number'
+            ? new Date(dateVal > 1e12 ? dateVal : dateVal * 1000)
+            : new Date(dateVal);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+        return '';
+    }
+}
+
+function renderProposalDiscussion(discussion, proposalId) {
+    const el = document.getElementById('proposal-detail-discussion');
+    const comments = discussion.comments || [];
+
+    let html = `<h3 style="margin-bottom:0.75rem;">Discussion (${comments.length})</h3>`;
+
+    if (comments.length === 0) {
+        html += '<p class="empty-state" style="padding:0.5rem 0;">No comments yet. Start the discussion!</p>';
+    } else {
+        // Build a tree: group comments by parent_id
+        const rootComments = comments.filter(c => !c.parent_id);
+        const childMap = {};
+        comments.forEach(c => {
+            if (c.parent_id) {
+                if (!childMap[c.parent_id]) childMap[c.parent_id] = [];
+                childMap[c.parent_id].push(c);
+            }
+        });
+
+        html += '<div class="comment-list">';
+        rootComments.forEach(c => {
+            html += renderComment(c, 0, childMap, proposalId);
+        });
+        html += '</div>';
+    }
+
+    // Comment form
+    const key = domKey(proposalId);
+    const pidEncoded = encodeURIComponent(String(proposalId));
+    html += `
+        <div class="comment-form">
+            <textarea id="comment-input-${key}" placeholder="Add a comment..." aria-label="Add a comment"></textarea>
+            <button class="btn btn-primary btn-small" onclick="submitComment('${pidEncoded}')">Post Comment</button>
+        </div>
+    `;
+
+    el.innerHTML = html;
+}
+
+function renderComment(comment, depth, childMap, proposalId) {
+    const authorName = getNameSync(comment.author);
+    const dateStr = formatDateSafe(comment.created_at);
+    const escapedContent = escapeHtml(comment.content);
+    const commentIdEnc = encodeURIComponent(String(comment.id));
+    const pidEnc = encodeURIComponent(String(proposalId));
+
+    let reactionsHtml = '';
+    if (comment.reactions && typeof comment.reactions === 'object') {
+        const entries = Object.entries(comment.reactions);
+        if (entries.length > 0) {
+            reactionsHtml = '<div class="comment-reactions">';
+            entries.forEach(([emoji, count]) => {
+                const emojiEnc = encodeURIComponent(emoji);
+                reactionsHtml += `<span class="comment-reaction" onclick="toggleReaction('${commentIdEnc}', '${emojiEnc}')" title="${escapeHtml(emoji)}">${emoji} ${count}</span>`;
+            });
+            reactionsHtml += '</div>';
+        }
+    }
+
+    let html = `
+        <div class="comment-item" style="--comment-depth:${depth};">
+            <div style="display:flex;align-items:center;">
+                <span class="comment-author">${escapeHtml(authorName)}</span>
+                <span class="comment-time">${dateStr}</span>
+                ${comment.is_edited ? '<span class="comment-time">(edited)</span>' : ''}
+            </div>
+            <div class="comment-content">${escapedContent}</div>
+            ${reactionsHtml}
+            <div class="comment-actions">
+                <button onclick="startReply('${pidEnc}', '${commentIdEnc}')">Reply</button>
+            </div>
+        </div>
+    `;
+
+    // Render children recursively
+    const children = childMap[comment.id] || [];
+    children.forEach(child => {
+        html += renderComment(child, depth + 1, childMap, proposalId);
+    });
+
+    return html;
+}
+
+function renderProposalSidebar(proposal, votes, discussion) {
+    const el = document.getElementById('proposal-detail-meta');
+    const stateKey = getStateKeyGlobal(proposal.state);
+    const proposerName = getNameSync(proposal.proposer);
+    const total = (votes.for_votes || 0) + (votes.against_votes || 0) + (votes.abstain_votes || 0);
+
+    let html = '<h3 style="margin-bottom:0.75rem;">Details</h3>';
+
+    html += `
+        <div class="meta-row"><span class="meta-label">Status</span><span class="proposal-state ${stateKey.toLowerCase()}">${stateKey}</span></div>
+        <div class="meta-row"><span class="meta-label">Proposer</span><span>${escapeHtml(proposerName)}</span></div>
+    `;
+
+    if (proposal.created_at) {
+        html += `<div class="meta-row"><span class="meta-label">Created</span><span>${formatDateSafe(proposal.created_at)}</span></div>`;
+    }
+    if (proposal.closes_at) {
+        html += `<div class="meta-row"><span class="meta-label">Closes</span><span>${formatDateSafe(proposal.closes_at)}</span></div>`;
+    }
+
+    html += `<div class="meta-row"><span class="meta-label">Total Votes</span><span>${total}</span></div>`;
+    html += `<div class="meta-row"><span class="meta-label">Participants</span><span>${discussion.participant_count || 0}</span></div>`;
+
+    // Proof link for closed proposals
+    if (stateKey === 'Accepted' || stateKey === 'Rejected' || stateKey === 'Closed') {
+        const pidEnc = encodeURIComponent(String(proposal.id));
+        html += `<div style="margin-top:1rem;"><button class="btn btn-secondary btn-small" onclick="viewProposalProof('${pidEnc}')">View Outcome Proof</button></div>`;
+    }
+
+    el.innerHTML = html;
+}
+
+async function submitComment(proposalIdEncoded) {
+    const proposalId = decodeURIComponent(proposalIdEncoded);
+    const key = domKey(proposalId);
+    const textarea = document.getElementById(`comment-input-${key}`);
+    if (!textarea) return;
+
+    const content = textarea.value.trim();
+    if (!content) {
+        // If in reply mode, clear it instead of warning
+        if (textarea.dataset.parentId) {
+            clearReplyMode(textarea);
+            return;
+        }
+        showToast('Comment cannot be empty', 'warning');
+        return;
+    }
+
+    const body = { content };
+    // Include parent_id if in reply mode
+    if (textarea.dataset.parentId) {
+        body.parent_id = textarea.dataset.parentId;
+    }
+
+    try {
+        await apiRequest('POST', `/gov/proposals/${encodeURIComponent(proposalId)}/comments`, body);
+        showToast(body.parent_id ? 'Reply posted' : 'Comment posted', 'success', 3000);
+        clearReplyMode(textarea);
+        // Reload discussion
+        if (currentDetailProposalId) {
+            loadProposalDetail(currentDetailProposalId);
+        }
+    } catch (error) {
+        showToast(`Failed to post comment: ${error.message}`, 'error');
+    }
+}
+
+function clearReplyMode(textarea) {
+    textarea.dataset.parentId = '';
+    textarea.placeholder = 'Add a comment...';
+    textarea.oninput = null;
+}
+
+async function startReply(proposalIdEncoded, parentCommentIdEncoded) {
+    const proposalId = decodeURIComponent(proposalIdEncoded);
+    const parentCommentId = decodeURIComponent(parentCommentIdEncoded);
+    const key = domKey(proposalId);
+    const textarea = document.getElementById(`comment-input-${key}`);
+    if (!textarea) return;
+
+    textarea.focus();
+    textarea.dataset.parentId = parentCommentId;
+    textarea.placeholder = 'Replying... (empty to cancel)';
+
+    // Auto-cancel reply mode when textarea is cleared
+    textarea.oninput = () => {
+        if (!textarea.value.trim() && textarea.dataset.parentId) {
+            clearReplyMode(textarea);
+        }
+    };
+}
+
+async function toggleReaction(commentIdEncoded, emojiEncoded) {
+    const commentId = decodeURIComponent(commentIdEncoded);
+    const emoji = decodeURIComponent(emojiEncoded);
+    try {
+        await apiRequest('POST', `/gov/comments/${encodeURIComponent(commentId)}/reactions`, { emoji });
+    } catch (error) {
+        const msg = String(error.message || '');
+        const looksLikeExists = msg.includes('409') || msg.toLowerCase().includes('conflict') || msg.toLowerCase().includes('already');
+        if (!looksLikeExists) {
+            showToast(`Failed to add reaction: ${msg}`, 'error');
+            return;
+        }
+        // Looks like a duplicate — attempt to remove
+        try {
+            await apiRequest('DELETE', `/gov/comments/${encodeURIComponent(commentId)}/reactions/${encodeURIComponent(emoji)}`);
+        } catch (err2) {
+            showToast(`Failed to remove reaction: ${String(err2.message || err2)}`, 'error');
+            return;
+        }
+    }
+    if (currentDetailProposalId) {
+        loadProposalDetail(currentDetailProposalId);
+    }
+}
+
+async function viewProposalProof(proposalIdEncoded) {
+    const proposalId = decodeURIComponent(proposalIdEncoded);
+    try {
+        const proof = await apiRequest('GET', `/gov/proposals/${encodeURIComponent(proposalId)}/proof`);
+        showToast('Proof loaded - check console for details', 'success', 5000);
+        console.log('Proposal Outcome Proof:', proof);
+    } catch (error) {
+        showToast(`Failed to load proof: ${error.message}`, 'error');
+    }
+}
+
+// Make proposal detail functions globally available
+window.castVoteAndReload = castVoteAndReload;
+window.submitComment = submitComment;
+window.startReply = startReply;
+window.toggleReaction = toggleReaction;
+window.viewProposalProof = viewProposalProof;
 
 // WebSocket Connection
 function connectWebSocket() {
@@ -1370,11 +1891,12 @@ function renderMemberList(members) {
                           (role === 'admin' || role === 'facilitator') ? 'admin' : '';
         const displayRole = member.role || 'Member';
 
+        const encodedDid = encodeURIComponent(String(member.did));
         return `
-            <div class="member-item" data-did="${escapeHtml(member.did)}">
+            <div class="member-item" data-did="${encodedDid}">
                 <div class="member-info">
                     <div class="member-did" title="${escapeHtml(member.did)}">${getNameSync(member.did)}</div>
-                    <button class="btn-copy-did" data-did="${escapeHtml(member.did)}" title="Copy full DID">📋</button>
+                    <button class="btn-copy-did" data-did="${encodedDid}" title="Copy full DID">📋</button>
                 </div>
                 <div class="member-role ${roleClass}">${escapeHtml(displayRole)}</div>
             </div>
@@ -1390,7 +1912,7 @@ function filterMembers(searchTerm) {
     const term = searchTerm.toLowerCase();
 
     memberItems.forEach(item => {
-        const did = item.dataset.did.toLowerCase();
+        const did = decodeURIComponent(item.dataset.did || '').toLowerCase();
         if (did.includes(term)) {
             item.style.display = '';
         } else {
@@ -1684,7 +2206,7 @@ document.addEventListener('click', (e) => {
 
     // Copy DID button
     if (e.target.classList.contains('btn-copy-did')) {
-        const did = e.target.dataset.did;
+        const did = decodeURIComponent(e.target.dataset.did || '');
         if (did) {
             copyToClipboard(did).then(success => {
                 if (success) {
@@ -3357,6 +3879,7 @@ function initializeMemberPagination() {
             // Only show action buttons for non-owners and non-self
             const showActions = canManage && !isOwner && !isCurrentUser;
 
+            const encDid = encodeURIComponent(String(member.did));
             return `
                 <div class="member-item">
                     <div class="member-avatar">
@@ -3364,14 +3887,14 @@ function initializeMemberPagination() {
                     </div>
                     <div class="member-info">
                         <div class="member-did">${getNameSync(member.did)}</div>
-                        <div class="member-role ${member.role || ''}">${member.role || 'Member'}</div>
+                        <div class="member-role ${escapeHtml(member.role || '')}">${escapeHtml(member.role || 'Member')}</div>
                     </div>
                     <div class="member-balance ${balanceClass}">
                         ${balance.toFixed(1)} hours
                     </div>
                     <button
                         class="btn btn-small btn-copy-did"
-                        data-did="${member.did}"
+                        data-did="${encDid}"
                         aria-label="Copy DID to clipboard"
                         title="Copy DID"
                     >
@@ -3381,15 +3904,15 @@ function initializeMemberPagination() {
                     <div class="member-actions">
                         <button
                             class="btn btn-small btn-edit"
-                            data-did="${member.did}"
-                            data-role="${member.role || 'member'}"
+                            data-did="${encDid}"
+                            data-role="${escapeHtml(member.role || 'member')}"
                             title="Edit role"
                         >
                             ✏️
                         </button>
                         <button
                             class="btn btn-small btn-remove"
-                            data-did="${member.did}"
+                            data-did="${encDid}"
                             title="Remove member"
                         >
                             🗑️
@@ -4546,7 +5069,7 @@ function initializeMemberManagement() {
         // Edit button
         if (e.target.closest('.btn-edit')) {
             const btn = e.target.closest('.btn-edit');
-            const did = btn.dataset.did;
+            const did = decodeURIComponent(btn.dataset.did || '');
             const currentRole = btn.dataset.role;
 
             if (editMemberModal && editMemberDid && editMemberDidDisplay && editMemberRole) {
@@ -4560,7 +5083,7 @@ function initializeMemberManagement() {
         // Remove button
         if (e.target.closest('.btn-remove')) {
             const btn = e.target.closest('.btn-remove');
-            const did = btn.dataset.did;
+            const did = decodeURIComponent(btn.dataset.did || '');
 
             if (removeMemberModal && removeMemberDid && removeMemberDidDisplay) {
                 removeMemberDid.value = did;
@@ -5719,6 +6242,9 @@ document.querySelectorAll('.governance-tabs .tab-btn').forEach(btn => {
         document.querySelectorAll('.governance-tabs .tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
+        // Clear detail view state if navigating away
+        currentDetailProposalId = null;
+
         const tab = btn.dataset.governanceTab;
         document.querySelectorAll('.governance-subtab').forEach(subtab => {
             subtab.classList.toggle('hidden', subtab.id !== `governance-${tab}`);
@@ -5729,6 +6255,12 @@ document.querySelectorAll('.governance-tabs .tab-btn').forEach(btn => {
         }
     });
 });
+
+// Proposal detail back button
+const proposalDetailBackBtn = document.getElementById('proposal-detail-back');
+if (proposalDetailBackBtn) {
+    proposalDetailBackBtn.addEventListener('click', returnToProposalList);
+}
 
 // Make functions available globally
 window.toggleActionItemStatus = toggleActionItemStatus;
