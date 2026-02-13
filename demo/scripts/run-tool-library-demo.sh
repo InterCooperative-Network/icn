@@ -194,7 +194,10 @@ else
     echo "Starting ICN daemon..."
     (
         cd "$ICN_DIR"
-        ICN_PASSPHRASE=demo123 ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" ./target/release/icnd \
+        ICN_PASSPHRASE=demo123 \
+            ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
+            ICN_CORS_ORIGINS="http://localhost:$UI_PORT,http://127.0.0.1:$UI_PORT" \
+            ./target/release/icnd \
             --config "$RUNTIME_CONFIG" \
             --gateway-enable \
             --gateway-bind "$GATEWAY_HOST:$GATEWAY_PORT" \
@@ -237,7 +240,7 @@ TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     auth token \
     --coop-id "$COOP_ID" \
     --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-    2>/dev/null | tr -d '\n' || true)
+    2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${YELLOW}⚠${NC} Could not auto-generate token"
@@ -246,7 +249,7 @@ else
     echo -e "${GREEN}✓${NC} Token generated"
 fi
 
-CURRENT_DID=$(cd "$ICN_DIR" && ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 if [ -z "$CURRENT_DID" ]; then
     CURRENT_DID="$DEFAULT_DID"
 fi

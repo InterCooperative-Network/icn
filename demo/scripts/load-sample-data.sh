@@ -44,7 +44,7 @@ TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
   auth token \
   --coop-id "$COOP_ID" \
   --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-  2>/dev/null | tr -d '\n' || true)
+  2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${RED}✗${NC} Failed to get token"

@@ -86,7 +86,7 @@ echo
 echo "API Tests:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-CURRENT_DID=$(cd "$ICN_DIR" && ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 
 TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     -d "$DATA_DIR" \
@@ -94,7 +94,7 @@ TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     auth token \
     --coop-id "$COOP_ID" \
     --scopes "coop:read,ledger:read" \
-    2>/dev/null | tr -d '\n' || true)
+    2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
     run_check "Get auth token" "[ -n '$TOKEN' ]"
