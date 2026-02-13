@@ -11,9 +11,16 @@ UI_DIR="${REPO_ROOT}/web/pilot-ui"
 
 # Configuration (override with env vars as needed)
 DEMO_NAME="Rochester Tool Library Demo"
-GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-127.0.0.1}"
+GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-0.0.0.0}"
 GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
-GATEWAY="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
+# For display/API calls, resolve 0.0.0.0 to a reachable address
+if [ "$GATEWAY_HOST" = "0.0.0.0" ]; then
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    GATEWAY_DISPLAY_HOST="${LAN_IP:-127.0.0.1}"
+else
+    GATEWAY_DISPLAY_HOST="$GATEWAY_HOST"
+fi
+GATEWAY="http://${GATEWAY_DISPLAY_HOST}:${GATEWAY_PORT}"
 UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
 COOP_ID="${ICN_DEMO_COOP_ID:-rochester-tool-library}"
 DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
@@ -83,8 +90,8 @@ echo
 echo "Configuration:"
 echo "  Repo root: $REPO_ROOT"
 echo "  Data dir:  $DATA_DIR"
-echo "  Gateway:   $GATEWAY"
-echo "  UI:        http://localhost:$UI_PORT"
+echo "  Gateway:   $GATEWAY (bind: $GATEWAY_HOST)"
+echo "  UI:        http://${GATEWAY_DISPLAY_HOST}:$UI_PORT"
 echo "  mDNS:      $MDNS_ENABLED"
 echo
 echo "Press Enter to continue or Ctrl+C to cancel..."
@@ -196,7 +203,7 @@ else
         cd "$ICN_DIR"
         ICN_PASSPHRASE=demo123 \
             ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
-            ICN_CORS_ORIGINS="http://localhost:$UI_PORT,http://127.0.0.1:$UI_PORT" \
+            ICN_CORS_ORIGINS="http://localhost:$UI_PORT,http://127.0.0.1:$UI_PORT,http://${GATEWAY_DISPLAY_HOST}:$UI_PORT" \
             ./target/release/icnd \
             --config "$RUNTIME_CONFIG" \
             --gateway-enable \
@@ -317,7 +324,7 @@ echo -e "${BLUE}Access Information:${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 echo "  Pilot UI:"
-echo "     http://localhost:$UI_PORT"
+echo "     http://${GATEWAY_DISPLAY_HOST}:$UI_PORT"
 echo
 echo "  Gateway API:"
 echo "     $GATEWAY"
@@ -344,7 +351,7 @@ echo
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 echo -e "${BLUE}Quick Start:${NC}"
-echo "  1. Open your browser to: http://localhost:$UI_PORT"
+echo "  1. Open your browser to: http://${GATEWAY_DISPLAY_HOST}:$UI_PORT"
 echo "  2. Click 'Sign In'"
 echo "  3. Fill in the form with the credentials above"
 echo "  4. Copy/paste the token"
