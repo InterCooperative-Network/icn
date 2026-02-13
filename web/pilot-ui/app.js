@@ -1742,6 +1742,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // Auto-detect gateway URL when served from the gateway itself
+    if (elements.gatewayUrl.value === 'http://localhost:8080' && window.location.hostname !== 'localhost') {
+        elements.gatewayUrl.value = window.location.origin;
+    }
+
     const savedGateway = localStorage.getItem('icn-gateway');
     const savedCoop = localStorage.getItem('icn-coop');
     const savedDid = localStorage.getItem('icn-did');

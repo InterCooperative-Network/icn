@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2563eb">
+    <title>Offline - ICN Timebank</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .offline-container {
+            text-align: center;
+            max-width: 500px;
+        }
+
+        .offline-icon {
+            font-size: 6rem;
+            margin-bottom: 1.5rem;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        p {
+            font-size: 1.125rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .offline-tips {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+
+        .offline-tips h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .offline-tips ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .offline-tips li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .offline-tips li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        .btn {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 0.875rem 2rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .connection-status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            margin-right: 0.5rem;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .status-indicator.online {
+            background: #22c55e;
+            animation: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">📡</div>
+
+        <h1>You're Offline</h1>
+
+        <p>
+            Looks like you've lost your internet connection. Don't worry – your timebank data is safe!
+        </p>
+
+        <div class="offline-tips">
+            <h2>What you can do:</h2>
+            <ul>
+                <li>Check your WiFi or mobile data connection</li>
+                <li>Try moving to an area with better signal</li>
+                <li>View cached data when you reconnect</li>
+                <li>Transactions made offline will sync automatically</li>
+            </ul>
+        </div>
+
+        <button class="btn" onclick="window.location.reload()">
+            Try Again
+        </button>
+
+        <div class="connection-status">
+            <span class="status-indicator" id="status-dot"></span>
+            <span id="status-text">Offline - Waiting for connection...</span>
+        </div>
+    </div>
+
+    <script>
+        // Monitor online/offline status
+        function updateConnectionStatus() {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+
+            if (navigator.onLine) {
+                statusDot.classList.add('online');
+                statusText.textContent = 'Connection restored! Reloading...';
+
+                // Automatically reload when back online
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                statusDot.classList.remove('online');
+                statusText.textContent = 'Offline - Waiting for connection...';
+            }
+        }
+
+        // Listen for online/offline events
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+
+        // Initial check
+        updateConnectionStatus();
+
+        // Periodic check (every 5 seconds)
+        setInterval(() => {
+            if (navigator.onLine) {
+                updateConnectionStatus();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
