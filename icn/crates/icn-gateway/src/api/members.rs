@@ -127,7 +127,7 @@ pub struct UpdateProfileRequest {
 /// PUT /v1/members/{coop_id}/{did}/profile - Update member profile
 ///
 /// Self-service only: JWT subject must match the DID being edited.
-#[put("/members/{coop_id}/{did}/profile")]
+#[put("/{coop_id}/{did}/profile")]
 pub async fn update_member_profile(
     http_req: HttpRequest,
     path: web::Path<(String, String)>,

@@ -995,7 +995,7 @@ impl GatewayServer {
                         .service(api::members::get_member_profile)
                         // Protected member profile update (auth + rate limiting)
                         .service(
-                            web::scope("")
+                            web::scope("/members")
                                 .service(api::members::update_member_profile)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
