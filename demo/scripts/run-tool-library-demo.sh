@@ -346,7 +346,7 @@ if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
     curl -s -X POST "$GATEWAY/v1/gov/domains" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME Governance\",\"description\":\"Democratic decision-making for our tool library cooperative\",\"members\":[\"$CURRENT_DID\"]}" \
+        -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME Governance\",\"profile\":\"cooperative_default\",\"quorum_percent\":50,\"approval_percent\":60,\"voting_period_days\":7,\"members\":[\"$CURRENT_DID\"]}" \
         >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Governance domain" || echo -e "  ${YELLOW}⚠${NC} Governance domain (may already exist)"
 
     # Create sample proposals

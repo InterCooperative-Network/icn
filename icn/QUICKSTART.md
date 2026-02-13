@@ -37,7 +37,8 @@ Then open health endpoint: `http://localhost:9090/v1/health`
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `ICN_PASSPHRASE` | Keystore passphrase | `"my-secure-pass"` |
+| `ICN_KEYSTORE_PASSPHRASE` | Keystore passphrase (preferred) | `"my-secure-pass"` |
+| `ICN_PASSPHRASE` | Keystore passphrase (legacy fallback) | `"my-secure-pass"` |
 | `ICN_GATEWAY_JWT_SECRET` | JWT signing secret (min 32 bytes) | `$(openssl rand -hex 32)` |
 | `ICN_STATIC_DIR` | Optional static files path override | `"/custom/path"` |
 

@@ -29,8 +29,8 @@
     --bg-secondary: var(--gray-50);
     --bg-tertiary: var(--gray-100);
     --text-primary: var(--gray-900);
-    --text-secondary: var(--gray-600);
-    --text-tertiary: var(--gray-500);
+    --text-secondary: var(--gray-700);
+    --text-tertiary: var(--gray-600);
     --border-color: var(--gray-200);
     --border-hover: var(--gray-300);
 

@@ -798,6 +798,10 @@ async function loadTransactions() {
         });
         state.transactions = transactions;
 
+        // Pre-resolve names for transaction counterparties
+        const allDids = transactions.flatMap(tx => [tx.from, tx.to]).filter(Boolean);
+        await resolveNames(allDids);
+
         // Calculate monthly hours
         const oneMonthAgo = Date.now() / 1000 - 30 * 24 * 60 * 60;
         const monthlyTx = transactions.filter(tx => tx.timestamp > oneMonthAgo);
@@ -829,7 +833,8 @@ async function loadProposals() {
             if (typeof state === 'object' && state !== null) return Object.keys(state)[0];
             return '';
         };
-        const openProposals = proposals.filter(p => getStateKey(p.state) === 'Open');
+        const activeStates = ['Open', 'Draft'];
+        const openProposals = proposals.filter(p => activeStates.includes(getStateKey(p.state)));
         const closedProposals = proposals.filter(p => getStateKey(p.state) === 'Closed');
 
         // Render lists
@@ -848,7 +853,7 @@ async function renderProposalList(proposals, container, showVoteButtons) {
     if (!container) return;
 
     if (proposals.length === 0) {
-        container.innerHTML = `<p class="empty-state">${showVoteButtons ? 'No active proposals' : 'No closed proposals yet'}</p>`;
+        container.innerHTML = `<p class="empty-state">${showVoteButtons ? 'No proposals yet' : 'No closed proposals yet'}</p>`;
         return;
     }
 
@@ -1263,7 +1268,7 @@ async function renderDashboardProposals() {
     try {
         const response = await apiRequest('GET', '/gov/proposals');
         const proposals = Array.isArray(response) ? response : (response.data || []);
-        const openProposals = proposals.filter(p => p.state === 'Open').slice(0, 3);
+        const openProposals = proposals.filter(p => ['Open', 'Draft'].includes(typeof p.state === 'string' ? p.state : Object.keys(p.state)[0])).slice(0, 3);
 
         if (openProposals.length === 0) {
             elements.dashboardProposals.innerHTML = '<p class="empty-state">No pending proposals</p>';
@@ -2334,8 +2339,11 @@ function loadProfile() {
     document.getElementById('profile-name').textContent = state.did ? 'Member Profile' : 'Your Profile';
     document.getElementById('profile-did').textContent = state.userName || truncateDid(state.did || 'did:icn:...');
 
-    // Update initials
-    const initials = state.did ? state.did.slice(8, 10).toUpperCase() : '?';
+    // Update initials - prefer name-based
+    const profileName = state.did ? getNameSync(state.did) : '';
+    const initials = !state.did ? '?'
+        : profileName.startsWith('did:') ? state.did.slice(8, 10).toUpperCase()
+        : profileName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     document.getElementById('profile-initials').textContent = initials;
 
     // Load stats
@@ -3347,7 +3355,7 @@ function initializeMemberPagination() {
             return `
                 <div class="member-item">
                     <div class="member-avatar">
-                        <div class="avatar-placeholder">${member.did.slice(-6, -4).toUpperCase()}</div>
+                        <div class="avatar-placeholder">${(() => { const n = getNameSync(member.did); return n.startsWith('did:') ? member.did.slice(-6, -4).toUpperCase() : n.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(); })()}</div>
                     </div>
                     <div class="member-info">
                         <div class="member-did">${getNameSync(member.did)}</div>
