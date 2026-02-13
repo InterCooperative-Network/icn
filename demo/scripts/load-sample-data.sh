@@ -61,7 +61,7 @@ MEMBERS_FILE="$REPO_ROOT/demo/data/tool-library-members.json"
 
 echo "Loading members from $MEMBERS_FILE..."
 
-CURRENT_DID=$(cd "$ICN_DIR" && ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 if [ -z "$CURRENT_DID" ]; then
     CURRENT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
 fi

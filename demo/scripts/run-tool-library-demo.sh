@@ -246,7 +246,7 @@ TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
     -e "$RPC_ENDPOINT" \
     auth token \
     --coop-id "$COOP_ID" \
-    --scopes "coop:write,coop:read,ledger:read,ledger:write" \
+    --scopes "coop:write,coop:read,ledger:read,ledger:write,gov:read,gov:write" \
     2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -z "$TOKEN" ]; then
@@ -294,31 +294,73 @@ else
     echo -e "${YELLOW}⚠${NC} Skipping cooperative verification (no token)"
 fi
 
-# Step 3b: Seed minimal demo data so the dashboard isn't empty
+# Step 3b: Seed demo data so the dashboard shows activity
 if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
     echo
     echo "Seeding demo data..."
+
+    # Generate a recipient identity for demo payments
+    RECIPIENT_DIR=$(mktemp -d /tmp/icn-demo-recipient.XXXXXX)
+    RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+        -d "$RECIPIENT_DIR" id init 2>/dev/null \
+        | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+    if [ -z "$RECIPIENT_DID" ]; then
+        # Identity may already exist from a previous run; read it
+        RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+            -d "$RECIPIENT_DIR" id show 2>/dev/null \
+            | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+    fi
 
     # Create governance domain
     curl -s -X POST "$GATEWAY/v1/gov/domains" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME Governance\",\"description\":\"Democratic decision-making\",\"members\":[\"$CURRENT_DID\"]}" \
+        -d "{\"id\":\"$COOP_ID\",\"name\":\"$COOP_NAME Governance\",\"description\":\"Democratic decision-making for our tool library cooperative\",\"members\":[\"$CURRENT_DID\"]}" \
         >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Governance domain" || echo -e "  ${YELLOW}⚠${NC} Governance domain (may already exist)"
 
-    # Create a sample proposal
+    # Create sample proposals
     curl -s -X POST "$GATEWAY/v1/gov/proposals" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Welcome new members for Spring 2026\",\"description\":\"Open enrollment for the spring cohort\",\"proposal_type\":\"membership\"}" \
-        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Sample proposal" || true
+        -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Welcome new members for Spring 2026\",\"description\":\"Open enrollment for the spring cohort — approve 12 new member applications\",\"payload\":{\"type\":\"text\",\"body\":\"Approve batch enrollment of 12 applicants for Q1 2026\"}}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Proposal: Spring enrollment" || true
 
-    # Create a sample ledger entry
-    curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+    curl -s -X POST "$GATEWAY/v1/gov/proposals" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"from_did\":\"$CURRENT_DID\",\"to_did\":\"did:icn:zBobExample456\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Garden bed construction\"}" \
-        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Sample transaction" || true
+        -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Purchase new cordless drill set\",\"description\":\"Replace worn-out DeWalt set with new Milwaukee M18 combo kit\",\"payload\":{\"type\":\"budget\",\"amount\":450,\"currency\":\"USD\",\"recipient\":\"$COOP_ID\",\"purpose\":\"Replace failing drill batteries after 3 years of heavy use\"}}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Proposal: Equipment purchase" || true
+
+    curl -s -X POST "$GATEWAY/v1/gov/proposals" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Extend Saturday hours through summer\",\"description\":\"Open 9am-5pm on Saturdays (currently 10am-2pm) from June through September\",\"payload\":{\"type\":\"text\",\"body\":\"Extend Saturday operating hours for summer season\"}}" \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Proposal: Extended hours" || true
+
+    # Create sample ledger transactions (requires valid recipient DID)
+    if [ -n "$RECIPIENT_DID" ]; then
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Garden work (3 hrs)" || echo -e "  ${YELLOW}⚠${NC} Transaction failed"
+
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Tool maintenance — sharpened mower blades and pruning shears\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Tool maintenance (2 hrs)" || true
+
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"Workshop instruction — intro to power tools safety\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Workshop (1 hr)" || true
+    else
+        echo -e "  ${YELLOW}⚠${NC} Skipping transactions (no recipient DID)"
+    fi
+
+    rm -rf "$RECIPIENT_DIR"
 fi
 
 # Step 4: Start UI
