@@ -993,6 +993,15 @@ impl GatewayServer {
                         )
                         // Public member profiles (read-only)
                         .service(api::members::get_member_profile)
+                        // Protected member profile update (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .service(api::members::update_member_profile)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Public cooperative statistics (no auth required)
                         .service(api::coops::get_coop_stats)
                         // Public SDIS endpoints (verification + enrollment)

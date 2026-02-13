@@ -1,6 +1,6 @@
 //! Member profile API endpoints
 
-use actix_web::{get, web, HttpRequest, HttpResponse};
+use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -115,6 +115,70 @@ pub async fn get_member_profile(
     };
 
     Ok(HttpResponse::Ok().json(profile))
+}
+
+/// Request body for updating member profile
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateProfileRequest {
+    /// Display name to set
+    pub display_name: String,
+}
+
+/// PUT /v1/members/{coop_id}/{did}/profile - Update member profile
+///
+/// Self-service only: JWT subject must match the DID being edited.
+#[put("/members/{coop_id}/{did}/profile")]
+pub async fn update_member_profile(
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+    body: web::Json<UpdateProfileRequest>,
+    coop_manager: web::Data<Arc<CoopManager>>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    let (coop_id, did_str) = path.into_inner();
+
+    let did = did_str
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+    // Self-service only: JWT sub must match the DID being edited
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid caller DID: {e}")))?;
+    if caller_did != did {
+        return Err(GatewayError::Forbidden(
+            "Can only update your own profile".to_string(),
+        ));
+    }
+
+    // Verify member exists in coop
+    let coop = coop_manager.get_coop(&coop_id).await?;
+    if !coop.members.iter().any(|m| m.did == did) {
+        return Err(GatewayError::NotFound(
+            "Member not found in cooperative".to_string(),
+        ));
+    }
+
+    // Validate display name
+    let name = body.display_name.trim().to_string();
+    if name.is_empty() || name.len() > 100 {
+        return Err(GatewayError::BadRequest(
+            "Display name must be 1-100 characters".to_string(),
+        ));
+    }
+
+    commons_manager
+        .update_display_name(&did, name.clone())
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to update display name: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "did": did_str,
+        "display_name": name
+    })))
 }
 
 #[cfg(test)]

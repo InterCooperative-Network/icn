@@ -255,7 +255,7 @@ TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
     -e "$RPC_ENDPOINT" \
     auth token \
     --coop-id "$COOP_ID" \
-    --scopes "coop:write,coop:read,ledger:read,ledger:write,gov:read,gov:write" \
+    --scopes "coop:write,coop:read,coop:admin,ledger:read,ledger:write,gov:read,gov:write" \
     2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -z "$TOKEN" ]; then
@@ -308,17 +308,39 @@ if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
     echo
     echo "Seeding demo data..."
 
-    # Generate a recipient identity for demo payments
-    RECIPIENT_DIR=$(mktemp -d /tmp/icn-demo-recipient.XXXXXX)
-    RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
-        -d "$RECIPIENT_DIR" id init 2>/dev/null \
-        | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
-    if [ -z "$RECIPIENT_DID" ]; then
-        # Identity may already exist from a previous run; read it
-        RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
-            -d "$RECIPIENT_DIR" id show 2>/dev/null \
+    # Set current user display name
+    curl -s -X PUT "$GATEWAY/v1/members/$COOP_ID/$(python3 -c "import urllib.parse; print(urllib.parse.quote('$CURRENT_DID', safe=''))")/profile" \
+        -H "Authorization: Bearer $TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"display_name":"Demo User"}' \
+        >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Set current user name: Demo User" || echo -e "  ${YELLOW}⚠${NC} Could not set current user name"
+
+    # Generate 4 named demo members
+    MEMBER_NAMES=("Sarah Chen" "Marcus Rivera" "Priya Patel" "James Okafor")
+    MEMBER_DIDS=()
+
+    for i in "${!MEMBER_NAMES[@]}"; do
+        NAME="${MEMBER_NAMES[$i]}"
+        MEMBER_DIR=$(mktemp -d "/tmp/icn-demo-member-${i}.XXXXXX")
+        MEMBER_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
+            -d "$MEMBER_DIR" id init 2>/dev/null \
             | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
-    fi
+        if [ -z "$MEMBER_DID" ]; then
+            MEMBER_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
+                -d "$MEMBER_DIR" id show 2>/dev/null \
+                | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+        fi
+
+        if [ -n "$MEMBER_DID" ]; then
+            curl -s -X POST "$GATEWAY/v1/coops/$COOP_ID/members" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{\"did\":\"$MEMBER_DID\",\"role\":\"participant\",\"display_name\":\"$NAME\"}" \
+                >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Member: $NAME" || echo -e "  ${YELLOW}⚠${NC} Member: $NAME (may already exist)"
+            MEMBER_DIDS+=("$MEMBER_DID")
+        fi
+        rm -rf "$MEMBER_DIR"
+    done
 
     # Create governance domain
     curl -s -X POST "$GATEWAY/v1/gov/domains" \
@@ -346,30 +368,40 @@ if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
         -d "{\"domain_id\":\"$COOP_ID\",\"title\":\"Extend Saturday hours through summer\",\"description\":\"Open 9am-5pm on Saturdays (currently 10am-2pm) from June through September\",\"payload\":{\"type\":\"text\",\"body\":\"Extend Saturday operating hours for summer season\"}}" \
         >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Proposal: Extended hours" || true
 
-    # Create sample ledger transactions (requires valid recipient DID)
-    if [ -n "$RECIPIENT_DID" ]; then
+    # Create sample ledger transactions between named members
+    if [ ${#MEMBER_DIDS[@]} -ge 3 ]; then
         curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \
-            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Garden work (3 hrs)" || echo -e "  ${YELLOW}⚠${NC} Transaction failed"
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[0]}\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Sarah Chen (3 hrs)" || echo -e "  ${YELLOW}⚠${NC} Transaction failed"
 
         curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Tool maintenance — sharpened mower blades and pruning shears\"}" \
-            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Tool maintenance (2 hrs)" || true
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[1]}\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Tool maintenance — sharpened mower blades and pruning shears\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Marcus Rivera (2 hrs)" || true
 
         curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"$RECIPIENT_DID\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"Workshop instruction — intro to power tools safety\"}" \
-            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Workshop (1 hr)" || true
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[2]}\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"Workshop instruction — intro to power tools safety\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Priya Patel (1 hr)" || true
+
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\":\"${MEMBER_DIDS[0]}\",\"to\":\"${MEMBER_DIDS[3]}\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Furniture repair — reglued two dining chairs\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Sarah Chen -> James Okafor (2 hrs)" || true
+    elif [ ${#MEMBER_DIDS[@]} -ge 1 ]; then
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[0]}\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \
+            >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: 3 hrs" || true
     else
-        echo -e "  ${YELLOW}⚠${NC} Skipping transactions (no recipient DID)"
+        echo -e "  ${YELLOW}⚠${NC} Skipping transactions (no member DIDs generated)"
     fi
-
-    rm -rf "$RECIPIENT_DIR"
 fi
 
 # Step 4: Start UI

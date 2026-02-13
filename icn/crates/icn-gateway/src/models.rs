@@ -105,6 +105,9 @@ pub struct AddMemberRequest {
     /// Role for the new member: "steward", "facilitator", or "participant"
     /// Legacy names "owner", "admin", "member" are also accepted for backwards compatibility
     pub role: String,
+    /// Optional display name to set when adding the member
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 /// Update member role

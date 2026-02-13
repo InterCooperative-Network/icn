@@ -363,6 +363,25 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         self.store.get_holder_by_did(&did_str)
     }
 
+    /// Update the display name for a holder identified by DID.
+    /// If no holder record exists yet, creates a minimal holder record directly.
+    pub async fn update_display_name(&self, did: &Did, display_name: String) -> Result<()> {
+        let did_str = did.to_string();
+        if let Some(mut holder) = self.store.get_holder_by_did(&did_str)? {
+            holder.set_display_name(display_name);
+            self.store.put_holder(&holder)?;
+        } else {
+            // Create a minimal holder record directly (no anchor required).
+            // This is used for demo seeding where members don't go through
+            // full SDIS enrollment but still need display names.
+            let anchor_bytes: [u8; 32] = Sha256::digest(did_str.as_bytes()).into();
+            let mut holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), POPLevel::Weak);
+            holder.set_display_name(display_name);
+            self.store.put_holder(&holder)?;
+        }
+        Ok(())
+    }
+
     /// Get or create a CommonsHolderRecord (idempotent)
     ///
     /// This method provides create-or-get semantics for holders:

@@ -28,6 +28,8 @@ const state = {
     myListings: [],
     ws: null,
     wsConnected: false,
+    nameCache: new Map(),
+    userName: null,
 };
 
 // DOM Elements
@@ -334,6 +336,42 @@ function truncateDid(did) {
     return `${did.slice(0, 12)}...${did.slice(-6)}`;
 }
 
+// Name resolution with caching (5-minute TTL)
+const NAME_CACHE_TTL = 5 * 60 * 1000;
+
+async function resolveName(did) {
+    if (!did) return 'Unknown';
+    const cached = state.nameCache.get(did);
+    if (cached && (Date.now() - cached.fetchedAt) < NAME_CACHE_TTL) {
+        return cached.name;
+    }
+    if (did === state.did && state.userName) {
+        return state.userName;
+    }
+    try {
+        const profile = await apiRequest('GET', `/members/${encodeURIComponent(state.coopId)}/${encodeURIComponent(did)}`);
+        const name = profile.name || truncateDid(did);
+        state.nameCache.set(did, { name, fetchedAt: Date.now() });
+        return name;
+    } catch (e) {
+        const fallback = truncateDid(did);
+        state.nameCache.set(did, { name: fallback, fetchedAt: Date.now() });
+        return fallback;
+    }
+}
+
+async function resolveNames(dids) {
+    const unique = [...new Set(dids.filter(Boolean))];
+    await Promise.all(unique.map(did => resolveName(did)));
+}
+
+function getNameSync(did) {
+    if (!did) return 'Unknown';
+    const cached = state.nameCache.get(did);
+    if (cached) return cached.name;
+    return truncateDid(did);
+}
+
 function formatDate(timestamp) {
     return new Date(timestamp * 1000).toLocaleDateString();
 }
@@ -529,6 +567,32 @@ async function login() {
         // Update header
         elements.coopName.textContent = state.coopId;
         elements.userDid.textContent = truncateDid(state.did);
+        // Resolve display name for current user
+        resolveName(state.did).then(name => {
+            state.userName = name;
+            elements.userDid.textContent = name;
+        });
+        // Show edit button after login
+        const editNameBtn = document.getElementById('edit-name-btn');
+        if (editNameBtn) {
+            editNameBtn.style.display = 'inline-block';
+            editNameBtn.onclick = () => {
+                const currentName = state.userName || '';
+                const newName = prompt('Enter your display name:', currentName);
+                if (newName !== null && newName.trim() !== '') {
+                    apiRequest('PUT', `/members/${encodeURIComponent(state.coopId)}/${encodeURIComponent(state.did)}/profile`, {
+                        display_name: newName.trim()
+                    }).then(() => {
+                        state.userName = newName.trim();
+                        state.nameCache.set(state.did, { name: newName.trim(), fetchedAt: Date.now() });
+                        elements.userDid.textContent = newName.trim();
+                        showToast('Display name updated', 'success');
+                    }).catch(err => {
+                        showToast('Failed to update name: ' + err.message, 'error');
+                    });
+                }
+            };
+        }
         updateTokenExpiry();
 
         // Load data
@@ -679,13 +743,19 @@ async function loadMembers() {
 
         elements.totalMembers.textContent = members.length;
 
+        // Pre-resolve names for all members
+        await resolveNames(members.map(m => m.did));
+
         // Update recipient dropdown
         elements.recipient.innerHTML = '<option value="">Select member...</option>';
         for (const member of members) {
             if (member.did !== state.did) {
                 const option = document.createElement('option');
                 option.value = member.did;
-                option.textContent = truncateDid(member.did);
+                const memberName = getNameSync(member.did);
+                option.textContent = memberName !== truncateDid(member.did)
+                    ? `${memberName} (${truncateDid(member.did)})`
+                    : truncateDid(member.did);
                 elements.recipient.appendChild(option);
             }
         }
@@ -782,6 +852,8 @@ async function renderProposalList(proposals, container, showVoteButtons) {
         return;
     }
 
+    await resolveNames(proposals.map(p => p.proposer).filter(Boolean));
+
     const html = await Promise.all(proposals.map(async (proposal) => {
         // Get vote tally
         let votes = { for_votes: 0, against_votes: 0, abstain_votes: 0 };
@@ -844,6 +916,7 @@ async function renderProposalList(proposals, container, showVoteButtons) {
                     <div class="proposal-title">${escapeHtml(proposal.title)}</div>
                     <div class="proposal-state ${stateClass}">${stateKey}</div>
                 </div>
+                ${proposal.proposer ? `<div class="proposal-proposer" style="font-size:0.85em;color:var(--text-secondary,#666);margin-bottom:0.5em;">Proposed by ${getNameSync(proposal.proposer)}</div>` : ''}
                 ${proposal.description ? `<div class="proposal-description">${escapeHtml(proposal.description)}</div>` : ''}
                 ${deadlineHtml}
                 <div class="proposal-votes">
@@ -1046,7 +1119,7 @@ function renderRecentActivity(transactions) {
             <div class="activity-item">
                 <div class="activity-details">
                     <div class="activity-parties">
-                        ${isReceived ? 'From' : 'To'} ${truncateDid(other)}
+                        ${isReceived ? 'From' : 'To'} ${getNameSync(other)}
                     </div>
                     ${tx.memo ? `<div class="activity-memo">${escapeHtml(tx.memo)}</div>` : ''}
                 </div>
@@ -1239,7 +1312,7 @@ function renderTopContributors() {
         return `
             <div class="contributor-item">
                 <span class="contributor-rank">${rank}</span>
-                <span class="contributor-did">${truncateDid(did)}</span>
+                <span class="contributor-did">${getNameSync(did)}</span>
                 <span class="contributor-hours">${hours.toFixed(1)} hrs</span>
             </div>
         `;
@@ -1261,7 +1334,7 @@ function renderTransactionList(transactions) {
             <div class="transaction-item">
                 <div class="transaction-info">
                     <div class="transaction-parties">
-                        ${truncateDid(tx.from)} &rarr; ${truncateDid(tx.to)}
+                        ${getNameSync(tx.from)} &rarr; ${getNameSync(tx.to)}
                     </div>
                     <div class="transaction-meta">
                         ${formatDateTime(tx.timestamp)}
@@ -1295,7 +1368,7 @@ function renderMemberList(members) {
         return `
             <div class="member-item" data-did="${escapeHtml(member.did)}">
                 <div class="member-info">
-                    <div class="member-did" title="${escapeHtml(member.did)}">${truncateDid(member.did)}</div>
+                    <div class="member-did" title="${escapeHtml(member.did)}">${getNameSync(member.did)}</div>
                     <button class="btn-copy-did" data-did="${escapeHtml(member.did)}" title="Copy full DID">📋</button>
                 </div>
                 <div class="member-role ${roleClass}">${escapeHtml(displayRole)}</div>
@@ -2259,7 +2332,7 @@ function loadProfile() {
 
     // Update UI
     document.getElementById('profile-name').textContent = state.did ? 'Member Profile' : 'Your Profile';
-    document.getElementById('profile-did').textContent = truncateDid(state.did || 'did:icn:...');
+    document.getElementById('profile-did').textContent = state.userName || truncateDid(state.did || 'did:icn:...');
 
     // Update initials
     const initials = state.did ? state.did.slice(8, 10).toUpperCase() : '?';
@@ -2421,7 +2494,7 @@ function createServiceHistoryItem(tx, type) {
     item.innerHTML = `
         <div class="service-history-details">
             <div class="service-history-description">${description}</div>
-            <div class="service-history-date">${formatDate(tx.timestamp)} • ${truncateDid(peer)}</div>
+            <div class="service-history-date">${formatDate(tx.timestamp)} • ${getNameSync(peer)}</div>
         </div>
         <div class="service-history-hours">${tx.amount}h</div>
     `;
@@ -2608,7 +2681,7 @@ function createServiceListing(service) {
         <p class="service-listing-description">${escapeHtml(service.description)}</p>
         <div class="service-listing-meta">
             <div class="service-listing-poster">
-                Posted by <strong>${truncateDid(service.poster)}</strong>
+                Posted by <strong>${getNameSync(service.poster)}</strong>
             </div>
             <div class="service-listing-date">${formatDate(service.date)}</div>
         </div>
@@ -3232,7 +3305,7 @@ function initializeTransactionPagination() {
                     <div class="transaction-details">
                         <div class="transaction-party">
                             ${isIncoming ? 'From' : 'To'}:
-                            <span class="did">${truncateDid(isIncoming ? tx.from : tx.to)}</span>
+                            <span class="did">${getNameSync(isIncoming ? tx.from : tx.to)}</span>
                         </div>
                         <div class="transaction-memo">${tx.memo || 'No description'}</div>
                         <div class="transaction-date">${formatDate(tx.timestamp)}</div>
@@ -3277,7 +3350,7 @@ function initializeMemberPagination() {
                         <div class="avatar-placeholder">${member.did.slice(-6, -4).toUpperCase()}</div>
                     </div>
                     <div class="member-info">
-                        <div class="member-did">${truncateDid(member.did)}</div>
+                        <div class="member-did">${getNameSync(member.did)}</div>
                         <div class="member-role ${member.role || ''}">${member.role || 'Member'}</div>
                     </div>
                     <div class="member-balance ${balanceClass}">
@@ -3702,7 +3775,7 @@ function renderPreview() {
 
             return `
                 <tr>
-                    <td>${truncateDid(row.did)}</td>
+                    <td>${getNameSync(row.did)}</td>
                     <td>${escapeHtml(row.role)}</td>
                     <td>${parseFloat(row.balance).toFixed(1)}</td>
                     <td class="${statusClass}">${statusText}</td>
@@ -4074,8 +4147,8 @@ function renderBatchPreview() {
 
             return `
                 <tr>
-                    <td>${truncateDid(row.from)}</td>
-                    <td>${truncateDid(row.to)}</td>
+                    <td>${getNameSync(row.from)}</td>
+                    <td>${getNameSync(row.to)}</td>
                     <td>${parseFloat(row.amount).toFixed(1)} hrs</td>
                     <td>${escapeHtml(row.memo || '')}</td>
                     <td class="${statusClass}">${statusText}</td>
@@ -4286,7 +4359,7 @@ document.addEventListener('DOMContentLoaded', initializeLanguageSwitcher);
 async function addMember(did, role) {
     try {
         await apiRequest('POST', `/coops/${state.coopId}/members`, { did, role });
-        showToast(`Member ${truncateDid(did)} added successfully`, 'success');
+        showToast(`Member ${getNameSync(did)} added successfully`, 'success');
         await loadMembers(); // Reload member list
     } catch (error) {
         console.error('Failed to add member:', error);
@@ -4301,7 +4374,7 @@ async function addMember(did, role) {
 async function removeMember(did) {
     try {
         await apiRequest('DELETE', `/coops/${state.coopId}/members/${encodeURIComponent(did)}`);
-        showToast(`Member ${truncateDid(did)} removed`, 'success');
+        showToast(`Member ${getNameSync(did)} removed`, 'success');
         await loadMembers(); // Reload member list
     } catch (error) {
         console.error('Failed to remove member:', error);
@@ -4316,7 +4389,7 @@ async function removeMember(did) {
 async function updateMemberRole(did, newRole) {
     try {
         await apiRequest('PUT', `/coops/${state.coopId}/members/${encodeURIComponent(did)}/role`, { role: newRole });
-        showToast(`Updated ${truncateDid(did)} to ${newRole}`, 'success');
+        showToast(`Updated ${getNameSync(did)} to ${newRole}`, 'success');
         await loadMembers(); // Reload member list
     } catch (error) {
         console.error('Failed to update member role:', error);
@@ -5140,10 +5213,10 @@ function applyTransactionFilters() {
         filterState.activeFilters.push({ type: 'search', label: `Search: "${filterState.search}"` });
     }
     if (filterState.fromDid) {
-        filterState.activeFilters.push({ type: 'fromDid', label: `From: ${truncateDid(filterState.fromDid)}` });
+        filterState.activeFilters.push({ type: 'fromDid', label: `From: ${getNameSync(filterState.fromDid)}` });
     }
     if (filterState.toDid) {
-        filterState.activeFilters.push({ type: 'toDid', label: `To: ${truncateDid(filterState.toDid)}` });
+        filterState.activeFilters.push({ type: 'toDid', label: `To: ${getNameSync(filterState.toDid)}` });
     }
     if (filterState.minAmount !== null) {
         filterState.activeFilters.push({ type: 'minAmount', label: `Min: ${filterState.minAmount}` });
@@ -5381,9 +5454,9 @@ function renderFilteredTransactions(transactions) {
     listElement.innerHTML = transactions.map(tx => `
         <div class="transaction-item">
             <div class="transaction-details">
-                <div class="transaction-from">${truncateDid(tx.from)}</div>
+                <div class="transaction-from">${getNameSync(tx.from)}</div>
                 <div class="transaction-arrow">→</div>
-                <div class="transaction-to">${truncateDid(tx.to)}</div>
+                <div class="transaction-to">${getNameSync(tx.to)}</div>
             </div>
             <div class="transaction-amount">${tx.amount} ${tx.currency}</div>
             <div class="transaction-memo">${tx.memo || '—'}</div>
