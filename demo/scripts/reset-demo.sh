@@ -8,6 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ICN_DIR="${REPO_ROOT}/icn"
 
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
 DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
 UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
 
@@ -118,7 +127,7 @@ mkdir -p "$DATA_DIR"
 cd "$ICN_DIR"
 
 echo "Creating fresh identity..."
-ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
     -d "$DATA_DIR" \
     id init > /tmp/icn-reset-init.log 2>&1
 

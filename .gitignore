@@ -35,6 +35,7 @@ icn/.cargo/config.user.toml
 *.key
 *.pem
 /keys/
+demo-token.txt
 
 # Build artifacts
 *.o

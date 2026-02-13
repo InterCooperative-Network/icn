@@ -8,6 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ICN_DIR="${REPO_ROOT}/icn"
 
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
 GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-127.0.0.1}"
 GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
 GATEWAY="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
@@ -38,7 +47,7 @@ echo
 
 # Get JWT token
 echo "Getting JWT token..."
-TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
   -d "$DATA_DIR" \
   -e "$RPC_ENDPOINT" \
   auth token \
@@ -50,7 +59,7 @@ if [ -z "$TOKEN" ]; then
     echo -e "${RED}✗${NC} Failed to get token"
     echo "Try manually:"
     echo "  cd $ICN_DIR"
-    echo "  ICN_PASSPHRASE=demo123 ./target/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\""
+    echo "  ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\""
     exit 1
 fi
 echo -e "${GREEN}✓${NC} Got JWT token"
@@ -61,7 +70,7 @@ MEMBERS_FILE="$REPO_ROOT/demo/data/tool-library-members.json"
 
 echo "Loading members from $MEMBERS_FILE..."
 
-CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 if [ -z "$CURRENT_DID" ]; then
     CURRENT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
 fi

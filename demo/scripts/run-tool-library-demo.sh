@@ -9,6 +9,15 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ICN_DIR="${REPO_ROOT}/icn"
 UI_DIR="${REPO_ROOT}/web/pilot-ui"
 
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var and .cargo/config.toml)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
 # Configuration (override with env vars as needed)
 DEMO_NAME="Rochester Tool Library Demo"
 GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-0.0.0.0}"
@@ -111,11 +120,11 @@ if [ -z "$JWT_SECRET" ]; then
 fi
 
 if [ "${#JWT_SECRET}" -lt 32 ]; then
-    echo -e "${RED}✗${NC} ICN_GATEWAY_JWT_SECRET must be at least 32 bytes"
+    echo -e "${RED}✗${NC} ICN_GATEWAY_JWT_SECRET must be at least 32 characters"
     exit 1
 fi
 
-if [ ! -x "$ICN_DIR/target/release/icnd" ] || [ ! -x "$ICN_DIR/target/release/icnctl" ]; then
+if [ ! -x "$TARGET_DIR/release/icnd" ] || [ ! -x "$TARGET_DIR/release/icnctl" ]; then
     echo "Release binaries missing; building icnd and icnctl..."
     (
         cd "$ICN_DIR"
@@ -127,7 +136,7 @@ if [ ! -f "$DATA_DIR/identity.age" ]; then
     echo "No demo identity found; initializing one in $DATA_DIR..."
     (
         cd "$ICN_DIR"
-        ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id init >/tmp/icn-demo-id-init.log 2>&1
+        ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d "$DATA_DIR" id init >/tmp/icn-demo-id-init.log 2>&1
     )
 fi
 
@@ -204,7 +213,7 @@ else
         ICN_PASSPHRASE=demo123 \
             ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
             ICN_CORS_ORIGINS="http://localhost:$UI_PORT,http://127.0.0.1:$UI_PORT,http://${GATEWAY_DISPLAY_HOST}:$UI_PORT" \
-            ./target/release/icnd \
+            $TARGET_DIR/release/icnd \
             --config "$RUNTIME_CONFIG" \
             --gateway-enable \
             --gateway-bind "$GATEWAY_HOST:$GATEWAY_PORT" \
@@ -241,7 +250,7 @@ echo "Step 2: Getting authentication token"
 echo "========================================="
 echo
 
-TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
     -d "$DATA_DIR" \
     -e "$RPC_ENDPOINT" \
     auth token \
@@ -256,7 +265,7 @@ else
     echo -e "${GREEN}✓${NC} Token generated"
 fi
 
-CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 if [ -z "$CURRENT_DID" ]; then
     CURRENT_DID="$DEFAULT_DID"
 fi
@@ -301,12 +310,12 @@ if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
 
     # Generate a recipient identity for demo payments
     RECIPIENT_DIR=$(mktemp -d /tmp/icn-demo-recipient.XXXXXX)
-    RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+    RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
         -d "$RECIPIENT_DIR" id init 2>/dev/null \
         | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
     if [ -z "$RECIPIENT_DID" ]; then
         # Identity may already exist from a previous run; read it
-        RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+        RECIPIENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
             -d "$RECIPIENT_DIR" id show 2>/dev/null \
             | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
     fi

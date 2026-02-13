@@ -8,6 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ICN_DIR="${REPO_ROOT}/icn"
 
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
 GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-127.0.0.1}"
 GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
 GATEWAY="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
@@ -70,8 +79,8 @@ echo
 
 echo "Infrastructure Tests:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-run_check "Backend binary exists" "[ -x '$ICN_DIR/target/release/icnd' ]"
-run_check "CLI binary exists" "[ -x '$ICN_DIR/target/release/icnctl' ]"
+run_check "Backend binary exists" "[ -x '$TARGET_DIR/release/icnd' ]"
+run_check "CLI binary exists" "[ -x '$TARGET_DIR/release/icnctl' ]"
 run_check "UI files exist" "[ -f '$REPO_ROOT/web/pilot-ui/index.html' ]"
 run_check "Sample data exists" "[ -f '$REPO_ROOT/demo/data/tool-library-members.json' ]"
 run_check "Demo scripts exist" "[ -x '$REPO_ROOT/demo/scripts/run-tool-library-demo.sh' ]"
@@ -86,9 +95,9 @@ echo
 echo "API Tests:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
 
-TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 ./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
     -d "$DATA_DIR" \
     -e "$RPC_ENDPOINT" \
     auth token \

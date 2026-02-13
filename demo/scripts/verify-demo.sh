@@ -7,6 +7,13 @@ set -e
 FAILURES=0
 WARNINGS=0
 
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+else
+    TARGET_DIR="icn/target"
+fi
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -42,8 +49,8 @@ echo
 # Build checks
 echo "Build Checks:"
 check "Backend builds" "cd icn && RUSTC_WRAPPER= cargo build --release --quiet -p icnd -p icnctl"
-check "icnd binary exists" "[ -x icn/target/release/icnd ]"
-check "icnctl binary exists" "[ -x icn/target/release/icnctl ]"
+check "icnd binary exists" "[ -x $TARGET_DIR/release/icnd ]"
+check "icnctl binary exists" "[ -x $TARGET_DIR/release/icnctl ]"
 
 # Demo infrastructure checks
 echo

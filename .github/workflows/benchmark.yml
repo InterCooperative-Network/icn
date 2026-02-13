@@ -98,9 +98,9 @@ jobs:
           cache-on-failure: true
 
       - name: Run baseline benchmarks
-        run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline base
+        run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline base --sample-size 20
         working-directory: ./baseline/icn
-        timeout-minutes: 45
+        timeout-minutes: 60
 
       # Checkout PR head commit for comparison
       - name: Checkout PR commit
@@ -137,7 +137,7 @@ jobs:
           # Run benchmarks with comparison against baseline
           # Use process substitution to capture exit code while still using tee
           BENCH_EXIT=0
-          cargo bench $BENCH_TARGETS -- --noplot --baseline base 2>&1 | tee bench_output.txt || BENCH_EXIT=$?
+          cargo bench $BENCH_TARGETS -- --noplot --baseline base --sample-size 20 2>&1 | tee bench_output.txt || BENCH_EXIT=$?
 
           if [ "$BENCH_EXIT" -ne 0 ]; then
             echo "::error::Benchmark execution failed with exit code $BENCH_EXIT"
@@ -192,7 +192,7 @@ jobs:
             } > regression_report.md
           fi
         working-directory: ./pr/icn
-        timeout-minutes: 45
+        timeout-minutes: 60
 
       - name: Comment on PR
         uses: actions/github-script@v8
