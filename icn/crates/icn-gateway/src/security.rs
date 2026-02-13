@@ -104,10 +104,35 @@ impl SecurityConfig {
             }
         }
 
+        // Build CSP connect-src to include CORS origins so browsers
+        // don't block cross-origin API requests via Content-Security-Policy
+        let mut connect_sources: Vec<String> = vec![
+            "'self'".to_string(),
+            "ws:".to_string(),
+            "wss:".to_string(),
+            "http://localhost:*".to_string(),
+            "ws://localhost:*".to_string(),
+        ];
+        for origin in &origins {
+            if !connect_sources.contains(origin) {
+                connect_sources.push(origin.clone());
+                // Also allow WebSocket on same host:port
+                if let Some(ws) = origin.strip_prefix("http://") {
+                    connect_sources.push(format!("ws://{ws}"));
+                } else if let Some(ws) = origin.strip_prefix("https://") {
+                    connect_sources.push(format!("wss://{ws}"));
+                }
+            }
+        }
+        let csp = format!(
+            "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src {}",
+            connect_sources.join(" ")
+        );
+
         Self {
             cors_mode: CorsMode::AllowedOrigins(origins),
             enable_security_headers: true,
-            csp_directive: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss: http://localhost:* ws://localhost:*".to_string(),
+            csp_directive: csp,
         }
     }
 
