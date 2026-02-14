@@ -1021,11 +1021,285 @@ function logout() {
     elements.mainScreen.classList.add('hidden');
     elements.loginScreen.classList.remove('hidden');
     showToast('Signed out successfully', 'info', 3000);
+
+    // Hide scope banner
+    const scopeBanner = document.getElementById('scope-context-banner');
+    if (scopeBanner) {
+        scopeBanner.classList.add('hidden');
+    }
+}
+
+/**
+ * Load and populate scope context banner (P0-T04)
+ */
+async function loadScopeContext() {
+    const scopeBanner = document.getElementById('scope-context-banner');
+    const entityTypeBadge = document.getElementById('scope-entity-type');
+    const entityNameEl = document.getElementById('scope-entity-name');
+    const charterLink = document.getElementById('scope-charter-link');
+    const charterNameEl = document.getElementById('scope-charter-name');
+    const userRoleEl = document.getElementById('scope-user-role');
+    const trustClassEl = document.getElementById('scope-trust-value');
+    const trustScoreEl = document.getElementById('scope-trust-score');
+
+    if (!scopeBanner) return;
+
+    try {
+        // Fetch coop details
+        const coopResponse = await apiRequest('GET', `/coops/${state.coopId}`);
+        const coopData = coopResponse.coop || coopResponse;
+
+        // Determine entity type (defaulting to cooperative for now)
+        const entityType = coopData.entity_type || coopData.type || 'cooperative';
+        const entityName = coopData.name || state.coopId;
+
+        // Set entity type badge
+        entityTypeBadge.textContent = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+        entityTypeBadge.setAttribute('data-type', entityType.toLowerCase());
+
+        // Set entity name
+        entityNameEl.textContent = entityName;
+
+        // Fetch charter
+        try {
+            const charterResponse = await apiRequest('GET', `/charter?coop_id=${state.coopId}`);
+            const charter = charterResponse.charter || charterResponse;
+
+            if (charter && charter.name) {
+                charterNameEl.textContent = charter.name;
+                charterLink.setAttribute('data-charter-id', charter.id || '');
+            } else {
+                charterNameEl.textContent = 'Charter';
+            }
+        } catch (err) {
+            debugLog('Failed to load charter:', err);
+            charterNameEl.textContent = 'Charter';
+        }
+
+        // Get user role from membership
+        try {
+            const memberResponse = await apiRequest('GET', `/members/${state.coopId}/${encodeURIComponent(state.did)}`);
+            const member = memberResponse.member || memberResponse;
+
+            if (member && member.role) {
+                userRoleEl.textContent = member.role.charAt(0).toUpperCase() + member.role.slice(1);
+            } else {
+                userRoleEl.textContent = 'Member';
+            }
+        } catch (err) {
+            debugLog('Failed to load member role:', err);
+            userRoleEl.textContent = 'Member';
+        }
+
+        // Get trust score
+        try {
+            const trustResponse = await apiRequest('GET', `/trust/score/${encodeURIComponent(state.did)}`);
+            const trustScore = trustResponse.score !== undefined ? trustResponse.score : null;
+
+            if (trustScore !== null) {
+                const trustClass = getTrustClass(trustScore);
+                trustClassEl.textContent = trustClass;
+                trustClassEl.setAttribute('data-class', trustClass.toLowerCase());
+                trustScoreEl.textContent = `(${trustScore.toFixed(2)})`;
+            } else {
+                trustClassEl.textContent = 'Unknown';
+                trustScoreEl.textContent = '(--)';
+            }
+        } catch (err) {
+            debugLog('Failed to load trust score:', err);
+            trustClassEl.textContent = 'Unknown';
+            trustScoreEl.textContent = '(--)';
+        }
+
+        // Show the banner
+        scopeBanner.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Failed to load scope context:', error);
+        // Still show banner with default values
+        scopeBanner.classList.remove('hidden');
+    }
+}
+
+/**
+ * Map trust score to trust class (matches trust oracle thresholds)
+ */
+function getTrustClass(score) {
+    if (score >= 0.7) return 'Federated';
+    if (score >= 0.4) return 'Partner';
+    if (score >= 0.1) return 'Known';
+    return 'Isolated';
+}
+
+/**
+ * Show charter detail modal (P0-T05)
+ */
+async function showCharterDetail() {
+    const modal = document.getElementById('charter-detail-modal');
+    const loadingEl = document.getElementById('charter-loading');
+    const contentEl = document.getElementById('charter-content');
+    const errorEl = document.getElementById('charter-error');
+
+    if (!modal) return;
+
+    // Show modal with loading state
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    loadingEl.classList.remove('hidden');
+    contentEl.classList.add('hidden');
+    errorEl.classList.add('hidden');
+
+    try {
+        const response = await apiRequest('GET', `/charter?coop_id=${state.coopId}`);
+        const charter = response.charter || response;
+
+        // Populate fields
+        document.getElementById('charter-detail-name').textContent = charter.name || 'Unknown';
+        document.getElementById('charter-detail-id').textContent = charter.id || '--';
+        document.getElementById('charter-detail-version').textContent = charter.version || 'v1';
+        document.getElementById('charter-detail-authority').textContent = charter.authority_did || charter.authority || '--';
+        document.getElementById('charter-detail-domain').textContent = charter.domain || 'governance';
+
+        // Status badge
+        const statusEl = document.getElementById('charter-detail-status');
+        const status = charter.status || 'active';
+        statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        statusEl.className = `status-badge ${status.toLowerCase()}`;
+
+        // Last updated
+        if (charter.updated_at || charter.last_updated) {
+            const timestamp = charter.updated_at || charter.last_updated;
+            document.getElementById('charter-detail-updated').textContent = new Date(timestamp * 1000).toLocaleString();
+        } else {
+            document.getElementById('charter-detail-updated').textContent = '--';
+        }
+
+        // Description (optional)
+        if (charter.description) {
+            document.getElementById('charter-detail-description').textContent = charter.description;
+            document.getElementById('charter-description-section').classList.remove('hidden');
+        } else {
+            document.getElementById('charter-description-section').classList.add('hidden');
+        }
+
+        // Show content
+        loadingEl.classList.add('hidden');
+        contentEl.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Failed to load charter details:', error);
+        loadingEl.classList.add('hidden');
+        errorEl.textContent = error.message || 'Failed to load charter details';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+/**
+ * Close charter detail modal
+ */
+function closeCharterDetail() {
+    const modal = document.getElementById('charter-detail-modal');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+/**
+ * Load and populate "My Constraints" dashboard card (P0-T14)
+ */
+async function loadMyConstraints() {
+    const rateLimitEl = document.getElementById('constraint-rate-limit');
+    const rateSourceEl = document.getElementById('constraint-rate-source');
+    const trustClassEl = document.getElementById('constraint-trust-class');
+    const trustScoreDisplayEl = document.getElementById('constraint-trust-score-display');
+    const creditLimitEl = document.getElementById('constraint-credit-limit');
+    const creditSourceEl = document.getElementById('constraint-credit-source');
+
+    if (!rateLimitEl) return;
+
+    try {
+        // Fetch trust score (which now includes provenance from T13)
+        const trustResponse = await apiRequest('GET', `/trust/score/${encodeURIComponent(state.did)}`);
+        const trustScore = trustResponse.score !== undefined ? trustResponse.score : null;
+        const policyDomain = trustResponse.policy_domain || 'trust';
+        const evaluatedAt = trustResponse.evaluated_at;
+
+        if (trustScore !== null) {
+            // Map trust score to trust class
+            const trustClass = getTrustClass(trustScore);
+
+            // Map trust score to rate limit (matches TrustPolicyOracle thresholds)
+            let rateLimit;
+            if (trustScore >= 0.7) {
+                rateLimit = 200; // Federated
+            } else if (trustScore >= 0.4) {
+                rateLimit = 100; // Partner
+            } else if (trustScore >= 0.1) {
+                rateLimit = 20;  // Known
+            } else {
+                rateLimit = 10;  // Isolated
+            }
+
+            // Populate rate limit
+            rateLimitEl.textContent = rateLimit;
+            rateSourceEl.textContent = `Trust Policy (${policyDomain})`;
+
+            // Populate trust class
+            trustClassEl.textContent = trustClass;
+            trustClassEl.setAttribute('data-class', trustClass.toLowerCase());
+            trustScoreDisplayEl.textContent = trustScore.toFixed(2);
+
+        } else {
+            rateLimitEl.textContent = '--';
+            rateSourceEl.textContent = 'Unknown';
+            trustClassEl.textContent = 'Unknown';
+            trustScoreDisplayEl.textContent = '--';
+        }
+
+        // Fetch credit limit (if available from T17)
+        try {
+            const balanceResponse = await apiRequest('GET', `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`);
+
+            if (balanceResponse.credit_limit !== undefined) {
+                creditLimitEl.textContent = balanceResponse.credit_limit;
+                creditSourceEl.textContent = 'Ledger Policy';
+            } else {
+                // Fallback: use trust-based multiplier estimate
+                if (trustScore !== null) {
+                    // Credit multiplier typically scales with trust score
+                    const baseCredit = 100; // hours
+                    const multiplier = Math.max(0.5, trustScore); // minimum 50%
+                    const estimatedLimit = Math.round(baseCredit * multiplier);
+                    creditLimitEl.textContent = `~${estimatedLimit}`;
+                    creditSourceEl.textContent = 'Estimated (Trust-based)';
+                } else {
+                    creditLimitEl.textContent = '--';
+                    creditSourceEl.textContent = '--';
+                }
+            }
+        } catch (err) {
+            debugLog('Failed to load credit limit:', err);
+            creditLimitEl.textContent = '--';
+            creditSourceEl.textContent = '--';
+        }
+
+    } catch (error) {
+        console.error('Failed to load constraints:', error);
+        rateLimitEl.textContent = '--';
+        rateSourceEl.textContent = '--';
+        trustClassEl.textContent = '--';
+        trustScoreDisplayEl.textContent = '--';
+        creditLimitEl.textContent = '--';
+        creditSourceEl.textContent = '--';
+    }
 }
 
 // Data Loading
 async function loadAllData() {
     await Promise.all([
+        loadScopeContext(),
+        loadMyConstraints(),
         loadBalance(),
         loadMembers(),
         loadTransactions(),
@@ -1774,6 +2048,17 @@ function renderProposalSidebar(proposal, votes, discussion) {
     }
 
     el.innerHTML = html;
+
+    // Load receipt chain for closed proposals
+    const receiptsEl = document.getElementById('proposal-detail-receipts');
+    if (receiptsEl) {
+        if (stateKey === 'Accepted' || stateKey === 'Rejected' || stateKey === 'Closed') {
+            loadProposalReceiptChain(proposal.id, receiptsEl);
+        } else {
+            receiptsEl.classList.add('hidden');
+            receiptsEl.innerHTML = '';
+        }
+    }
 }
 
 async function submitComment(proposalIdEncoded) {
@@ -1873,12 +2158,187 @@ async function viewProposalProof(proposalIdEncoded) {
     }
 }
 
+// --- Receipt Chain Integration (P0-T11) ---
+
+/**
+ * Fetch the receipt chain for a governance decision hash.
+ * Calls GET /api/v1/receipts/chain?decision_hash={hash}
+ * Returns { decisionHash, allocations, intents }
+ */
+async function fetchReceiptChain(decisionHash) {
+    const url = `${state.gatewayUrl}/v1/receipts/chain?decision_hash=${encodeURIComponent(decisionHash)}`;
+    const headers = { 'Accept': 'application/json' };
+    if (state.token) {
+        headers['Authorization'] = `Bearer ${state.token}`;
+    }
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+        if (response.status === 404) {
+            return { decisionHash, allocations: [], intents: [] };
+        }
+        throw new Error(`Receipt chain query failed: ${response.status}`);
+    }
+    return response.json();
+}
+
+/**
+ * Convert a decision_hash from proof format (byte array or hex string) to hex string.
+ */
+function decisionHashToHex(hash) {
+    if (typeof hash === 'string') return hash.toLowerCase();
+    if (Array.isArray(hash)) {
+        return hash.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    return '';
+}
+
+/**
+ * Load and render the receipt chain inline in the proposal detail sidebar.
+ */
+async function loadProposalReceiptChain(proposalId, containerEl) {
+    containerEl.classList.remove('hidden');
+    containerEl.innerHTML = `
+        <h3 style="margin-bottom:0.75rem;">Receipt Chain</h3>
+        <p class="loading" style="font-size:0.85rem;">Loading receipt chain...</p>
+    `;
+
+    try {
+        // First, fetch the proof to get the decision_hash
+        const proof = await apiRequest('GET', `/gov/proposals/${encodeURIComponent(proposalId)}/proof`);
+        const decisionHash = decisionHashToHex(proof.receipt?.decision_hash);
+
+        if (!decisionHash) {
+            containerEl.innerHTML = `
+                <h3 style="margin-bottom:0.75rem;">Receipt Chain</h3>
+                <p class="empty-state" style="font-size:0.85rem;">No decision hash available</p>
+            `;
+            return;
+        }
+
+        // Now fetch the receipt chain
+        let chainData;
+        try {
+            chainData = await fetchReceiptChain(decisionHash);
+        } catch (e) {
+            // Receipt chain endpoint may not have data yet — that's normal
+            chainData = { decisionHash, allocations: [], intents: [] };
+        }
+
+        renderInlineReceiptChain(containerEl, decisionHash, chainData, proof);
+    } catch (error) {
+        // Proof not found or other error — show graceful fallback
+        containerEl.innerHTML = `
+            <h3 style="margin-bottom:0.75rem;">Receipt Chain</h3>
+            <p class="empty-state" style="font-size:0.85rem;">Receipt data not yet available</p>
+        `;
+    }
+}
+
+/**
+ * Render the receipt chain inline within the proposal detail.
+ */
+function renderInlineReceiptChain(containerEl, decisionHash, chainData, proof) {
+    const allocations = chainData.allocations || [];
+    const intents = chainData.intents || [];
+    const truncHash = decisionHash.length > 16
+        ? `${decisionHash.substring(0, 8)}...${decisionHash.substring(decisionHash.length - 8)}`
+        : decisionHash;
+
+    let html = '<h3 style="margin-bottom:0.75rem;">Receipt Chain</h3>';
+
+    // Governance receipt (always present if we have the proof)
+    html += `
+        <div class="receipt-chain-step completed">
+            <div class="receipt-chain-icon">1</div>
+            <div class="receipt-chain-content">
+                <div class="receipt-chain-label">Governance Receipt</div>
+                <code class="hash" style="font-size:0.75rem;">${escapeHtml(truncHash)}</code>
+                <div class="receipt-chain-detail">${escapeHtml(proof.receipt?.outcome || 'Unknown')} — ${proof.receipt?.vote_tally ? `${proof.receipt.vote_tally.for_votes || 0}/${proof.receipt.vote_tally.against_votes || 0}/${proof.receipt.vote_tally.abstain_votes || 0}` : '—'}</div>
+            </div>
+        </div>
+    `;
+
+    // Allocation receipts
+    if (allocations.length > 0) {
+        html += `
+            <div class="receipt-chain-step completed">
+                <div class="receipt-chain-icon">2</div>
+                <div class="receipt-chain-content">
+                    <div class="receipt-chain-label">Allocation</div>
+                    <div class="receipt-chain-detail">${allocations.length} receipt${allocations.length > 1 ? 's' : ''}</div>
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="receipt-chain-step pending">
+                <div class="receipt-chain-icon">2</div>
+                <div class="receipt-chain-content">
+                    <div class="receipt-chain-label">Allocation</div>
+                    <div class="receipt-chain-detail">Pending</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Settlement intents
+    if (intents.length > 0) {
+        html += `
+            <div class="receipt-chain-step completed">
+                <div class="receipt-chain-icon">3</div>
+                <div class="receipt-chain-content">
+                    <div class="receipt-chain-label">Settlement</div>
+                    <div class="receipt-chain-detail">${intents.length} intent${intents.length > 1 ? 's' : ''}</div>
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="receipt-chain-step pending">
+                <div class="receipt-chain-icon">3</div>
+                <div class="receipt-chain-content">
+                    <div class="receipt-chain-label">Settlement</div>
+                    <div class="receipt-chain-detail">Pending</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // "View Full Chain" link to receipts tab
+    const safeHash = escapeHtml(decisionHash);
+    html += `<div style="margin-top:0.75rem;"><button class="btn btn-secondary btn-small" onclick="viewReceiptChain('${safeHash}')">View Full Chain</button></div>`;
+
+    containerEl.innerHTML = html;
+}
+
+/**
+ * Navigate to the Receipts tab with the decision hash pre-filled and auto-query.
+ */
+function viewReceiptChain(decisionHash) {
+    // Switch to receipts tab
+    switchTab('receipts');
+
+    // Pre-fill the decision hash input
+    const input = document.getElementById('decision-hash-input');
+    if (input) {
+        input.value = decisionHash;
+    }
+
+    // Auto-trigger the query
+    const queryBtn = document.getElementById('query-chain-btn');
+    if (queryBtn) {
+        queryBtn.click();
+    }
+}
+
 // Make proposal detail functions globally available
 window.castVoteAndReload = castVoteAndReload;
 window.submitComment = submitComment;
 window.startReply = startReply;
 window.toggleReaction = toggleReaction;
 window.viewProposalProof = viewProposalProof;
+window.viewReceiptChain = viewReceiptChain;
+window.fetchReceiptChain = fetchReceiptChain;
 
 // WebSocket Connection
 function connectWebSocket() {
@@ -2586,6 +3046,26 @@ elements.onboardingWizard.addEventListener('click', (e) => {
         closeOnboardingWizard();
     }
 });
+// Charter detail modal (P0-T05)
+const charterLinkBtn = document.getElementById('scope-charter-link');
+const closeCharterBtn = document.getElementById('close-charter-detail');
+const charterModal = document.getElementById('charter-detail-modal');
+
+if (charterLinkBtn) {
+    charterLinkBtn.addEventListener('click', showCharterDetail);
+}
+
+if (closeCharterBtn) {
+    closeCharterBtn.addEventListener('click', closeCharterDetail);
+}
+
+if (charterModal) {
+    charterModal.addEventListener('click', (e) => {
+        if (e.target === charterModal) {
+            closeCharterDetail();
+        }
+    });
+}
 
 // Member search
 elements.memberSearch.addEventListener('input', (e) => {

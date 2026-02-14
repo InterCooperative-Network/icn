@@ -368,6 +368,12 @@
             class="modal hidden"
             role="dialog"
             aria-labelledby="create-identity-title"
+        <!-- Charter Detail Modal (P0-T05) -->
+        <div
+            id="charter-detail-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="charter-detail-title"
             aria-modal="true"
             aria-hidden="true"
         >
@@ -437,6 +443,55 @@
 
                         <button id="use-new-identity-btn" type="button" class="btn btn-primary">Use This Identity</button>
                     </div>
+                    <h2 id="charter-detail-title">Charter Details</h2>
+                    <button id="close-charter-detail" class="modal-close" aria-label="Close charter detail dialog">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="charter-loading" class="loading">Loading charter details...</div>
+
+                    <div id="charter-content" class="hidden">
+                        <div class="charter-field">
+                            <label>Charter Name:</label>
+                            <span id="charter-detail-name" class="charter-value">--</span>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Charter ID:</label>
+                            <code id="charter-detail-id" class="charter-value">--</code>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Version:</label>
+                            <span id="charter-detail-version" class="charter-value">--</span>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Status:</label>
+                            <span id="charter-detail-status" class="status-badge">--</span>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Authority:</label>
+                            <code id="charter-detail-authority" class="charter-value">--</code>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Last Updated:</label>
+                            <span id="charter-detail-updated" class="charter-value">--</span>
+                        </div>
+
+                        <div class="charter-field">
+                            <label>Governance Domain:</label>
+                            <span id="charter-detail-domain" class="charter-value">--</span>
+                        </div>
+
+                        <div id="charter-description-section" class="charter-field hidden">
+                            <label>Description:</label>
+                            <p id="charter-detail-description" class="charter-description">--</p>
+                        </div>
+                    </div>
+
+                    <div id="charter-error" class="error-message hidden" role="alert"></div>
                 </div>
             </div>
         </div>
@@ -536,6 +591,27 @@
                 </div>
             </header>
 
+            <!-- Scope Context Banner (P0-T04) -->
+            <div id="scope-context-banner" class="scope-banner hidden" role="region" aria-label="Current scope context">
+                <div class="scope-info">
+                    <span id="scope-entity-type" class="entity-type-badge" aria-label="Entity type">Cooperative</span>
+                    <span id="scope-entity-name" class="entity-name" aria-label="Entity name">Loading...</span>
+                    <button id="scope-charter-link" class="charter-link" aria-label="View governing charter">
+                        <span id="scope-charter-name">Charter</span>
+                        <span class="charter-icon">⚖️</span>
+                    </button>
+                </div>
+                <div class="scope-status">
+                    <span id="scope-user-role" class="user-role" aria-label="Your role">Member</span>
+                    <span class="divider">•</span>
+                    <span id="scope-trust-class" class="trust-class" aria-label="Trust class">
+                        <span class="trust-label">Trust:</span>
+                        <span id="scope-trust-value">Unknown</span>
+                        <span id="scope-trust-score" class="trust-score">(--)</span>
+                    </span>
+                </div>
+            </div>
+
             <!-- Navigation -->
             <nav role="navigation" aria-label="Main navigation">
                 <button class="nav-btn active" data-tab="dashboard" aria-current="page">
@@ -562,7 +638,7 @@
                 <button class="nav-btn hidden" data-tab="exchange">
                     <span aria-label="Internal exchange marketplace">Exchange</span>
                 </button>
-                <button class="nav-btn hidden" data-tab="receipts">
+                <button class="nav-btn" data-tab="receipts">
                     <span aria-label="Economic receipt chain viewer">Receipts</span>
                 </button>
             </nav>
@@ -582,6 +658,59 @@
                     <div class="stat-card">
                         <div class="stat-value" id="monthly-hours" aria-label="Hours logged this month">--</div>
                         <div class="stat-label">Hours This Month</div>
+                    </div>
+                </div>
+
+                <!-- My Constraints Card (P0-T14) -->
+                <div class="card constraints-card" role="region" aria-label="Your active constraints">
+                    <div class="card-header">
+                        <h2>My Constraints</h2>
+                        <span class="info-tooltip" title="Constraints derived from your trust score and membership">ℹ️</span>
+                    </div>
+                    <div id="constraints-content" class="constraints-content">
+                        <div class="constraint-item">
+                            <div class="constraint-label">
+                                <span class="constraint-icon">⚡</span>
+                                <span>Rate Limit</span>
+                            </div>
+                            <div class="constraint-value-group">
+                                <span id="constraint-rate-limit" class="constraint-value">--</span>
+                                <span class="constraint-unit">msg/sec</span>
+                            </div>
+                            <div class="constraint-source">
+                                <span class="source-label">Source:</span>
+                                <span id="constraint-rate-source" class="source-value">--</span>
+                            </div>
+                        </div>
+
+                        <div class="constraint-item">
+                            <div class="constraint-label">
+                                <span class="constraint-icon">🤝</span>
+                                <span>Trust Class</span>
+                            </div>
+                            <div class="constraint-value-group">
+                                <span id="constraint-trust-class" class="constraint-value">--</span>
+                            </div>
+                            <div class="constraint-source">
+                                <span class="source-label">Score:</span>
+                                <span id="constraint-trust-score-display" class="source-value">--</span>
+                            </div>
+                        </div>
+
+                        <div class="constraint-item">
+                            <div class="constraint-label">
+                                <span class="constraint-icon">💳</span>
+                                <span>Credit Limit</span>
+                            </div>
+                            <div class="constraint-value-group">
+                                <span id="constraint-credit-limit" class="constraint-value">--</span>
+                                <span class="constraint-unit">hours</span>
+                            </div>
+                            <div class="constraint-source">
+                                <span class="source-label">Source:</span>
+                                <span id="constraint-credit-source" class="source-value">--</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1557,6 +1686,8 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                                 <div id="proposal-detail-meta" class="card"></div>
                                 <!-- Timeline: created → deliberation → open → closed -->
                                 <div id="proposal-detail-timeline" class="card"></div>
+                                <!-- Receipt chain (shown for closed proposals) -->
+                                <div id="proposal-detail-receipts" class="card hidden"></div>
                             </div>
                         </div>
                     </div>
