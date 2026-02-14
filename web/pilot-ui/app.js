@@ -70,6 +70,20 @@ const elements = {
     helpCoop: document.getElementById('help-coop'),
     copyCommand: document.getElementById('copy-command'),
 
+    // Create Identity Modal
+    showCreateIdentityBtn: document.getElementById('show-create-identity-btn'),
+    createIdentityModal: document.getElementById('create-identity-modal'),
+    closeCreateIdentity: document.getElementById('close-create-identity'),
+    identityPassword: document.getElementById('identity-password'),
+    identityPasswordConfirm: document.getElementById('identity-password-confirm'),
+    generateIdentityBtn: document.getElementById('generate-identity-btn'),
+    createIdentityError: document.getElementById('create-identity-error'),
+    createIdentityFormStep: document.getElementById('create-identity-form-step'),
+    createIdentitySuccessStep: document.getElementById('create-identity-success-step'),
+    generatedDid: document.getElementById('generated-did'),
+    copyGeneratedDid: document.getElementById('copy-generated-did'),
+    useNewIdentityBtn: document.getElementById('use-new-identity-btn'),
+
     // Toast
     toastContainer: document.getElementById('toast-container'),
 
@@ -523,6 +537,102 @@ async function copyAuthCommand() {
         showToast('Command copied to clipboard', 'success', 3000);
     } else {
         showToast('Failed to copy. Please select and copy manually.', 'error');
+    }
+}
+
+// Create Identity Modal Functions
+function showCreateIdentityModal() {
+    // Reset form
+    elements.identityPassword.value = '';
+    elements.identityPasswordConfirm.value = '';
+    elements.createIdentityError.textContent = '';
+    elements.createIdentityFormStep.classList.remove('hidden');
+    elements.createIdentitySuccessStep.classList.add('hidden');
+
+    elements.createIdentityModal.classList.remove('hidden');
+}
+
+function closeCreateIdentityModal() {
+    elements.createIdentityModal.classList.add('hidden');
+}
+
+async function generateIdentity() {
+    const password = elements.identityPassword.value;
+    const passwordConfirm = elements.identityPasswordConfirm.value;
+
+    // Validation
+    if (!password || password.length < 8) {
+        elements.createIdentityError.textContent = 'Password must be at least 8 characters';
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        elements.createIdentityError.textContent = 'Passwords do not match';
+        return;
+    }
+
+    try {
+        // Disable button during generation
+        elements.generateIdentityBtn.disabled = true;
+        elements.generateIdentityBtn.textContent = 'Generating...';
+        elements.createIdentityError.textContent = '';
+
+        // Generate keypair using WebCrypto
+        const keypair = await window.ICNCrypto.generateKeypair();
+
+        // Store encrypted in IndexedDB
+        await window.ICNCrypto.storeKeypair(keypair.did, keypair, password);
+
+        // Show success step
+        elements.generatedDid.value = keypair.did;
+        elements.createIdentityFormStep.classList.add('hidden');
+        elements.createIdentitySuccessStep.classList.remove('hidden');
+
+        showToast('Identity created successfully!', 'success', 3000);
+
+        debugLog('Generated DID:', keypair.did);
+    } catch (error) {
+        console.error('Error generating identity:', error);
+        elements.createIdentityError.textContent = 'Failed to generate identity. Please try again.';
+        showToast('Failed to generate identity', 'error');
+    } finally {
+        elements.generateIdentityBtn.disabled = false;
+        elements.generateIdentityBtn.textContent = 'Generate Identity';
+    }
+}
+
+async function copyGeneratedDidToClipboard() {
+    const did = elements.generatedDid.value;
+    const success = await copyToClipboard(did);
+
+    if (success) {
+        const btn = elements.copyGeneratedDid;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+        showToast('DID copied to clipboard', 'success', 2000);
+    } else {
+        showToast('Failed to copy. Please select and copy manually.', 'error');
+    }
+}
+
+function useNewIdentity() {
+    const did = elements.generatedDid.value;
+
+    // Close modal
+    closeCreateIdentityModal();
+
+    // Fill in the DID field on login screen
+    elements.did.value = did;
+
+    // Focus on coop-id field if empty, otherwise focus on token field
+    if (!elements.coopId.value) {
+        elements.coopId.focus();
+    } else {
+        // Suggest using challenge-response auth (which will be implemented in T02)
+        showToast('Identity ready! You can now use challenge-response authentication.', 'info', 5000);
     }
 }
 
@@ -2160,6 +2270,20 @@ elements.copyCommand.addEventListener('click', copyAuthCommand);
 elements.authHelpModal.addEventListener('click', (e) => {
     if (e.target === elements.authHelpModal) {
         closeAuthHelpModal();
+    }
+});
+
+// Create Identity Modal event listeners
+elements.showCreateIdentityBtn.addEventListener('click', showCreateIdentityModal);
+elements.closeCreateIdentity.addEventListener('click', closeCreateIdentityModal);
+elements.generateIdentityBtn.addEventListener('click', generateIdentity);
+elements.copyGeneratedDid.addEventListener('click', copyGeneratedDidToClipboard);
+elements.useNewIdentityBtn.addEventListener('click', useNewIdentity);
+
+// Close modal when clicking outside
+elements.createIdentityModal.addEventListener('click', (e) => {
+    if (e.target === elements.createIdentityModal) {
+        closeCreateIdentityModal();
     }
 });
 

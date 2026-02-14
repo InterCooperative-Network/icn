@@ -104,6 +104,12 @@
                 </div>
 
                 <button id="show-join-btn" type="button" class="btn btn-secondary">Join with Invite Code</button>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-create-identity-btn" type="button" class="btn btn-secondary">Create New Identity</button>
             </div>
         </div>
 
@@ -237,6 +243,85 @@
                             <li>Point your camera at this QR code</li>
                             <li>Confirm the login on your phone</li>
                         </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Identity Modal -->
+        <div
+            id="create-identity-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="create-identity-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="create-identity-title">Create New Identity</h2>
+                    <button id="close-create-identity" class="modal-close" aria-label="Close create identity dialog">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="help-intro">Create a new ICN identity directly in your browser. Your keys will be stored securely and never leave your device.</p>
+
+                    <div id="create-identity-form-step" class="create-identity-step">
+                        <div class="form-group">
+                            <label for="identity-password">Choose a Password</label>
+                            <input
+                                type="password"
+                                id="identity-password"
+                                placeholder="Enter a strong password"
+                                aria-required="true"
+                                aria-describedby="password-hint"
+                            />
+                            <small id="password-hint">This will encrypt your private key. Don't lose it!</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="identity-password-confirm">Confirm Password</label>
+                            <input
+                                type="password"
+                                id="identity-password-confirm"
+                                placeholder="Re-enter your password"
+                                aria-required="true"
+                            />
+                        </div>
+
+                        <div id="create-identity-error" class="error-message" role="alert"></div>
+
+                        <button id="generate-identity-btn" type="button" class="btn btn-primary">Generate Identity</button>
+                    </div>
+
+                    <div id="create-identity-success-step" class="create-identity-step hidden">
+                        <div class="success-message">
+                            <strong>✓ Identity Created Successfully!</strong>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="generated-did">Your DID</label>
+                            <div class="input-with-copy">
+                                <input
+                                    type="text"
+                                    id="generated-did"
+                                    readonly
+                                    aria-label="Your generated DID"
+                                />
+                                <button id="copy-generated-did" class="btn-copy" title="Copy DID">Copy</button>
+                            </div>
+                            <small>This is your unique identifier. Save it somewhere safe.</small>
+                        </div>
+
+                        <div class="help-note">
+                            <strong>Important:</strong>
+                            <ul>
+                                <li>Your identity is stored in this browser only</li>
+                                <li>Make sure to remember your password - it cannot be recovered</li>
+                                <li>You can now use this DID to log in</li>
+                            </ul>
+                        </div>
+
+                        <button id="use-new-identity-btn" type="button" class="btn btn-primary">Use This Identity</button>
                     </div>
                 </div>
             </div>
@@ -1745,6 +1830,7 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
         </div>
     </div>
 
+    <script src="crypto.js"></script>
     <script src="offline-storage.js"></script>
     <script src="app.js?v=1771017695"></script>
     <script src="receipts.js"></script>
