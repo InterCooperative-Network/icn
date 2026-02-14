@@ -49,6 +49,15 @@ spec:
               name: icn-config
               key: gateway_base_url
               optional: true
+        # Trusted proxy IPs for X-Forwarded-* header validation (comma-separated)
+        # Only these IPs can set X-Forwarded-Host/Proto headers
+        # If not set, only localhost (127.0.0.1, ::1) is trusted
+        - name: TRUSTED_PROXY_IPS
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: trusted_proxy_ips
+              optional: true
         # CORS is handled by the gateway directly (not via reverse proxy)
         # Uncomment ICN_SKIP_CORS=1 only when behind Cloudflare or similar proxy
         # - name: ICN_SKIP_CORS

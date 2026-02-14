@@ -10,6 +10,12 @@ data:
   # Update this to your actual domain or external IP
   # Examples: "https://icn.example.com", "http://10.8.10.40:30080"
   gateway_base_url: "http://10.8.10.40:30080"
+
+  # Trusted proxy IPs that can set X-Forwarded-* headers (comma-separated)
+  # Only needed if GATEWAY_BASE_URL is not set and you're behind a reverse proxy
+  # Example: "10.42.0.1,10.43.0.1" (K8s cluster IPs)
+  # If not set, only localhost (127.0.0.1, ::1) is trusted
+  # trusted_proxy_ips: "10.42.0.1"
   icn.toml: |
     data_dir = "/data"
 

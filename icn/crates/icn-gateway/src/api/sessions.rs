@@ -40,47 +40,90 @@ fn get_client_ip(req: &HttpRequest) -> String {
 
 /// Get gateway base URL from environment or request headers
 /// Handles reverse proxy scenarios (K8s ingress, Cloudflare, nginx, etc.)
+///
+/// **Security**: Pinned GATEWAY_BASE_URL prevents X-Forwarded-* header spoofing.
+/// If GATEWAY_BASE_URL is not set, X-Forwarded-* headers are only trusted if the
+/// request comes from a trusted proxy IP (configured via TRUSTED_PROXY_IPS).
 fn get_gateway_url(req: &HttpRequest) -> String {
     // First try environment variable (recommended for production)
+    // This takes precedence over all headers to prevent spoofing
     if let Ok(url) = std::env::var("GATEWAY_BASE_URL") {
         return url;
     }
 
-    // Determine scheme from X-Forwarded-Proto (set by reverse proxies)
-    let scheme = req
-        .headers()
-        .get("x-forwarded-proto")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_else(|| {
-            // Check if connection is secure
-            if req.connection_info().scheme() == "https" {
-                "https"
-            } else {
-                "http"
-            }
-        });
+    // Check if the request came from a trusted proxy
+    let is_trusted_proxy = if let Some(peer_addr) = req.peer_addr() {
+        let peer_ip = peer_addr.ip().to_string();
 
-    // Get host from X-Forwarded-Host (reverse proxy) or Host header
-    let host = req
-        .headers()
-        .get("x-forwarded-host")
-        .and_then(|v| v.to_str().ok())
-        .or_else(|| req.headers().get("host").and_then(|v| v.to_str().ok()));
-
-    if let Some(h) = host {
-        // Strip port for standard ports
-        let clean_host = if (scheme == "https" && h.ends_with(":443"))
-            || (scheme == "http" && h.ends_with(":80"))
-        {
-            h.split(':').next().unwrap_or(h)
+        // Get trusted proxy list from environment (comma-separated IPs)
+        // Example: TRUSTED_PROXY_IPS="127.0.0.1,::1,10.0.0.1"
+        if let Ok(trusted_ips) = std::env::var("TRUSTED_PROXY_IPS") {
+            trusted_ips.split(',').any(|ip| ip.trim() == peer_ip)
         } else {
-            h
-        };
-        return format!("{scheme}://{clean_host}");
+            // If TRUSTED_PROXY_IPS not set, only trust localhost
+            peer_ip == "127.0.0.1" || peer_ip == "::1"
+        }
+    } else {
+        false
+    };
+
+    // Only trust X-Forwarded-* headers if from a trusted proxy
+    if is_trusted_proxy {
+        // Determine scheme from X-Forwarded-Proto (set by reverse proxies)
+        let scheme = req
+            .headers()
+            .get("x-forwarded-proto")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_else(|| {
+                // Check if connection is secure
+                if req.connection_info().scheme() == "https" {
+                    "https"
+                } else {
+                    "http"
+                }
+            });
+
+        // Get host from X-Forwarded-Host (reverse proxy) or Host header
+        let host = req
+            .headers()
+            .get("x-forwarded-host")
+            .and_then(|v| v.to_str().ok())
+            .or_else(|| req.headers().get("host").and_then(|v| v.to_str().ok()));
+
+        if let Some(h) = host {
+            // Strip port for standard ports
+            let clean_host = if (scheme == "https" && h.ends_with(":443"))
+                || (scheme == "http" && h.ends_with(":80"))
+            {
+                h.split(':').next().unwrap_or(h)
+            } else {
+                h
+            };
+            return format!("{scheme}://{clean_host}");
+        }
+    } else if req.headers().contains_key("x-forwarded-for")
+        || req.headers().contains_key("x-forwarded-host")
+    {
+        // Untrusted proxy detected - log warning
+        tracing::warn!(
+            peer_addr = ?req.peer_addr(),
+            "Rejecting X-Forwarded-* headers from untrusted source. \
+             Set GATEWAY_BASE_URL or TRUSTED_PROXY_IPS to enable proxied QR login."
+        );
     }
 
-    // Fallback
-    "http://localhost:8080".to_string()
+    // Fallback: derive from connection info (direct connection only)
+    let scheme = if req.connection_info().scheme() == "https" {
+        "https"
+    } else {
+        "http"
+    };
+
+    if let Some(host) = req.headers().get("host").and_then(|v| v.to_str().ok()) {
+        format!("{scheme}://{host}")
+    } else {
+        "http://localhost:8080".to_string()
+    }
 }
 
 // ============================================================================
