@@ -19,7 +19,8 @@
 //! - Topic limits to check
 
 use icn_kernel_api::authz::{
-    ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
+    ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyError, PolicyOracle, PolicyRequest,
+    RateLimit,
 };
 use icn_trust::{ScopeId, TrustGraph};
 use parking_lot::RwLock;
@@ -230,7 +231,15 @@ impl PolicyOracle for TrustPolicyOracle {
                     required = %required,
                     "Trust oracle denied request due to minimum trust threshold"
                 );
-                return PolicyDecision::deny("trust score below required threshold");
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                return PolicyDecision::deny_with_provenance(
+                    PolicyError::Denied("trust score below required threshold".into()),
+                    "trust",
+                    now,
+                );
             }
         }
 
@@ -247,7 +256,13 @@ impl PolicyOracle for TrustPolicyOracle {
         // THIS IS WHERE THE MEANING FIREWALL IS ENFORCED
         let constraints = self.score_to_constraints(score, &request.core.action);
 
-        PolicyDecision::allow_with(constraints)
+        // Add provenance metadata (generic values, kernel does not interpret)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        PolicyDecision::allow_with_provenance(constraints, "trust", now)
     }
 
     fn domain(&self) -> Domain {
