@@ -289,8 +289,8 @@ pub async fn approve_session(
         "coop:write".to_string(),
         "ledger:read".to_string(),
         "ledger:transact".to_string(),
-        "gov:read".to_string(),
-        "gov:write".to_string(),
+        "governance:read".to_string(),
+        "governance:write".to_string(),
     ];
 
     let token = auth_mgr
@@ -356,8 +356,8 @@ pub async fn approve_session_handler(
         "coop:write".to_string(),
         "ledger:read".to_string(),
         "ledger:transact".to_string(),
-        "gov:read".to_string(),
-        "gov:write".to_string(),
+        "governance:read".to_string(),
+        "governance:write".to_string(),
     ];
 
     let token = auth_mgr
