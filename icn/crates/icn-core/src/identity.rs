@@ -291,6 +291,8 @@ mod tests {
                 fn evaluate(&self, _req: &PolicyRequest) -> PolicyDecision {
                     PolicyDecision::Allow {
                         constraints: ConstraintSet::default(),
+                        policy_domain: None,
+                        evaluated_at: None,
                     }
                 }
                 fn domain(&self) -> Domain {

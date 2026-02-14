@@ -1064,6 +1064,8 @@ mod tests {
                         max_topics: Some(50),
                         ..Default::default()
                     },
+                    policy_domain: None,
+                    evaluated_at: None,
                 }
             } else {
                 // Unknown actors get denied

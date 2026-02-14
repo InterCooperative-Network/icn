@@ -235,7 +235,7 @@ mod tests {
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 17), // Phase 4 governance extraction pending
+            ("icn-gateway", 20), // Phase 4 governance extraction pending (P0: +3 for receipt types)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -275,7 +275,7 @@ mod tests {
     /// - Other scattered: 10 (entity, treasury, steward, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 77;
+        let expected: usize = 81; // P0: +4 for GovernanceDecisionReceipt, ProofOutcome, VoteTally, GovernanceProofV2
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(
