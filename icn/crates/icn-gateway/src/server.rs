@@ -462,18 +462,25 @@ impl GatewayServer {
             }
         };
 
+        // Create receipt store early so governance manager can reference it
+        let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
+        info!("Receipt store initialized");
+
         // Create governance manager with Sled-backed action items
         // (uses GovernanceActor if handle available for proposals/votes/domains)
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
                 info!("Governance manager connected to daemon with persistent action items");
-                Arc::new(GovernanceManager::with_sled_action_items(
-                    handle,
-                    Arc::new(db.clone()),
-                ))
+                Arc::new(
+                    GovernanceManager::with_sled_action_items(handle, Arc::new(db.clone()))
+                        .with_receipt_store(receipt_store.clone()),
+                )
             } else {
                 info!("Governance manager running standalone with persistent action items");
-                Arc::new(GovernanceManager::new_with_sled(Arc::new(db.clone())))
+                Arc::new(
+                    GovernanceManager::new_with_sled(Arc::new(db.clone()))
+                        .with_receipt_store(receipt_store.clone()),
+                )
             };
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
@@ -718,9 +725,7 @@ impl GatewayServer {
         let decision_registry = Arc::new(api::registry::DecisionRegistry::new());
         info!("Decision registry initialized");
 
-        // Create receipt store for economic receipts (AllocationReceipt, SettlementIntent)
-        let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
-        info!("Receipt store initialized");
+        // receipt_store was created earlier (before governance manager) for shared use
 
         // Create recurring payment store
         let recurring_payment_store =
