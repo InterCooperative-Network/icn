@@ -143,6 +143,10 @@ pub struct CreatePaymentRequest {
 pub struct BalanceResponse {
     pub did: String,
     pub balances: std::collections::HashMap<String, i64>, // currency -> balance
+    /// Credit limits per currency (max negative balance allowed)
+    /// Absence of a key means no credit limit for that currency
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credit_limits: Option<std::collections::HashMap<String, i64>>,
 }
 
 /// Transaction history entry

@@ -175,6 +175,33 @@ impl From<ContractMetadata> for ContractMetadataResponse {
     }
 }
 
+/// Contract summary response (human-readable)
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ContractSummaryResponse {
+    /// Content hash (hex)
+    pub hash: String,
+    /// Contract name
+    pub name: String,
+    /// Version number
+    pub version: u32,
+    /// Owner DID
+    pub owner: String,
+    /// Deployment timestamp (Unix seconds)
+    pub deployed_at: u64,
+    /// Optional description
+    pub description: Option<String>,
+    /// Contract lifecycle status: "active", "deprecated", or "revoked"
+    pub status: String,
+    /// Visibility level: "private", "coop:<id>", or "public"
+    pub visibility: String,
+    /// Rule names in the contract
+    pub rule_names: Vec<String>,
+    /// Participant DIDs (extracted from contract rules)
+    pub participants: Vec<String>,
+    /// Required capabilities (extracted from contract execution requirements)
+    pub capabilities: Vec<String>,
+}
+
 /// Request to revoke a contract
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RevokeContractRequest {
@@ -460,6 +487,74 @@ pub async fn get_contract(
     }))
 }
 
+/// GET /contracts/{hash}/summary - Get contract summary
+///
+/// Returns a human-readable summary of the contract including name, version,
+/// participants, rule names, and capabilities.
+///
+/// Requires `contracts:read` scope.
+#[get("/{hash}/summary")]
+pub async fn get_contract_summary(
+    http_req: HttpRequest,
+    registry_opt: web::Data<Option<Arc<ContractRegistryHandle>>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Get the registry or return 503
+    let registry = get_registry(&registry_opt)?;
+
+    // Require contracts:read scope
+    require_scope(&http_req, "contracts:read")?;
+
+    let hash_hex = path.into_inner();
+    let hash = parse_hash(&hash_hex)?;
+
+    // Get metadata
+    let metadata = registry
+        .get_metadata(&hash)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get metadata: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Contract {hash_hex} not found")))?;
+
+    // Get contract status
+    let status = registry
+        .get_status(&hash)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get status: {e}")))?
+        .unwrap_or(ContractStatus::Active);
+
+    // Extract participants and capabilities from metadata
+    let participants = metadata.participants.clone();
+
+    // TODO: Extract required capabilities from contract execution requirements
+    // For now, return empty list
+    let capabilities: Vec<String> = vec![];
+
+    // Build summary response
+    let summary = ContractSummaryResponse {
+        hash: hash_hex,
+        name: metadata.name.clone(),
+        version: metadata.version,
+        owner: metadata.owner.clone(),
+        deployed_at: metadata.deployed_at,
+        description: metadata.description.clone(),
+        status: match &status {
+            ContractStatus::Active => "active".to_string(),
+            ContractStatus::Deprecated { .. } => "deprecated".to_string(),
+            ContractStatus::Revoked { .. } => "revoked".to_string(),
+        },
+        visibility: match &metadata.visibility {
+            Visibility::Private => "private".to_string(),
+            Visibility::Coop(id) => format!("coop:{id}"),
+            Visibility::Public => "public".to_string(),
+        },
+        rule_names: metadata.rules.clone(),
+        participants,
+        capabilities,
+    };
+
+    Ok(HttpResponse::Ok().json(summary))
+}
+
 /// DELETE /contracts/{hash} - Revoke a contract
 ///
 /// Requires `contracts:write` scope. Only the contract owner can revoke.
@@ -661,6 +756,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(deploy_contract)
         .service(list_contracts)
         .service(get_contract)
+        .service(get_contract_summary)
         .service(revoke_contract)
         .service(deprecate_contract)
         .service(get_contract_status)

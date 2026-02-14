@@ -52,6 +52,9 @@ pub enum GatewayError {
 
     #[error("Kernel error: {0}")]
     Kernel(#[from] KernelError),
+
+    #[error("Ledger error: {0}")]
+    Ledger(#[from] icn_ledger::LedgerError),
 }
 
 impl GatewayError {
@@ -72,6 +75,16 @@ impl GatewayError {
             GatewayError::ServiceUnavailable(_) => Some("SERVICE_UNAVAILABLE"),
             GatewayError::Fx(fx_err) => Some(fx_err.error_code()),
             GatewayError::Kernel(kernel_err) => Some(kernel_err.code.as_str()),
+            GatewayError::Ledger(ledger_err) => match ledger_err {
+                icn_ledger::LedgerError::CreditLimitExceeded { .. } => {
+                    Some("CREDIT_LIMIT_EXCEEDED")
+                }
+                icn_ledger::LedgerError::InvalidEntry(_) => Some("INVALID_ENTRY"),
+                icn_ledger::LedgerError::DuplicateEntry(_) => Some("DUPLICATE_ENTRY"),
+                icn_ledger::LedgerError::AccountFrozen(_) => Some("ACCOUNT_FROZEN"),
+                icn_ledger::LedgerError::EntryNotFound(_) => Some("ENTRY_NOT_FOUND"),
+                _ => None,
+            },
             // Internal errors don't expose codes
             GatewayError::InternalError(_) => None,
             GatewayError::SubstrateError(_) => None,
@@ -106,6 +119,15 @@ impl ResponseError for GatewayError {
             }
             GatewayError::Kernel(kernel_err) => StatusCode::from_u16(kernel_err.http_status())
                 .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            GatewayError::Ledger(ledger_err) => match ledger_err {
+                icn_ledger::LedgerError::CreditLimitExceeded { .. } => StatusCode::FORBIDDEN,
+                icn_ledger::LedgerError::InvalidEntry(_) => StatusCode::BAD_REQUEST,
+                icn_ledger::LedgerError::DuplicateEntry(_) => StatusCode::CONFLICT,
+                icn_ledger::LedgerError::AccountFrozen(_) => StatusCode::FORBIDDEN,
+                icn_ledger::LedgerError::EntryNotFound(_) => StatusCode::NOT_FOUND,
+                icn_ledger::LedgerError::Quarantined { .. } => StatusCode::CONFLICT,
+                _ => StatusCode::INTERNAL_SERVER_ERROR,
+            },
         }
     }
 
@@ -170,6 +192,9 @@ impl ResponseError for GatewayError {
             // Kernel errors - protocol-level errors with stable codes
             GatewayError::Kernel(kernel_err) => kernel_err.message.clone(),
 
+            // Ledger errors - include structured details for client handling
+            GatewayError::Ledger(ledger_err) => ledger_err.to_string(),
+
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client
             GatewayError::InternalError(details) => {
@@ -186,13 +211,33 @@ impl ResponseError for GatewayError {
             }
         };
 
-        // Build response with optional error code
+        // Build response with optional error code and details
         let mut response = serde_json::json!({
             "error": error_message,
         });
 
         if let Some(code) = self.error_code() {
             response["code"] = serde_json::Value::String(code.to_string());
+        }
+
+        // Add structured details for specific error types
+        if let GatewayError::Ledger(icn_ledger::LedgerError::CreditLimitExceeded {
+            account,
+            currency,
+            would_be,
+            limit,
+        }) = self
+        {
+            response["details"] = serde_json::json!({
+                "account": account,
+                "currency": currency,
+                "would_be_balance": would_be,
+                "credit_limit": limit,
+                "explanation": format!(
+                    "Transfer would result in balance of {} {} but credit limit is {}",
+                    would_be, currency, limit
+                )
+            });
         }
 
         HttpResponse::build(self.status_code()).json(response)
