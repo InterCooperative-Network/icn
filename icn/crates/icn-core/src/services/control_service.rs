@@ -18,8 +18,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info, warn};
 
-use crate::governance::GovernanceHandle;
-use icn_governance::{ForcedOutcome, ProposalId};
+use crate::governance::{ForcedOutcome, GovernanceHandle, ProposalId};
 use icn_kernel_api::{
     ControlService, ForceCloseProposalRequest, ForceCloseProposalResult, VetoProposalRequest,
     VetoProposalResult,

@@ -60,7 +60,7 @@ pub use icn_kernel_api::governance::{
 // Re-export governance types needed by supervisor initialization.
 // This allows icn-core to import from icn_governance_actor instead of
 // icn_governance directly, reducing direct governance coupling.
-pub use icn_governance::{MembershipResolver, StaticMembershipResolver};
+pub use icn_governance::{ForcedOutcome, MembershipResolver, ProposalId, StaticMembershipResolver};
 
 /// Create a ProposalExecutor instance.
 ///

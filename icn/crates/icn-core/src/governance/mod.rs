@@ -6,5 +6,6 @@
 
 pub use icn_governance_actor::actor;
 pub use icn_governance_actor::{
-    GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
+    ForcedOutcome, GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle,
+    ProposalId,
 };

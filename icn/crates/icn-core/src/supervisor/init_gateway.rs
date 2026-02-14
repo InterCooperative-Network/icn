@@ -26,7 +26,7 @@ pub struct GatewayHandles {
     /// Trust service for trust queries (kernel/app separated)
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Governance handle for governance operations
-    pub governance: Option<Arc<dyn icn_governance::GovernanceOps + Send + Sync>>,
+    pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
     /// Treasury handle for treasury operations
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     /// Ledger handle for balance queries

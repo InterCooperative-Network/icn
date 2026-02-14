@@ -389,24 +389,23 @@ mod tests {
         }
     }
 
-    /// Pinned count of ALL `icn_governance::` references in icn-core source.
+    /// Pinned count of ALL governance-crate references in icn-core source.
     ///
-    /// Tracks both `use icn_governance::` import statements AND inline qualified
-    /// paths like `icn_governance::Body`. Consistent with ledger/CCL ratchets.
+    /// Tracks both import statements AND inline qualified paths.
+    /// Consistent with ledger/CCL ratchets.
     ///
     /// Target state: 0 after governance extraction to apps/governance (#913).
     ///
-    /// Current state (2026-02-11):
-    /// governance_handlers/ has been DELETED (Sprint 4 migration complete).
-    /// Remaining references are:
-    /// - actors.rs: GatewayActorHandles governance handle
-    /// - init_gateway.rs: GovernanceManager import
-    /// - Other initialization/wiring files
+    /// Current state (2026-02-14):
+    /// CLEAN - all governance-crate references eliminated from icn-core.
+    /// - actors.rs: uses gateway governance handle type alias
+    /// - init_gateway.rs: uses gateway governance handle type alias
+    /// - control_service.rs: uses crate::governance re-exports from actor crate
     ///
-    /// All proposal execution now routes through the effect path.
+    /// All proposal execution routes through the effect path.
     #[test]
     fn strict_core_governance_reference_ratchet() {
-        let expected: usize = 3; // Dropped from 44 after governance_handlers deletion
+        let expected: usize = 0; // CLEAN: all references routed through actor crate or gateway
         let actual = count_imports_in_crate("icn-core", "icn_governance::");
 
         assert!(
