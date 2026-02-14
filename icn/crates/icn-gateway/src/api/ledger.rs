@@ -39,9 +39,12 @@ pub async fn get_balance(
     // Track balance query
     gateway::balance_queries_inc();
 
+    // TODO: Retrieve actual credit limits from CreditPolicy when available
+    // For now, return None to maintain backward compatibility
     let response = BalanceResponse {
         did: did_str,
         balances,
+        credit_limits: None,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -666,6 +669,7 @@ mod tests {
 
         let resp: BalanceResponse = test::call_and_read_body_json(&app, req).await;
         assert_eq!(resp.balances.get("hours"), Some(&10));
+        assert_eq!(resp.credit_limits, None); // No credit limits configured in test
     }
 
     #[actix_web::test]
