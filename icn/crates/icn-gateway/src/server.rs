@@ -37,7 +37,7 @@ use crate::rate_limit::{
 };
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
-use crate::trust_mgr::{TrustGraphHandle, TrustManager};
+use crate::trust_mgr::TrustManager;
 use icn_compute::ComputeHandle;
 use icn_store::SledStore;
 use tokio::sync::RwLock;
@@ -84,9 +84,7 @@ pub struct GatewayServer {
 
     compute_handle: Option<ComputeHandle>,
     coop_handle: Option<icn_coop::CoopHandle>,
-    /// Optional handle to daemon's TrustGraph (for actor-backed mode, deprecated)
-    trust_graph_handle: Option<TrustGraphHandle>,
-    /// Optional TrustService for kernel/app separation (preferred over trust_graph_handle)
+    /// Optional TrustService for kernel/app separation
     trust_service_handle: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
@@ -126,7 +124,6 @@ impl GatewayServer {
 
             compute_handle: None,
             coop_handle: None,
-            trust_graph_handle: None,
             trust_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
@@ -166,7 +163,6 @@ impl GatewayServer {
 
             compute_handle: None,
             coop_handle: None,
-            trust_graph_handle: None,
             trust_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
@@ -207,7 +203,6 @@ impl GatewayServer {
 
             compute_handle: None,
             coop_handle: None,
-            trust_graph_handle: None,
             trust_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
@@ -272,21 +267,10 @@ impl GatewayServer {
         self
     }
 
-    /// Set trust graph handle for daemon integration (deprecated)
-    ///
-    /// **Deprecated**: Use `with_trust_service()` instead for proper kernel/app separation.
-    /// When set, the TrustManager will delegate all operations to the daemon's
-    /// TrustGraph actor, ensuring persistence and gossip synchronization.
-    pub fn with_trust_handle(mut self, handle: TrustGraphHandle) -> Self {
-        self.trust_graph_handle = Some(handle);
-        self
-    }
-
     /// Set trust service for daemon integration (kernel/app separated)
     ///
     /// When set, the TrustManager will use the provided TrustService for trust
-    /// score queries, enabling proper kernel/app separation. This is preferred
-    /// over `with_trust_handle()`.
+    /// score queries, enabling proper kernel/app separation.
     pub fn with_trust_service(
         mut self,
         service: Arc<dyn icn_kernel_api::services::TrustService>,
@@ -485,18 +469,10 @@ impl GatewayServer {
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 
-        // Create trust manager (prefers TrustService, falls back to TrustGraph, then in-memory)
+        // Create trust manager (prefers TrustService, falls back to in-memory)
         let trust_manager: Arc<TrustManager> = if let Some(service) = self.trust_service_handle {
             info!("Trust manager connected to daemon (using TrustService, kernel/app separated)");
             let mut mgr = TrustManager::with_trust_service(service);
-            if let Some(score) = self.default_trust_score {
-                info!("Setting custom default trust score: {}", score);
-                mgr = mgr.with_default_score(score);
-            }
-            Arc::new(mgr)
-        } else if let Some(handle) = self.trust_graph_handle {
-            info!("Trust manager connected to daemon (using TrustGraph actor, deprecated)");
-            let mut mgr = TrustManager::with_handle(handle);
             if let Some(score) = self.default_trust_score {
                 info!("Setting custom default trust score: {}", score);
                 mgr = mgr.with_default_score(score);

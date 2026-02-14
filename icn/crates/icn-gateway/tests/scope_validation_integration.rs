@@ -12,14 +12,14 @@ fn test_scope_allowlist_validation() {
     assert!(validation::validate_scopes(&["ledger:read".to_string()]).is_ok());
     assert!(validation::validate_scopes(&["ledger:write".to_string()]).is_ok());
     assert!(validation::validate_scopes(&["coop:admin".to_string()]).is_ok());
-    assert!(validation::validate_scopes(&["gov:read".to_string()]).is_ok());
+    assert!(validation::validate_scopes(&["governance:read".to_string()]).is_ok());
     assert!(validation::validate_scopes(&["payments:write".to_string()]).is_ok());
 
     // Multiple valid scopes
     assert!(validation::validate_scopes(&[
         "ledger:read".to_string(),
         "coop:write".to_string(),
-        "gov:read".to_string(),
+        "governance:read".to_string(),
     ])
     .is_ok());
 

@@ -43,7 +43,7 @@ pub async fn create_domain(
     req: web::Json<CreateDomainRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -155,7 +155,7 @@ pub async fn list_domains(
     query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let query = query.into_inner().validate();
 
@@ -253,7 +253,7 @@ pub async fn get_domain(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let domain_id = GovernanceDomainId(id.into_inner());
     let domain = gov_mgr.get_domain(&domain_id).await?.ok_or_else(|| {
@@ -272,7 +272,7 @@ pub async fn add_domain_member(
     body: web::Json<crate::models::AddDomainMemberRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -335,7 +335,7 @@ pub async fn create_proposal(
     req: web::Json<CreateProposalRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -525,7 +525,7 @@ pub async fn list_proposals(
     query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let query = query.into_inner().validate();
 
@@ -658,7 +658,7 @@ pub async fn get_proposal(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
     let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
@@ -676,7 +676,7 @@ pub async fn get_votes(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
 
@@ -712,7 +712,7 @@ pub async fn get_proposal_proof(
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
 
@@ -794,7 +794,7 @@ pub async fn open_proposal(
     req: web::Json<OpenProposalRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -912,7 +912,7 @@ pub async fn close_proposal(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1042,7 +1042,7 @@ fn extract_federation_common(
     description: &str,
 ) -> Result<FederationProposalCommon> {
     // Check authorization
-    require_scope(http_req, "gov:write")?;
+    require_scope(http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(http_req).ok_or_else(|| {
@@ -1409,7 +1409,7 @@ pub async fn cast_vote(
     req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1510,7 +1510,7 @@ pub async fn create_delegation(
     req: web::Json<CreateDelegationRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1561,7 +1561,7 @@ pub async fn list_delegations(
     query: web::Query<ListDelegationsQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1605,7 +1605,7 @@ pub async fn get_delegation(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1645,7 +1645,7 @@ pub async fn revoke_delegation(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1729,7 +1729,7 @@ pub async fn start_deliberation(
     req: web::Json<StartDeliberationRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1776,7 +1776,7 @@ pub async fn end_deliberation(
     req: web::Json<EndDeliberationRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1828,7 +1828,7 @@ pub async fn add_comment(
     req: web::Json<AddCommentRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -1888,7 +1888,7 @@ pub async fn list_comments(
     query: web::Query<ListCommentsQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization (read access)
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
 
@@ -1930,7 +1930,7 @@ pub async fn get_discussion(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization (read access)
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
 
@@ -1980,7 +1980,7 @@ pub async fn edit_comment(
     req: web::Json<EditCommentRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -2035,7 +2035,7 @@ pub async fn delete_comment(
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -2062,7 +2062,7 @@ pub async fn add_reaction(
     req: web::Json<AddReactionRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -2097,7 +2097,7 @@ pub async fn remove_reaction(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req).ok_or_else(|| {
@@ -2374,7 +2374,7 @@ pub async fn create_action_item(
     domain_id: web::Path<String>,
     req: web::Json<CreateActionItemRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -2436,7 +2436,7 @@ pub async fn list_action_items(
     domain_id: web::Path<String>,
     query: web::Query<ActionItemFilterParams>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let domain = GovernanceDomainId(domain_id.into_inner());
 
@@ -2459,7 +2459,7 @@ pub async fn get_action_item(
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let (domain_id, item_id) = path.into_inner();
     let domain = GovernanceDomainId(domain_id);
@@ -2481,7 +2481,7 @@ pub async fn update_action_item(
     path: web::Path<(String, String)>,
     req: web::Json<UpdateActionItemRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -2576,7 +2576,7 @@ pub async fn delete_action_item(
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -2623,7 +2623,7 @@ pub async fn add_action_item_note(
     path: web::Path<(String, String)>,
     req: web::Json<AddActionItemNoteRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -2655,7 +2655,7 @@ pub async fn update_action_item_status(
     path: web::Path<(String, String)>,
     req: web::Json<StatusUpdateRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
@@ -2867,7 +2867,7 @@ mod tests {
             members: vec![alice.did().to_string()],
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/domains")
             .set_json(&req_body)
@@ -2878,7 +2878,7 @@ mod tests {
         assert!(resp.status().is_success());
 
         // Get domain
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/domains/coop:food")
             .to_request();
@@ -2918,7 +2918,7 @@ mod tests {
                 members: vec![alice.did().to_string()],
             };
 
-            let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+            let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
             let req = test::TestRequest::post()
                 .uri("/gov/domains")
                 .set_json(&req_body)
@@ -2928,7 +2928,7 @@ mod tests {
         }
 
         // List all domains
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get().uri("/gov/domains").to_request();
         req.extensions_mut().insert(claims);
 
@@ -2974,7 +2974,7 @@ mod tests {
             },
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals")
             .set_json(&req_body)
@@ -3037,7 +3037,7 @@ mod tests {
             },
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals")
             .set_json(&req_body)
@@ -3052,7 +3052,7 @@ mod tests {
             voting_period_seconds: Some(86400),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{proposal_id}/open"))
             .set_json(&req_body)
@@ -3069,7 +3069,7 @@ mod tests {
                 comment: None,
             };
 
-            let claims = create_test_claims(&voter.to_string(), vec!["gov:write"]);
+            let claims = create_test_claims(&voter.to_string(), vec!["governance:write"]);
             let req = test::TestRequest::post()
                 .uri(&format!("/gov/proposals/{proposal_id}/vote"))
                 .set_json(&req_body)
@@ -3081,7 +3081,7 @@ mod tests {
         }
 
         // 4. Close proposal
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{proposal_id}/close"))
             .to_request();
@@ -3091,7 +3091,7 @@ mod tests {
         assert!(resp.status().is_success());
 
         // 5. Verify final state (should be rejected: 1 for, 1 against, simple majority fails)
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri(&format!("/gov/proposals/{proposal_id}"))
             .to_request();
@@ -3151,7 +3151,7 @@ mod tests {
                 },
             };
 
-            let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+            let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
             let req = test::TestRequest::post()
                 .uri("/gov/proposals")
                 .set_json(&req_body)
@@ -3161,7 +3161,7 @@ mod tests {
         }
 
         // List all proposals
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get().uri("/gov/proposals").to_request();
         req.extensions_mut().insert(claims);
 
@@ -3171,7 +3171,7 @@ mod tests {
         assert_eq!(resp["pagination"]["total"], 3);
 
         // Filter by domain
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/proposals?domain_id=coop:food")
             .to_request();
@@ -3183,7 +3183,7 @@ mod tests {
         assert_eq!(resp["pagination"]["total"], 2);
 
         // Filter by state
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/proposals?state=draft")
             .to_request();
@@ -3222,7 +3222,7 @@ mod tests {
         .await;
 
         // First page: limit=2
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/domains?limit=2")
             .to_request();
@@ -3237,7 +3237,7 @@ mod tests {
         assert_eq!(cursor, "offset:2");
 
         // Second page using cursor
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
             .to_request();
@@ -3251,7 +3251,7 @@ mod tests {
         assert_eq!(cursor, "offset:4");
 
         // Third page (last, only 1 item)
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
             .to_request();
@@ -3322,7 +3322,7 @@ mod tests {
         };
 
         // Try without gov:write scope (should fail)
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::post()
             .uri("/gov/domains")
             .set_json(&req_body)
@@ -3345,7 +3345,7 @@ mod tests {
         )
         .await;
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/domains/nonexistent")
             .to_request();
@@ -3373,7 +3373,7 @@ mod tests {
             voting_period_seconds: Some(86400),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/nonexistent/open")
             .set_json(&req_body)
@@ -3938,7 +3938,7 @@ mod tests {
             members: vec![alice.did().to_string()],
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/domains")
             .set_json(&req_body)
@@ -3959,7 +3959,7 @@ mod tests {
             members: vec![alice.did().to_string()],
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/domains")
             .set_json(&req_body_zero)
@@ -3980,7 +3980,7 @@ mod tests {
             members: vec![alice.did().to_string()],
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/domains")
             .set_json(&req_body_valid)
@@ -4050,7 +4050,7 @@ mod tests {
         let req_body = OpenProposalRequest {
             voting_period_seconds: Some(86400),
         };
-        let claims = create_test_claims(&bob.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&bob.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{}/open", proposal_id.0))
             .set_json(&req_body)
@@ -4061,7 +4061,7 @@ mod tests {
         assert_eq!(resp.status(), 403); // Forbidden - not a member
 
         // Alice (member) opens proposal successfully
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{}/open", proposal_id.0))
             .set_json(&req_body)
@@ -4072,7 +4072,7 @@ mod tests {
         assert_eq!(resp.status(), 200); // Success
 
         // Bob (non-member) tries to close proposal
-        let claims = create_test_claims(&bob.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&bob.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{}/close", proposal_id.0))
             .to_request();
@@ -4082,7 +4082,7 @@ mod tests {
         assert_eq!(resp.status(), 403); // Forbidden - not a member
 
         // Alice (member) can close proposal successfully
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri(&format!("/gov/proposals/{}/close", proposal_id.0))
             .to_request();
@@ -4137,7 +4137,7 @@ mod tests {
             sponsor_coop_id: Some("organic-farms-coop".to_string()),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/join")
             .set_json(&req_body)
@@ -4189,7 +4189,7 @@ mod tests {
             grace_period_days: 30,
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/leave")
             .set_json(&req_body)
@@ -4243,7 +4243,7 @@ mod tests {
             currency: "HOURS".to_string(),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/clearing")
             .set_json(&req_body)
@@ -4293,7 +4293,7 @@ mod tests {
             reason: "Partnership no longer beneficial".to_string(),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/clearing/terminate")
             .set_json(&req_body)
@@ -4347,7 +4347,7 @@ mod tests {
             evidence: Some("Six months of successful trading".to_string()),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/vouch")
             .set_json(&req_body)
@@ -4397,7 +4397,7 @@ mod tests {
             reason: "Repeated contract violations".to_string(),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/vouch/revoke")
             .set_json(&req_body)
@@ -4448,7 +4448,7 @@ mod tests {
             max_attestations_per_minute: Some(30),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/policy")
             .set_json(&req_body)
@@ -4505,7 +4505,7 @@ mod tests {
             "sponsor_coop_id": null
         });
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/join")
             .set_json(&invalid_json)
@@ -4551,7 +4551,7 @@ mod tests {
             grace_period_days: 500, // Invalid - too long
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/leave")
             .set_json(&req_body)
@@ -4599,7 +4599,7 @@ mod tests {
             currency: "HOURS".to_string(),
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/clearing")
             .set_json(&req_body)
@@ -4700,7 +4700,7 @@ mod tests {
         };
 
         // Request with only read scope (not write)
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/join")
             .set_json(&req_body)
@@ -4746,7 +4746,7 @@ mod tests {
             max_attestations_per_minute: None,
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/policy")
             .set_json(&req_body)
@@ -4797,7 +4797,7 @@ mod tests {
             sponsor_coop_id: None,
         };
 
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/join")
             .set_json(&req_body)
@@ -4873,7 +4873,7 @@ mod tests {
         .await;
 
         // Filter scope=local => 1 result
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/proposals?scope=local")
             .to_request();
@@ -4884,7 +4884,7 @@ mod tests {
         assert_eq!(proposals[0].title, "Local Proposal");
 
         // Filter scope=federation => 2 results
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/proposals?scope=federation")
             .to_request();
@@ -4894,7 +4894,7 @@ mod tests {
         assert_eq!(proposals.len(), 2);
 
         // Filter scope=my-fed => 1 result (specific federation ID)
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get()
             .uri("/gov/proposals?scope=my-fed")
             .to_request();
@@ -4905,7 +4905,7 @@ mod tests {
         assert_eq!(proposals[0].title, "Federation Proposal");
 
         // No scope filter => all 3
-        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let claims = create_test_claims(&alice.did().to_string(), vec!["governance:read"]);
         let req = test::TestRequest::get().uri("/gov/proposals").to_request();
         req.extensions_mut().insert(claims);
         let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;

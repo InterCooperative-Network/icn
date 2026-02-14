@@ -41,6 +41,8 @@ pub mod governance {
     pub const VOTE: &str = "governance:vote";
     /// Query proposals and votes
     pub const READ: &str = "governance:read";
+    /// Modify governance state (proposals, domains, voting)
+    pub const WRITE: &str = "governance:write";
     /// Wildcard for all governance operations
     pub const WILDCARD: &str = "governance:*";
 }

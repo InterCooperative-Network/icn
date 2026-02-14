@@ -471,7 +471,7 @@ pub async fn create_meeting(
     registry: web::Data<Arc<DecisionRegistry>>,
     req: web::Json<CreateMeetingRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -533,7 +533,7 @@ pub async fn list_meetings(
     registry: web::Data<Arc<DecisionRegistry>>,
     query: web::Query<ListMeetingsQuery>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
     let offset = query.offset.unwrap_or(0);
@@ -567,7 +567,7 @@ pub async fn index_decision_endpoint(
     registry: web::Data<Arc<DecisionRegistry>>,
     req: web::Json<IndexDecisionRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:write")?;
+    require_scope(&http_req, "governance:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -652,7 +652,7 @@ pub async fn list_decisions(
     registry: web::Data<Arc<DecisionRegistry>>,
     query: web::Query<ListDecisionsQuery>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
     let offset = query.offset.unwrap_or(0);
@@ -695,7 +695,7 @@ pub async fn get_decision(
     registry: web::Data<Arc<DecisionRegistry>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let decision_id = path.into_inner();
 
@@ -716,7 +716,7 @@ pub async fn get_decision_trace(
     registry: web::Data<Arc<DecisionRegistry>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "gov:read")?;
+    require_scope(&http_req, "governance:read")?;
 
     let decision_id = path.into_inner();
 

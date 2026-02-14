@@ -50,9 +50,8 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     "coop:write",
     "coop:admin",
     // Governance operations
-    "gov:read",
-    "gov:write",
     "governance:read",
+    "governance:write",
     // Payment operations
     "payments:read",
     "payments:write",
