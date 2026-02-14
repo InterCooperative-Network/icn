@@ -91,3 +91,6 @@ sims/mutual-credit/*.png
 
 # Copilot session files
 copilot-session-*.md
+
+# Local artifacts (agent work products, not for repo)
+.local_artifacts/
