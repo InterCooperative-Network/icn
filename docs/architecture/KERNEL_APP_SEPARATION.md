@@ -589,9 +589,6 @@ pub struct ServiceRegistry {
     security: Option<Arc<dyn SecurityService>>,
     governance: Option<Arc<dyn GovernanceService>>,
     ledger: Option<Arc<dyn LedgerService>>,
-    
-    /// Transition handles for migration period
-    raw_handles: HashMap<String, Arc<dyn Any + Send + Sync>>,
 }
 
 impl ServiceRegistry {
@@ -599,76 +596,51 @@ impl ServiceRegistry {
     pub fn with_trust(self, service: Arc<dyn TrustService>) -> Self;
     pub fn with_security(self, service: Arc<dyn SecurityService>) -> Self;
     pub fn with_governance(self, service: Arc<dyn GovernanceService>) -> Self;
-    
-    /// Transition mechanism for components still needing direct access
-    pub fn with_raw_handle<T>(self, key: &str, handle: Arc<T>) -> Self;
-    pub fn raw_handle<T>(&self, key: &str) -> Option<Arc<T>>;
+    pub fn with_ledger(self, service: Arc<dyn LedgerService>) -> Self;
 }
 ```
 
-**Key Constants** (prevent typo-induced silent `None`):
+Concrete domain objects that need to be shared with the supervisor (ledger handle,
+contract runtime, dispute/treasury managers, etc.) are passed via typed
+`BootstrapHandles` instead of type-erased `raw_handle()` calls:
 
 ```rust
-impl ServiceRegistry {
-    pub const TRUST_GRAPH_KEY: &str = "trust_graph";
-    pub const PROTOCOL_PARAM_STORE_KEY: &str = "protocol_parameter_store";
-    pub const LEDGER_KEY: &str = "ledger";
-    pub const LEDGER_STORE_KEY: &str = "ledger_store";
+/// File: icn/crates/icn-core/src/supervisor/actors.rs
+
+pub struct BootstrapHandles {
+    pub ledger: Arc<RwLock<Ledger>>,
+    pub ledger_store: Arc<SledStore>,
+    pub dispute_manager: Arc<RwLock<DisputeManager>>,
+    pub treasury_manager: Arc<RwLock<TreasuryManager>>,
+    pub contract_runtime: Arc<RwLock<ContractRuntime>>,
+    pub contract_actor: Arc<RwLock<ContractActor>>,
+    pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
 }
 ```
 
-Always use these constants instead of string literals when calling `with_raw_handle()` or `raw_handle()`.
-
-**Usage in icnd** (all three services wired):
+**Usage in icnd**:
 
 ```rust
-// In icnd main.rs — build_service_registry()
-// 1. Trust
-let trust_graph_handle = Arc::new(RwLock::new(TrustGraph::new(store, did)));
+// In icnd main.rs — trait-based services go in ServiceRegistry
 let trust_service = icn_trust_app::create_service_tokio(trust_graph_handle.clone());
-registry = registry.with_trust(trust_service);
-registry = registry.with_raw_handle(ServiceRegistry::TRUST_GRAPH_KEY, trust_graph_handle);
+let registry = ServiceRegistry::new().with_trust(trust_service);
+let runtime = Runtime::new(config, identity)
+    .with_services(registry);
 
-// 2. Governance
-let parameter_store = Arc::new(SledParameterStore::new(Arc::new(param_db))?);
-let governance_service = icn_governance_app::create_service(parameter_store.clone() as _);
-registry = registry.with_governance(governance_service);
-registry = registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, parameter_store);
-
-// 3. Ledger
-let ledger_store = Arc::new(SledStore::open(&ledger_store_path)?);
-let ledger = Ledger::new(ledger_store.clone() as _)?;
-let ledger_handle = Arc::new(RwLock::new(ledger));
-let ledger_service = icn_ledger_app::create_service(ledger_handle.clone());
-registry = registry.with_ledger(ledger_service);
-registry = registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
-registry = registry.with_raw_handle(ServiceRegistry::LEDGER_STORE_KEY, ledger_store);
+// Concrete domain handles go in BootstrapHandles
+let handles = BootstrapHandles {
+    ledger: ledger_handle,
+    ledger_store,
+    dispute_manager,
+    treasury_manager,
+    contract_runtime,
+    contract_actor,
+    protocol_parameter_store,
+};
+let runtime = runtime.with_bootstrap_handles(handles);
 ```
 
-#### raw_handle Type Patterns
-
-The `raw_handle<T>` method requires `T: Sized`. This creates two patterns depending on the stored type:
-
-**Pattern A: Concrete type with trait upcast** (for trait objects like `dyn ProtocolParameterStore`):
-```rust
-// Store concrete type (Sized)
-registry.with_raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY, arc_sled_param_store);
-
-// Retrieve as concrete, then upcast
-let store: Arc<SledParameterStore> = registry.raw_handle(ServiceRegistry::PROTOCOL_PARAM_STORE_KEY)?;
-let trait_obj: Arc<dyn ProtocolParameterStore> = store;  // upcast
-```
-
-**Pattern B: Direct storage** (for wrapped types like `Arc<RwLock<Ledger>>`):
-```rust
-// Store directly (RwLock<Ledger> is Sized)
-registry.with_raw_handle(ServiceRegistry::LEDGER_KEY, ledger_handle);
-
-// Retrieve directly
-let handle: Arc<RwLock<Ledger>> = registry.raw_handle(ServiceRegistry::LEDGER_KEY)?;
-```
-
-**Why the daemon passes stores separately**: Sled uses exclusive file locking (`flock` on Linux). Opening the same sled path twice in the same process fails. The daemon creates stores once and passes them through `raw_handle` so the supervisor can reuse them for ancillary services (DisputeManager, TreasuryManager) without re-opening.
+**Why the daemon passes stores separately**: Sled uses exclusive file locking (`flock` on Linux). Opening the same sled path twice in the same process fails. The daemon creates stores once and passes them through `BootstrapHandles` so the supervisor can reuse them for ancillary services (DisputeManager, TreasuryManager) without re-opening.
 
 ### 3.4 ConstraintSet
 
@@ -1005,7 +977,7 @@ Currently detected by `firewall_denylist.py`:
 **Definition of Done for Complete Separation**:
 - [ ] CI `firewall-contract` job passes without violations
 - [ ] `continue-on-error` removed from CI job
-- [ ] All `raw_handles` removed from ServiceRegistry
+- [x] All `raw_handles` removed from ServiceRegistry (completed in #911)
 - [ ] No kernel crate depends on any domain/app crate
 
 ### 6.0.1 Enforcement Mechanism Status
@@ -1060,18 +1032,17 @@ The table below shows the current state of kernel enforcement mechanisms and pol
 | icn-governance dep in icn-core | icn-core/Cargo.toml | #913 | Kernel crate still imports domain crate |
 | icn-ledger dep in icn-core | icn-core/Cargo.toml | #914 | Kernel crate still imports domain crate |
 
-### 6.3 Transition Handles
+### 6.3 Transition Handles (Completed)
 
-These `raw_handles` exist for components not yet migrated:
+The `raw_handles` transition mechanism has been fully removed (#911). All domain
+objects are now provided via:
 
-| Key | Type | Used By | Remove When |
-|-----|------|---------|-------------|
-| `TRUST_GRAPH_KEY` | `Arc<RwLock<TrustGraph>>` | MisbehaviorDetector, ContractActor | Components migrated to TrustService |
-| `PROTOCOL_PARAM_STORE_KEY` | `Arc<SledParameterStore>` | Supervisor init_governance | Supervisor creates its own (standalone mode only) |
-| `LEDGER_KEY` | `Arc<RwLock<Ledger>>` | Supervisor init_ledger | Supervisor creates its own (standalone mode only) |
-| `LEDGER_STORE_KEY` | `Arc<SledStore>` | Supervisor init_ledger (DisputeManager, TreasuryManager) | Sled replaced or all stores created by daemon |
-
-**Goal**: Remove all `raw_handles` when migration is complete.
+- **`BootstrapHandles`** (`icn-core/src/supervisor/actors.rs`) -- Typed handles
+  for ledger, contract runtime, dispute/treasury managers, and protocol parameter
+  store. Passed from daemon to supervisor via `Runtime::with_bootstrap_handles()`.
+- **`ServiceRegistry`** (`icn-kernel-api/src/services.rs`) -- Trait-based service
+  injection for TrustService, GovernanceService, LedgerService, SecurityService.
+  Passed via `Runtime::with_services()`.
 
 ---
 
@@ -1193,9 +1164,9 @@ let constraints = ConstraintSet::new()
 
 Kernel code should only use `icn_kernel_api::TrustClass`.
 
-### Q: When will raw_handles be removed?
+### Q: When were raw_handles removed?
 
-**A**: When all components are migrated to use service traits. Target: Phase 20+.
+**A**: Completed in #911. All components now use typed `BootstrapHandles` or trait-based `ServiceRegistry` injection.
 
 ---
 
@@ -1209,7 +1180,7 @@ The daemon creates sled-backed stores under `config.store_path()` (default: `~/.
 | `store/protocol_params/` | Daemon → GovernanceService | Protocol parameter values |
 | `store/ledger/` | Daemon → Ledger + DisputeManager + TreasuryManager | Double-entry transactions, disputes |
 
-Each path is opened exactly once by the daemon. The supervisor receives handles via `ServiceRegistry.raw_handle()` to avoid double-opening sled databases.
+Each path is opened exactly once by the daemon. The supervisor receives handles via `BootstrapHandles` to avoid double-opening sled databases.
 
 Helper methods on `Config`:
 - `config.store_path()` → base store directory
