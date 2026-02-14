@@ -101,7 +101,11 @@ impl PolicyOracle for GovernancePolicyOracle {
         // This crosses the meaning firewall - governance rules become generic limits
         let constraints = self.params_to_constraints(&request.context);
 
-        PolicyDecision::Allow { constraints }
+        PolicyDecision::Allow {
+            constraints,
+            policy_domain: None,
+            evaluated_at: None,
+        }
     }
 }
 
@@ -173,7 +177,7 @@ mod tests {
         );
 
         let decision = oracle.evaluate(&request);
-        if let PolicyDecision::Allow { constraints } = decision {
+        if let PolicyDecision::Allow { constraints, .. } = decision {
             assert!(constraints.rate_limit.is_some());
             assert_eq!(constraints.rate_limit.unwrap().messages_per_second, 100);
         } else {
@@ -194,7 +198,7 @@ mod tests {
 
         let decision = oracle.evaluate(&request);
         // Should allow with empty constraints (abstain)
-        if let PolicyDecision::Allow { constraints } = decision {
+        if let PolicyDecision::Allow { constraints, .. } = decision {
             assert!(constraints.rate_limit.is_none());
         } else {
             panic!("Expected Allow decision for non-governance domain");

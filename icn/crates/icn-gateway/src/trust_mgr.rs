@@ -684,7 +684,7 @@ impl TrustManager {
         let decision = oracle.evaluate(&request);
 
         match decision {
-            PolicyDecision::Allow { constraints } => {
+            PolicyDecision::Allow { constraints, .. } => {
                 // Check for custom "trust_score" constraint first
                 if let Some(icn_kernel_api::ConstraintValue::Float(score)) =
                     constraints.custom.get("trust_score")
@@ -1527,7 +1527,7 @@ mod tests {
         let decision = oracle.evaluate(&req);
 
         // Verify decision
-        if let PolicyDecision::Allow { constraints } = decision {
+        if let PolicyDecision::Allow { constraints, .. } = decision {
             let score_val = constraints.custom.get("trust_score").unwrap();
             let score = match score_val {
                 ConstraintValue::Float(f) => f.into_inner(),
@@ -1574,7 +1574,7 @@ mod tests {
         let decision = oracle.evaluate(&request);
 
         // Verify decision contains default trust score
-        if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
+        if let icn_kernel_api::PolicyDecision::Allow { constraints, .. } = decision {
             // In standalone mode, compute_local is called which accepts strings
             // So we get a computed score (likely 0.0 for no edges), not DEFAULT_TRUST_SCORE
             // This test verifies the oracle doesn't panic on unusual input
@@ -1610,7 +1610,7 @@ mod tests {
         );
 
         let decision = oracle.evaluate(&request);
-        if let icn_kernel_api::PolicyDecision::Allow { constraints } = decision {
+        if let icn_kernel_api::PolicyDecision::Allow { constraints, .. } = decision {
             let score = constraints
                 .custom
                 .get("trust_score")
@@ -1641,7 +1641,7 @@ mod tests {
 
     /// Helper: extract trust_score from a PolicyDecision's constraints.
     fn extract_trust_score(decision: &PolicyDecision) -> f64 {
-        if let PolicyDecision::Allow { constraints } = decision {
+        if let PolicyDecision::Allow { constraints, .. } = decision {
             if let Some(icn_kernel_api::ConstraintValue::Float(f)) =
                 constraints.custom.get("trust_score")
             {

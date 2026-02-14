@@ -566,7 +566,7 @@ pub async fn trust_rate_limit_middleware(
     let decision = oracle.evaluate(&policy_req);
 
     match decision {
-        PolicyDecision::Allow { constraints } => {
+        PolicyDecision::Allow { constraints, .. } => {
             // Extract rate limit from constraints, using fallback if none specified
             let config = if let Some(limit) = constraints.rate_limit {
                 RateLimitConfig {
@@ -589,7 +589,7 @@ pub async fn trust_rate_limit_middleware(
                 Err(e) => Err(Error::from(e)),
             }
         }
-        PolicyDecision::Deny { reason } => {
+        PolicyDecision::Deny { reason, .. } => {
             warn!("Access denied by policy for DID {}: {}", did, reason);
             Err(Error::from(GatewayError::Forbidden(reason.to_string())))
         }

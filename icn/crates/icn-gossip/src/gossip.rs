@@ -806,7 +806,7 @@ impl GossipActor {
                 ),
                 context,
             );
-            if let PolicyDecision::Deny { reason } = oracle.evaluate(&req) {
+            if let PolicyDecision::Deny { reason, .. } = oracle.evaluate(&req) {
                 bail!("Not authorized to publish to topic: {topic} ({reason})");
             }
         }
@@ -1530,7 +1530,11 @@ mod tests {
                     .with_max_message_size(64 * 1024);
             }
 
-            PolicyDecision::Allow { constraints }
+            PolicyDecision::Allow {
+                constraints,
+                policy_domain: None,
+                evaluated_at: None,
+            }
         }
 
         fn domain(&self) -> Domain {

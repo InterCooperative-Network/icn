@@ -96,7 +96,7 @@ impl GossipActor {
                 ActionKind::Subscribe, // treat pull as subscribe for now? Or generic access
                 Domain::trust(),
             );
-            if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
+            if let icn_kernel_api::authz::PolicyDecision::Allow { constraints, .. } =
                 oracle.evaluate(&req)
             {
                 limits = ResourceLimits::from_constraints(&constraints);
@@ -373,7 +373,7 @@ impl GossipActor {
                         ActionKind::Subscribe,
                         Domain::trust(),
                     );
-                    if let icn_kernel_api::authz::PolicyDecision::Allow { constraints } =
+                    if let icn_kernel_api::authz::PolicyDecision::Allow { constraints, .. } =
                         oracle.evaluate(&req)
                     {
                         limits = ResourceLimits::from_constraints(&constraints);

@@ -75,7 +75,11 @@ impl PolicyOracle for TestTrustOracle {
         constraints
             .custom
             .insert("trust_score".to_string(), score.into());
-        PolicyDecision::Allow { constraints }
+        PolicyDecision::Allow {
+            constraints,
+            policy_domain: None,
+            evaluated_at: None,
+        }
     }
 
     fn domain(&self) -> Domain {

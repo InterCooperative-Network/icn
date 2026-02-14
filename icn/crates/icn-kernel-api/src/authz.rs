@@ -1059,7 +1059,7 @@ mod tests {
         assert!(!decision.is_allowed());
 
         match decision {
-            PolicyDecision::Deny { reason } => {
+            PolicyDecision::Deny { reason, .. } => {
                 assert!(matches!(reason, PolicyError::Denied(r) if r == "system locked"));
             }
             _ => panic!("Expected Deny"),
@@ -1124,7 +1124,7 @@ mod tests {
         assert!(!decision.is_allowed());
 
         match decision {
-            PolicyDecision::Deny { reason } => {
+            PolicyDecision::Deny { reason, .. } => {
                 assert!(matches!(
                     reason,
                     PolicyError::Denied(r) if r.contains("async test lockdown")

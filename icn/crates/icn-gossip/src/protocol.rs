@@ -54,7 +54,7 @@ impl GossipActor {
                 icn_kernel_api::authz::PolicyDecision::Allow { .. } => {
                     debug!(peer_did = %sender, "Processing message from authorized sender");
                 }
-                icn_kernel_api::authz::PolicyDecision::Deny { reason } => {
+                icn_kernel_api::authz::PolicyDecision::Deny { reason, .. } => {
                     warn!(
                         peer_did = %sender,
                         reason = %reason,
