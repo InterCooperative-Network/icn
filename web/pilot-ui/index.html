@@ -40,11 +40,12 @@
                         <input
                             type="url"
                             id="gateway-url"
-                            value="http://localhost:8080"
+                            value=""
+                            placeholder="Auto-detected from server"
                             aria-required="true"
                             aria-describedby="gateway-url-hint"
                         />
-                        <small id="gateway-url-hint" class="sr-only">The URL of your ICN gateway server</small>
+                        <small id="gateway-url-hint" class="sr-only">The URL of your ICN gateway server (auto-detected)</small>
                     </div>
 
                     <div class="form-group">
@@ -68,7 +69,22 @@
                             aria-required="true"
                             aria-describedby="did-hint"
                         />
-                        <small id="did-hint">Don't know your DID? Run <code>icnctl id show</code></small>
+                        <small id="did-hint">Your decentralized identifier</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password">Password (for in-browser auth)</label>
+                        <input
+                            type="password"
+                            id="login-password"
+                            placeholder="Your identity password"
+                            aria-describedby="login-password-hint"
+                        />
+                        <small id="login-password-hint">Required for in-browser challenge-response authentication</small>
+                    </div>
+
+                    <div class="login-divider">
+                        <span>or use CLI token</span>
                     </div>
 
                     <div class="form-group">
@@ -76,8 +92,7 @@
                         <input
                             type="password"
                             id="token"
-                            placeholder="Paste your token here"
-                            aria-required="true"
+                            placeholder="Paste your token here (optional)"
                             aria-describedby="token-hint"
                         />
                         <button type="button" id="show-auth-help" class="btn-link" aria-label="Open help dialog for getting authentication token">How do I get a token?</button>
@@ -103,6 +118,18 @@
                 </div>
 
                 <button id="show-join-btn" type="button" class="btn btn-secondary">Join with Invite Code</button>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-create-identity-btn" type="button" class="btn btn-secondary">Create New Identity</button>
+
+                <div class="login-divider">
+                    <span>New here?</span>
+                </div>
+
+                <button id="show-onboarding-wizard-btn" type="button" class="btn btn-primary btn-large">Get Started</button>
             </div>
         </div>
 
@@ -118,7 +145,8 @@
                         <input
                             type="url"
                             id="join-gateway-url"
-                            value="http://localhost:8080"
+                            value=""
+                            placeholder="Auto-detected from server"
                             aria-required="true"
                         />
                     </div>
@@ -235,6 +263,179 @@
                             <li>Point your camera at this QR code</li>
                             <li>Confirm the login on your phone</li>
                         </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onboarding Wizard -->
+        <div id="onboarding-wizard" class="modal hidden" role="dialog" aria-labelledby="wizard-title" aria-modal="true">
+            <div class="modal-content modal-wizard">
+                <div class="modal-header">
+                    <h2 id="wizard-title">Welcome to ICN</h2>
+                    <button id="close-wizard" class="modal-close" aria-label="Close wizard">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Progress Indicator -->
+                    <div class="wizard-progress">
+                        <div class="wizard-step" data-step="1">
+                            <div class="step-circle active">1</div>
+                            <div class="step-label">Create Identity</div>
+                        </div>
+                        <div class="wizard-step" data-step="2">
+                            <div class="step-circle">2</div>
+                            <div class="step-label">Join Cooperative</div>
+                        </div>
+                        <div class="wizard-step" data-step="3">
+                            <div class="step-circle">3</div>
+                            <div class="step-label">Get Started</div>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Create Identity -->
+                    <div id="wizard-step-1" class="wizard-content active">
+                        <h3>Step 1: Create Your Identity</h3>
+                        <p>Your identity is stored securely in your browser. Choose a strong password to protect it.</p>
+
+                        <div class="form-group">
+                            <label for="wizard-password">Password</label>
+                            <input type="password" id="wizard-password" placeholder="Enter a strong password" />
+                            <small>At least 8 characters</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wizard-password-confirm">Confirm Password</label>
+                            <input type="password" id="wizard-password-confirm" placeholder="Re-enter your password" />
+                        </div>
+
+                        <div id="wizard-step-1-error" class="error-message" role="alert"></div>
+
+                        <button id="wizard-next-1" class="btn btn-primary">Create Identity & Continue</button>
+                    </div>
+
+                    <!-- Step 2: Join Cooperative -->
+                    <div id="wizard-step-2" class="wizard-content hidden">
+                        <h3>Step 2: Join a Cooperative</h3>
+                        <p>Enter the invite code you received to join your cooperative.</p>
+
+                        <div class="success-message">
+                            <strong>✓ Identity Created!</strong><br>
+                            Your DID: <code id="wizard-did-display"></code>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wizard-invite-code">Invite Code</label>
+                            <input type="text" id="wizard-invite-code" placeholder="XXXX-XXXX-XXXX" maxlength="14" />
+                            <small>Get this from your cooperative administrator</small>
+                        </div>
+
+                        <div id="wizard-step-2-error" class="error-message" role="alert"></div>
+
+                        <div class="wizard-actions">
+                            <button id="wizard-back-2" class="btn btn-secondary">Back</button>
+                            <button id="wizard-next-2" class="btn btn-primary">Join & Continue</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Ready -->
+                    <div id="wizard-step-3" class="wizard-content hidden">
+                        <h3>🎉 You're All Set!</h3>
+
+                        <div class="success-message">
+                            <strong>✓ Welcome to <span id="wizard-coop-name"></span>!</strong>
+                        </div>
+
+                        <p>Your account is ready. Click below to access your dashboard.</p>
+
+                        <div class="help-note">
+                            <strong>Remember:</strong>
+                            <ul>
+                                <li>Your password protects your identity - keep it safe!</li>
+                                <li>Your DID is your permanent identifier</li>
+                                <li>You can access this cooperative from any browser by entering your DID and password</li>
+                            </ul>
+                        </div>
+
+                        <button id="wizard-finish" class="btn btn-primary btn-large">Go to Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Identity Modal -->
+        <div
+            id="create-identity-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="create-identity-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="create-identity-title">Create New Identity</h2>
+                    <button id="close-create-identity" class="modal-close" aria-label="Close create identity dialog">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="help-intro">Create a new ICN identity directly in your browser. Your keys will be stored securely and never leave your device.</p>
+
+                    <div id="create-identity-form-step" class="create-identity-step">
+                        <div class="form-group">
+                            <label for="identity-password">Choose a Password</label>
+                            <input
+                                type="password"
+                                id="identity-password"
+                                placeholder="Enter a strong password"
+                                aria-required="true"
+                                aria-describedby="password-hint"
+                            />
+                            <small id="password-hint">This will encrypt your private key. Don't lose it!</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="identity-password-confirm">Confirm Password</label>
+                            <input
+                                type="password"
+                                id="identity-password-confirm"
+                                placeholder="Re-enter your password"
+                                aria-required="true"
+                            />
+                        </div>
+
+                        <div id="create-identity-error" class="error-message" role="alert"></div>
+
+                        <button id="generate-identity-btn" type="button" class="btn btn-primary">Generate Identity</button>
+                    </div>
+
+                    <div id="create-identity-success-step" class="create-identity-step hidden">
+                        <div class="success-message">
+                            <strong>✓ Identity Created Successfully!</strong>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="generated-did">Your DID</label>
+                            <div class="input-with-copy">
+                                <input
+                                    type="text"
+                                    id="generated-did"
+                                    readonly
+                                    aria-label="Your generated DID"
+                                />
+                                <button id="copy-generated-did" class="btn-copy" title="Copy DID">Copy</button>
+                            </div>
+                            <small>This is your unique identifier. Save it somewhere safe.</small>
+                        </div>
+
+                        <div class="help-note">
+                            <strong>Important:</strong>
+                            <ul>
+                                <li>Your identity is stored in this browser only</li>
+                                <li>Make sure to remember your password - it cannot be recovered</li>
+                                <li>You can now use this DID to log in</li>
+                            </ul>
+                        </div>
+
+                        <button id="use-new-identity-btn" type="button" class="btn btn-primary">Use This Identity</button>
                     </div>
                 </div>
             </div>
@@ -1743,6 +1944,7 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
         </div>
     </div>
 
+    <script src="crypto.js"></script>
     <script src="offline-storage.js"></script>
     <script src="app.js?v=1771017695"></script>
     <script src="receipts.js"></script>

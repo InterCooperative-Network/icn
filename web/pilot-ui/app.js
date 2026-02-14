@@ -43,6 +43,7 @@ const elements = {
     gatewayUrl: document.getElementById('gateway-url'),
     coopId: document.getElementById('coop-id'),
     did: document.getElementById('did'),
+    loginPassword: document.getElementById('login-password'),
     token: document.getElementById('token'),
     loginBtn: document.getElementById('login-btn'),
     loginError: document.getElementById('login-error'),
@@ -69,6 +70,39 @@ const elements = {
     helpGateway: document.getElementById('help-gateway'),
     helpCoop: document.getElementById('help-coop'),
     copyCommand: document.getElementById('copy-command'),
+
+    // Create Identity Modal
+    showCreateIdentityBtn: document.getElementById('show-create-identity-btn'),
+    createIdentityModal: document.getElementById('create-identity-modal'),
+    closeCreateIdentity: document.getElementById('close-create-identity'),
+    identityPassword: document.getElementById('identity-password'),
+    identityPasswordConfirm: document.getElementById('identity-password-confirm'),
+    generateIdentityBtn: document.getElementById('generate-identity-btn'),
+    createIdentityError: document.getElementById('create-identity-error'),
+    createIdentityFormStep: document.getElementById('create-identity-form-step'),
+    createIdentitySuccessStep: document.getElementById('create-identity-success-step'),
+    generatedDid: document.getElementById('generated-did'),
+    copyGeneratedDid: document.getElementById('copy-generated-did'),
+    useNewIdentityBtn: document.getElementById('use-new-identity-btn'),
+
+    // Onboarding Wizard
+    showOnboardingWizardBtn: document.getElementById('show-onboarding-wizard-btn'),
+    onboardingWizard: document.getElementById('onboarding-wizard'),
+    closeWizard: document.getElementById('close-wizard'),
+    wizardStep1: document.getElementById('wizard-step-1'),
+    wizardStep2: document.getElementById('wizard-step-2'),
+    wizardStep3: document.getElementById('wizard-step-3'),
+    wizardPassword: document.getElementById('wizard-password'),
+    wizardPasswordConfirm: document.getElementById('wizard-password-confirm'),
+    wizardNext1: document.getElementById('wizard-next-1'),
+    wizardStep1Error: document.getElementById('wizard-step-1-error'),
+    wizardDidDisplay: document.getElementById('wizard-did-display'),
+    wizardInviteCode: document.getElementById('wizard-invite-code'),
+    wizardBack2: document.getElementById('wizard-back-2'),
+    wizardNext2: document.getElementById('wizard-next-2'),
+    wizardStep2Error: document.getElementById('wizard-step-2-error'),
+    wizardCoopName: document.getElementById('wizard-coop-name'),
+    wizardFinish: document.getElementById('wizard-finish'),
 
     // Toast
     toastContainer: document.getElementById('toast-container'),
@@ -526,6 +560,349 @@ async function copyAuthCommand() {
     }
 }
 
+// Create Identity Modal Functions
+function showCreateIdentityModal() {
+    // Reset form
+    elements.identityPassword.value = '';
+    elements.identityPasswordConfirm.value = '';
+    elements.createIdentityError.textContent = '';
+    elements.createIdentityFormStep.classList.remove('hidden');
+    elements.createIdentitySuccessStep.classList.add('hidden');
+
+    elements.createIdentityModal.classList.remove('hidden');
+}
+
+function closeCreateIdentityModal() {
+    elements.createIdentityModal.classList.add('hidden');
+}
+
+async function generateIdentity() {
+    const password = elements.identityPassword.value;
+    const passwordConfirm = elements.identityPasswordConfirm.value;
+
+    // Validation
+    if (!password || password.length < 8) {
+        elements.createIdentityError.textContent = 'Password must be at least 8 characters';
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        elements.createIdentityError.textContent = 'Passwords do not match';
+        return;
+    }
+
+    try {
+        // Disable button during generation
+        elements.generateIdentityBtn.disabled = true;
+        elements.generateIdentityBtn.textContent = 'Generating...';
+        elements.createIdentityError.textContent = '';
+
+        // Generate keypair using WebCrypto
+        const keypair = await window.ICNCrypto.generateKeypair();
+
+        // Store encrypted in IndexedDB
+        await window.ICNCrypto.storeKeypair(keypair.did, keypair, password);
+
+        // Show success step
+        elements.generatedDid.value = keypair.did;
+        elements.createIdentityFormStep.classList.add('hidden');
+        elements.createIdentitySuccessStep.classList.remove('hidden');
+
+        showToast('Identity created successfully!', 'success', 3000);
+
+        debugLog('Generated DID:', keypair.did);
+    } catch (error) {
+        console.error('Error generating identity:', error);
+        elements.createIdentityError.textContent = 'Failed to generate identity. Please try again.';
+        showToast('Failed to generate identity', 'error');
+    } finally {
+        elements.generateIdentityBtn.disabled = false;
+        elements.generateIdentityBtn.textContent = 'Generate Identity';
+    }
+}
+
+async function copyGeneratedDidToClipboard() {
+    const did = elements.generatedDid.value;
+    const success = await copyToClipboard(did);
+
+    if (success) {
+        const btn = elements.copyGeneratedDid;
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+        showToast('DID copied to clipboard', 'success', 2000);
+    } else {
+        showToast('Failed to copy. Please select and copy manually.', 'error');
+    }
+}
+
+function useNewIdentity() {
+    const did = elements.generatedDid.value;
+
+    // Close modal
+    closeCreateIdentityModal();
+
+    // Fill in the DID field on login screen
+    elements.did.value = did;
+
+    // Focus on coop-id field if empty, otherwise focus on token field
+    if (!elements.coopId.value) {
+        elements.coopId.focus();
+    } else {
+        // Suggest using challenge-response auth (which will be implemented in T02)
+        showToast('Identity ready! You can now use challenge-response authentication.', 'info', 5000);
+    }
+}
+
+// Onboarding Wizard State
+const wizardState = {
+    currentStep: 1,
+    did: null,
+    password: null,
+    coopId: null,
+    gatewayUrl: null
+};
+
+// Onboarding Wizard Functions
+function showOnboardingWizard() {
+    // Reset wizard state
+    wizardState.currentStep = 1;
+    wizardState.did = null;
+    wizardState.password = null;
+    wizardState.coopId = null;
+    wizardState.gatewayUrl = detectGatewayUrl();
+
+    // Reset form
+    elements.wizardPassword.value = '';
+    elements.wizardPasswordConfirm.value = '';
+    elements.wizardInviteCode.value = '';
+    elements.wizardStep1Error.textContent = '';
+    elements.wizardStep2Error.textContent = '';
+
+    // Show step 1
+    showWizardStep(1);
+
+    // Show wizard
+    elements.onboardingWizard.classList.remove('hidden');
+}
+
+function closeOnboardingWizard() {
+    elements.onboardingWizard.classList.add('hidden');
+}
+
+function showWizardStep(stepNumber) {
+    wizardState.currentStep = stepNumber;
+
+    // Hide all steps
+    elements.wizardStep1.classList.add('hidden');
+    elements.wizardStep2.classList.add('hidden');
+    elements.wizardStep3.classList.add('hidden');
+
+    // Show current step
+    const stepElement = document.getElementById(`wizard-step-${stepNumber}`);
+    if (stepElement) {
+        stepElement.classList.remove('hidden');
+    }
+
+    // Update progress indicator
+    document.querySelectorAll('.wizard-step').forEach((step, index) => {
+        const circle = step.querySelector('.step-circle');
+        if (index + 1 < stepNumber) {
+            circle.classList.add('completed');
+            circle.classList.remove('active');
+        } else if (index + 1 === stepNumber) {
+            circle.classList.add('active');
+            circle.classList.remove('completed');
+        } else {
+            circle.classList.remove('active', 'completed');
+        }
+    });
+}
+
+async function wizardStep1Next() {
+    const password = elements.wizardPassword.value;
+    const passwordConfirm = elements.wizardPasswordConfirm.value;
+
+    // Validation
+    if (!password || password.length < 8) {
+        elements.wizardStep1Error.textContent = 'Password must be at least 8 characters';
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        elements.wizardStep1Error.textContent = 'Passwords do not match';
+        return;
+    }
+
+    try {
+        // Disable button during generation
+        elements.wizardNext1.disabled = true;
+        elements.wizardNext1.textContent = 'Creating Identity...';
+        elements.wizardStep1Error.textContent = '';
+
+        // Generate keypair
+        const keypair = await window.ICNCrypto.generateKeypair();
+
+        // Store encrypted in IndexedDB
+        await window.ICNCrypto.storeKeypair(keypair.did, keypair, password);
+
+        // Save to wizard state
+        wizardState.did = keypair.did;
+        wizardState.password = password;
+
+        // Show in step 2
+        elements.wizardDidDisplay.textContent = keypair.did;
+
+        // Move to step 2
+        showWizardStep(2);
+
+        debugLog('Wizard: Identity created:', keypair.did);
+
+    } catch (error) {
+        console.error('Wizard step 1 error:', error);
+        elements.wizardStep1Error.textContent = 'Failed to create identity. Please try again.';
+    } finally {
+        elements.wizardNext1.disabled = false;
+        elements.wizardNext1.textContent = 'Create Identity & Continue';
+    }
+}
+
+async function wizardStep2Next() {
+    const inviteCode = elements.wizardInviteCode.value.trim();
+
+    if (!inviteCode) {
+        elements.wizardStep2Error.textContent = 'Please enter an invite code';
+        return;
+    }
+
+    try {
+        // Disable button
+        elements.wizardNext2.disabled = true;
+        elements.wizardNext2.textContent = 'Joining...';
+        elements.wizardStep2Error.textContent = '';
+
+        // Join cooperative via invite code
+        const joinUrl = `${wizardState.gatewayUrl}/v1/invites/join`;
+        const response = await fetch(joinUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: inviteCode,
+                did: wizardState.did
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to join cooperative');
+        }
+
+        const data = await response.json();
+        wizardState.coopId = data.coop_id || data.cooperative_id || 'unknown';
+
+        // Show coop name in step 3
+        elements.wizardCoopName.textContent = wizardState.coopId;
+
+        // Move to step 3
+        showWizardStep(3);
+
+        debugLog('Wizard: Joined cooperative:', wizardState.coopId);
+
+    } catch (error) {
+        console.error('Wizard step 2 error:', error);
+        elements.wizardStep2Error.textContent = `Failed to join: ${error.message}`;
+    } finally {
+        elements.wizardNext2.disabled = false;
+        elements.wizardNext2.textContent = 'Join & Continue';
+    }
+}
+
+async function wizardFinish() {
+    // Close wizard
+    closeOnboardingWizard();
+
+    // Fill in login form
+    elements.gatewayUrl.value = wizardState.gatewayUrl;
+    elements.coopId.value = wizardState.coopId;
+    elements.did.value = wizardState.did;
+    elements.loginPassword.value = wizardState.password;
+
+    // Auto-login
+    showToast('Logging you in...', 'info', 2000);
+    await login();
+}
+
+// Challenge-Response Authentication
+async function challengeResponseAuth(did, password) {
+    try {
+        // Step 1: Request challenge from gateway
+        debugLog('Requesting challenge for DID:', did);
+        const challengeUrl = `${state.gatewayUrl}/v1/auth/challenge`;
+        const challengeResponse = await fetch(challengeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ did: did })
+        });
+
+        if (!challengeResponse.ok) {
+            const errorText = await challengeResponse.text();
+            throw new Error(`Challenge request failed: ${errorText}`);
+        }
+
+        const challengeData = await challengeResponse.json();
+        const challenge = challengeData.challenge;
+        debugLog('Received challenge:', challenge);
+
+        // Step 2: Load and decrypt keypair from IndexedDB
+        debugLog('Loading keypair from IndexedDB');
+        let keypair;
+        try {
+            keypair = await window.ICNCrypto.loadKeypair(did, password);
+        } catch (err) {
+            throw new Error('Failed to load keypair. Wrong password or identity not found.');
+        }
+
+        // Step 3: Sign the challenge
+        debugLog('Signing challenge');
+        const signature = await window.ICNCrypto.signChallenge(challenge, keypair);
+        debugLog('Signature generated');
+
+        // Step 4: Send signed challenge to gateway for verification
+        debugLog('Verifying signature with gateway');
+        const verifyUrl = `${state.gatewayUrl}/v1/auth/verify`;
+        const verifyResponse = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                did: did,
+                challenge: challenge,
+                signature: signature
+            })
+        });
+
+        if (!verifyResponse.ok) {
+            const errorText = await verifyResponse.text();
+            throw new Error(`Signature verification failed: ${errorText}`);
+        }
+
+        const verifyData = await verifyResponse.json();
+        const token = verifyData.token;
+
+        if (!token) {
+            throw new Error('No token returned from gateway');
+        }
+
+        debugLog('Challenge-response authentication successful, token acquired');
+        return token;
+
+    } catch (error) {
+        console.error('Challenge-response auth error:', error);
+        throw new Error(`Authentication failed: ${error.message}`);
+    }
+}
+
 // Login
 async function login() {
     clearError(elements.loginError);
@@ -533,16 +910,34 @@ async function login() {
     state.gatewayUrl = elements.gatewayUrl.value.trim().replace(/\/$/, '');
     state.coopId = elements.coopId.value.trim();
     state.did = elements.did.value.trim();
-    state.token = elements.token.value.trim();
+    const password = elements.loginPassword.value.trim();
+    const token = elements.token.value.trim();
 
-    if (!state.gatewayUrl || !state.coopId || !state.did || !state.token) {
-        showError(elements.loginError, 'Please fill in all fields');
+    // Validation: need either password (for challenge-response) or token (for CLI auth)
+    if (!state.gatewayUrl || !state.coopId || !state.did) {
+        showError(elements.loginError, 'Please fill in gateway URL, cooperative ID, and DID');
+        return;
+    }
+
+    if (!password && !token) {
+        showError(elements.loginError, 'Please provide either a password (for in-browser auth) or a token (from CLI)');
         return;
     }
 
     try {
         elements.loginBtn.disabled = true;
         elements.loginBtn.textContent = 'Connecting...';
+
+        // Determine authentication method
+        if (password) {
+            // Challenge-response authentication
+            debugLog('Using challenge-response authentication');
+            state.token = await challengeResponseAuth(state.did, password);
+        } else {
+            // Token-based authentication (existing flow)
+            debugLog('Using token-based authentication');
+            state.token = token;
+        }
 
         // Test connection by fetching health
         await apiRequest('GET', '/health');
@@ -2163,6 +2558,35 @@ elements.authHelpModal.addEventListener('click', (e) => {
     }
 });
 
+// Create Identity Modal event listeners
+elements.showCreateIdentityBtn.addEventListener('click', showCreateIdentityModal);
+elements.closeCreateIdentity.addEventListener('click', closeCreateIdentityModal);
+elements.generateIdentityBtn.addEventListener('click', generateIdentity);
+elements.copyGeneratedDid.addEventListener('click', copyGeneratedDidToClipboard);
+elements.useNewIdentityBtn.addEventListener('click', useNewIdentity);
+
+// Close modal when clicking outside
+elements.createIdentityModal.addEventListener('click', (e) => {
+    if (e.target === elements.createIdentityModal) {
+        closeCreateIdentityModal();
+    }
+});
+
+// Onboarding Wizard event listeners
+elements.showOnboardingWizardBtn.addEventListener('click', showOnboardingWizard);
+elements.closeWizard.addEventListener('click', closeOnboardingWizard);
+elements.wizardNext1.addEventListener('click', wizardStep1Next);
+elements.wizardBack2.addEventListener('click', () => showWizardStep(1));
+elements.wizardNext2.addEventListener('click', wizardStep2Next);
+elements.wizardFinish.addEventListener('click', wizardFinish);
+
+// Close wizard when clicking outside
+elements.onboardingWizard.addEventListener('click', (e) => {
+    if (e.target === elements.onboardingWizard) {
+        closeOnboardingWizard();
+    }
+});
+
 // Member search
 elements.memberSearch.addEventListener('input', (e) => {
     filterMembers(e.target.value);
@@ -2238,6 +2662,17 @@ setInterval(() => {
     }
 }, 60000);
 
+// Auto-detect gateway URL based on where the app is being served from
+function detectGatewayUrl() {
+    // If served from the gateway itself (not localhost), use window.location.origin
+    // This allows LAN access without manual URL configuration
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return window.location.origin;
+    }
+    // Default to localhost for local development
+    return 'http://localhost:8080';
+}
+
 // Load saved credentials
 document.addEventListener('DOMContentLoaded', () => {
     // Check for magic link parameters in URL hash
@@ -2264,10 +2699,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // Auto-detect gateway URL when served from the gateway itself
-    if (elements.gatewayUrl.value === 'http://localhost:8080' && window.location.hostname !== 'localhost') {
-        elements.gatewayUrl.value = window.location.origin;
-    }
+    // Auto-detect gateway URL for both login and join screens
+    const detectedGatewayUrl = detectGatewayUrl();
 
     const savedGateway = localStorage.getItem('icn-gateway');
     const savedCoop = localStorage.getItem('icn-coop');
@@ -2275,7 +2708,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedToken = localStorage.getItem('icn-token');
     const savedExpiry = localStorage.getItem('icn-token-expiry');
 
-    if (savedGateway) elements.gatewayUrl.value = savedGateway;
+    // Use saved gateway if available, otherwise use auto-detected URL
+    const gatewayUrl = savedGateway || detectedGatewayUrl;
+
+    elements.gatewayUrl.value = gatewayUrl;
+    elements.joinGatewayUrl.value = gatewayUrl;
+
     if (savedCoop) elements.coopId.value = savedCoop;
     if (savedDid) elements.did.value = savedDid;
     if (savedToken) elements.token.value = savedToken;

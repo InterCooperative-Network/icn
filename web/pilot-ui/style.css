@@ -5178,3 +5178,119 @@ footer .sync-status.error {
     background: var(--success);
     color: white;
 }
+
+/* ============================================================================
+   Onboarding Wizard Styles
+   ============================================================================ */
+
+.modal-wizard {
+    max-width: 600px;
+}
+
+.wizard-progress {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+}
+
+.wizard-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: -1;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.step-circle.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.step-circle.completed {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+}
+
+.step-circle.completed::before {
+    content: '✓';
+}
+
+.step-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.wizard-content {
+    display: none;
+}
+
+.wizard-content.active {
+    display: block;
+}
+
+.wizard-content h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--text);
+}
+
+.wizard-content p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.wizard-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.wizard-actions button {
+    flex: 1;
+}
+
+.btn-large {
+    padding: 0.875rem 2rem;
+    font-size: 1.125rem;
+    width: 100%;
+}
+
+#wizard-did-display {
+    font-size: 0.875rem;
+    word-break: break-all;
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: var(--background);
+    border-radius: 4px;
+}
