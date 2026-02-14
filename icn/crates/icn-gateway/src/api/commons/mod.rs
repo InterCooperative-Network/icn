@@ -63,16 +63,31 @@ pub struct AffiliationResponse {
     pub capabilities: Vec<String>,
     pub roles: Vec<String>,
     pub joined_at: u64,
+    /// Scope level derived from the jurisdiction type (e.g., "org", "community",
+    /// "federation", "network"). None if the jurisdiction ID format is unrecognized.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_level: Option<String>,
 }
 
 impl From<&Affiliation> for AffiliationResponse {
     fn from(a: &Affiliation) -> Self {
+        let scope_level = a.jurisdiction_id.jurisdiction_type().map(|jt| {
+            match jt {
+                icn_identity::JurisdictionType::Cooperative => "org",
+                icn_identity::JurisdictionType::Community => "community",
+                icn_identity::JurisdictionType::Federation => "federation",
+                icn_identity::JurisdictionType::Network => "network",
+            }
+            .to_string()
+        });
+
         Self {
             jurisdiction_id: a.jurisdiction_id.to_string(),
             membership_status: format!("{}", a.membership_status),
             capabilities: a.capabilities.iter().map(|c| format!("{c}")).collect(),
             roles: a.roles.clone(),
             joined_at: a.joined_at,
+            scope_level,
         }
     }
 }

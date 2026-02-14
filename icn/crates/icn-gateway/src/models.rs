@@ -341,6 +341,38 @@ pub enum VoteChoiceResponse {
     Abstain,
 }
 
+// === Proposal Response ===
+
+/// Gateway response DTO for governance proposals.
+///
+/// Wraps the core `Proposal` fields with additional gateway-level metadata.
+/// Currently a stub — future phases will populate fields like `policy_ref`
+/// from CCL contract integration.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProposalResponse {
+    /// Proposal ID
+    pub id: String,
+    /// Domain this proposal belongs to
+    pub domain_id: String,
+    /// DID of the proposer
+    pub proposer: String,
+    /// Title of the proposal
+    pub title: String,
+    /// Description
+    pub description: String,
+    /// Current state (draft, open, closed)
+    pub state: String,
+    /// When created (Unix timestamp)
+    pub created_at: u64,
+    /// When last updated (Unix timestamp)
+    pub updated_at: u64,
+    /// Reference to the CCL policy document governing this proposal's rules
+    /// (e.g., quorum thresholds, approval criteria). None until CCL integration
+    /// is implemented in a later phase.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_ref: Option<String>,
+}
+
 // === Invite System ===
 
 /// Create an invite for someone to join the coop

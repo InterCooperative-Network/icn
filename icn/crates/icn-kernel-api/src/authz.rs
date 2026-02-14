@@ -58,11 +58,21 @@ pub enum PolicyDecision {
     Allow {
         /// Constraints the kernel will enforce
         constraints: ConstraintSet,
+        /// Domain that evaluated this decision (e.g., "trust", "governance")
+        /// Generic string - kernel does not interpret this value
+        policy_domain: Option<String>,
+        /// Unix timestamp when this decision was evaluated
+        /// Generic timestamp - kernel does not interpret this value
+        evaluated_at: Option<u64>,
     },
     /// Request is denied
     Deny {
         /// Error describing why the request was denied
         reason: PolicyError,
+        /// Domain that evaluated this decision
+        policy_domain: Option<String>,
+        /// Unix timestamp when this decision was evaluated
+        evaluated_at: Option<u64>,
     },
 }
 
@@ -71,24 +81,62 @@ impl PolicyDecision {
     pub fn allow() -> Self {
         Self::Allow {
             constraints: ConstraintSet::default(),
+            policy_domain: None,
+            evaluated_at: None,
         }
     }
 
     /// Create an Allow decision with constraints.
     pub fn allow_with(constraints: ConstraintSet) -> Self {
-        Self::Allow { constraints }
+        Self::Allow {
+            constraints,
+            policy_domain: None,
+            evaluated_at: None,
+        }
+    }
+
+    /// Create an Allow decision with constraints and provenance.
+    pub fn allow_with_provenance(
+        constraints: ConstraintSet,
+        policy_domain: impl Into<String>,
+        evaluated_at: u64,
+    ) -> Self {
+        Self::Allow {
+            constraints,
+            policy_domain: Some(policy_domain.into()),
+            evaluated_at: Some(evaluated_at),
+        }
     }
 
     /// Create a Deny decision.
     pub fn deny(reason: impl Into<String>) -> Self {
         Self::Deny {
             reason: PolicyError::Denied(reason.into()),
+            policy_domain: None,
+            evaluated_at: None,
         }
     }
 
     /// Create a Deny decision with a PolicyError.
     pub fn deny_error(reason: PolicyError) -> Self {
-        Self::Deny { reason }
+        Self::Deny {
+            reason,
+            policy_domain: None,
+            evaluated_at: None,
+        }
+    }
+
+    /// Create a Deny decision with provenance.
+    pub fn deny_with_provenance(
+        reason: PolicyError,
+        policy_domain: impl Into<String>,
+        evaluated_at: u64,
+    ) -> Self {
+        Self::Deny {
+            reason,
+            policy_domain: Some(policy_domain.into()),
+            evaluated_at: Some(evaluated_at),
+        }
     }
 
     /// Check if this decision allows the request.
@@ -99,8 +147,24 @@ impl PolicyDecision {
     /// Get constraints if allowed, None if denied.
     pub fn constraints(&self) -> Option<&ConstraintSet> {
         match self {
-            Self::Allow { constraints } => Some(constraints),
+            Self::Allow { constraints, .. } => Some(constraints),
             Self::Deny { .. } => None,
+        }
+    }
+
+    /// Get policy domain if available.
+    pub fn policy_domain(&self) -> Option<&str> {
+        match self {
+            Self::Allow { policy_domain, .. } | Self::Deny { policy_domain, .. } => {
+                policy_domain.as_deref()
+            }
+        }
+    }
+
+    /// Get evaluation timestamp if available.
+    pub fn evaluated_at(&self) -> Option<u64> {
+        match self {
+            Self::Allow { evaluated_at, .. } | Self::Deny { evaluated_at, .. } => *evaluated_at,
         }
     }
 }
