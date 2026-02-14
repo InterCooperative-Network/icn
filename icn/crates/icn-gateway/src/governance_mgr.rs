@@ -15,15 +15,17 @@
 //!
 //! When created with `new()`, it uses in-memory storage (suitable for testing only).
 
+use crate::receipt_store::ReceiptStore;
 use anyhow::Result;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
-    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDomain,
-    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
-    InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig, MembershipSource,
-    PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalState,
-    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDecisionReceipt,
+    GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
+    GovernanceProfileId, InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig,
+    MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
+    ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -220,6 +222,8 @@ pub struct GovernanceManager {
     action_items: Box<dyn ActionItemStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
+    /// Optional receipt store for persisting GovernanceDecisionReceipts
+    receipt_store: Option<Arc<ReceiptStore>>,
 }
 
 impl GovernanceManager {
@@ -237,6 +241,7 @@ impl GovernanceManager {
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(InMemoryActionItemStore::new()),
             governance_handle: None,
+            receipt_store: None,
         }
     }
 
@@ -267,6 +272,7 @@ impl GovernanceManager {
             // Use set_action_item_store() to configure persistent storage
             action_items: Box::new(InMemoryActionItemStore::new()),
             governance_handle: Some(handle),
+            receipt_store: None,
         }
     }
 
@@ -276,6 +282,15 @@ impl GovernanceManager {
     /// Must be called before any action items are created.
     pub fn set_action_item_store(&mut self, store: Box<dyn ActionItemStoreBackend>) {
         self.action_items = store;
+    }
+
+    /// Attach a receipt store for persisting GovernanceDecisionReceipts.
+    ///
+    /// When set, `close_proposal()` in standalone mode will automatically
+    /// generate and store a `GovernanceDecisionReceipt` after closing.
+    pub fn with_receipt_store(mut self, store: Arc<ReceiptStore>) -> Self {
+        self.receipt_store = Some(store);
+        self
     }
 
     /// Create a governance manager with Sled-backed action item storage
@@ -291,6 +306,7 @@ impl GovernanceManager {
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
             governance_handle: Some(handle),
+            receipt_store: None,
         }
     }
 
@@ -307,6 +323,7 @@ impl GovernanceManager {
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
             action_items: Box::new(SledActionItemStore::new(db)),
             governance_handle: None,
+            receipt_store: None,
         }
     }
 
@@ -675,7 +692,7 @@ impl GovernanceManager {
 
             // Calculate vote tally using proper vote tally system
             let proposal_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
-            let tally = VoteTally::from(proposal_votes);
+            let tally = VoteTally::from(proposal_votes.clone());
 
             // Get total eligible voters from domain membership
             let total_members = match &domain.config.membership.source {
@@ -733,7 +750,33 @@ impl GovernanceManager {
                 ProposalState::Rejected { closed_at: now }
             };
 
+            let outcome = match &final_state {
+                ProposalState::Accepted { .. } => ProofOutcome::Accepted,
+                ProposalState::Rejected { .. } => ProofOutcome::Rejected,
+                ProposalState::NoQuorum { .. } => ProofOutcome::NoQuorum,
+                _ => unreachable!("final_state is always Accepted/Rejected/NoQuorum"),
+            };
+
             proposal.close(final_state)?;
+
+            // Generate and persist a GovernanceDecisionReceipt
+            if let Some(ref store) = self.receipt_store {
+                let receipt = GovernanceDecisionReceipt::new(
+                    proposal_id.0.clone(),
+                    proposal.domain_id.0.clone(),
+                    outcome,
+                    tally,
+                    &proposal_votes,
+                );
+                if let Err(e) = store.put_governance(&receipt) {
+                    tracing::warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Failed to store governance decision receipt (non-fatal)"
+                    );
+                }
+            }
+
             Ok(())
         } else {
             anyhow::bail!(
@@ -786,7 +829,26 @@ impl GovernanceManager {
         if let Some(ref handle) = self.governance_handle {
             return handle.get_proof(proposal_id).await;
         }
-        // Standalone mode: no proof generation
+        // Standalone mode: check receipt store for a canonical receipt
+        if let Some(ref store) = self.receipt_store {
+            match store.get_governance_by_proposal(&proposal_id.0) {
+                Ok(Some(receipt)) => {
+                    // Wrap canonical receipt as ProofV2 (no attestations in standalone)
+                    return Ok(Some(icn_governance::GovernanceProofV2::new(
+                        receipt,
+                        Vec::new(),
+                    )));
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Failed to query receipt store for proof"
+                    );
+                }
+            }
+        }
         Ok(None)
     }
 

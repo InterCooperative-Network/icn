@@ -1,20 +1,29 @@
-//! Receipt storage service for economic receipts.
+//! Receipt storage service for governance and economic receipts.
 //!
-//! Stores AllocationReceipt and SettlementIntent by canonical hash.
-//! Supports lookup by hash, decision_hash, and decision_receipt_id.
+//! Stores three canonical receipt types:
+//! - GovernanceDecisionReceipt (governance decisions)
+//! - AllocationReceipt (resource allocation)
+//! - SettlementIntent (economic settlement)
+//!
+//! Supports lookup by canonical hash, decision_hash, and proposal_id.
 
+use icn_governance::GovernanceDecisionReceipt;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
 use sled::Db;
 
+/// Key prefix for governance decision receipts
+const GOVERNANCE_PREFIX: &[u8] = b"receipt:governance:";
 /// Key prefix for allocation receipts
 const ALLOCATION_PREFIX: &[u8] = b"receipt:allocation:";
 /// Key prefix for settlement intents
 const INTENT_PREFIX: &[u8] = b"receipt:intent:";
 /// Index prefix for decision hash lookups
 const DECISION_INDEX_PREFIX: &[u8] = b"receipt:by_decision:";
+/// Index prefix for proposal ID lookups (governance receipts only)
+const PROPOSAL_INDEX_PREFIX: &[u8] = b"receipt:by_proposal:";
 
-/// Receipt storage service for economic chain artifacts.
+/// Receipt storage service for governance and economic chain artifacts.
 ///
 /// Stores receipts by canonical hash for cross-node deterministic lookup.
 pub struct ReceiptStore {
@@ -57,6 +66,113 @@ impl ReceiptStore {
         prefix.extend_from_slice(type_tag);
         prefix.push(b':');
         prefix
+    }
+
+    /// Build a proposal ID index key
+    fn make_proposal_index_key(proposal_id: &str, receipt_hash: &Hash) -> Vec<u8> {
+        let mut key = PROPOSAL_INDEX_PREFIX.to_vec();
+        key.extend_from_slice(proposal_id.as_bytes());
+        key.push(b':');
+        key.extend_from_slice(hex::encode(receipt_hash).as_bytes());
+        key
+    }
+
+    /// Build a proposal ID scan prefix
+    fn make_proposal_scan_prefix(proposal_id: &str) -> Vec<u8> {
+        let mut prefix = PROPOSAL_INDEX_PREFIX.to_vec();
+        prefix.extend_from_slice(proposal_id.as_bytes());
+        prefix.push(b':');
+        prefix
+    }
+
+    // ========================================================================
+    // GovernanceDecisionReceipt operations
+    // ========================================================================
+
+    /// Store a governance decision receipt by its canonical decision_hash.
+    ///
+    /// Indexes by both decision_hash and proposal_id for O(1) lookups.
+    pub fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<Hash, String> {
+        let hash = receipt.decision_hash;
+        let key = Self::make_key(GOVERNANCE_PREFIX, &hash);
+        let value = serde_json::to_vec(receipt)
+            .map_err(|e| format!("Failed to serialize governance receipt: {}", e))?;
+
+        self.db
+            .insert(&key, value)
+            .map_err(|e| format!("Failed to store governance receipt: {}", e))?;
+
+        // Index by decision_hash (for chain lookups)
+        let decision_key = Self::make_decision_index_key(&hash, b"governance", &hash);
+        self.db
+            .insert(&decision_key, &hash[..])
+            .map_err(|e| format!("Failed to index governance receipt by decision_hash: {}", e))?;
+
+        // Index by proposal_id (for proposal → receipt lookups)
+        let proposal_key = Self::make_proposal_index_key(&receipt.proposal_id, &hash);
+        self.db
+            .insert(&proposal_key, &hash[..])
+            .map_err(|e| format!("Failed to index governance receipt by proposal_id: {}", e))?;
+
+        Ok(hash)
+    }
+
+    /// Get a governance decision receipt by decision_hash.
+    pub fn get_governance(&self, hash: &Hash) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        let key = Self::make_key(GOVERNANCE_PREFIX, hash);
+        match self.db.get(&key) {
+            Ok(Some(bytes)) => {
+                let receipt: GovernanceDecisionReceipt = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("Failed to deserialize governance receipt: {}", e))?;
+                Ok(Some(receipt))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(format!("Failed to get governance receipt: {}", e)),
+        }
+    }
+
+    /// Get a governance decision receipt by proposal_id.
+    pub fn get_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        let prefix = Self::make_proposal_scan_prefix(proposal_id);
+
+        // Scan for all receipts with this proposal_id (should be exactly 1)
+        for entry in self.db.scan_prefix(&prefix) {
+            let (_, hash_bytes) =
+                entry.map_err(|e| format!("Failed to scan proposal index: {}", e))?;
+            if hash_bytes.len() == 32 {
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                return self.get_governance(&hash);
+            }
+        }
+        Ok(None)
+    }
+
+    /// List governance decision receipts for a decision hash.
+    ///
+    /// For governance receipts, decision_hash IS the canonical hash, so this
+    /// returns at most one receipt.
+    pub fn list_governance_by_decision(
+        &self,
+        decision_hash: &Hash,
+    ) -> Result<Vec<GovernanceDecisionReceipt>, String> {
+        let prefix = Self::make_decision_scan_prefix(decision_hash, b"governance");
+
+        let mut receipts = Vec::new();
+        for entry in self.db.scan_prefix(&prefix) {
+            let (_, hash_bytes) = entry.map_err(|e| format!("Failed to scan: {}", e))?;
+            if hash_bytes.len() == 32 {
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                if let Ok(Some(receipt)) = self.get_governance(&hash) {
+                    receipts.push(receipt);
+                }
+            }
+        }
+        Ok(receipts)
     }
 
     // ========================================================================
@@ -208,6 +324,7 @@ impl ReceiptStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_governance::{ProofOutcome, VoteTally};
     use icn_kernel_api::ScopeLevel;
 
     fn temp_db() -> Db {
@@ -225,6 +342,82 @@ mod tests {
         )
         .with_timestamp(1000000)
     }
+
+    fn make_test_governance_receipt(proposal_id: &str) -> GovernanceDecisionReceipt {
+        let votes = vec![];
+        let tally = VoteTally::empty();
+        GovernanceDecisionReceipt::new(
+            proposal_id.to_string(),
+            "test-domain".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+        )
+    }
+
+    // ========================================================================
+    // Governance receipt tests
+    // ========================================================================
+
+    #[test]
+    fn test_put_get_governance() {
+        let store = ReceiptStore::new(temp_db());
+        let receipt = make_test_governance_receipt("prop-001");
+        let hash = store.put_governance(&receipt).unwrap();
+
+        let retrieved = store.get_governance(&hash).unwrap().unwrap();
+        assert_eq!(retrieved.decision_hash, receipt.decision_hash);
+        assert_eq!(retrieved.proposal_id, "prop-001");
+    }
+
+    #[test]
+    fn test_get_governance_by_proposal() {
+        let store = ReceiptStore::new(temp_db());
+        let receipt = make_test_governance_receipt("prop-002");
+        store.put_governance(&receipt).unwrap();
+
+        let retrieved = store
+            .get_governance_by_proposal("prop-002")
+            .unwrap()
+            .unwrap();
+        assert_eq!(retrieved.decision_hash, receipt.decision_hash);
+        assert_eq!(retrieved.proposal_id, "prop-002");
+    }
+
+    #[test]
+    fn test_list_governance_by_decision() {
+        let store = ReceiptStore::new(temp_db());
+        let receipt = make_test_governance_receipt("prop-003");
+        let hash = receipt.decision_hash;
+        store.put_governance(&receipt).unwrap();
+
+        let receipts = store.list_governance_by_decision(&hash).unwrap();
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(receipts[0].proposal_id, "prop-003");
+    }
+
+    #[test]
+    fn test_governance_dual_indexing() {
+        let store = ReceiptStore::new(temp_db());
+        let receipt = make_test_governance_receipt("prop-dual-index");
+        let hash = receipt.decision_hash;
+        store.put_governance(&receipt).unwrap();
+
+        // Verify can retrieve by decision_hash
+        let by_hash = store.get_governance(&hash).unwrap().unwrap();
+        assert_eq!(by_hash.proposal_id, "prop-dual-index");
+
+        // Verify can retrieve by proposal_id
+        let by_proposal = store
+            .get_governance_by_proposal("prop-dual-index")
+            .unwrap()
+            .unwrap();
+        assert_eq!(by_proposal.decision_hash, hash);
+    }
+
+    // ========================================================================
+    // Economic receipt tests (unchanged)
+    // ========================================================================
 
     #[test]
     fn test_put_get_intent() {
