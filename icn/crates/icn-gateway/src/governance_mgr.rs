@@ -15,8 +15,8 @@
 //!
 //! When created with `new()`, it uses in-memory storage (suitable for testing only).
 
-use anyhow::Result;
 use crate::receipt_store::ReceiptStore;
+use anyhow::Result;
 use icn_governance::{
     scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
     ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,

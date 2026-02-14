@@ -140,7 +140,8 @@ impl ReceiptStore {
 
         // Scan for all receipts with this proposal_id (should be exactly 1)
         for entry in self.db.scan_prefix(&prefix) {
-            let (_, hash_bytes) = entry.map_err(|e| format!("Failed to scan proposal index: {}", e))?;
+            let (_, hash_bytes) =
+                entry.map_err(|e| format!("Failed to scan proposal index: {}", e))?;
             if hash_bytes.len() == 32 {
                 let mut hash = [0u8; 32];
                 hash.copy_from_slice(&hash_bytes);
@@ -375,7 +376,10 @@ mod tests {
         let receipt = make_test_governance_receipt("prop-002");
         store.put_governance(&receipt).unwrap();
 
-        let retrieved = store.get_governance_by_proposal("prop-002").unwrap().unwrap();
+        let retrieved = store
+            .get_governance_by_proposal("prop-002")
+            .unwrap()
+            .unwrap();
         assert_eq!(retrieved.decision_hash, receipt.decision_hash);
         assert_eq!(retrieved.proposal_id, "prop-002");
     }
@@ -404,7 +408,10 @@ mod tests {
         assert_eq!(by_hash.proposal_id, "prop-dual-index");
 
         // Verify can retrieve by proposal_id
-        let by_proposal = store.get_governance_by_proposal("prop-dual-index").unwrap().unwrap();
+        let by_proposal = store
+            .get_governance_by_proposal("prop-dual-index")
+            .unwrap()
+            .unwrap();
         assert_eq!(by_proposal.decision_hash, hash);
     }
 
