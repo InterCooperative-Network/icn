@@ -2238,6 +2238,17 @@ setInterval(() => {
     }
 }, 60000);
 
+// Auto-detect gateway URL based on where the app is being served from
+function detectGatewayUrl() {
+    // If served from the gateway itself (not localhost), use window.location.origin
+    // This allows LAN access without manual URL configuration
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return window.location.origin;
+    }
+    // Default to localhost for local development
+    return 'http://localhost:8080';
+}
+
 // Load saved credentials
 document.addEventListener('DOMContentLoaded', () => {
     // Check for magic link parameters in URL hash
@@ -2264,10 +2275,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // Auto-detect gateway URL when served from the gateway itself
-    if (elements.gatewayUrl.value === 'http://localhost:8080' && window.location.hostname !== 'localhost') {
-        elements.gatewayUrl.value = window.location.origin;
-    }
+    // Auto-detect gateway URL for both login and join screens
+    const detectedGatewayUrl = detectGatewayUrl();
 
     const savedGateway = localStorage.getItem('icn-gateway');
     const savedCoop = localStorage.getItem('icn-coop');
@@ -2275,7 +2284,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedToken = localStorage.getItem('icn-token');
     const savedExpiry = localStorage.getItem('icn-token-expiry');
 
-    if (savedGateway) elements.gatewayUrl.value = savedGateway;
+    // Use saved gateway if available, otherwise use auto-detected URL
+    const gatewayUrl = savedGateway || detectedGatewayUrl;
+
+    elements.gatewayUrl.value = gatewayUrl;
+    elements.joinGatewayUrl.value = gatewayUrl;
+
     if (savedCoop) elements.coopId.value = savedCoop;
     if (savedDid) elements.did.value = savedDid;
     if (savedToken) elements.token.value = savedToken;
