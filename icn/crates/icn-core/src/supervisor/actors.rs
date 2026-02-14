@@ -47,18 +47,13 @@ pub struct EventSubscriptionHandles {
 
 /// Typed handles for domain objects passed from daemon to supervisor.
 ///
-/// This replaces the type-erased `raw_handles` HashMap that was previously
-/// on `ServiceRegistry`. Each field is a concrete, typed handle — no
-/// `Any` downcasting required.
+/// Each field is a concrete, typed handle. The daemon constructs these
+/// objects (opening sled stores, initializing ledger services, etc.) and
+/// passes them to the supervisor via `Runtime::with_bootstrap_handles()`.
+/// The supervisor wires them into actors during initialization.
 ///
-/// The daemon constructs these objects (opening sled stores, initializing
-/// ledger services, etc.) and passes them to the supervisor. The supervisor
-/// wires them into actors during initialization.
-///
-/// **Note**: `TrustGraph` is intentionally absent — all kernel components
-/// (MisbehaviorDetector, ReplicationManager, StorageChallenge, RPC) have
-/// migrated to the `TrustService` trait on `ServiceRegistry`. The daemon
-/// passes trust via `ServiceRegistry::with_trust()` instead.
+/// Trust is provided separately via `ServiceRegistry::with_trust()` using
+/// the `TrustService` trait — not through these handles.
 ///
 /// See `icn-kernel-api::services::ServiceRegistry` for trait-based abstractions.
 pub struct BootstrapHandles {
