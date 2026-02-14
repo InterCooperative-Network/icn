@@ -292,7 +292,7 @@ impl RateLimiter {
         decision: PolicyDecision,
     ) -> Option<RateLimitConfig> {
         match decision {
-            PolicyDecision::Allow { constraints } => Some(Self::rate_limit_from_constraints(
+            PolicyDecision::Allow { constraints, .. } => Some(Self::rate_limit_from_constraints(
                 fallback_config,
                 &constraints,
             )),

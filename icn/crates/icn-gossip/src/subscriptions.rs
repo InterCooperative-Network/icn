@@ -57,10 +57,10 @@ impl GossipActor {
             );
 
             match oracle.evaluate(&req) {
-                PolicyDecision::Allow { constraints } => {
+                PolicyDecision::Allow { constraints, .. } => {
                     limits = ResourceLimits::from_constraints(&constraints);
                 }
-                PolicyDecision::Deny { reason } => {
+                PolicyDecision::Deny { reason, .. } => {
                     warn!(
                         "PolicyOracle denied subscription for {}: {}",
                         subscriber, reason

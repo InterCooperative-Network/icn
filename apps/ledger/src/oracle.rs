@@ -70,7 +70,11 @@ impl PolicyOracle for LedgerPolicyOracle {
         // This crosses the meaning firewall - ledger rules become generic limits
         let constraints = self.ledger_to_constraints(&request.context);
 
-        PolicyDecision::Allow { constraints }
+        PolicyDecision::Allow {
+            constraints,
+            policy_domain: None,
+            evaluated_at: None,
+        }
     }
 }
 
@@ -122,7 +126,7 @@ mod tests {
 
         let decision = oracle.evaluate(&request);
         // Should allow with empty constraints (abstain)
-        if let PolicyDecision::Allow { constraints } = decision {
+        if let PolicyDecision::Allow { constraints, .. } = decision {
             assert!(constraints.rate_limit.is_none());
         } else {
             panic!("Expected Allow decision for non-ledger domain");

@@ -24,7 +24,11 @@ impl PolicyOracle for MockPolicyOracle {
         constraints
             .custom
             .insert("trust_score".to_string(), 0.5.into());
-        PolicyDecision::Allow { constraints }
+        PolicyDecision::Allow {
+            constraints,
+            policy_domain: None,
+            evaluated_at: None,
+        }
     }
 
     fn domain(&self) -> Domain {

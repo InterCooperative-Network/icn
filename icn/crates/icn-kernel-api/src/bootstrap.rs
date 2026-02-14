@@ -797,7 +797,7 @@ mod tests {
 
         // Verify it's a proper denial with reason
         match decision {
-            PolicyDecision::Deny { reason } => match reason {
+            PolicyDecision::Deny { reason, .. } => match reason {
                 crate::authz::PolicyError::Denied(msg) => {
                     assert!(msg.contains("No oracle registered"));
                     assert!(msg.contains("trust"));
