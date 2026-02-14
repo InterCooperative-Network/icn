@@ -1503,6 +1503,8 @@ mod tests {
                         reason: icn_kernel_api::authz::PolicyError::Denied(
                             "trust score below required threshold".to_string(),
                         ),
+                        policy_domain: None,
+                        evaluated_at: None,
                     };
                 }
             }

@@ -34,6 +34,8 @@ impl PolicyOracle for TestTrustOracle {
             Err(_) => {
                 return PolicyDecision::Deny {
                     reason: PolicyError::Denied("Invalid DID".to_string()),
+                    policy_domain: None,
+                    evaluated_at: None,
                 };
             }
         };
@@ -66,6 +68,8 @@ impl PolicyOracle for TestTrustOracle {
                         "Insufficient trust: {:.2} < {:.2} required",
                         score, threshold
                     )),
+                    policy_domain: None,
+                    evaluated_at: None,
                 };
             }
         }
