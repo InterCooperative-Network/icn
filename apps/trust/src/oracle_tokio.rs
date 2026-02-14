@@ -8,9 +8,9 @@
 //! # Note
 //!
 //! Since `PolicyOracle::evaluate()` is synchronous, this implementation
-//! uses `tokio::task::block_in_place` to safely access the tokio lock
-//! from a sync context. This should be called from a multi-threaded
-//! tokio runtime.
+//! uses `try_read()` for non-blocking access to the tokio lock. If the
+//! lock is contended, it fails closed with a score of 0.0 (most
+//! restrictive constraints) rather than blocking.
 
 use icn_kernel_api::authz::{
     ActionKind, ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest, RateLimit,
@@ -89,18 +89,18 @@ impl TrustPolicyOracleTokio {
 impl PolicyOracle for TrustPolicyOracleTokio {
     fn evaluate(&self, request: &PolicyRequest) -> PolicyDecision {
         // Use try_read() for non-blocking access. If lock is contended,
-        // fall back to a default "known" score. This avoids block_in_place
+        // fail closed with minimal trust. This avoids block_in_place
         // which requires a multi-threaded runtime (actix workers are single-threaded).
         let score = match self.graph.try_read() {
             Ok(graph) => compute_score(&graph, &request.core.actor),
             Err(_) => {
-                // Lock contention - use default "known" score instead of blocking.
-                // This allows the request to proceed with reasonable limits.
+                // Lock contention — fail closed with minimal trust so unknown/low-trust
+                // actors cannot gain elevated privileges by inducing contention.
                 tracing::debug!(
                     actor = %request.core.actor,
-                    "Trust oracle lock contention, using default score 0.3"
+                    "Trust oracle lock contention, using minimal score 0.0"
                 );
-                0.3 // "Known" class - reasonable default under contention
+                0.0 // Minimal trust under contention: most restrictive constraints
             }
         };
 

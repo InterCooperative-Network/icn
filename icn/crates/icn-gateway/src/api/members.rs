@@ -1,6 +1,6 @@
 //! Member profile API endpoints
 
-use actix_web::{get, web, HttpRequest, HttpResponse};
+use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -117,14 +117,89 @@ pub async fn get_member_profile(
     Ok(HttpResponse::Ok().json(profile))
 }
 
+/// Request body for updating member profile
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UpdateProfileRequest {
+    /// Display name to set
+    pub display_name: String,
+}
+
+/// PUT /v1/members/{coop_id}/{did}/profile - Update member profile
+///
+/// Self-service only: JWT subject must match the DID being edited.
+#[put("/{coop_id}/{did}/profile")]
+pub async fn update_member_profile(
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+    body: web::Json<UpdateProfileRequest>,
+    coop_manager: web::Data<Arc<CoopManager>>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    let (coop_id, did_str) = path.into_inner();
+
+    let did = did_str
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+    // Self-service only: JWT sub must match the DID being edited
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid caller DID: {e}")))?;
+    if caller_did != did {
+        return Err(GatewayError::Forbidden(
+            "Can only update your own profile".to_string(),
+        ));
+    }
+
+    // Verify member exists in coop
+    let coop = coop_manager.get_coop(&coop_id).await?;
+    if !coop.members.iter().any(|m| m.did == did) {
+        return Err(GatewayError::NotFound(
+            "Member not found in cooperative".to_string(),
+        ));
+    }
+
+    // Validate display name
+    let name = body.display_name.trim().to_string();
+    if name.is_empty() || name.len() > 100 {
+        return Err(GatewayError::BadRequest(
+            "Display name must be 1-100 characters".to_string(),
+        ));
+    }
+
+    commons_manager
+        .update_display_name(&did, name.clone())
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to update display name: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "did": did_str,
+        "display_name": name
+    })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::TokenClaims;
     use crate::coop::MemberRole;
-    use actix_web::{test, App};
+    use actix_web::{test, App, HttpMessage};
 
     fn create_test_commons_manager() -> Arc<CommonsManager> {
         Arc::new(CommonsManager::new())
+    }
+
+    fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
+        TokenClaims {
+            sub: did.to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            exp: 9999999999,
+        }
     }
 
     #[actix_web::test]
@@ -201,5 +276,179 @@ mod tests {
         let resp = test::call_service(&app, req).await;
 
         assert_eq!(resp.status(), actix_web::http::StatusCode::NOT_FOUND);
+    }
+
+    #[actix_web::test]
+    async fn test_update_member_profile_success() {
+        let coop_manager = Arc::new(CoopManager::new());
+        let commons_manager = create_test_commons_manager();
+
+        let coop_id = "test-coop";
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let did_str = did.to_string();
+        let timestamp = icn_time::current_timestamp_secs();
+
+        coop_manager
+            .create_coop(
+                coop_id.to_string(),
+                "Test".to_string(),
+                did.clone(),
+                timestamp,
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_manager))
+                .app_data(web::Data::new(commons_manager))
+                .service(update_member_profile),
+        )
+        .await;
+
+        let claims = create_test_claims(&did_str, vec!["coop:write"]);
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{did_str}/profile"))
+            .set_json(UpdateProfileRequest {
+                display_name: "Alice".to_string(),
+            })
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::OK);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["display_name"], "Alice");
+        assert_eq!(body["did"], did_str);
+    }
+
+    #[actix_web::test]
+    async fn test_update_member_profile_forbidden_wrong_did() {
+        let coop_manager = Arc::new(CoopManager::new());
+        let commons_manager = create_test_commons_manager();
+
+        let coop_id = "test-coop";
+        let owner = icn_identity::KeyPair::generate().unwrap();
+        let other = icn_identity::KeyPair::generate().unwrap();
+        let timestamp = icn_time::current_timestamp_secs();
+
+        coop_manager
+            .create_coop(
+                coop_id.to_string(),
+                "Test".to_string(),
+                owner.did().clone(),
+                timestamp,
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_manager))
+                .app_data(web::Data::new(commons_manager))
+                .service(update_member_profile),
+        )
+        .await;
+
+        // Authenticated as `other` but trying to edit `owner`'s profile
+        let claims = create_test_claims(&other.did().to_string(), vec!["coop:write"]);
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{}/profile", owner.did()))
+            .set_json(UpdateProfileRequest {
+                display_name: "Hacked".to_string(),
+            })
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_update_member_profile_bad_request_empty_name() {
+        let coop_manager = Arc::new(CoopManager::new());
+        let commons_manager = create_test_commons_manager();
+
+        let coop_id = "test-coop";
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let did_str = did.to_string();
+        let timestamp = icn_time::current_timestamp_secs();
+
+        coop_manager
+            .create_coop(
+                coop_id.to_string(),
+                "Test".to_string(),
+                did.clone(),
+                timestamp,
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_manager))
+                .app_data(web::Data::new(commons_manager))
+                .service(update_member_profile),
+        )
+        .await;
+
+        // Empty name (after trim)
+        let claims = create_test_claims(&did_str, vec!["coop:write"]);
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{did_str}/profile"))
+            .set_json(UpdateProfileRequest {
+                display_name: "   ".to_string(),
+            })
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_update_member_profile_bad_request_too_long() {
+        let coop_manager = Arc::new(CoopManager::new());
+        let commons_manager = create_test_commons_manager();
+
+        let coop_id = "test-coop";
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+        let did_str = did.to_string();
+        let timestamp = icn_time::current_timestamp_secs();
+
+        coop_manager
+            .create_coop(
+                coop_id.to_string(),
+                "Test".to_string(),
+                did.clone(),
+                timestamp,
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(coop_manager))
+                .app_data(web::Data::new(commons_manager))
+                .service(update_member_profile),
+        )
+        .await;
+
+        // Name exceeding 100 characters
+        let claims = create_test_claims(&did_str, vec!["coop:write"]);
+        let req = test::TestRequest::put()
+            .uri(&format!("/{coop_id}/{did_str}/profile"))
+            .set_json(UpdateProfileRequest {
+                display_name: "A".repeat(101),
+            })
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
     }
 }

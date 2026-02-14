@@ -1,11 +1,24 @@
 #!/bin/bash
 # ICN Demo Reset Script
-# Stops all services and cleans demo data
+# Stops all services and cleans demo data.
 
-set -e
+set -euo pipefail
 
-DATA_DIR="/home/matt/icn-demo-test/data"
-UI_PORT=3000
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+ICN_DIR="${REPO_ROOT}/icn"
+
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
+DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
+UI_PORT="${ICN_DEMO_UI_PORT:-3000}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -22,11 +35,13 @@ echo "  1. Stop all running services"
 echo "  2. Clean demo data"
 echo "  3. Prepare for fresh demo run"
 echo
+echo "  Data dir: $DATA_DIR"
+echo
 echo -e "${YELLOW}WARNING: This will delete all demo data!${NC}"
 echo
-read -p "Continue? (y/N) " -n 1 -r
+read -r -p "Continue? (y/N) " -n 1 REPLY
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
     echo "Cancelled."
     exit 0
 fi
@@ -36,11 +51,11 @@ echo "Step 1: Stopping services..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Stop UI server
-UI_PIDS=$(lsof -Pi :$UI_PORT -sTCP:LISTEN -t 2>/dev/null || true)
+UI_PIDS=$(lsof -Pi :"$UI_PORT" -sTCP:LISTEN -t 2>/dev/null || true)
 if [ -n "$UI_PIDS" ]; then
     for pid in $UI_PIDS; do
         echo "Stopping UI server (PID: $pid)..."
-        kill $pid 2>/dev/null || true
+        kill "$pid" 2>/dev/null || true
     done
     sleep 1
     echo -e "${GREEN}✓${NC} UI server stopped"
@@ -48,12 +63,13 @@ else
     echo "UI server not running"
 fi
 
-# Stop daemon (check gateway port 8080)
-DAEMON_PIDS=$(lsof -Pi :8080 -sTCP:LISTEN -t 2>/dev/null || true)
+# Stop daemon (check gateway port)
+GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
+DAEMON_PIDS=$(lsof -Pi :"$GATEWAY_PORT" -sTCP:LISTEN -t 2>/dev/null || true)
 if [ -n "$DAEMON_PIDS" ]; then
     for pid in $DAEMON_PIDS; do
         echo "Stopping daemon (PID: $pid)..."
-        kill $pid 2>/dev/null || true
+        kill "$pid" 2>/dev/null || true
     done
     sleep 2
     echo -e "${GREEN}✓${NC} Daemon stopped"
@@ -66,14 +82,14 @@ ICND_PIDS=$(pgrep icnd || true)
 if [ -n "$ICND_PIDS" ]; then
     echo -e "${YELLOW}⚠${NC} Found additional icnd processes:"
     for pid in $ICND_PIDS; do
-        ps -p $pid -o pid,cmd | grep -v PID
+        ps -p "$pid" -o pid,cmd | grep -v PID
     done
     echo
-    read -p "Kill these too? (y/N) " -n 1 -r
+    read -r -p "Kill these too? (y/N) " -n 1 REPLY
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         for pid in $ICND_PIDS; do
-            kill $pid 2>/dev/null || true
+            kill "$pid" 2>/dev/null || true
         done
         sleep 1
         echo -e "${GREEN}✓${NC} Additional processes stopped"
@@ -107,21 +123,20 @@ echo
 echo "Step 3: Recreating identity..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-cd /home/matt/projects/icn/icn
+mkdir -p "$DATA_DIR"
+cd "$ICN_DIR"
 
 echo "Creating fresh identity..."
-echo "demo123" | ./target/release/icnctl \
+ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
     -d "$DATA_DIR" \
-    id init \
-    --passphrase-stdin > /tmp/icn-reset-init.log 2>&1
+    id init > /tmp/icn-reset-init.log 2>&1
 
 if [ $? -eq 0 ]; then
-    NEW_DID=$(grep -oP 'did:icn:[a-zA-Z0-9]+' /tmp/icn-reset-init.log | head -1)
+    NEW_DID=$(grep -oE 'did:icn:[a-zA-Z0-9]+' /tmp/icn-reset-init.log | head -1)
     echo -e "${GREEN}✓${NC} Identity created"
     echo "New DID: $NEW_DID"
     echo
-    echo -e "${YELLOW}NOTE:${NC} DID has changed! Update your demo scripts/docs with:"
-    echo "  $NEW_DID"
+    echo -e "${YELLOW}NOTE:${NC} DID has changed! Use this DID for demo login."
 else
     echo -e "${RED}✗${NC} Failed to create identity"
     echo "Check /tmp/icn-reset-init.log for details"
@@ -134,9 +149,4 @@ echo "========================================="
 echo
 echo "Demo has been reset. To start fresh:"
 echo "  ./demo/scripts/run-tool-library-demo.sh"
-echo
-echo "Or manually:"
-echo "  1. Start daemon with fresh identity"
-echo "  2. Create cooperative"
-echo "  3. Start UI"
 echo

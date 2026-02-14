@@ -931,10 +931,10 @@ impl GatewayServer {
                 .app_data(web::Data::new(governance_trigger.clone()))
                 .app_data(web::Data::new(recurring_payment_store.clone()))
                 .app_data(web::Data::new(escrow_store.clone()))
-                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::from(budget_store.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
-                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::from(velocity_limiter.clone()))
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)
@@ -993,6 +993,15 @@ impl GatewayServer {
                         )
                         // Public member profiles (read-only)
                         .service(api::members::get_member_profile)
+                        // Protected member profile update (auth + rate limiting)
+                        .service(
+                            web::scope("/members")
+                                .service(api::members::update_member_profile)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Public cooperative statistics (no auth required)
                         .service(api::coops::get_coop_stats)
                         // Public SDIS endpoints (verification + enrollment)
@@ -1343,9 +1352,16 @@ impl GatewayServer {
                 // Static files and root route
                 .service(web::redirect("/", "/static/index.html"))
                 .service(
-                    fs::Files::new("/static", get_static_dir())
-                        .prefer_utf8(true)
-                        .use_last_modified(true),
+                    web::scope("/static")
+                        .wrap(
+                            middleware::DefaultHeaders::new()
+                                .add(("Cache-Control", "no-store, no-cache, must-revalidate")),
+                        )
+                        .service(
+                            fs::Files::new("/", get_static_dir())
+                                .prefer_utf8(true)
+                                .use_last_modified(true),
+                        ),
                 )
         })
         // Production-ready HTTP timeout configuration

@@ -27,6 +27,15 @@ Then open:
 
 Use the credentials printed by the script.
 
+Optional overrides:
+- `ICN_DEMO_DATA_DIR`
+- `ICN_DEMO_GATEWAY_HOST`
+- `ICN_DEMO_GATEWAY_PORT`
+- `ICN_DEMO_UI_PORT`
+- `ICN_DEMO_COOP_ID`
+- `ICN_DEMO_RPC_ENDPOINT`
+- `ICN_DEMO_MDNS_ENABLED` (set `true` to enable mDNS discovery)
+
 ---
 
 ## What This Demo Proves
@@ -71,12 +80,12 @@ Nodes: node-a http://localhost:8000, node-b http://localhost:8001, node-c http:/
 
 ## Authentication
 
-**Demo mode**: The one-click script generates a JWT token and displays it.
+**Demo mode**: The one-click script generates a JWT token and displays it (when identity and coop are initialized in the demo data dir).
 
 **Manual mode**: Set `ICN_GATEWAY_JWT_SECRET` env var (min 32 bytes):
 
 ```bash
-ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" ./target/release/icnd --gateway-enable
+ICN_GATEWAY_JWT_SECRET="0123456789abcdef0123456789abcdef" ./target/release/icnd --gateway-enable
 ```
 
 API endpoints require auth header (except `/v1/health`):

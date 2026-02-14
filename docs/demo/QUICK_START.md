@@ -2,7 +2,7 @@
 
 **Time to running**: 5 minutes
 **Prerequisites**: Git, Rust toolchain (1.88+), Python 3
-**Last Updated**: 2026-02-11
+**Last Updated**: 2026-02-13
 
 ---
 
@@ -56,7 +56,7 @@ cargo build --release
 ### Step 3: Start Daemon
 
 ```bash
-ICN_GATEWAY_JWT_SECRET="demo-secret-at-least-32-bytes!!" \
+ICN_GATEWAY_JWT_SECRET="0123456789abcdef0123456789abcdef" \
   ./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
 ```
 
@@ -110,10 +110,20 @@ curl http://localhost:8080/v1/health
 
 ---
 
+## What You'll See
+
+After login, the demo is pre-seeded with:
+- **4 named members**: Sarah Chen, Marcus Rivera, Priya Patel, James Okafor
+- **Sample transactions** between members (with names, not raw DIDs)
+- **3 governance proposals** ready for voting
+- **Edit-name button** (pencil icon) to set your display name
+
+All views show human-readable names instead of cryptographic identifiers.
+
 ## Next Steps
 
 - **Explore the UI**: Dashboard, Governance, Transactions
-- **Read the Demo Script**: `docs/demo/DEMO_SCRIPT.md`
+- **Read the Demo Script**: `docs/demo/DEMO_SCRIPT.md` (20-minute presenter guide)
 - **Understand Architecture**: `docs/ARCHITECTURE.md`
 - **Join a Pilot**: Contact the team
 

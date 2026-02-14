@@ -267,6 +267,7 @@ When running multiple agents in parallel, each agent gets its own Git worktree w
 - Never commit to `main` — all work on feature branches
 - Worktrees live in `../icn-wt/` (sibling to repo root)
 - Override defaults via `ICN_WT_DIR`, `ICN_WT_REMOTE`, `ICN_WT_BASE_REF`
+- **Rebase before edits**: Any agent assigned to an older branch must first run `git fetch origin && git rebase origin/main` before making any edits. This prevents CRLF phantom diffs and merge conflicts from stale bases.
 
 ---
 

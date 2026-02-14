@@ -29,8 +29,8 @@
     --bg-secondary: var(--gray-50);
     --bg-tertiary: var(--gray-100);
     --text-primary: var(--gray-900);
-    --text-secondary: var(--gray-600);
-    --text-tertiary: var(--gray-500);
+    --text-secondary: var(--gray-700);
+    --text-tertiary: var(--gray-600);
     --border-color: var(--gray-200);
     --border-hover: var(--gray-300);
 
@@ -1189,6 +1189,257 @@ main {
 .proposal-outcome.rejected {
     background: #fee2e2;
     color: var(--danger);
+}
+
+/* ============================================================================
+   Proposal Detail View
+   ============================================================================ */
+
+/* Clickable proposal cards */
+.proposal-clickable {
+    transition: all 0.2s ease;
+}
+.proposal-clickable:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+    transform: translateY(-1px);
+}
+
+/* Layout */
+.proposal-detail-layout {
+    padding: 0.5rem 0;
+}
+.proposal-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+@media (max-width: 768px) {
+    .proposal-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Header */
+.proposal-detail-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+}
+.proposal-detail-proposer {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Vote Progress Bars */
+.vote-bar-container {
+    margin: 1rem 0;
+}
+.vote-bar {
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    background: var(--gray-100);
+}
+.vote-bar-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    min-width: 2rem;
+    transition: width 0.3s ease;
+}
+.vote-bar-for {
+    background: var(--success);
+}
+.vote-bar-against {
+    background: var(--danger);
+}
+.vote-bar-abstain {
+    background: var(--gray-400);
+}
+.vote-summary {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Discussion Thread */
+.comment-list {
+    margin-top: 1rem;
+}
+.comment-item {
+    padding: 1rem;
+    border-left: 3px solid var(--gray-200);
+    margin-bottom: 0.75rem;
+    margin-left: calc(var(--comment-depth, 0) * 1.5rem);
+    background: var(--gray-50);
+    border-radius: 0 8px 8px 0;
+}
+.comment-author {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.comment-time {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+.comment-content {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+}
+.comment-reactions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.comment-reaction {
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+    background: var(--gray-100);
+    font-size: 0.8rem;
+    cursor: pointer;
+    border: 1px solid var(--gray-200);
+    transition: background 0.2s;
+}
+.comment-reaction:hover {
+    background: var(--gray-200);
+}
+.comment-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+.comment-actions button {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.8rem;
+}
+.comment-actions button:hover {
+    text-decoration: underline;
+}
+.comment-form {
+    margin-top: 1rem;
+}
+.comment-form textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+.comment-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: var(--focus-ring);
+}
+.comment-form button {
+    margin-top: 0.5rem;
+}
+
+/* Timeline */
+.proposal-timeline {
+    position: relative;
+    padding-left: 0.5rem;
+}
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--gray-200);
+}
+.timeline-item:last-child {
+    border-left-color: transparent;
+    padding-bottom: 0;
+}
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--gray-300);
+}
+.timeline-item.active::before {
+    background: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+.timeline-item.completed::before {
+    background: var(--success);
+}
+.timeline-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.timeline-date {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+}
+
+/* Sidebar meta */
+.meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.9rem;
+    align-items: center;
+}
+.meta-row:last-child {
+    border-bottom: none;
+}
+.meta-label {
+    color: var(--text-tertiary);
+}
+
+/* Payload rendering */
+.payload-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.75rem;
+}
+.payload-type-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: var(--primary);
+    color: white;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.payload-field {
+    margin-bottom: 0.5rem;
+}
+.payload-field label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-right: 0.5rem;
 }
 
 .empty-state {

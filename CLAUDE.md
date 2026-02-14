@@ -564,3 +564,57 @@ CCL documents are stored as state, interpreted by apps, and converted to `Constr
 - `apps/membership`: Entity management (future)
 
 **Never import domain crates into kernel crates.**
+
+## Claude Execution Contract
+
+### Default Mode
+You are operating as an execution engine. Be concise. Do not narrate routine steps.
+
+### Scope is Law
+- The user's request defines the complete scope.
+- Do not expand scope.
+- If something adjacent is important, add a short NOTE section at the end, but do not act on it.
+
+### Branch/Target Hygiene (mandatory)
+Before making ANY code change:
+1. Print current branch
+2. Identify PR number (if any) and its base branch
+3. Confirm correct repo + correct directory
+
+If any of these are ambiguous, STOP and ask.
+
+### PR Workflow Gates (for Rust workspace)
+When applying review feedback or fixing CI:
+- After changes and before pushing:
+  - `cargo fmt --check`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo test` (or `cargo test --workspace` if appropriate)
+- Do not push broken formatting/lints/tests.
+- **Never run `git push` directly. Always use `/push`.** This is the only sanctioned push path.
+
+### Do Not "Fix the World"
+- Do NOT upgrade toolchains, refactor unrelated code, or address pre-existing lints unless explicitly asked.
+- If you encounter unrelated failures, report them, but do not start a toolchain/infra project.
+
+### Infrastructure Tasks = No ICN Code Changes
+If the task is homelab/infra/proxmox/networking:
+- Do not modify ICN repo code unless explicitly instructed.
+- Document findings in the infra/homelab notes repo (or a designated doc), not in ICN code.
+
+### Debugging Protocol (stop wrong-path spirals)
+Before pursuing any hypothesis:
+1. List top 3 hypotheses ranked by likelihood
+2. For each: evidence FOR, evidence AGAINST, cheapest test
+3. Start with the cheapest test
+
+Do not jump to hardware/compiler blame without strong evidence.
+
+### Sequential by Default
+- Do not make parallel changes without explicit instruction.
+- Do one change-set, verify it works, then proceed to the next.
+- "Implement everything in parallel" requires the user to say "in parallel."
+
+### Prose Mode (when requested)
+- Keep the user's voice: sharp, direct, not formalized, not melodramatic.
+- "Sharper/edgier" means more authentic and raw, NOT more structured or sitcom cadence.
+- If corrected on tone, internalize within the session.

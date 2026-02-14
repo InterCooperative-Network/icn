@@ -1,13 +1,28 @@
 #!/bin/bash
 # Load Sample Data into ICN Demo
-# This script adds the 12 members and creates historical transactions
+# This script validates demo API access and shows member-loading next steps.
 
-set -e
+set -euo pipefail
 
-GATEWAY="http://localhost:8080"
-COOP_ID="rochester-tool-library"
-DATA_DIR="/home/matt/icn-demo-test/data"
-RPC_ENDPOINT="127.0.0.1:15602"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+ICN_DIR="${REPO_ROOT}/icn"
+
+# Resolve cargo target directory (respects CARGO_TARGET_DIR env var)
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+    TARGET_DIR="$CARGO_TARGET_DIR"
+elif command -v cargo >/dev/null 2>&1; then
+    TARGET_DIR="$(cd "$ICN_DIR" && cargo metadata --format-version 1 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["target_directory"])' 2>/dev/null || echo "$ICN_DIR/target")"
+else
+    TARGET_DIR="$ICN_DIR/target"
+fi
+
+GATEWAY_HOST="${ICN_DEMO_GATEWAY_HOST:-127.0.0.1}"
+GATEWAY_PORT="${ICN_DEMO_GATEWAY_PORT:-8080}"
+GATEWAY="http://${GATEWAY_HOST}:${GATEWAY_PORT}"
+COOP_ID="${ICN_DEMO_COOP_ID:-rochester-tool-library}"
+DATA_DIR="${ICN_DEMO_DATA_DIR:-${REPO_ROOT}/.demo-data/tool-library}"
+RPC_ENDPOINT="${ICN_DEMO_RPC_ENDPOINT:-127.0.0.1:15602}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -22,10 +37,9 @@ echo
 
 # Check if gateway is running
 echo "Checking gateway..."
-if ! curl -s "$GATEWAY/v1/health" > /dev/null 2>&1; then
+if ! curl -fsS "$GATEWAY/v1/health" >/dev/null 2>&1; then
     echo -e "${RED}✗${NC} Gateway not responding at $GATEWAY"
-    echo "Please start the daemon first:"
-    echo "  cd icn && ./target/release/icnd -d $DATA_DIR -e $RPC_ENDPOINT --gateway-enable --gateway-bind \"127.0.0.1:8080\""
+    echo "Start demo first: ./demo/scripts/run-tool-library-demo.sh"
     exit 1
 fi
 echo -e "${GREEN}✓${NC} Gateway is running"
@@ -33,141 +47,81 @@ echo
 
 # Get JWT token
 echo "Getting JWT token..."
-cd /home/matt/projects/icn/icn
-
-TOKEN=$(./target/release/icnctl \
+TOKEN=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl \
   -d "$DATA_DIR" \
   -e "$RPC_ENDPOINT" \
   auth token \
   --coop-id "$COOP_ID" \
   --scopes "coop:write,coop:read,ledger:read,ledger:write" \
-  --passphrase demo123 2>/dev/null | grep -v "Enter passphrase" | tr -d '\n')
+  2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' | head -1 || true)
 
 if [ -z "$TOKEN" ]; then
     echo -e "${RED}✗${NC} Failed to get token"
     echo "Try manually:"
-    echo "  ./target/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\""
+    echo "  cd $ICN_DIR"
+    echo "  ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d $DATA_DIR -e $RPC_ENDPOINT auth token --coop-id $COOP_ID --scopes \"coop:write,coop:read,ledger:read,ledger:write\""
     exit 1
 fi
 echo -e "${GREEN}✓${NC} Got JWT token"
 echo
 
 # Load member data
-cd /home/matt/projects/icn
-MEMBERS_FILE="demo/data/tool-library-members.json"
+MEMBERS_FILE="$REPO_ROOT/demo/data/tool-library-members.json"
 
 echo "Loading members from $MEMBERS_FILE..."
 
-# Parse JSON and add each member
-# For now, we'll create a simple version that adds members one by one
-# In a real implementation, this would parse the JSON properly
-
-# Get founder DID (the existing member)
-FOUNDER_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
-
-echo "Sample members to add:"
-echo "  1. Alice Chen - Tool Coordinator"
-echo "  2. Bob Martinez - Member"
-echo "  3. Carol Johnson - Member"
-echo "  4. David Lee - Treasurer"
-echo "  5. Elena Rodriguez - Member"
-echo "  6. Frank Wilson - Member"
-echo "  7. Grace Park - Board Member"
-echo "  8. Henry Brown - Member"
-echo "  9. Isabel Garcia - Member"
-echo "  10. Jack Thompson - Member"
-echo "  11. Kelly O'Brien - Member"
-echo "  12. Luis Sanchez - Member"
-echo
-
-echo -e "${YELLOW}NOTE:${NC} To add members, we need their DIDs."
-echo "Each member needs to:"
-echo "  1. Create their own identity (icnctl id init)"
-echo "  2. Share their DID with the admin"
-echo "  3. Admin adds them to the cooperative"
-echo
-
-echo "For demo purposes, you can:"
-echo
-
-echo "Option A: Create DIDs for all 12 members"
-echo "  - Run icnctl id init for each member"
-echo "  - Add each to the cooperative via API"
-echo
-
-echo "Option B: Use the pilot UI's 'Invite' feature"
-echo "  - Generate invite links"
-echo "  - Members join via invite"
-echo
-
-echo "Option C: Simulate members for demo"
-echo "  - Create identities programmatically"
-echo "  - Add via API in batch"
-echo
+CURRENT_DID=$(cd "$ICN_DIR" && ICN_PASSPHRASE=demo123 $TARGET_DIR/release/icnctl -d "$DATA_DIR" id show 2>/dev/null | grep -oE 'did:icn:[A-Za-z0-9]+' | head -1 || true)
+if [ -z "$CURRENT_DID" ]; then
+    CURRENT_DID="did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh"
+fi
 
 echo "========================================="
-echo "What this script CAN do right now:"
+echo "What this script can validate now"
 echo "========================================="
 echo
 
 echo "1. Verify cooperative exists:"
-COOP_INFO=$(curl -s "$GATEWAY/v1/coops/$COOP_ID" \
-  -H "Authorization: Bearer $TOKEN")
+COOP_INFO=$(curl -s "$GATEWAY/v1/coops/$COOP_ID" -H "Authorization: Bearer $TOKEN")
 
 if echo "$COOP_INFO" | grep -q "\"id\":\"$COOP_ID\""; then
     echo -e "${GREEN}✓${NC} Cooperative '$COOP_ID' exists"
-    echo "$COOP_INFO" | jq . 2>/dev/null || echo "$COOP_INFO"
+    if command -v jq >/dev/null 2>&1; then
+        echo "$COOP_INFO" | jq .
+    else
+        echo "$COOP_INFO"
+    fi
 else
     echo -e "${YELLOW}⚠${NC} Cooperative response: $COOP_INFO"
 fi
 
 echo
+echo "2. Check current identity balance:"
+BALANCE=$(curl -s "$GATEWAY/v1/ledger/$COOP_ID/balance/$CURRENT_DID" -H "Authorization: Bearer $TOKEN")
 
-echo "2. Check founder balance:"
-BALANCE=$(curl -s "$GATEWAY/v1/ledger/coops/$COOP_ID/balances/$FOUNDER_DID" \
-  -H "Authorization: Bearer $TOKEN")
-
-echo -e "${GREEN}✓${NC} Founder balance:"
-echo "$BALANCE" | jq . 2>/dev/null || echo "$BALANCE"
+echo -e "${GREEN}✓${NC} Balance payload:"
+if command -v jq >/dev/null 2>&1; then
+    echo "$BALANCE" | jq .
+else
+    echo "$BALANCE"
+fi
 
 echo
-
 echo "========================================="
-echo "Next Steps"
+echo "Next Steps for Full Sample Data"
 echo "========================================="
 echo
-
-echo "To complete member loading:"
+echo "The JSON files are present, but full member import still requires identity creation"
+echo "for each sample member. Recommended flow:"
 echo
-
-echo "1. Create member identities:"
-echo "   for i in {1..12}; do"
-echo "     icnctl id init --data-dir /tmp/member\$i"
-echo "   done"
+echo "1. Start demo: ./demo/scripts/run-tool-library-demo.sh"
+echo "2. Create identities (or invite users from UI)"
+echo "3. Add members to coop via /v1/coops/{coop_id}/members"
+echo "4. Create historical payments via /v1/ledger/{coop_id}/payment"
 echo
-
-echo "2. Get their DIDs and add to cooperative"
-echo
-
-echo "3. OR use the UI invite system:"
-echo "   - Open http://localhost:3000"
-echo "   - Go to Members → Invite"
-echo "   - Generate invite links"
-echo "   - Share with members"
-echo
-
-echo "4. OR use a full automation script that:"
-echo "   - Creates identities"
-echo "   - Extracts DIDs"
-echo "   - Calls API to add members"
-echo "   - Creates sample transactions"
-echo
-
 echo "Gateway: $GATEWAY"
 echo "Cooperative: $COOP_ID"
-echo "Token valid: $(echo $TOKEN | cut -c1-20)..."
+echo "Token preview: $(echo "$TOKEN" | cut -c1-20)..."
 echo
-
 echo "========================================="
-echo "Script complete!"
+echo "Script complete"
 echo "========================================="

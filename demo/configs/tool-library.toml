@@ -6,7 +6,7 @@ data_dir = "~/.icn-demo/tool-library"
 
 [network]
 listen_addr = "127.0.0.1:7777"
-enable_mdns = true
+mdns_enabled = true
 
 [api]
 listen_addr = "127.0.0.1:5601"

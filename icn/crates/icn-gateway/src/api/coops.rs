@@ -175,6 +175,7 @@ pub async fn delete_coop(
 pub async fn add_member(
     http_req: HttpRequest,
     coop_mgr: web::Data<Arc<CoopManager>>,
+    commons_mgr: web::Data<Arc<crate::commons_mgr::CommonsManager>>,
     broadcaster: web::Data<Arc<EventBroadcaster>>,
     id: web::Path<String>,
     req: web::Json<AddMemberRequest>,
@@ -196,6 +197,16 @@ pub async fn add_member(
     let coop = coop_mgr
         .add_member_atomic(&id, did.clone(), role.clone(), timestamp())
         .await?;
+
+    // Set display name if provided (best-effort, don't fail member creation)
+    if let Some(ref name) = req.display_name {
+        let trimmed = name.trim();
+        if !trimmed.is_empty() {
+            let _ = commons_mgr
+                .update_display_name(&did, trimmed.to_string())
+                .await;
+        }
+    }
 
     // Track member addition
     gateway::members_added_inc();
@@ -425,6 +436,7 @@ mod tests {
     #[actix_web::test]
     async fn test_add_remove_member() {
         let coop_mgr = Arc::new(CoopManager::new());
+        let commons_mgr = Arc::new(crate::commons_mgr::CommonsManager::new());
         let broadcaster = Arc::new(EventBroadcaster::new());
         let owner = IdentityBundle::generate().unwrap();
         let member = IdentityBundle::generate().unwrap();
@@ -443,6 +455,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(commons_mgr.clone()))
                 .app_data(web::Data::new(broadcaster.clone()))
                 .service(
                     web::scope("/coops")
@@ -456,6 +469,7 @@ mod tests {
         let req_body = AddMemberRequest {
             did: member.did().to_string(),
             role: "member".to_string(),
+            display_name: None,
         };
 
         let claims = TokenClaims {
@@ -487,6 +501,7 @@ mod tests {
     #[actix_web::test]
     async fn test_authorization_scope_check() {
         let coop_mgr = Arc::new(CoopManager::new());
+        let commons_mgr = Arc::new(crate::commons_mgr::CommonsManager::new());
         let broadcaster = Arc::new(EventBroadcaster::new());
         let owner = IdentityBundle::generate().unwrap();
         let member = IdentityBundle::generate().unwrap();
@@ -505,6 +520,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(commons_mgr.clone()))
                 .app_data(web::Data::new(broadcaster.clone()))
                 .service(
                     web::scope("/coops")
@@ -518,6 +534,7 @@ mod tests {
         let req_body = AddMemberRequest {
             did: member.did().to_string(),
             role: "member".to_string(),
+            display_name: None,
         };
 
         let claims = TokenClaims {
@@ -620,6 +637,7 @@ mod tests {
     #[actix_web::test]
     async fn test_cross_cooperative_authorization_fails() {
         let coop_mgr = Arc::new(CoopManager::new());
+        let commons_mgr = Arc::new(crate::commons_mgr::CommonsManager::new());
         let broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -648,6 +666,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_mgr.clone()))
+                .app_data(web::Data::new(commons_mgr.clone()))
                 .app_data(web::Data::new(broadcaster.clone()))
                 .service(
                     web::scope("/coops")
@@ -704,6 +723,7 @@ mod tests {
         let add_req = AddMemberRequest {
             did: alice.did().to_string(),
             role: "admin".to_string(),
+            display_name: None,
         };
 
         let req = test::TestRequest::post()
