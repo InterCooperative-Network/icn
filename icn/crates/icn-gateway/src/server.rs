@@ -1115,6 +1115,15 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
+                        // Rights summary endpoint (auth + rate limiting)
+                        .service(
+                            web::scope("/rights")
+                                .service(api::rights::rights_summary)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Recurring payments endpoints (auth + rate limiting)
                         .service(
                             web::scope("")

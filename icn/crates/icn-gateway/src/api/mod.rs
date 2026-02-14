@@ -28,6 +28,7 @@ pub mod oracle;
 pub mod receipts;
 pub mod recurring_payments;
 pub mod registry;
+pub mod rights;
 pub mod sdis;
 pub mod services;
 pub mod sessions;
