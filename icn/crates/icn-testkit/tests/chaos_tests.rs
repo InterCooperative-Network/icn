@@ -25,7 +25,6 @@ use std::time::Duration;
 /// 5. Heal partition
 /// 6. Verify all nodes converge to same state
 #[tokio::test]
-#[ignore] // QUIC connection timing issues in CI - see issue #319
 async fn test_network_partition_recovery() -> Result<()> {
     let cluster = TestCluster::new(4).await?;
     cluster.fully_connect().await?;
@@ -114,7 +113,6 @@ async fn test_network_partition_recovery() -> Result<()> {
 /// 3. Publish entries on both sides
 /// 4. Heal and verify convergence
 #[tokio::test]
-#[ignore] // QUIC connection timing issues in CI - see issue #319
 async fn test_single_node_isolation() -> Result<()> {
     let cluster = TestCluster::new(4).await?;
     cluster.fully_connect().await?;
@@ -175,7 +173,6 @@ async fn test_single_node_isolation() -> Result<()> {
 /// 2. Connect, publish, disconnect, repeat
 /// 3. Verify entries eventually converge
 #[tokio::test]
-#[ignore] // QUIC connection timing issues in CI - see issue #319
 async fn test_connection_flapping() -> Result<()> {
     let cluster = TestCluster::new(2).await?;
 

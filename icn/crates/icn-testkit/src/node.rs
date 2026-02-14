@@ -1,7 +1,9 @@
 //! Test node implementation with full ICN stack
 
 use anyhow::{Context, Result};
-use icn_gossip::{AccessControl, GossipActor, GossipEntry, GossipMessage, Topic};
+use icn_gossip::{
+    start_digest_emitter, AccessControl, GossipActor, GossipEntry, GossipMessage, Topic,
+};
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_kernel_api::authz::{ConstraintSet, Domain, PolicyDecision, PolicyOracle, PolicyRequest};
 use icn_net::{
@@ -450,6 +452,16 @@ impl TestNode {
             g.set_send_callback(send_callback);
         }
 
+        // Start periodic digest emitter so gossip entries propagate between
+        // test nodes via the pull-based anti-entropy protocol (Digest -> PullRequest
+        // -> PullResponse). Uses a short interval for fast convergence in tests.
+        let _digest_handle = start_digest_emitter(
+            gossip.clone(),
+            200, // 200ms interval (production uses 10s+)
+            0,   // no jitter for deterministic test timing
+            shutdown_tx.subscribe(),
+        );
+
         info!("Test node {} listening on {}", index, addr);
 
         // Spawn succeeded - disarm the cleanup guard
@@ -819,9 +831,7 @@ mod tests {
     /// Integration test for network condition with actual message delivery
     ///
     /// This test verifies that network conditions affect actual gossip delivery.
-    /// Marked as ignored due to QUIC connection timing issues in CI - see issue #319
     #[tokio::test]
-    #[ignore]
     async fn test_network_condition_latency_integration() -> Result<()> {
         use crate::simulation::NetworkCondition;
         use std::time::Instant;

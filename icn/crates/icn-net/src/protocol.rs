@@ -964,8 +964,11 @@ impl NetworkMessage {
     }
 }
 
-/// Helper for reading length-prefixed messages from QUIC streams (legacy format)
 /// Read a length-prefixed message from a QUIC stream
+///
+/// Uses the negotiated wire format (1-byte format header + payload) which all
+/// write paths now produce via `write_message` / `write_message_negotiated`.
+///
 /// Returns the message and the number of bytes read (including 4-byte length prefix)
 pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
     // Read 4-byte length prefix (big-endian)
@@ -992,7 +995,7 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
         .await
         .context("Failed to read message body")?;
 
-    let msg = NetworkMessage::from_bytes(&buf)?;
+    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
     // Return total bytes: 4 (length prefix) + message body
     Ok((msg, 4 + len))
 }
@@ -1032,28 +1035,15 @@ pub async fn read_message_compressed(
     Ok((msg, 4 + len))
 }
 
-/// Helper for writing length-prefixed messages to QUIC streams (legacy format)
+/// Helper for writing length-prefixed messages to QUIC streams
+///
+/// Delegates to `write_message_negotiated` with default encoding (postcard, no
+/// compression) so that all write paths produce the same wire format that
+/// `read_message` (via `from_bytes_negotiated`) expects.
+///
 /// Returns the number of bytes written (including 4-byte length prefix)
 pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -> Result<usize> {
-    use tokio::io::AsyncWriteExt;
-
-    let bytes = msg.to_bytes()?;
-    let len = bytes.len() as u32;
-
-    // Write 4-byte length prefix (big-endian)
-    send.write_all(&len.to_be_bytes())
-        .await
-        .context("Failed to write message length")?;
-
-    // Write message bytes
-    send.write_all(&bytes)
-        .await
-        .context("Failed to write message body")?;
-
-    send.flush().await.context("Failed to flush stream")?;
-
-    // Return total bytes: 4 (length prefix) + message body
-    Ok(4 + bytes.len())
+    write_message_negotiated(send, msg, false, false).await
 }
 
 /// Helper for writing length-prefixed messages with compression support

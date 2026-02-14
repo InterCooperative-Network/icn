@@ -327,7 +327,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // QUIC connection timing issues in CI - see issue #319
     async fn test_fully_connect() -> Result<()> {
         let cluster = TestCluster::new(3).await?;
         cluster.fully_connect().await?;
@@ -348,7 +347,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // QUIC connection timing issues in CI - see issue #319
     async fn test_gossip_propagation() -> Result<()> {
         let cluster = TestCluster::new(3).await?;
         cluster.fully_connect().await?;
