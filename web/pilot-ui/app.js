@@ -85,6 +85,25 @@ const elements = {
     copyGeneratedDid: document.getElementById('copy-generated-did'),
     useNewIdentityBtn: document.getElementById('use-new-identity-btn'),
 
+    // Onboarding Wizard
+    showOnboardingWizardBtn: document.getElementById('show-onboarding-wizard-btn'),
+    onboardingWizard: document.getElementById('onboarding-wizard'),
+    closeWizard: document.getElementById('close-wizard'),
+    wizardStep1: document.getElementById('wizard-step-1'),
+    wizardStep2: document.getElementById('wizard-step-2'),
+    wizardStep3: document.getElementById('wizard-step-3'),
+    wizardPassword: document.getElementById('wizard-password'),
+    wizardPasswordConfirm: document.getElementById('wizard-password-confirm'),
+    wizardNext1: document.getElementById('wizard-next-1'),
+    wizardStep1Error: document.getElementById('wizard-step-1-error'),
+    wizardDidDisplay: document.getElementById('wizard-did-display'),
+    wizardInviteCode: document.getElementById('wizard-invite-code'),
+    wizardBack2: document.getElementById('wizard-back-2'),
+    wizardNext2: document.getElementById('wizard-next-2'),
+    wizardStep2Error: document.getElementById('wizard-step-2-error'),
+    wizardCoopName: document.getElementById('wizard-coop-name'),
+    wizardFinish: document.getElementById('wizard-finish'),
+
     // Toast
     toastContainer: document.getElementById('toast-container'),
 
@@ -635,6 +654,184 @@ function useNewIdentity() {
         // Suggest using challenge-response auth (which will be implemented in T02)
         showToast('Identity ready! You can now use challenge-response authentication.', 'info', 5000);
     }
+}
+
+// Onboarding Wizard State
+const wizardState = {
+    currentStep: 1,
+    did: null,
+    password: null,
+    coopId: null,
+    gatewayUrl: null
+};
+
+// Onboarding Wizard Functions
+function showOnboardingWizard() {
+    // Reset wizard state
+    wizardState.currentStep = 1;
+    wizardState.did = null;
+    wizardState.password = null;
+    wizardState.coopId = null;
+    wizardState.gatewayUrl = detectGatewayUrl();
+
+    // Reset form
+    elements.wizardPassword.value = '';
+    elements.wizardPasswordConfirm.value = '';
+    elements.wizardInviteCode.value = '';
+    elements.wizardStep1Error.textContent = '';
+    elements.wizardStep2Error.textContent = '';
+
+    // Show step 1
+    showWizardStep(1);
+
+    // Show wizard
+    elements.onboardingWizard.classList.remove('hidden');
+}
+
+function closeOnboardingWizard() {
+    elements.onboardingWizard.classList.add('hidden');
+}
+
+function showWizardStep(stepNumber) {
+    wizardState.currentStep = stepNumber;
+
+    // Hide all steps
+    elements.wizardStep1.classList.add('hidden');
+    elements.wizardStep2.classList.add('hidden');
+    elements.wizardStep3.classList.add('hidden');
+
+    // Show current step
+    const stepElement = document.getElementById(`wizard-step-${stepNumber}`);
+    if (stepElement) {
+        stepElement.classList.remove('hidden');
+    }
+
+    // Update progress indicator
+    document.querySelectorAll('.wizard-step').forEach((step, index) => {
+        const circle = step.querySelector('.step-circle');
+        if (index + 1 < stepNumber) {
+            circle.classList.add('completed');
+            circle.classList.remove('active');
+        } else if (index + 1 === stepNumber) {
+            circle.classList.add('active');
+            circle.classList.remove('completed');
+        } else {
+            circle.classList.remove('active', 'completed');
+        }
+    });
+}
+
+async function wizardStep1Next() {
+    const password = elements.wizardPassword.value;
+    const passwordConfirm = elements.wizardPasswordConfirm.value;
+
+    // Validation
+    if (!password || password.length < 8) {
+        elements.wizardStep1Error.textContent = 'Password must be at least 8 characters';
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        elements.wizardStep1Error.textContent = 'Passwords do not match';
+        return;
+    }
+
+    try {
+        // Disable button during generation
+        elements.wizardNext1.disabled = true;
+        elements.wizardNext1.textContent = 'Creating Identity...';
+        elements.wizardStep1Error.textContent = '';
+
+        // Generate keypair
+        const keypair = await window.ICNCrypto.generateKeypair();
+
+        // Store encrypted in IndexedDB
+        await window.ICNCrypto.storeKeypair(keypair.did, keypair, password);
+
+        // Save to wizard state
+        wizardState.did = keypair.did;
+        wizardState.password = password;
+
+        // Show in step 2
+        elements.wizardDidDisplay.textContent = keypair.did;
+
+        // Move to step 2
+        showWizardStep(2);
+
+        debugLog('Wizard: Identity created:', keypair.did);
+
+    } catch (error) {
+        console.error('Wizard step 1 error:', error);
+        elements.wizardStep1Error.textContent = 'Failed to create identity. Please try again.';
+    } finally {
+        elements.wizardNext1.disabled = false;
+        elements.wizardNext1.textContent = 'Create Identity & Continue';
+    }
+}
+
+async function wizardStep2Next() {
+    const inviteCode = elements.wizardInviteCode.value.trim();
+
+    if (!inviteCode) {
+        elements.wizardStep2Error.textContent = 'Please enter an invite code';
+        return;
+    }
+
+    try {
+        // Disable button
+        elements.wizardNext2.disabled = true;
+        elements.wizardNext2.textContent = 'Joining...';
+        elements.wizardStep2Error.textContent = '';
+
+        // Join cooperative via invite code
+        const joinUrl = `${wizardState.gatewayUrl}/v1/invites/join`;
+        const response = await fetch(joinUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: inviteCode,
+                did: wizardState.did
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to join cooperative');
+        }
+
+        const data = await response.json();
+        wizardState.coopId = data.coop_id || data.cooperative_id || 'unknown';
+
+        // Show coop name in step 3
+        elements.wizardCoopName.textContent = wizardState.coopId;
+
+        // Move to step 3
+        showWizardStep(3);
+
+        debugLog('Wizard: Joined cooperative:', wizardState.coopId);
+
+    } catch (error) {
+        console.error('Wizard step 2 error:', error);
+        elements.wizardStep2Error.textContent = `Failed to join: ${error.message}`;
+    } finally {
+        elements.wizardNext2.disabled = false;
+        elements.wizardNext2.textContent = 'Join & Continue';
+    }
+}
+
+async function wizardFinish() {
+    // Close wizard
+    closeOnboardingWizard();
+
+    // Fill in login form
+    elements.gatewayUrl.value = wizardState.gatewayUrl;
+    elements.coopId.value = wizardState.coopId;
+    elements.did.value = wizardState.did;
+    elements.loginPassword.value = wizardState.password;
+
+    // Auto-login
+    showToast('Logging you in...', 'info', 2000);
+    await login();
 }
 
 // Challenge-Response Authentication
@@ -2372,6 +2569,21 @@ elements.useNewIdentityBtn.addEventListener('click', useNewIdentity);
 elements.createIdentityModal.addEventListener('click', (e) => {
     if (e.target === elements.createIdentityModal) {
         closeCreateIdentityModal();
+    }
+});
+
+// Onboarding Wizard event listeners
+elements.showOnboardingWizardBtn.addEventListener('click', showOnboardingWizard);
+elements.closeWizard.addEventListener('click', closeOnboardingWizard);
+elements.wizardNext1.addEventListener('click', wizardStep1Next);
+elements.wizardBack2.addEventListener('click', () => showWizardStep(1));
+elements.wizardNext2.addEventListener('click', wizardStep2Next);
+elements.wizardFinish.addEventListener('click', wizardFinish);
+
+// Close wizard when clicking outside
+elements.onboardingWizard.addEventListener('click', (e) => {
+    if (e.target === elements.onboardingWizard) {
+        closeOnboardingWizard();
     }
 });
 
