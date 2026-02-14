@@ -651,6 +651,169 @@ header {
     background: #fee2e2;
 }
 
+/* ============================================================================
+   Scope Context Banner (P0-T04)
+   ============================================================================ */
+.scope-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border-bottom: 2px solid var(--border-color);
+    min-height: 3rem;
+}
+
+.scope-banner.hidden {
+    display: none;
+}
+
+.scope-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.entity-type-badge {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Cooperative (Economic) entity type */
+.entity-type-badge[data-type="cooperative"] {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+}
+
+/* Community (Civic) entity type */
+.entity-type-badge[data-type="community"] {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+/* Federation entity type */
+.entity-type-badge[data-type="federation"] {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde047;
+}
+
+/* Default/fallback */
+.entity-type-badge:not([data-type]) {
+    background: var(--gray-200);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+}
+
+.entity-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.charter-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.charter-link:hover {
+    background: var(--bg-primary);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.charter-icon {
+    font-size: 0.875rem;
+}
+
+.scope-status {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.8125rem;
+}
+
+.user-role {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.divider {
+    color: var(--gray-400);
+}
+
+.trust-class {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.trust-label {
+    color: var(--text-tertiary);
+}
+
+.trust-score {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+}
+
+/* Trust class value colors */
+#scope-trust-value {
+    font-weight: 600;
+}
+
+#scope-trust-value[data-class="isolated"] {
+    color: var(--danger);
+}
+
+#scope-trust-value[data-class="known"] {
+    color: var(--warning);
+}
+
+#scope-trust-value[data-class="partner"] {
+    color: var(--info);
+}
+
+#scope-trust-value[data-class="federated"] {
+    color: var(--success);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .entity-type-badge[data-type="cooperative"] {
+    background: #1e3a8a;
+    color: #bfdbfe;
+    border-color: #3b82f6;
+}
+
+[data-theme="dark"] .entity-type-badge[data-type="community"] {
+    background: #14532d;
+    color: #bbf7d0;
+    border-color: #22c55e;
+}
+
+[data-theme="dark"] .entity-type-badge[data-type="federation"] {
+    background: #78350f;
+    color: #fef08a;
+    border-color: #eab308;
+}
+
 /* Navigation */
 nav {
     display: flex;
@@ -1663,6 +1826,166 @@ footer {
     border-radius: 4px;
     font-size: 0.875rem;
     line-height: 1.6;
+}
+
+/* Charter Detail Modal (P0-T05) */
+.charter-field {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.charter-field:last-child {
+    border-bottom: none;
+}
+
+.charter-field label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.charter-value {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.charter-value code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+}
+
+.charter-description {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Constraints Card (P0-T14) */
+.constraints-card {
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    border-left: 4px solid var(--primary);
+}
+
+.info-tooltip {
+    cursor: help;
+    font-size: 1rem;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.info-tooltip:hover {
+    opacity: 1;
+}
+
+.constraints-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.constraint-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.constraint-item:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.constraint-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.constraint-icon {
+    font-size: 1.125rem;
+}
+
+.constraint-value-group {
+    display: flex;
+    align-items: baseline;
+    gap: 0.375rem;
+}
+
+.constraint-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.constraint-unit {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.constraint-source {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+}
+
+.source-label {
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.source-value {
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+}
+
+/* Trust class specific colors in constraints card */
+#constraint-trust-class[data-class="isolated"] {
+    color: var(--danger);
+}
+
+#constraint-trust-class[data-class="known"] {
+    color: var(--warning);
+}
+
+#constraint-trust-class[data-class="partner"] {
+    color: var(--info);
+}
+
+#constraint-trust-class[data-class="federated"] {
+    color: var(--success);
+}
+
+/* Dark mode adjustments for constraints card */
+[data-theme="dark"] .constraints-card {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+}
+
+[data-theme="dark"] .constraint-item {
+    background: var(--bg-secondary);
+    border-color: var(--gray-700);
+}
+
+[data-theme="dark"] .constraint-item:hover {
+    border-color: var(--primary);
 }
 
 .btn-link {
@@ -5293,4 +5616,72 @@ footer .sync-status.error {
     padding: 0.5rem;
     background: var(--background);
     border-radius: 4px;
+   Inline Receipt Chain (Proposal Detail Sidebar) — P0-T11
+   ============================================================================ */
+
+.receipt-chain-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    position: relative;
+}
+
+.receipt-chain-step:not(:last-of-type)::after {
+    content: '';
+    position: absolute;
+    left: 0.9rem;
+    top: 2rem;
+    bottom: -0.5rem;
+    width: 2px;
+    background: var(--border-color);
+}
+
+.receipt-chain-step.completed .receipt-chain-icon {
+    background: var(--primary);
+    color: white;
+}
+
+.receipt-chain-step.pending .receipt-chain-icon {
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    border: 2px dashed var(--border-color);
+}
+
+.receipt-chain-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.receipt-chain-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.receipt-chain-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.15rem;
+}
+
+.receipt-chain-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+}
+
+.receipt-chain-step.pending .receipt-chain-label {
+    color: var(--text-tertiary);
+}
+
+.receipt-chain-step.pending .receipt-chain-detail {
+    color: var(--text-tertiary);
+    font-style: italic;
 }
