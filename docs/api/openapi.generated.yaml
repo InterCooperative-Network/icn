@@ -91,6 +91,11 @@ components:
       properties:
         did:
           type: string
+        display_name:
+          type:
+          - string
+          - 'null'
+          description: Optional display name to set when adding the member
         role:
           type: string
           description: |-
