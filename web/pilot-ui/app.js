@@ -43,6 +43,7 @@ const elements = {
     gatewayUrl: document.getElementById('gateway-url'),
     coopId: document.getElementById('coop-id'),
     did: document.getElementById('did'),
+    loginPassword: document.getElementById('login-password'),
     token: document.getElementById('token'),
     loginBtn: document.getElementById('login-btn'),
     loginError: document.getElementById('login-error'),
@@ -636,6 +637,75 @@ function useNewIdentity() {
     }
 }
 
+// Challenge-Response Authentication
+async function challengeResponseAuth(did, password) {
+    try {
+        // Step 1: Request challenge from gateway
+        debugLog('Requesting challenge for DID:', did);
+        const challengeUrl = `${state.gatewayUrl}/v1/auth/challenge`;
+        const challengeResponse = await fetch(challengeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ did: did })
+        });
+
+        if (!challengeResponse.ok) {
+            const errorText = await challengeResponse.text();
+            throw new Error(`Challenge request failed: ${errorText}`);
+        }
+
+        const challengeData = await challengeResponse.json();
+        const challenge = challengeData.challenge;
+        debugLog('Received challenge:', challenge);
+
+        // Step 2: Load and decrypt keypair from IndexedDB
+        debugLog('Loading keypair from IndexedDB');
+        let keypair;
+        try {
+            keypair = await window.ICNCrypto.loadKeypair(did, password);
+        } catch (err) {
+            throw new Error('Failed to load keypair. Wrong password or identity not found.');
+        }
+
+        // Step 3: Sign the challenge
+        debugLog('Signing challenge');
+        const signature = await window.ICNCrypto.signChallenge(challenge, keypair);
+        debugLog('Signature generated');
+
+        // Step 4: Send signed challenge to gateway for verification
+        debugLog('Verifying signature with gateway');
+        const verifyUrl = `${state.gatewayUrl}/v1/auth/verify`;
+        const verifyResponse = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                did: did,
+                challenge: challenge,
+                signature: signature
+            })
+        });
+
+        if (!verifyResponse.ok) {
+            const errorText = await verifyResponse.text();
+            throw new Error(`Signature verification failed: ${errorText}`);
+        }
+
+        const verifyData = await verifyResponse.json();
+        const token = verifyData.token;
+
+        if (!token) {
+            throw new Error('No token returned from gateway');
+        }
+
+        debugLog('Challenge-response authentication successful, token acquired');
+        return token;
+
+    } catch (error) {
+        console.error('Challenge-response auth error:', error);
+        throw new Error(`Authentication failed: ${error.message}`);
+    }
+}
+
 // Login
 async function login() {
     clearError(elements.loginError);
@@ -643,16 +713,34 @@ async function login() {
     state.gatewayUrl = elements.gatewayUrl.value.trim().replace(/\/$/, '');
     state.coopId = elements.coopId.value.trim();
     state.did = elements.did.value.trim();
-    state.token = elements.token.value.trim();
+    const password = elements.loginPassword.value.trim();
+    const token = elements.token.value.trim();
 
-    if (!state.gatewayUrl || !state.coopId || !state.did || !state.token) {
-        showError(elements.loginError, 'Please fill in all fields');
+    // Validation: need either password (for challenge-response) or token (for CLI auth)
+    if (!state.gatewayUrl || !state.coopId || !state.did) {
+        showError(elements.loginError, 'Please fill in gateway URL, cooperative ID, and DID');
+        return;
+    }
+
+    if (!password && !token) {
+        showError(elements.loginError, 'Please provide either a password (for in-browser auth) or a token (from CLI)');
         return;
     }
 
     try {
         elements.loginBtn.disabled = true;
         elements.loginBtn.textContent = 'Connecting...';
+
+        // Determine authentication method
+        if (password) {
+            // Challenge-response authentication
+            debugLog('Using challenge-response authentication');
+            state.token = await challengeResponseAuth(state.did, password);
+        } else {
+            // Token-based authentication (existing flow)
+            debugLog('Using token-based authentication');
+            state.token = token;
+        }
 
         // Test connection by fetching health
         await apiRequest('GET', '/health');

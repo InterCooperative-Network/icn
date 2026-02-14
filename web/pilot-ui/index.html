@@ -69,7 +69,22 @@
                             aria-required="true"
                             aria-describedby="did-hint"
                         />
-                        <small id="did-hint">Don't know your DID? Run <code>icnctl id show</code></small>
+                        <small id="did-hint">Your decentralized identifier</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password">Password (for in-browser auth)</label>
+                        <input
+                            type="password"
+                            id="login-password"
+                            placeholder="Your identity password"
+                            aria-describedby="login-password-hint"
+                        />
+                        <small id="login-password-hint">Required for in-browser challenge-response authentication</small>
+                    </div>
+
+                    <div class="login-divider">
+                        <span>or use CLI token</span>
                     </div>
 
                     <div class="form-group">
@@ -77,8 +92,7 @@
                         <input
                             type="password"
                             id="token"
-                            placeholder="Paste your token here"
-                            aria-required="true"
+                            placeholder="Paste your token here (optional)"
                             aria-describedby="token-hint"
                         />
                         <button type="button" id="show-auth-help" class="btn-link" aria-label="Open help dialog for getting authentication token">How do I get a token?</button>
