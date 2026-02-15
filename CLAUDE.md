@@ -618,3 +618,34 @@ Do not jump to hardware/compiler blame without strong evidence.
 - Keep the user's voice: sharp, direct, not formalized, not melodramatic.
 - "Sharper/edgier" means more authentic and raw, NOT more structured or sitcom cadence.
 - If corrected on tone, internalize within the session.
+
+## CRLF / Line Ending Gotchas
+- Some branches predating `.gitattributes` line-ending normalization may show large phantom diffs on checkout.
+- If you see hundreds of CRLF-only changes:
+  - Prefer `git checkout -f main` to force-reset the worktree state.
+  - Avoid rebasing noisy branches without normalizing; consider a one-time "line ending normalization" commit, then rebase.
+- Recommended local config in all worktrees:
+  - `git config core.autocrlf false`
+  - `git config core.eol lf`
+
+## Test Filtering Notes
+- `cargo test <filter>` matches **test function names**, not file names.
+- To run an integration test file:
+  - `cargo test -p <crate> --test <filename>` (omit `.rs`)
+- Example:
+  - `cargo test -p icn-core --test backup_restore_integration`
+
+## Multi-Agent Worktree Pattern
+- Give each agent an isolated worktree and branch.
+- Keep territory constraints strict: each agent only touches its assigned crate/app.
+- Merge order:
+  - smallest / most independent first
+  - largest / most dependent last
+- Crash recovery: worktrees survive VM crashes; rebase/stash workflow can salvage state.
+
+## PR Merge Edge Cases
+- Draft PRs must be marked ready before merge:
+  - `gh pr ready <pr>`
+- `--delete-branch` will fail if the branch is checked out in a worktree.
+  - Remove the worktree first, then delete the branch.
+- Use `--admin` sparingly (prefer fixing flake sources rather than normalizing bypass).
