@@ -151,32 +151,44 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
 
     // Verify required components are present
     let has_kernel_executor = content.contains("KernelGovernanceExecutor");
-    let has_effect_subscription = content.contains("create_effect_subscription");
+    // Effect subscription is now provided via BootstrapHandles factory
+    // (governance-actor dependency moved to daemon)
+    let has_effect_factory = content.contains("effect_subscription_factory");
     // Env gate has been removed - effect path is now the default
     let has_no_env_gate = !content.contains("ICN_USE_EFFECT_PATH");
+    // Direct governance-actor call should NOT be in lifecycle.rs anymore
+    let has_no_direct_gov_actor = !content.contains("icn_governance_actor::");
 
     println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║         🎉 EFFECT DISPATCHER IS THE DEFAULT PATH 🎉              ║");
+    println!("║         EFFECT DISPATCHER IS THE DEFAULT PATH                    ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!(
-        "║ EffectDispatcher:           {}                           ║",
-        if has_effect_dispatcher { "✅" } else { "❌" }
-    );
-    println!(
-        "║ KernelGovernanceExecutor:   {}                           ║",
-        if has_kernel_executor { "✅" } else { "❌" }
-    );
-    println!(
-        "║ create_effect_subscription: {}                           ║",
-        if has_effect_subscription {
-            "✅"
+        "║ EffectDispatcher:              {}                           ║",
+        if has_effect_dispatcher {
+            "OK"
         } else {
-            "❌"
+            "MISSING"
         }
     );
     println!(
-        "║ Env gate removed:           {}                           ║",
-        if has_no_env_gate { "✅" } else { "❌" }
+        "║ KernelGovernanceExecutor:      {}                           ║",
+        if has_kernel_executor { "OK" } else { "MISSING" }
+    );
+    println!(
+        "║ effect_subscription_factory:   {}                           ║",
+        if has_effect_factory { "OK" } else { "MISSING" }
+    );
+    println!(
+        "║ No direct gov-actor call:      {}                           ║",
+        if has_no_direct_gov_actor {
+            "OK"
+        } else {
+            "VIOLATION"
+        }
+    );
+    println!(
+        "║ Env gate removed:              {}                           ║",
+        if has_no_env_gate { "OK" } else { "PRESENT" }
     );
     println!("╠══════════════════════════════════════════════════════════════════╣");
     println!("║ Status: Effect path is production-ready (always active)         ║");
@@ -191,8 +203,12 @@ fn tripwire_effect_dispatcher_in_lifecycle() {
         "KernelGovernanceExecutor should be in lifecycle.rs"
     );
     assert!(
-        has_effect_subscription,
-        "create_effect_subscription should be in lifecycle.rs"
+        has_effect_factory,
+        "effect_subscription_factory should be in lifecycle.rs (from BootstrapHandles)"
+    );
+    assert!(
+        has_no_direct_gov_actor,
+        "lifecycle.rs should not call icn_governance_actor directly - use factory from BootstrapHandles"
     );
     assert!(
         has_no_env_gate,

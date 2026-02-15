@@ -16,7 +16,6 @@ pub mod config;
 pub mod dead_letter;
 pub mod error;
 pub mod events;
-pub mod governance;
 pub mod identity;
 pub mod node;
 pub mod policy;
@@ -40,7 +39,6 @@ pub use config::Config;
 pub use dead_letter::{DeadLetterQueue, EntryStatus, FailedOperation, FailureType};
 pub use error::{CoreError, Result};
 pub use events::{EventBus, EventCallback, SystemEvent};
-pub use governance::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
 pub use identity::{IdentityActor, IdentityHandle, IdentityMsg};
 pub use node::{
     capability_keys, create_node_profile, sense_extended_capabilities, sense_hardware,

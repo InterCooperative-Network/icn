@@ -89,14 +89,31 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
     files
 }
 
-/// Check if a Cargo.toml contains a dependency on a specific crate.
+/// Check if a Cargo.toml contains a **production** dependency on a specific crate.
+///
+/// Only searches the `[dependencies]` section, stopping at `[dev-dependencies]`
+/// or `[build-dependencies]`. Dev-deps are intentionally excluded because they
+/// don't affect the runtime dependency graph.
 fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
-    cargo_toml.contains(&format!("{dep_name} ="))
-        || cargo_toml.contains(&format!("{dep_name}="))
-        || cargo_toml.contains(&format!("{dep_name}.workspace"))
-        || cargo_toml.contains(&format!("[dependencies.{dep_name}]"))
-        || cargo_toml.contains(&format!("[dev-dependencies.{dep_name}]"))
-        || cargo_toml.contains(&format!("[build-dependencies.{dep_name}]"))
+    // Extract only the [dependencies] section (before [dev-dependencies] etc.)
+    let deps_section = if let Some(start) = cargo_toml.find("[dependencies]") {
+        let after_header = &cargo_toml[start..];
+        // Find the next section header after [dependencies]
+        if let Some(next) = after_header[1..]
+            .find("\n[")
+            .map(|pos| pos + 1)
+        {
+            &after_header[..next]
+        } else {
+            after_header
+        }
+    } else {
+        return false;
+    };
+
+    deps_section.contains(&format!("{dep_name} ="))
+        || deps_section.contains(&format!("{dep_name}="))
+        || deps_section.contains(&format!("{dep_name}.workspace"))
 }
 
 /// Count occurrences of a pattern in source files.
@@ -138,18 +155,18 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-02-15):
     /// - icn-gossip: CLEAN
-    /// - icn-net: CLEAN (dev-dep removed by #915/PR #973)
-    /// - icn-gateway: 2 (icn-trust + icn-governance)
-    /// - icn-ledger: 2 (icn-trust + icn-governance)
+    /// - icn-net: CLEAN
+    /// - icn-gateway: 2 (icn-trust + icn-governance in prod deps)
+    /// - icn-ledger: CLEAN (icn-trust + icn-governance are dev-deps only)
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-gossip", 0),  // CLEAN ✅
-            ("icn-net", 0),     // CLEAN ✅ (dev-dep removed by #915/PR #973)
+            ("icn-net", 0),     // CLEAN ✅
             ("icn-gateway", 2), // icn-trust + icn-governance
-            ("icn-ledger", 2),  // icn-trust + icn-governance
+            ("icn-ledger", 0),  // CLEAN ✅ (domain crates are dev-deps only)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -443,7 +460,7 @@ mod tests {
             }
         }
 
-        let expected: usize = 3; // icn-ledger + icn-ccl + icn-governance
+        let expected: usize = 2; // icn-ledger + icn-ccl (icn-governance moved to dev-deps only)
 
         assert!(
             actual <= expected,

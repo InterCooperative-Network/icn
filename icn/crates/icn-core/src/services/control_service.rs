@@ -18,7 +18,7 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info, warn};
 
-use crate::governance::{ForcedOutcome, GovernanceHandle, ProposalId};
+use icn_governance_actor::{ForcedOutcome, GovernanceCommand, GovernanceHandle, ProposalId};
 use icn_kernel_api::{
     ControlService, ForceCloseProposalRequest, ForceCloseProposalResult, VetoProposalRequest,
     VetoProposalResult,
@@ -117,7 +117,6 @@ impl ControlService for ControlServiceImpl {
         // Try to execute synchronously using tokio's current runtime
         let result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                use crate::governance::GovernanceCommand;
                 handle
                     .submit(GovernanceCommand::VetoProposal {
                         proposal_id: proposal_id.clone(),
@@ -214,7 +213,6 @@ impl ControlService for ControlServiceImpl {
 
         let result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                use crate::governance::GovernanceCommand;
                 handle
                     .submit(GovernanceCommand::ForceCloseProposal {
                         proposal_id: proposal_id.clone(),

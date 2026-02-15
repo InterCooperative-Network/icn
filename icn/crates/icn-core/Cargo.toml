@@ -43,7 +43,6 @@ icn-obs.workspace = true
 icn-snapshot.workspace = true
 icn-time.workspace = true
 icn-gateway.workspace = true
-icn-governance.workspace = true
 icn-compute = { path = "../icn-compute" }
 icn-security.workspace = true
 icn-federation.workspace = true

@@ -42,6 +42,7 @@ icn-obs.workspace = true
 # App crates (domain logic - lives outside kernel)
 icn-trust-app = { path = "../../../apps/trust" }
 icn-governance-app = { path = "../../../apps/governance" }
+icn-governance-actor = { path = "../../apps/governance" }
 icn-ledger-app = { path = "../../../apps/ledger" }
 
 # Needed for parameter store construction in daemon
