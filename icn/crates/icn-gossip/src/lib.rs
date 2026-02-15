@@ -42,6 +42,7 @@ pub mod key_rotation;
 pub mod labor_shares;
 #[allow(missing_docs)]
 pub mod partition;
+pub mod quotas;
 #[allow(missing_docs)]
 pub mod scalability;
 pub mod service_discovery;

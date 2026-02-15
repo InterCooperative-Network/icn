@@ -32,7 +32,7 @@ pub struct GossipServices {
     /// Partition healer for recovery
     pub partition_healer: Arc<RwLock<PartitionHealer>>,
     /// Storage quota manager
-    pub storage_quota: Arc<RwLock<icn_store::StorageQuotaManager>>,
+    pub storage_quota: Arc<RwLock<icn_gossip::quotas::StorageQuotaManager>>,
     /// Loaded snapshot (if any)
     pub loaded_snapshot: Option<StateSnapshot>,
 }
@@ -165,7 +165,7 @@ pub async fn init_gossip_services(
 
     // Phase 18 Week 6: Initialize StorageQuotaManager for gossip entries
     // Default: 1GB global limit, 90% eviction threshold, 10MB per-DID quota
-    let storage_quota_manager = icn_store::StorageQuotaManager::new(
+    let storage_quota_manager = icn_gossip::quotas::StorageQuotaManager::new(
         1024 * 1024 * 1024, // 1GB global limit
         0.9,                // Start evicting at 90% capacity
     );
