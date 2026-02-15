@@ -49,6 +49,7 @@ export interface Cooperative {
   owner: string;
   created_at: number;
   settings: CoopSettings;
+  treasury_did?: string;
 }
 
 export interface CoopSettings {
