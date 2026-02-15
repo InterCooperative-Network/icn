@@ -697,6 +697,35 @@ impl SledStore {
     pub fn generate_id(&self) -> Result<u64> {
         Ok(self.db.generate_id()?)
     }
+
+    /// Export all key-value pairs as a serializable snapshot.
+    ///
+    /// Returns a vector of `(key, value)` byte pairs representing the complete
+    /// database contents. This is suitable for backup and can be restored with
+    /// [`import_snapshot`].
+    ///
+    /// Note: This loads the entire database into memory. For very large databases,
+    /// consider streaming or chunked approaches.
+    pub fn export_snapshot(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut entries = Vec::new();
+        for item in self.db.iter() {
+            let (k, v) = item?;
+            entries.push((k.to_vec(), v.to_vec()));
+        }
+        Ok(entries)
+    }
+
+    /// Import key-value pairs from a snapshot, restoring database state.
+    ///
+    /// Inserts all entries from the snapshot into this database. Any existing
+    /// keys will be overwritten. This is the counterpart to [`export_snapshot`].
+    pub fn import_snapshot(&self, entries: &[(Vec<u8>, Vec<u8>)]) -> Result<()> {
+        for (key, value) in entries {
+            self.db.insert(key.as_slice(), value.as_slice())?;
+        }
+        self.db.flush()?;
+        Ok(())
+    }
 }
 
 impl Store for SledStore {
