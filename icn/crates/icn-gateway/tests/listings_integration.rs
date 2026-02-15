@@ -612,8 +612,8 @@ async fn test_listing_persists_across_manager_instances() {
 
     // Create listing with first manager instance
     {
-        let db = sled::open(db_path.path()).unwrap();
-        let mgr = ListingsManager::with_sled(Arc::new(db));
+        let db = Arc::new(sled::open(db_path.path()).unwrap());
+        let mgr = ListingsManager::with_sled(db.clone());
 
         let listing = mgr
             .create_listing(
@@ -632,6 +632,10 @@ async fn test_listing_persists_across_manager_instances() {
             .unwrap();
 
         listing_id = listing.id;
+
+        // Ensure sled releases its file lock before re-opening
+        drop(mgr);
+        db.flush().unwrap();
     }
 
     // Open new manager instance and verify listing exists
@@ -656,8 +660,8 @@ async fn test_interest_persists_across_manager_instances() {
 
     // Create listing and interest with first manager instance
     {
-        let db = sled::open(db_path.path()).unwrap();
-        let mgr = ListingsManager::with_sled(Arc::new(db));
+        let db = Arc::new(sled::open(db_path.path()).unwrap());
+        let mgr = ListingsManager::with_sled(db.clone());
 
         let listing = mgr
             .create_listing(
@@ -685,6 +689,11 @@ async fn test_interest_persists_across_manager_instances() {
             Some("My offer".to_string()),
         )
         .unwrap();
+
+        // Drop manager first, then flush and drop db to ensure sled
+        // releases its file lock before we re-open in the next block.
+        drop(mgr);
+        db.flush().unwrap();
     }
 
     // Open new manager instance and verify interest exists
