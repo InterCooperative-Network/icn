@@ -25,6 +25,11 @@ if [[ "$FILE_PATH" != *.rs ]]; then
   exit 0
 fi
 
+# Exclude test files — integration tests legitimately use domain crates as dev-dependencies
+if echo "$FILE_PATH" | grep -qE '/tests/|#\[cfg\(test\)\]'; then
+  exit 0
+fi
+
 # Check new content for domain imports
 NEW_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty')
 

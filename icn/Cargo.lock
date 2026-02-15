@@ -2954,6 +2954,7 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
+ "icn-membership-app",
  "icn-net",
  "icn-obs",
  "icn-rpc",
