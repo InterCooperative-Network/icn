@@ -7,11 +7,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
-/// Get the path to the icnctl binary
+/// Get the path to the icnctl binary.
+/// Uses CARGO_BIN_EXE which respects custom target directories.
 fn icnctl_bin() -> PathBuf {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("../../target/debug/icnctl");
-    path
+    PathBuf::from(env!("CARGO_BIN_EXE_icnctl"))
 }
 
 #[test]
