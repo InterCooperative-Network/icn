@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 /// Default suspicious rate threshold.
 ///
-/// Must match `icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD`.
+/// Must match the default suspicious rate threshold in the ledger oracle.
 /// A CI/unit-test drift guard in `icn-ledger-app` (apps/ledger) ensures this.
 const DEFAULT_SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
 

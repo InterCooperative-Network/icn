@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// Type aliases for common handle types
-pub type LedgerHandle = Arc<RwLock<icn_ledger::Ledger>>;
+pub type LedgerHandle = super::actors::LedgerHandle;
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ComputeHandleHolder = Arc<RwLock<Option<icn_compute::ComputeHandle>>>;
 pub type DisputeHandleHolder = Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>;

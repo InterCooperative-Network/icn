@@ -341,22 +341,21 @@ mod tests {
     ///
     /// Target state: 0 after ledger extraction completes (#914).
     ///
-    /// Current state (2026-02-11):
-    /// - services/ledger_service.rs: Legitimate composition root for LedgerService
-    /// - lifecycle.rs: ledger_handle fn signature
-    /// - init_compute.rs: LedgerHandle alias, JournalEntryBuilder
-    /// - init_notifications.rs: LedgerHandle alias
-    /// - init_rpc.rs: Ledger, DisputeManager imports
-    /// - actors.rs: CoreActorHandles ledger types
+    /// Current state (2026-02-15):
+    /// - actors.rs: 3 refs — consolidated type aliases (LedgerHandle, DisputeManagerHandle, TreasuryManagerHandle)
+    /// - services/ledger_service.rs: 1 ref — composition root for LedgerService
+    /// - init_compute.rs: 1 ref — JournalEntryBuilder for payment settlement
     ///
-    /// governance_handlers/ has been DELETED (Sprint 4 migration complete).
+    /// All other refs removed: doc-comment cleanups, alias consolidation,
+    /// lifecycle/init_rpc/init_notifications now import from actors.rs.
     ///
     /// Tracked for extraction in #914 (ledger extraction).
     #[test]
     fn strict_core_ledger_reference_ratchet() {
-        // Note: services/ledger_service.rs legitimately imports icn_ledger types
-        // to implement LedgerService trait. This is the composition root.
-        let expected: usize = 12;
+        // actors.rs defines consolidated type aliases (3 refs).
+        // ledger_service.rs is the composition root (1 ref).
+        // init_compute.rs uses JournalEntryBuilder for payment settlement (1 ref).
+        let expected: usize = 5;
         let actual = count_imports_in_crate("icn-core", "icn_ledger::");
 
         assert!(

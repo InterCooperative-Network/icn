@@ -60,6 +60,19 @@ pub struct EventSubscriptionHandles {
 pub type EffectSubscriptionFactory =
     Box<dyn FnOnce(Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync>) -> EventCallback + Send>;
 
+/// Shared type alias for the concrete ledger handle.
+///
+/// This confines the concrete Ledger type to one declaration.
+/// Other supervisor modules import this alias instead of referencing
+/// the ledger crate directly.
+pub type LedgerHandle = Arc<RwLock<icn_ledger::Ledger>>;
+
+/// Type alias for the dispute manager handle.
+pub type DisputeManagerHandle = Arc<RwLock<icn_ledger::DisputeManager>>;
+
+/// Type alias for the treasury manager handle.
+pub type TreasuryManagerHandle = Arc<RwLock<icn_ledger::TreasuryManager>>;
+
 /// Typed handles for domain objects passed from daemon to supervisor.
 ///
 /// Each field is a concrete, typed handle. The daemon constructs these
@@ -73,13 +86,13 @@ pub type EffectSubscriptionFactory =
 /// See `icn-kernel-api::services::ServiceRegistry` for trait-based abstractions.
 pub struct BootstrapHandles {
     /// Pre-initialized ledger handle.
-    pub ledger: Arc<RwLock<icn_ledger::Ledger>>,
+    pub ledger: LedgerHandle,
     /// Shared sled store for ledger (prevents double-open due to exclusive flock).
     pub ledger_store: Arc<icn_store::SledStore>,
     /// Dispute manager for payment dispute resolution.
-    pub dispute_manager: Arc<RwLock<icn_ledger::DisputeManager>>,
+    pub dispute_manager: DisputeManagerHandle,
     /// Treasury manager for cooperative treasury operations.
-    pub treasury_manager: Arc<RwLock<icn_ledger::TreasuryManager>>,
+    pub treasury_manager: TreasuryManagerHandle,
     /// Contract runtime for CCL execution.
     pub contract_runtime: Arc<RwLock<icn_ccl::ContractRuntime>>,
     /// Contract actor for contract lifecycle management.
