@@ -1,16 +1,15 @@
-//! Governance actor initialization
+//! Governance services initialization (thin wrapper)
 //!
-//! This module extracts the governance actor setup from the supervisor,
-//! providing a cleaner separation of concerns for governance services.
+//! Delegates governance actor spawning to `icn_governance_actor::init` and
+//! then creates kernel-level infrastructure (UpgradeActor, DeadLetterQueue,
+//! VersionTracker, KernelGovernanceExecutor) that belongs in icn-core.
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::config::Config;
-use icn_governance_actor::{
-    GovernanceActor, GovernanceHandle, MembershipResolver, StaticMembershipResolver,
-};
+use icn_governance_actor::GovernanceHandle;
 use icn_identity::Did;
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_store::SledStore;
@@ -56,42 +55,30 @@ pub struct GovernanceServices {
 
 /// Initialize governance services
 ///
-/// Creates:
-/// - GovernanceActor for proposal management
+/// Delegates governance actor spawning to `icn_governance_actor::init`, then
+/// creates kernel-level infrastructure:
 /// - UpgradeActor for network-wide upgrade coordination
 /// - Dead-letter queue for failed operations recovery
 /// - Version tracker for upgrade state
+/// - KernelGovernanceExecutor for proposal execution
 pub async fn init_governance_services(
     config: &Config,
     did: Did,
     deps: GovernanceDeps,
 ) -> anyhow::Result<GovernanceServices> {
-    // Create governance topic before spawning GovernanceActor
-    {
-        let mut gossip = deps.gossip_handle.write().await;
-        gossip.create_topic(icn_gossip::Topic::new(
-            "governance:proposal".to_string(),
-            icn_gossip::AccessControl::Public,
-        ));
-    }
-
-    // Spawn Governance actor
-    let gov_store_path = config.store_path().join("governance");
-    let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
-    let gov_resolver: Arc<dyn MembershipResolver + Send + Sync> =
-        Arc::new(StaticMembershipResolver::new());
-
-    let governance_handle = GovernanceActor::spawn(
+    // Delegate governance actor spawning to the governance app crate
+    let actor_services = icn_governance_actor::init::init_governance_actor(
+        &config.store_path(),
         did.clone(),
-        gov_store.clone(),
-        deps.gossip_handle.clone(),
-        gov_resolver,
-        Some(deps.event_bus.clone()),
-        deps.signing_key,
+        icn_governance_actor::init::GovernanceActorDeps {
+            gossip_handle: deps.gossip_handle.clone(),
+            event_bus: deps.event_bus.clone(),
+            signing_key: deps.signing_key,
+        },
     )
     .await?;
 
-    info!("✓ Governance actor spawned at {}", gov_store_path.display());
+    // --- Kernel-level infrastructure below ---
 
     // Spawn UpgradeActor for network-wide upgrade coordination
     let current_version = icn_kernel_api::Version::new(
@@ -144,7 +131,8 @@ pub async fn init_governance_services(
     info!("✓ Governance executor created");
 
     // Attach protocol parameter store and executor to governance handle
-    let governance_handle = governance_handle
+    let governance_handle = actor_services
+        .governance_handle
         .with_protocol_params(protocol_parameter_store.clone())
         .with_executor(governance_executor);
 
@@ -153,7 +141,7 @@ pub async fn init_governance_services(
         upgrade_handle,
         version_tracker,
         dead_letter_queue,
-        governance_store: gov_store,
+        governance_store: actor_services.governance_store,
         protocol_parameter_store,
     })
 }

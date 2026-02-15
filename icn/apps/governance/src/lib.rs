@@ -32,6 +32,7 @@
 pub mod actor;
 pub mod executor;
 pub mod handlers;
+pub mod init;
 pub mod registry;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
