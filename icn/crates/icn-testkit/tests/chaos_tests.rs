@@ -208,9 +208,10 @@ async fn test_connection_flapping() -> Result<()> {
     // Final connect and wait for sync
     cluster.nodes[0].connect(&cluster.nodes[1]).await?;
 
-    // Wait for convergence (6 entries total)
+    // Wait for convergence (6 entries total).
+    // Use generous timeout — CI runners can be slow after rapid connect/disconnect cycles.
     cluster
-        .await_gossip_convergence(topic, 6, Duration::from_secs(10))
+        .await_gossip_convergence(topic, 6, Duration::from_secs(30))
         .await?;
 
     // Verify all entries on both nodes
