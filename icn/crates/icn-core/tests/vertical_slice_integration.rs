@@ -22,6 +22,7 @@ use icn_governance::{
 };
 use icn_governance_actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite};
 use icn_identity::KeyPair;
+use icn_ledger::asset_types::{AssetClass, AssetCondition, AssetMetadata, AssetRegistry};
 use icn_ledger::entry::JournalEntryBuilder;
 use icn_ledger::treasury::TreasuryManager;
 use icn_ledger::Ledger;
@@ -456,33 +457,32 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         );
     }
 
-    // Store asset metadata in KV store (links to ledger entry + proposal)
-    let asset_ref = serde_json::json!({
-        "asset_id": "tool-library:drill-press-001",
-        "asset_type": "Durable",
-        "name": "Drill Press",
-        "value_hours": 30,
-        "ledger_hash": hex::encode(asset_ledger_hash.0),
-        "acquired_via": budget_proposal_id.0,
-        "status": "available",
-    });
-    gov_store.put(
-        b"asset:tool-library:drill-press-001",
-        &serde_json::to_vec(&asset_ref)?,
-    )?;
+    // Register asset using the typed AssetRegistry
+    let asset_registry = AssetRegistry::new(ledger_store.clone());
+    let drill_press = AssetMetadata {
+        id: "tool-library:drill-press-001".to_string(),
+        name: "Drill Press".to_string(),
+        class: AssetClass::Durable,
+        description: "Heavy-duty drill press for tool library".to_string(),
+        owner_did: alice.did(),
+        created_at: 1_700_000_000,
+        condition: AssetCondition::New,
+    };
 
-    info!("  Asset registered in ledger and store");
+    let asset_id = asset_registry.register_asset(drill_press)?;
+    assert_eq!(asset_id, "tool-library:drill-press-001");
+    info!("  Asset registered via AssetRegistry: {}", asset_id);
 
     // =========================================================================
     // Step 8: Dave checks out tool → use-access entry → return
     // =========================================================================
     info!("── Step 8: Dave checks out and returns the drill press ──");
 
-    // Checkout: create a use-access ledger entry
+    // Checkout: transfer custody from coop (Alice) to Dave + ledger entry
     {
         let mut guard = ledger.write().await;
 
-        // Checkout entry: Dave borrows from coop inventory (double-entry)
+        // Double-entry: Dave borrows from coop inventory
         let checkout_entry = JournalEntryBuilder::new(dave.did())
             .debit(dave.did(), "TOOL_ACCESS".to_string(), 1)
             .credit(alice.did(), "TOOL_ACCESS".to_string(), 1)
@@ -490,23 +490,28 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
 
         let checkout_hash = guard.append_entry(checkout_entry).await?;
         info!(
-            "  Dave checked out drill press (hash={})",
+            "  Ledger checkout entry (hash={})",
             hex::encode(&checkout_hash.0[..8])
         );
+    }
 
-        // Store checkout record in KV
-        let checkout_record = serde_json::json!({
-            "action": "checkout",
-            "asset_id": "tool-library:drill-press-001",
-            "checked_out_by": dave.did().to_string(),
-            "ledger_hash": hex::encode(checkout_hash.0),
-        });
-        gov_store.put(
-            format!("checkout:{}", hex::encode(&checkout_hash.0[..8])).as_bytes(),
-            &serde_json::to_vec(&checkout_record)?,
-        )?;
+    // Transfer custody via AssetRegistry
+    asset_registry.transfer_custody(&asset_id, &alice.did(), &dave.did())?;
+    info!("  Custody transferred: Alice -> Dave");
 
-        // Return entry: Dave returns to coop inventory (double-entry)
+    // Verify Dave now holds the asset
+    let checked_out = asset_registry.get_asset(&asset_id)?.expect("asset exists");
+    assert_eq!(
+        checked_out.owner_did,
+        dave.did(),
+        "Dave should hold the asset"
+    );
+
+    // Return: transfer custody back from Dave to coop (Alice) + ledger entry
+    {
+        let mut guard = ledger.write().await;
+
+        // Double-entry: Dave returns to coop inventory
         let return_entry = JournalEntryBuilder::new(dave.did())
             .credit(dave.did(), "TOOL_ACCESS".to_string(), 1)
             .debit(alice.did(), "TOOL_ACCESS".to_string(), 1)
@@ -514,12 +519,16 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
 
         let return_hash = guard.append_entry(return_entry).await?;
         info!(
-            "  Dave returned drill press (hash={})",
+            "  Ledger return entry (hash={})",
             hex::encode(&return_hash.0[..8])
         );
     }
 
-    // Verify Dave's tool access balance is back to zero
+    // Transfer custody back via AssetRegistry
+    asset_registry.transfer_custody(&asset_id, &dave.did(), &alice.did())?;
+    info!("  Custody transferred: Dave -> Alice");
+
+    // Verify balances net to zero and custody is restored
     {
         let guard = ledger.read().await;
         let dave_access = guard.get_balance(&dave.did(), "TOOL_ACCESS");
@@ -529,6 +538,14 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         );
         info!("  Verified: Dave's TOOL_ACCESS balance = 0 (checkout + return)");
     }
+
+    let returned = asset_registry.get_asset(&asset_id)?.expect("asset exists");
+    assert_eq!(
+        returned.owner_did,
+        alice.did(),
+        "Alice should hold the asset again"
+    );
+    info!("  Verified: Asset custody returned to Alice");
 
     // =========================================================================
     // Step 9: Full audit trail verification
@@ -547,14 +564,14 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     assert_eq!(audit_record["recipient"], supplier.did().to_string());
     info!("  Budget proposal audit trail: verified");
 
-    // Verify asset record exists
-    let asset_bytes = gov_store
-        .get(b"asset:tool-library:drill-press-001")?
-        .expect("Asset record should exist");
-    let asset_record: serde_json::Value = serde_json::from_slice(&asset_bytes)?;
-    assert_eq!(asset_record["asset_type"], "Durable");
-    assert_eq!(asset_record["name"], "Drill Press");
-    info!("  Asset registration audit trail: verified");
+    // Verify asset record via AssetRegistry
+    let verified_asset = asset_registry
+        .get_asset("tool-library:drill-press-001")?
+        .expect("Asset record should exist in registry");
+    assert_eq!(verified_asset.class, AssetClass::Durable);
+    assert_eq!(verified_asset.name, "Drill Press");
+    assert_eq!(verified_asset.owner_did, alice.did());
+    info!("  Asset registration audit trail: verified via AssetRegistry");
 
     // Verify cooperative state
     let final_coop = coop_handle.get_cooperative(coop.id.clone()).await?;
