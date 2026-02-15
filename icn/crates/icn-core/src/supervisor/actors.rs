@@ -52,7 +52,8 @@ pub struct EventSubscriptionHandles {
 /// through the kernel effect system.
 ///
 /// The daemon provides this factory (backed by `icn_governance_actor::create_effect_subscription`),
-/// keeping the governance-actor dependency out of icn-core.
+/// keeping governance-actor references out of the supervisor's lifecycle/effect wiring
+/// and centralizing effect subscription creation in the daemon.
 ///
 /// Arguments: `effect_callback` receives translated `Vec<KernelEffect>` + decision receipt ID.
 /// Returns: an `EventCallback` suitable for `EventBus::subscribe()`.

@@ -637,7 +637,7 @@ async fn spawn_actors_with_identity(
             super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
 
         // Create effect-based subscription via factory from BootstrapHandles
-        // (avoids direct icn_governance_actor dependency in icn-core)
+        // (avoids direct icn_governance_actor reference from lifecycle.rs)
         let effect_callback_arc: Arc<
             dyn Fn(Vec<icn_kernel_api::effects::KernelEffect>, String) + Send + Sync,
         > = Arc::new(move |effects, receipt_id| {

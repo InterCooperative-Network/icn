@@ -91,29 +91,34 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
 
 /// Check if a Cargo.toml contains a **production** dependency on a specific crate.
 ///
-/// Only searches the `[dependencies]` section, stopping at `[dev-dependencies]`
-/// or `[build-dependencies]`. Dev-deps are intentionally excluded because they
-/// don't affect the runtime dependency graph.
+/// Uses proper TOML parsing to inspect only `[dependencies]`, excluding
+/// `[dev-dependencies]` and `[build-dependencies]`. Also handles
+/// `[dependencies.crate_name]` sub-table syntax and `[target.*.dependencies]`.
 fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
-    // Extract only the [dependencies] section (before [dev-dependencies] etc.)
-    let deps_section = if let Some(start) = cargo_toml.find("[dependencies]") {
-        let after_header = &cargo_toml[start..];
-        // Find the next section header after [dependencies]
-        if let Some(next) = after_header[1..]
-            .find("\n[")
-            .map(|pos| pos + 1)
-        {
-            &after_header[..next]
-        } else {
-            after_header
-        }
-    } else {
-        return false;
+    let parsed: toml::Table = match toml::from_str(cargo_toml) {
+        Ok(v) => v,
+        Err(_) => return false,
     };
 
-    deps_section.contains(&format!("{dep_name} ="))
-        || deps_section.contains(&format!("{dep_name}="))
-        || deps_section.contains(&format!("{dep_name}.workspace"))
+    // Check [dependencies] table
+    if let Some(toml::Value::Table(deps)) = parsed.get("dependencies") {
+        if deps.contains_key(dep_name) {
+            return true;
+        }
+    }
+
+    // Check [target.*.dependencies] tables
+    if let Some(toml::Value::Table(targets)) = parsed.get("target") {
+        for target_cfg in targets.values() {
+            if let Some(toml::Value::Table(deps)) = target_cfg.get("dependencies") {
+                if deps.contains_key(dep_name) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Count occurrences of a pattern in source files.
