@@ -6,6 +6,9 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use icn_kernel_api::effects::KernelEffect;
+use icn_kernel_api::events::EventCallback;
+
 /// Handle types collected during actor initialization for gateway integration
 #[derive(Default)]
 pub struct GatewayActorHandles {
@@ -45,6 +48,18 @@ pub struct EventSubscriptionHandles {
     pub governance_event_subscription: Option<crate::events::SubscriptionHandle>,
 }
 
+/// Factory that creates an event subscription routing accepted proposals
+/// through the kernel effect system.
+///
+/// The daemon provides this factory (backed by `icn_governance_actor::create_effect_subscription`),
+/// keeping governance-actor references out of the supervisor's lifecycle/effect wiring
+/// and centralizing effect subscription creation in the daemon.
+///
+/// Arguments: `effect_callback` receives translated `Vec<KernelEffect>` + decision receipt ID.
+/// Returns: an `EventCallback` suitable for `EventBus::subscribe()`.
+pub type EffectSubscriptionFactory =
+    Box<dyn FnOnce(Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync>) -> EventCallback + Send>;
+
 /// Typed handles for domain objects passed from daemon to supervisor.
 ///
 /// Each field is a concrete, typed handle. The daemon constructs these
@@ -71,4 +86,7 @@ pub struct BootstrapHandles {
     pub contract_actor: Arc<RwLock<icn_ccl::ContractActor>>,
     /// Protocol parameter store for governable parameters.
     pub protocol_parameter_store: Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
+    /// Factory for creating the governance effect subscription.
+    /// When provided, the supervisor uses this instead of calling `icn_governance_actor` directly.
+    pub effect_subscription_factory: Option<EffectSubscriptionFactory>,
 }

@@ -3589,7 +3589,6 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
- "icn-time",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -3599,7 +3598,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "utoipa",
 ]
 
 [[package]]
@@ -3771,6 +3769,7 @@ dependencies = [
  "icn-core",
  "icn-gossip",
  "icn-governance",
+ "icn-governance-actor",
  "icn-governance-app",
  "icn-identity",
  "icn-kernel-api",

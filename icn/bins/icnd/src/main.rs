@@ -250,6 +250,11 @@ async fn build_services(
         contract_actor: ledger_services.contract_actor,
         protocol_parameter_store: parameter_store.clone()
             as Arc<dyn icn_kernel_api::protocol_params::ProtocolParameterStore>,
+        effect_subscription_factory: Some(Box::new(|effect_callback| {
+            icn_governance_actor::create_effect_subscription(move |effects, receipt_id| {
+                effect_callback(effects, receipt_id);
+            })
+        })),
     };
 
     Ok((registry, Some(bootstrap_handles)))

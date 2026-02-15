@@ -8,7 +8,9 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::config::Config;
-use icn_governance_actor::{MembershipResolver, StaticMembershipResolver};
+use icn_governance_actor::{
+    GovernanceActor, GovernanceHandle, MembershipResolver, StaticMembershipResolver,
+};
 use icn_identity::Did;
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_store::SledStore;
@@ -39,7 +41,7 @@ pub struct GovernanceDeps {
 /// Services returned from governance initialization
 pub struct GovernanceServices {
     /// Handle to the governance actor
-    pub governance_handle: crate::governance::GovernanceHandle,
+    pub governance_handle: GovernanceHandle,
     /// Handle to the upgrade actor
     pub upgrade_handle: crate::upgrade_actor::UpgradeHandle,
     /// Version tracker for upgrade coordination
@@ -79,7 +81,7 @@ pub async fn init_governance_services(
     let gov_resolver: Arc<dyn MembershipResolver + Send + Sync> =
         Arc::new(StaticMembershipResolver::new());
 
-    let governance_handle = crate::governance::GovernanceActor::spawn(
+    let governance_handle = GovernanceActor::spawn(
         did.clone(),
         gov_store.clone(),
         deps.gossip_handle.clone(),

@@ -89,14 +89,36 @@ fn list_rust_files(crate_name: &str) -> Vec<PathBuf> {
     files
 }
 
-/// Check if a Cargo.toml contains a dependency on a specific crate.
+/// Check if a Cargo.toml contains a **production** dependency on a specific crate.
+///
+/// Uses proper TOML parsing to inspect only `[dependencies]`, excluding
+/// `[dev-dependencies]` and `[build-dependencies]`. Also handles
+/// `[dependencies.crate_name]` sub-table syntax and `[target.*.dependencies]`.
 fn has_dependency(cargo_toml: &str, dep_name: &str) -> bool {
-    cargo_toml.contains(&format!("{dep_name} ="))
-        || cargo_toml.contains(&format!("{dep_name}="))
-        || cargo_toml.contains(&format!("{dep_name}.workspace"))
-        || cargo_toml.contains(&format!("[dependencies.{dep_name}]"))
-        || cargo_toml.contains(&format!("[dev-dependencies.{dep_name}]"))
-        || cargo_toml.contains(&format!("[build-dependencies.{dep_name}]"))
+    let parsed: toml::Table = match toml::from_str(cargo_toml) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    // Check [dependencies] table
+    if let Some(toml::Value::Table(deps)) = parsed.get("dependencies") {
+        if deps.contains_key(dep_name) {
+            return true;
+        }
+    }
+
+    // Check [target.*.dependencies] tables
+    if let Some(toml::Value::Table(targets)) = parsed.get("target") {
+        for target_cfg in targets.values() {
+            if let Some(toml::Value::Table(deps)) = target_cfg.get("dependencies") {
+                if deps.contains_key(dep_name) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Count occurrences of a pattern in source files.
@@ -138,18 +160,18 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-02-15):
     /// - icn-gossip: CLEAN
-    /// - icn-net: CLEAN (dev-dep removed by #915/PR #973)
-    /// - icn-gateway: 2 (icn-trust + icn-governance)
-    /// - icn-ledger: 2 (icn-trust + icn-governance)
+    /// - icn-net: CLEAN
+    /// - icn-gateway: 2 (icn-trust + icn-governance in prod deps)
+    /// - icn-ledger: CLEAN (icn-trust + icn-governance are dev-deps only)
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-gossip", 0),  // CLEAN ✅
-            ("icn-net", 0),     // CLEAN ✅ (dev-dep removed by #915/PR #973)
+            ("icn-net", 0),     // CLEAN ✅
             ("icn-gateway", 2), // icn-trust + icn-governance
-            ("icn-ledger", 2),  // icn-trust + icn-governance
+            ("icn-ledger", 0),  // CLEAN ✅ (domain crates are dev-deps only)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -443,7 +465,7 @@ mod tests {
             }
         }
 
-        let expected: usize = 3; // icn-ledger + icn-ccl + icn-governance
+        let expected: usize = 2; // icn-ledger + icn-ccl (icn-governance moved to dev-deps only)
 
         assert!(
             actual <= expected,

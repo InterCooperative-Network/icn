@@ -8,12 +8,13 @@
 //! 4. Verify audit trail was stored linking proposal to ledger entry
 
 use anyhow::Result;
-use icn_core::{EventBus, GovernanceActor, SystemEvent};
+use icn_core::{EventBus, SystemEvent};
 use icn_gossip::GossipActor;
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceParams, GovernanceProfileId, MembershipConfig,
     Proposal, ProposalPayload, StaticMembershipResolver,
 };
+use icn_governance_actor::GovernanceActor;
 use icn_identity::KeyPair;
 use icn_ledger::Ledger;
 use icn_store::{SledStore, Store};

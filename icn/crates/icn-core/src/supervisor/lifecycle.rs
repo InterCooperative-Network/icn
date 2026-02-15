@@ -318,6 +318,7 @@ async fn spawn_actors_with_identity(
     let contract_runtime_handle = handles.contract_runtime;
     let contract_actor_handle = handles.contract_actor;
     let protocol_parameter_store_from_daemon = handles.protocol_parameter_store;
+    let effect_subscription_factory = handles.effect_subscription_factory;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
@@ -635,11 +636,19 @@ async fn spawn_actors_with_identity(
         let effect_callback =
             super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
 
-        // Create effect-based subscription
-        let effect_subscription =
-            icn_governance_actor::create_effect_subscription(move |effects, receipt_id| {
-                effect_callback(effects, receipt_id);
-            });
+        // Create effect-based subscription via factory from BootstrapHandles
+        // (avoids direct icn_governance_actor reference from lifecycle.rs)
+        let effect_callback_arc: Arc<
+            dyn Fn(Vec<icn_kernel_api::effects::KernelEffect>, String) + Send + Sync,
+        > = Arc::new(move |effects, receipt_id| {
+            effect_callback(effects, receipt_id);
+        });
+        let factory = effect_subscription_factory.ok_or_else(|| {
+            anyhow::anyhow!(
+                "BootstrapHandles must provide effect_subscription_factory for governance effect routing"
+            )
+        })?;
+        let effect_subscription = factory(effect_callback_arc);
 
         // Subscribe and return handle for lifecycle tracking
         let effect_handle = event_bus.subscribe(effect_subscription).await;

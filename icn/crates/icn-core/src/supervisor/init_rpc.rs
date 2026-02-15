@@ -18,7 +18,7 @@ use icn_ledger::{DisputeManager, Ledger};
 use icn_net::NetworkHandle;
 use icn_rpc::RpcServer;
 
-use crate::governance::GovernanceHandle;
+use icn_governance_actor::GovernanceHandle;
 
 /// Dependencies for RPC server initialization
 pub struct RpcDeps {
