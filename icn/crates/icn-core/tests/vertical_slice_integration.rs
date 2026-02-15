@@ -17,12 +17,14 @@ use anyhow::Result;
 use icn_core::{EventBus, SystemEvent};
 use icn_gossip::GossipActor;
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
-    StaticMembershipResolver, VoteChoice,
+    GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams, MembershipConfig,
+    ProofOutcome, ProposalId, ProposalPayload, StaticMembershipResolver, VoteChoice, VoteTally,
 };
 use icn_governance_actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite};
 use icn_identity::KeyPair;
+use icn_kernel_api::receipts::CanonicalReceipt;
 use icn_ledger::asset_types::{AssetClass, AssetCondition, AssetMetadata, AssetRegistry};
+use icn_ledger::create_budget_allocation;
 use icn_ledger::entry::JournalEntryBuilder;
 use icn_ledger::treasury::TreasuryManager;
 use icn_ledger::Ledger;
@@ -247,6 +249,44 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                     });
                     let audit_json = serde_json::to_vec(&audit_record).unwrap();
                     store.put(audit_key.as_bytes(), &audit_json).unwrap();
+
+                    // ── Structured receipt chain (B3) ──
+                    let decision_receipt = GovernanceDecisionReceipt::new(
+                        prop_id.clone(),
+                        "tool-library-gov".to_string(),
+                        ProofOutcome::Accepted,
+                        VoteTally {
+                            for_votes: 1,
+                            against_votes: 0,
+                            abstain_votes: 0,
+                        },
+                        &[], // empty votes for simplicity — hash will still be deterministic
+                    );
+
+                    let allocation = create_budget_allocation(
+                        decision_receipt.decision_hash,
+                        &prop_id,
+                        &from_did.to_string(),
+                        &recipient.to_string(),
+                        amount as u64,
+                        &currency,
+                        &format!("Budget allocation for proposal {}", prop_id),
+                    );
+
+                    // Store allocation receipt keyed by canonical hash
+                    let alloc_hash = allocation.canonical_hash();
+                    let alloc_key = format!("receipt:allocation:{}", hex::encode(alloc_hash));
+                    let alloc_json = serde_json::to_vec(&allocation).unwrap();
+                    store.put(alloc_key.as_bytes(), &alloc_json).unwrap();
+
+                    // Store the decision hash for verification in Step 9
+                    let decision_key = format!("receipt:decision:{}", prop_id);
+                    store
+                        .put(
+                            decision_key.as_bytes(),
+                            hex::encode(decision_receipt.decision_hash).as_bytes(),
+                        )
+                        .unwrap();
                 });
             }
         }))
@@ -563,6 +603,75 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     assert_eq!(audit_record["currency"], "HOURS");
     assert_eq!(audit_record["recipient"], supplier.did().to_string());
     info!("  Budget proposal audit trail: verified");
+
+    // ── Receipt chain verification ──
+    info!("  Verifying allocation receipt chain...");
+
+    // Load decision hash
+    let decision_key = format!("receipt:decision:{}", budget_proposal_id.0);
+    let decision_hash_hex = gov_store
+        .get(decision_key.as_bytes())?
+        .expect("Decision hash should be stored");
+    let decision_hash_str = String::from_utf8(decision_hash_hex).unwrap();
+    info!("  Decision hash: {}", &decision_hash_str[..16]);
+
+    // Scan for allocation receipts
+    let receipt_entries = gov_store.scan(b"receipt:allocation:")?;
+    assert!(
+        !receipt_entries.is_empty(),
+        "Should have at least one allocation receipt"
+    );
+
+    // Load and verify the first allocation receipt
+    let (_, receipt_bytes) = &receipt_entries[0];
+    let allocation: icn_kernel_api::receipts::AllocationReceipt =
+        serde_json::from_slice(receipt_bytes)?;
+
+    // Verify the chain links
+    let decision_hash_bytes = hex::decode(&decision_hash_str).unwrap();
+    let mut expected_hash = [0u8; 32];
+    expected_hash.copy_from_slice(&decision_hash_bytes);
+
+    assert_eq!(
+        allocation.decision_hash, expected_hash,
+        "AllocationReceipt must link to GovernanceDecisionReceipt"
+    );
+
+    assert_eq!(
+        allocation.intents.len(),
+        1,
+        "Should have exactly one settlement intent"
+    );
+    let intent = &allocation.intents[0];
+    assert_eq!(
+        intent.amount, 30,
+        "Intent amount should match budget proposal"
+    );
+    assert_eq!(
+        intent.unit, "HOURS",
+        "Intent unit should match budget currency"
+    );
+    assert_eq!(
+        intent.decision_hash, expected_hash,
+        "Intent must link to same decision"
+    );
+
+    // Verify provenance chain
+    assert!(
+        allocation
+            .provenance
+            .upstream_hashes
+            .contains(&expected_hash),
+        "Provenance must include decision hash"
+    );
+
+    info!("  Receipt chain verified: Decision -> Allocation -> Intent");
+    info!("    Decision hash: {}", &decision_hash_str[..16]);
+    info!("    Allocation intents: {}", allocation.intents.len());
+    info!(
+        "    Intent: {} {} from treasury to supplier",
+        intent.amount, intent.unit
+    );
 
     // Verify asset record via AssetRegistry
     let verified_asset = asset_registry
