@@ -277,9 +277,9 @@ mod tests {
     use super::*;
     use crate::notification_processor::ProcessorConfig;
     use crate::notification_queue::NotificationQueue;
+    use crate::notification_store::DeliveryLogEntry;
     use crate::notifications::{NotificationService, NotificationStore};
     use actix_web::{test, App};
-    use crate::notification_store::DeliveryLogEntry;
     use sled::Config;
 
     fn test_store() -> Arc<NotificationStore> {
