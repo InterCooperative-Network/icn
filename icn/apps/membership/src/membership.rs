@@ -7,8 +7,8 @@ use crate::entity::{EntityId, MembershipCriteria};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Re-export membership types from icn-entity
-pub use icn_entity::membership::{
+/// Re-export membership types from entity_core
+pub use crate::entity_core::membership::{
     Membership as EntityMembership, MembershipCapability, MembershipRole, MembershipStatus,
     UnifiedMembershipStatus,
 };

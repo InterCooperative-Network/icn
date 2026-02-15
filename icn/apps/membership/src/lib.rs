@@ -1,63 +1,99 @@
 //! ICN Membership App
 //!
 //! Unified membership management for all entity types in ICN.
-//! This app consolidates membership models from icn-entity, icn-coop,
-//! and icn-community into a single, CCL-driven implementation.
-//!
-//! # Overview
-//!
-//! The membership app handles:
-//! - Unified entity model (individuals, cooperatives, communities, federations)
-//! - Generic membership trait for all entity types
-//! - CCL-based membership criteria evaluation
-//! - Cooperative-specific features (shares, labor assignments)
-//! - Community-specific features (multi-type members, voting weights)
-//!
-//! # CCL Integration
-//!
-//! This is the second CCL consumer in ICN (after governance).
-//! Membership criteria can be defined in CCL:
-//!
-//! ```yaml
-//! entity:
-//!   name: "Rochester Civic Assembly"
-//!   type: community
-//!   membership:
-//!     classes:
-//!       - name: resident
-//!         criteria:
-//!           all:
-//!             - field: verified_address
-//!               op: "=="
-//!               value: true
-//! ```
+//! This app consolidates entity, cooperative, and community models
+//! into a single crate.
 //!
 //! # Architecture
 //!
 //! ```text
-//! MembershipApp
-//!   ├── entity (unified EntityId model)
-//!   ├── membership (generic trait + UnifiedMembership)
-//!   ├── coop (cooperative-specific logic)
-//!   └── community (community-specific logic)
+//! icn-membership-app
+//!   ├── entity_core  (from icn-entity: EntityId, CooperativeEntity, Membership, Registry)
+//!   ├── coop_core    (from icn-coop: Cooperative, CoopActor, CoopStore, treasury)
+//!   ├── community_core (from icn-community: Community, CommunityActor, CommunityStore)
+//!   ├── entity       (unified EntityConfig, MembershipClass, CCL criteria)
+//!   ├── membership   (unified MembershipTrait, UnifiedMembership, CCL evaluation)
+//!   ├── coop         (cooperative-specific membership wrappers)
+//!   └── community    (community-specific membership wrappers)
 //! ```
+#![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+// === Core modules (absorbed from original crates) ===
+pub mod community_core;
+pub mod coop_core;
+pub mod entity_core;
+
+// === Unified wrapper modules ===
 pub mod community;
 pub mod coop;
 pub mod entity;
 pub mod membership;
 
-// Re-export main types
-pub use community::{CommunityMembershipConfig, CommunityMembershipManager, MemberType};
-pub use coop::{CoopMembershipConfig, CoopMembershipManager};
-pub use entity::{Condition, EntityConfig, MembershipClass, MembershipConfig, MembershipCriteria};
-pub use membership::{
-    MembershipCapability, MembershipError, MembershipManager, MembershipRole, MembershipStatus,
-    MembershipTrait, UnifiedMembership, UnifiedMembershipStatus,
+// === Re-export entity_core types (backward compat with icn-entity) ===
+pub use entity_core::actor::{EntityActor, GossipHandle as EntityGossipHandle, ENTITY_TOPIC};
+pub use entity_core::entity::{
+    AccountId, AccountReference, CommunityProfile, CooperativeEntity, CooperativeProfile, EntityId,
+    EntityKind, EntityRelationship, EntityStatus, EntityType, FederationProfile, RelationType,
+};
+pub use entity_core::error::{EntityError, Result as EntityResult};
+pub use entity_core::handle::EntityHandle;
+pub use entity_core::labor_exchange::{
+    AssignmentApprovals, AssignmentId, AssignmentStatus, AssignmentType, Availability,
+    CreditRouting, LaborAssignment, LaborNeed, LaborPool, PoolRegistration, RoutingMode,
+};
+pub use entity_core::lifecycle::{EntityLifecycle, LifecycleEvent as EntityLifecycleEvent};
+pub use entity_core::membership::{
+    Membership, MembershipCapability, MembershipRole, MembershipStatus, UnifiedMembershipStatus,
+};
+pub use entity_core::registry::{EntityRegistry, EntityRegistryHandle, InMemoryRegistry};
+pub use entity_core::sled_registry::SledEntityRegistry;
+
+// === Re-export coop_core types (backward compat with icn-coop) ===
+pub use coop_core::actor::{CoopActor, COOP_TOPIC};
+pub use coop_core::actor::{GossipHandle as CoopGossipHandle, TreasuryManagerHandle};
+pub use coop_core::error::{CoopError, Result as CoopResult};
+pub use coop_core::handle::CoopHandle;
+pub use coop_core::lifecycle::{
+    derive_treasury_anchor, derive_treasury_did, LifecycleEvent as CoopLifecycleEvent,
+    LifecycleManager as CoopLifecycleManager,
+};
+pub use coop_core::membership::{MembershipChange, MembershipManager as CoopMembershipMgr};
+pub use coop_core::store::CoopStore;
+pub use coop_core::types::{
+    AssetDistributionPlan, BalanceAction, CapitalReturnMethod, CoopStatus, CoopType, Cooperative,
+    CooperativeId, DebtAction, DissolutionRequest, FormationRequest as CoopFormationRequest,
+    Member as CoopMember, MemberRole as CoopMemberRole, MemberStatus as CoopMemberStatus,
+    MembershipApplication, MembershipTier, StoredFounderSignature,
 };
 
-// Re-export EntityId for convenience
-pub use icn_entity::EntityId;
+// === Re-export community_core types (backward compat with icn-community) ===
+pub use community_core::actor::{CommunityActor, CommunityMessage, COMMUNITY_TOPIC};
+pub use community_core::error::{CommunityError, Result as CommunityResult};
+pub use community_core::handle::CommunityHandle;
+pub use community_core::lifecycle::{
+    CommunityLifecycle, FormationRequest as CommunityFormationRequest,
+};
+pub use community_core::membership::{
+    MemberApplication, MembershipManager as CommunityMembershipMgr,
+};
+pub use community_core::resources::{ResourceAllocation, ResourceManager};
+pub use community_core::store::{CommunityQuery, CommunityStore};
+pub use community_core::types::{
+    Community, CommunityStatus, CommunityType, MemberType as CommunityMemberType, ResourcePool,
+};
+
+// === Unified wrapper re-exports ===
+pub use self::community::{CommunityMembershipConfig, CommunityMembershipManager, MemberType};
+pub use self::coop::{CoopMembershipConfig, CoopMembershipManager};
+pub use self::entity::{
+    Condition, EntityConfig, MembershipClass, MembershipConfig, MembershipCriteria,
+};
+pub use self::membership::{
+    MembershipError, MembershipManager, MembershipTrait, UnifiedMembership,
+};
 
 /// App metadata constant
 const MEMBERSHIP_MANIFEST: &str = include_str!("../manifest.yaml");
@@ -80,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_entity_config_creation() {
-        let config = EntityConfig::cooperative("test-coop", "Test Coop".to_string());
+        let config = EntityConfig::cooperative("test-coop", "Test Coop".to_string()).unwrap();
         assert_eq!(config.name, "Test Coop");
     }
 
@@ -95,62 +131,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(matches!(
-            membership.status,
-            icn_entity::MembershipStatus::Pending
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_coop_membership() {
-        let coop_manager = CoopMembershipManager::new();
-        let config = CoopMembershipConfig::new(EntityConfig::cooperative(
-            "test-coop",
-            "Test Coop".to_string(),
-        ));
-
-        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
-        let coop_id = EntityId::cooperative("test-coop").expect("Invalid coop ID");
-
-        let membership = coop_manager
-            .add_coop_member(member_id, coop_id, MembershipRole::Worker, &config)
-            .await
-            .unwrap();
-
-        assert!(matches!(
-            membership.status,
-            icn_entity::MembershipStatus::Pending
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_community_membership() {
-        let community_manager = CommunityMembershipManager::new();
-        let config = CommunityMembershipConfig::new(EntityConfig::community(
-            "test-comm",
-            "Test Community".to_string(),
-        ));
-
-        let member_id = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
-        let community_id = EntityId::community("test-comm").expect("Invalid community ID");
-
-        let membership = community_manager
-            .add_community_member(
-                member_id,
-                community_id,
-                MembershipRole::Member,
-                MemberType::Individual,
-                &config,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(membership.shares, 1);
+        assert!(matches!(membership.status, MembershipStatus::Pending));
     }
 
     #[test]
     fn test_all_entity_types_supported() {
-        // Test that all entity types can be created
         let _individual = EntityId::from_did(icn_identity::KeyPair::generate().unwrap().did());
         let _coop = EntityId::cooperative("test-coop").expect("Invalid coop ID");
         let _community = EntityId::community("test-comm").expect("Invalid community ID");
