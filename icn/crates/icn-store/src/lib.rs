@@ -10,22 +10,15 @@
 pub mod blob_store;
 /// Storage maintenance tasks
 pub mod maintenance;
-/// Notification storage and management
-pub mod notifications;
 /// Peer cache for persisting discovered peers
 pub mod peer_cache;
 /// Proof-of-storage challenge system
 pub mod pos;
-/// Storage quota management
-pub mod quotas;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-
-// Re-export quota types
-pub use quotas::{QuotaPriority, QuotaStats, StorageItem, StorageQuota, StorageQuotaManager};
 
 // Re-export peer cache types
 pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};

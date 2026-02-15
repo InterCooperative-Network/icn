@@ -2,7 +2,7 @@
 //!
 //! Manages FCM device registration and sends push notifications for events.
 
-pub use icn_store::notifications::{
+pub use crate::notification_store::{
     DeliveryLogEntry, InAppNotification, NotificationStore, Platform, RegisteredDevice,
 };
 
@@ -225,7 +225,7 @@ fn format_did(did: &Did) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_store::notifications::NotificationStore;
+    use crate::notification_store::NotificationStore;
     use sled::Config;
 
     fn temp_store() -> Arc<NotificationStore> {

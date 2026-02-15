@@ -1,11 +1,16 @@
+//! Notification storage and management
+//!
+//! Persistent store for push notification devices, in-app notifications,
+//! and delivery logs. Extracted from icn-store as this is gateway-specific
+//! domain logic.
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Device platform type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
     /// Apple iOS device
@@ -17,8 +22,7 @@ pub enum Platform {
 }
 
 /// Registered device for push notifications
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RegisteredDevice {
     /// Device identifier (DID)
     pub did: String,
@@ -31,8 +35,7 @@ pub struct RegisteredDevice {
 }
 
 /// In-app notification
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct InAppNotification {
     /// Notification ID
     pub id: String,
@@ -311,8 +314,7 @@ impl NotificationStore {
 }
 
 /// Delivery log entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeliveryLogEntry {
     /// Notification ID
     pub notification_id: String,

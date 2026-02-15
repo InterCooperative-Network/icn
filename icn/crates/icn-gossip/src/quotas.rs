@@ -1,9 +1,8 @@
 //! Storage Quota Management
 //!
-//! Phase 18 Week 6: Prevents storage exhaustion by enforcing per-DID quotas and global limits
-//!
-//! This module implements storage quota enforcement with priority-based eviction. When storage
-//! approaches capacity, low-priority data is automatically evicted to prevent crashes.
+//! Prevents storage exhaustion by enforcing per-DID quotas and global limits.
+//! Implements priority-based eviction: when storage approaches capacity,
+//! low-priority data is automatically evicted to prevent crashes.
 
 use anyhow::{anyhow, Result};
 use icn_identity::Did;

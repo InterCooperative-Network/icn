@@ -128,7 +128,7 @@ pub struct GossipActor {
 
     /// Storage quota manager (Phase 18 Week 6 - optional)
     /// Enforces per-DID storage limits and provides priority-based eviction
-    storage_quota_manager: Option<Arc<RwLock<icn_store::StorageQuotaManager>>>,
+    storage_quota_manager: Option<Arc<RwLock<crate::quotas::StorageQuotaManager>>>,
 
     /// Bloom filter resize configuration (M2 - dynamic sizing)
     pub(crate) bloom_resize_config: crate::bloom::BloomResizeConfig,
@@ -317,7 +317,7 @@ impl GossipActor {
     /// Set storage quota manager for per-DID storage limits (Phase 18 Week 6)
     pub fn set_storage_quota_manager(
         &mut self,
-        manager: Arc<RwLock<icn_store::StorageQuotaManager>>,
+        manager: Arc<RwLock<crate::quotas::StorageQuotaManager>>,
     ) {
         self.storage_quota_manager = Some(manager);
     }
@@ -975,7 +975,7 @@ impl GossipActor {
                 &author,
                 hash.to_vec(),
                 entry_size,
-                icn_store::QuotaPriority::Normal,
+                crate::quotas::QuotaPriority::Normal,
             );
 
             // Check if eviction is needed
@@ -2933,8 +2933,8 @@ mod tests {
 
         // Create storage quota manager with small limits for testing
         // 1KB global limit, 500 byte per-DID quota
-        let mut quota_manager = icn_store::StorageQuotaManager::new(1024, 0.9);
-        quota_manager.set_quota(did.clone(), 500, icn_store::QuotaPriority::Normal);
+        let mut quota_manager = crate::quotas::StorageQuotaManager::new(1024, 0.9);
+        quota_manager.set_quota(did.clone(), 500, crate::quotas::QuotaPriority::Normal);
         let quota_handle = Arc::new(tokio::sync::RwLock::new(quota_manager));
 
         gossip.set_storage_quota_manager(quota_handle.clone());
@@ -2979,8 +2979,8 @@ mod tests {
 
         // Create storage quota manager with very small limit
         // 200 byte per-DID quota
-        let mut quota_manager = icn_store::StorageQuotaManager::new(10000, 0.9);
-        quota_manager.set_quota(did.clone(), 200, icn_store::QuotaPriority::Normal);
+        let mut quota_manager = crate::quotas::StorageQuotaManager::new(10000, 0.9);
+        quota_manager.set_quota(did.clone(), 200, crate::quotas::QuotaPriority::Normal);
         let quota_handle = Arc::new(tokio::sync::RwLock::new(quota_manager));
 
         gossip.set_storage_quota_manager(quota_handle.clone());

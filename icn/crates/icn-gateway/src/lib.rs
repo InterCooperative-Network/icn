@@ -49,6 +49,7 @@ pub mod models;
 pub mod notification_listener;
 pub mod notification_processor;
 pub mod notification_queue;
+pub mod notification_store;
 pub mod notification_triggers;
 pub mod notifications;
 pub mod openapi;
