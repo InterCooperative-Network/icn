@@ -1,5 +1,19 @@
 # Post-Quantum Cryptography in ICN
 
+> **⚠️ STATUS: DESIGN / EXPERIMENTAL / NOT ENABLED BY DEFAULT**
+>
+> This document describes a **proposed** post-quantum cryptography design. It is NOT the current production default.
+> 
+> **Current Reality**:
+> - Default ICN identities use **Ed25519 only** (NOT post-quantum safe)
+> - PQ features require opt-in via `post-quantum` feature flag
+> - SDIS/Anchor identities have experimental PQ support
+>
+> This doc becomes "implemented" when:
+> - Tests exist in `icn-crypto-pq` crate
+> - Integration tests verify hybrid signature workflows
+> - Feature flag is documented in deployment guides
+
 ## Overview
 
 ICN supports **hybrid post-quantum cryptography** that combines classical Ed25519 signatures with ML-DSA (Module-Lattice Digital Signature Algorithm, aka Dilithium3) to provide quantum-resistant security.
