@@ -63,6 +63,7 @@ sha2 = "0.10"
 regex = "1.10"
 icn-governance.workspace = true
 icn-trust.workspace = true
+icn-membership-app = { path = "../../apps/membership" }
 portpicker.workspace = true
 reqwest.workspace = true
 # Enable test-util for time mocking in integration tests
