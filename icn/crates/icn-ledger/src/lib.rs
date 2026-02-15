@@ -50,6 +50,7 @@
 //! }
 //! ```
 
+pub mod asset_types;
 pub mod balance;
 pub mod commons_credits;
 pub mod credit_policy;
@@ -79,6 +80,7 @@ pub mod treasury;
 pub mod types;
 pub mod use_access;
 
+pub use asset_types::{AssetClass, AssetCondition, AssetId, AssetMetadata, AssetRegistry};
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
 pub use dispute::DisputeManager;
 pub use dynamic_limits::{
