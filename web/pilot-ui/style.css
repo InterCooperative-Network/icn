@@ -1675,6 +1675,42 @@ footer {
     background: var(--danger);
 }
 
+/* WebSocket Connection Badge (header) */
+.ws-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    line-height: 1;
+}
+
+.ws-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    flex-shrink: 0;
+}
+
+.ws-status-badge.live .ws-dot {
+    background: var(--success);
+}
+
+.ws-status-badge.reconnecting .ws-dot {
+    background: var(--warning, #f59e0b);
+    animation: ws-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ws-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
 /* Modal */
 .modal {
     position: fixed;

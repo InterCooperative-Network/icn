@@ -431,6 +431,7 @@ function showResult(element, message, isSuccess) {
 }
 
 function updateConnectionStatus(connected) {
+    // Update footer status indicator
     const dot = elements.connectionStatus.querySelector('.status-dot');
     if (connected) {
         dot.classList.remove('disconnected');
@@ -438,6 +439,23 @@ function updateConnectionStatus(connected) {
     } else {
         dot.classList.add('disconnected');
         elements.connectionStatus.innerHTML = '<span class="status-dot disconnected"></span> Disconnected';
+    }
+
+    // Update header badge (3-state: live / reconnecting / offline)
+    const badge = document.getElementById('ws-status-badge');
+    if (badge) {
+        const label = badge.querySelector('.ws-label');
+        badge.classList.remove('live', 'reconnecting');
+        if (connected) {
+            badge.classList.add('live');
+            if (label) label.textContent = 'Live';
+        } else if (state.token) {
+            // Has token but disconnected = will auto-reconnect
+            badge.classList.add('reconnecting');
+            if (label) label.textContent = 'Reconnecting\u2026';
+        } else {
+            if (label) label.textContent = 'Offline';
+        }
     }
 }
 
