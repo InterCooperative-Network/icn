@@ -14,23 +14,23 @@ use icn_compute::ComputeHandle;
 use icn_gossip::GossipActor;
 use icn_kernel_api::authz::PolicyOracle;
 use icn_kernel_api::services::TrustService;
-use icn_ledger::{DisputeManager, Ledger};
 use icn_net::NetworkHandle;
 use icn_rpc::RpcServer;
 
+use super::actors::{DisputeManagerHandle, LedgerHandle};
 use icn_governance_actor::GovernanceHandle;
 
 /// Dependencies for RPC server initialization
 pub struct RpcDeps {
     pub network_handle: NetworkHandle,
-    pub ledger_handle: Arc<RwLock<Ledger>>,
+    pub ledger_handle: LedgerHandle,
     pub contract_runtime: Arc<RwLock<ContractRuntime>>,
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub governance_handle: GovernanceHandle,
     pub compute_handle: ComputeHandle,
     /// Trust service for trust-based operations
     pub trust_service: Option<Arc<dyn TrustService>>,
-    pub dispute_manager: Arc<RwLock<DisputeManager>>,
+    pub dispute_manager: DisputeManagerHandle,
     pub federation_registry: Option<Arc<icn_federation::CooperativeRegistry>>,
     /// Optional policy oracle for trust-based rate limiting.
     /// When provided, this should be used instead of trust_graph for policy decisions.

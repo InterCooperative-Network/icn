@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Type aliases for common handle types
-pub type LedgerHandle = Arc<RwLock<icn_ledger::Ledger>>;
+pub type LedgerHandle = super::actors::LedgerHandle;
 pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub type ContractActorHandle = Arc<RwLock<icn_ccl::ContractActor>>;
 pub type SnapshotCoordinatorHandle = Arc<RwLock<icn_snapshot::SnapshotCoordinator>>;

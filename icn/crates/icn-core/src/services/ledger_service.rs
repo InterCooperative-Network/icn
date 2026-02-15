@@ -1,7 +1,7 @@
 //! LedgerService implementation for icn-ledger.
 //!
 //! This adapter implements the kernel-safe `LedgerService` trait using
-//! the actual `icn_ledger::Ledger` implementation. It's the bridge between
+//! the actual ledger implementation. It's the bridge between
 //! the kernel's abstract ledger interface and the real mutual credit ledger.
 //!
 //! # Pilot Invariant
@@ -24,7 +24,7 @@ use icn_ledger::{entry::JournalEntryBuilder, AccountDelta, Ledger};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-/// Concrete implementation of `LedgerService` backed by `icn_ledger::Ledger`.
+/// Concrete implementation of `LedgerService` backed by the mutual credit ledger.
 ///
 /// This is the production adapter that translates kernel-safe treasury
 /// operations into real ledger entries with provenance tracking.

@@ -937,7 +937,7 @@ async fn configure_gossip_actor(
     did: &icn_identity::Did,
     contract_actor_handle: &Arc<RwLock<icn_ccl::ContractActor>>,
     recovery_store: &Arc<dyn icn_store::Store>,
-    ledger_handle: &Arc<RwLock<icn_ledger::Ledger>>,
+    ledger_handle: &super::actors::LedgerHandle,
     coop_store: &Arc<icn_coop::CoopStore>,
     community_store: &Arc<icn_community::CommunityStore>,
     snapshot_coordinator: &Arc<RwLock<icn_snapshot::SnapshotCoordinator>>,
