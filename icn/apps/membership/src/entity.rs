@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Re-export EntityId and related types from icn-entity
-pub use icn_entity::{
+/// Re-export EntityId and related types from entity_core
+pub use crate::entity_core::entity::{
     AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType,
 };
 
@@ -122,24 +122,24 @@ impl EntityConfig {
     }
 
     /// Create a cooperative entity configuration
-    pub fn cooperative(id: impl Into<String>, name: String) -> Self {
+    pub fn cooperative(id: impl Into<String>, name: String) -> anyhow::Result<Self> {
         let id_str: String = id.into();
-        let entity_id = EntityId::cooperative(&id_str).expect("Invalid cooperative ID");
-        Self::new(entity_id, name, EntityType::Cooperative)
+        let entity_id = EntityId::cooperative(&id_str)?;
+        Ok(Self::new(entity_id, name, EntityType::Cooperative))
     }
 
     /// Create a community entity configuration
-    pub fn community(id: impl Into<String>, name: String) -> Self {
+    pub fn community(id: impl Into<String>, name: String) -> anyhow::Result<Self> {
         let id_str: String = id.into();
-        let entity_id = EntityId::community(&id_str).expect("Invalid community ID");
-        Self::new(entity_id, name, EntityType::Community)
+        let entity_id = EntityId::community(&id_str)?;
+        Ok(Self::new(entity_id, name, EntityType::Community))
     }
 
     /// Create a federation entity configuration
-    pub fn federation(id: impl Into<String>, name: String) -> Self {
+    pub fn federation(id: impl Into<String>, name: String) -> anyhow::Result<Self> {
         let id_str: String = id.into();
-        let entity_id = EntityId::federation(&id_str).expect("Invalid federation ID");
-        Self::new(entity_id, name, EntityType::Federation)
+        let entity_id = EntityId::federation(&id_str)?;
+        Ok(Self::new(entity_id, name, EntityType::Federation))
     }
 
     /// Set description
@@ -161,7 +161,8 @@ mod tests {
 
     #[test]
     fn test_create_cooperative_config() {
-        let config = EntityConfig::cooperative("food-coop", "Food Cooperative".to_string());
+        let config =
+            EntityConfig::cooperative("food-coop", "Food Cooperative".to_string()).unwrap();
         assert_eq!(config.name, "Food Cooperative");
         assert!(matches!(config.entity_type, EntityType::Cooperative));
         assert_eq!(config.membership_config.min_trust_threshold, 0.3);
@@ -169,7 +170,8 @@ mod tests {
 
     #[test]
     fn test_create_community_config() {
-        let config = EntityConfig::community("rochester-civic", "Rochester Civic".to_string());
+        let config =
+            EntityConfig::community("rochester-civic", "Rochester Civic".to_string()).unwrap();
         assert_eq!(config.name, "Rochester Civic");
         assert!(matches!(config.entity_type, EntityType::Community));
     }

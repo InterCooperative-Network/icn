@@ -4,8 +4,8 @@
 //! using CCL for membership rules.
 
 use crate::entity::{EntityConfig, EntityId, MembershipClass};
+use crate::entity_core::membership::MembershipRole;
 use crate::membership::{MembershipError, MembershipManager, MembershipTrait, UnifiedMembership};
-use icn_entity::MembershipRole;
 use serde::{Deserialize, Serialize};
 
 /// Cooperative membership configuration
@@ -115,32 +115,42 @@ pub mod compat {
 
     /// Convert icn-coop Member to UnifiedMembership
     pub fn from_coop_member(
-        member: &icn_coop::Member,
+        member: &crate::coop_core::types::Member,
     ) -> Result<UnifiedMembership, MembershipError> {
         let member_id = EntityId::from_did(&member.did);
         let parent_id = EntityId::cooperative(&member.coop_id)
             .map_err(|e| MembershipError::InvalidCriteria(e.to_string()))?;
 
         let role = match member.role {
-            icn_coop::MemberRole::Founder => MembershipRole::Founder,
-            icn_coop::MemberRole::Member => MembershipRole::Member,
-            icn_coop::MemberRole::Worker => MembershipRole::Worker,
-            icn_coop::MemberRole::Consumer => MembershipRole::Consumer,
-            icn_coop::MemberRole::Producer => MembershipRole::Producer,
-            icn_coop::MemberRole::BoardMember => MembershipRole::BoardMember,
-            // TODO: icn_coop::MemberRole::Officer doesn't carry a title;
+            crate::coop_core::types::MemberRole::Founder => MembershipRole::Founder,
+            crate::coop_core::types::MemberRole::Member => MembershipRole::Member,
+            crate::coop_core::types::MemberRole::Worker => MembershipRole::Worker,
+            crate::coop_core::types::MemberRole::Consumer => MembershipRole::Consumer,
+            crate::coop_core::types::MemberRole::Producer => MembershipRole::Producer,
+            crate::coop_core::types::MemberRole::BoardMember => MembershipRole::BoardMember,
+            // TODO: crate::coop_core::types::MemberRole::Officer doesn't carry a title;
             // use a generic placeholder until the source crate is extended.
-            icn_coop::MemberRole::Officer => MembershipRole::Officer {
+            crate::coop_core::types::MemberRole::Officer => MembershipRole::Officer {
                 title: "Officer".to_string(),
             },
         };
 
         let status = match member.status {
-            icn_coop::MemberStatus::Pending => icn_entity::MembershipStatus::Pending,
-            icn_coop::MemberStatus::Active => icn_entity::MembershipStatus::Active,
-            icn_coop::MemberStatus::Suspended => icn_entity::MembershipStatus::Suspended,
-            icn_coop::MemberStatus::Inactive => icn_entity::MembershipStatus::Inactive,
-            icn_coop::MemberStatus::Removed => icn_entity::MembershipStatus::Removed,
+            crate::coop_core::types::MemberStatus::Pending => {
+                crate::entity_core::membership::MembershipStatus::Pending
+            }
+            crate::coop_core::types::MemberStatus::Active => {
+                crate::entity_core::membership::MembershipStatus::Active
+            }
+            crate::coop_core::types::MemberStatus::Suspended => {
+                crate::entity_core::membership::MembershipStatus::Suspended
+            }
+            crate::coop_core::types::MemberStatus::Inactive => {
+                crate::entity_core::membership::MembershipStatus::Inactive
+            }
+            crate::coop_core::types::MemberStatus::Removed => {
+                crate::entity_core::membership::MembershipStatus::Removed
+            }
         };
 
         Ok(UnifiedMembership {
@@ -165,14 +175,14 @@ pub mod compat {
 mod tests {
     use super::*;
     use crate::entity::MembershipConfig;
-    use icn_entity::EntityType;
+    use crate::entity_core::entity::EntityType;
 
     fn create_test_coop_config() -> CoopMembershipConfig {
         let entity = EntityConfig {
             id: EntityId::cooperative("test-coop").expect("Invalid coop ID"),
             name: "Test Coop".to_string(),
             entity_type: EntityType::Cooperative,
-            status: icn_entity::EntityStatus::Active,
+            status: crate::entity_core::entity::EntityStatus::Active,
             description: None,
             membership_config: MembershipConfig::default(),
             metadata: std::collections::HashMap::new(),
@@ -196,7 +206,7 @@ mod tests {
 
         assert!(matches!(
             membership.status,
-            icn_entity::MembershipStatus::Pending
+            crate::entity_core::membership::MembershipStatus::Pending
         ));
     }
 

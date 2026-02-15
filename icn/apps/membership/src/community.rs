@@ -4,8 +4,8 @@
 //! using CCL for membership rules.
 
 use crate::entity::{EntityConfig, EntityId};
+use crate::entity_core::membership::MembershipRole;
 use crate::membership::{MembershipError, MembershipManager, MembershipTrait, UnifiedMembership};
-use icn_entity::MembershipRole;
 use serde::{Deserialize, Serialize};
 
 /// Community membership configuration
@@ -134,7 +134,7 @@ impl CommunityMembershipManager {
             });
         }
 
-        membership.status = icn_entity::MembershipStatus::Inactive;
+        membership.status = crate::entity_core::membership::MembershipStatus::Inactive;
         membership.updated_at = icn_time::current_timestamp_secs();
         Ok(())
     }
@@ -169,12 +169,12 @@ pub mod compat {
 
     /// Convert icn-community Member to UnifiedMembership
     pub fn from_community_member(
-        member: &icn_community::types::Member,
+        member: &crate::community_core::types::Member,
         community_id: &str,
     ) -> Result<UnifiedMembership, MembershipError> {
         // Parse member type from metadata
         let member_type = match &member.member_type {
-            icn_community::MemberType::Individual(did_str) => {
+            crate::community_core::types::MemberType::Individual(did_str) => {
                 let did: icn_identity::Did = did_str.as_str().parse().map_err(|_| {
                     MembershipError::InvalidCriteria(format!(
                         "Invalid DID in community member: {}",
@@ -183,7 +183,7 @@ pub mod compat {
                 })?;
                 EntityId::from_did(&did)
             }
-            icn_community::MemberType::Cooperative(id) => EntityId::cooperative(id)
+            crate::community_core::types::MemberType::Cooperative(id) => EntityId::cooperative(id)
                 .map_err(|e| MembershipError::InvalidCriteria(e.to_string()))?,
         };
 
@@ -195,9 +195,9 @@ pub mod compat {
             parent_id,
             role: MembershipRole::Member,
             status: if member.active {
-                icn_entity::MembershipStatus::Active
+                crate::entity_core::membership::MembershipStatus::Active
             } else {
-                icn_entity::MembershipStatus::Inactive
+                crate::entity_core::membership::MembershipStatus::Inactive
             },
             // Clamp pre-1970 timestamps to 0 (icn-entity expects u64)
             joined_at: member.joined_at.timestamp().max(0) as u64,
@@ -216,14 +216,14 @@ pub mod compat {
 mod tests {
     use super::*;
     use crate::entity::MembershipConfig;
-    use icn_entity::EntityType;
+    use crate::entity_core::entity::EntityType;
 
     fn create_test_community_config() -> CommunityMembershipConfig {
         let entity = EntityConfig {
             id: EntityId::community("test-comm").expect("Invalid community ID"),
             name: "Test Community".to_string(),
             entity_type: EntityType::Community,
-            status: icn_entity::EntityStatus::Active,
+            status: crate::entity_core::entity::EntityStatus::Active,
             description: None,
             membership_config: MembershipConfig::default(),
             metadata: std::collections::HashMap::new(),
@@ -288,7 +288,7 @@ mod tests {
         assert!(manager.deactivate_member(&mut membership).is_ok());
         assert!(matches!(
             membership.status,
-            icn_entity::MembershipStatus::Inactive
+            crate::entity_core::membership::MembershipStatus::Inactive
         ));
     }
 }
