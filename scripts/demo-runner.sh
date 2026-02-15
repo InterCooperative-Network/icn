@@ -17,7 +17,7 @@ NC='\033[0m'
 echo -e "${BOLD}${CYAN}"
 echo "╔══════════════════════════════════════╗"
 echo "║     ICN Pilot Demo Runner            ║"
-echo "║     Three Flows End-to-End           ║"
+echo "║     Four Flows End-to-End            ║"
 echo "╚══════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -60,6 +60,7 @@ run_flow() {
 run_flow "Flow A: WASM Distribution" "$SCRIPT_DIR/demo-flow-a.sh"
 run_flow "Flow B: Service Discovery"  "$SCRIPT_DIR/demo-flow-b.sh"
 run_flow "Flow C: Treasury Governance" "$SCRIPT_DIR/demo-flow-c.sh"
+run_flow "Flow D: Tool Library Cooperative" "$SCRIPT_DIR/demo-flow-d.sh"
 
 # Summary
 TOTAL=$((PASSED + FAILED))
