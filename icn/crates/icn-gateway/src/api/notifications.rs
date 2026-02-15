@@ -279,7 +279,7 @@ mod tests {
     use crate::notification_queue::NotificationQueue;
     use crate::notifications::{NotificationService, NotificationStore};
     use actix_web::{test, App};
-    use icn_store::notifications::DeliveryLogEntry;
+    use crate::notification_store::DeliveryLogEntry;
     use sled::Config;
 
     fn test_store() -> Arc<NotificationStore> {

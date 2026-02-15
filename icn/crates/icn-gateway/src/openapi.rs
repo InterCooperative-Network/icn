@@ -42,7 +42,7 @@ use crate::api::steward::{
     StewardSummaryResponse, UpdateStatusRequest,
 };
 use crate::identity_mgr::DeviceInfo;
-use icn_store::notifications::{InAppNotification, Platform};
+use crate::notification_store::{InAppNotification, Platform};
 
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]

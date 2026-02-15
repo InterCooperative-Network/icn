@@ -707,7 +707,7 @@ impl NotificationProcessor {
 mod tests {
     use super::*;
     use crate::notification_queue::NotificationType;
-    use icn_store::notifications::NotificationStore;
+    use crate::notification_store::NotificationStore;
     use sled::Config;
 
     fn temp_store() -> Arc<NotificationStore> {

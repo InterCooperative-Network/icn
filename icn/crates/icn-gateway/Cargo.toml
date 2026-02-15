@@ -73,7 +73,7 @@ icn-entity = { path = "../icn-entity" }
 icn-time = { path = "../icn-time" }
 icn-ledger = { path = "../icn-ledger" }
 icn-ledger-app = { path = "../../../apps/ledger", features = ["utoipa"] }
-icn-store = { path = "../icn-store", features = ["openapi"] }
+icn-store = { path = "../icn-store" }
 icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }
