@@ -1886,11 +1886,25 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// Read passphrase from environment variables.
+///
+/// Checks ICN_KEYSTORE_PASSPHRASE first (preferred, matches icnd), then
+/// ICN_PASSPHRASE as a legacy fallback. Returns None if neither is set.
+fn passphrase_from_env() -> Option<String> {
+    if let Ok(p) = std::env::var("ICN_KEYSTORE_PASSPHRASE") {
+        return Some(p);
+    }
+    if let Ok(p) = std::env::var("ICN_PASSPHRASE") {
+        return Some(p);
+    }
+    None
+}
+
 /// Create an RPC client, optionally with authentication
 ///
 /// Tries to authenticate if:
 /// 1. The keystore exists
-/// 2. ICN_PASSPHRASE env var is set (non-interactive)
+/// 2. ICN_KEYSTORE_PASSPHRASE or ICN_PASSPHRASE env var is set (non-interactive)
 ///
 /// For interactive use, the client starts unauthenticated and will prompt
 /// if needed on auth failure.
@@ -1906,7 +1920,7 @@ fn create_rpc_client(
     let keystore_path = get_keystore_path(data_dir);
 
     // Check if we can/should authenticate
-    let passphrase_available = std::env::var("ICN_PASSPHRASE").is_ok();
+    let passphrase_env = passphrase_from_env();
     let keystore_exists = keystore_path.exists();
 
     if require_auth && !keystore_exists {
@@ -1914,10 +1928,7 @@ fn create_rpc_client(
     }
 
     // Use authenticated client if passphrase is available and keystore exists
-    if passphrase_available && keystore_exists {
-        // SAFETY: passphrase_available is true, so ICN_PASSPHRASE env var exists
-        #[allow(clippy::unwrap_used)]
-        let passphrase = std::env::var("ICN_PASSPHRASE").unwrap();
+    if let (Some(passphrase), true) = (passphrase_env, keystore_exists) {
         let mut keystore = AgeKeyStore::open(&keystore_path)?;
         keystore.unlock(passphrase.as_bytes())?;
         let keypair = keystore.get_keypair()?;
@@ -1953,9 +1964,14 @@ fn create_authenticated_rpc_client(endpoint: &str, data_dir: &Path) -> Result<ic
     ))
 }
 
+/// Read passphrase from environment or interactive prompt.
+///
+/// Checks in order:
+/// 1. ICN_KEYSTORE_PASSPHRASE (preferred, matches icnd)
+/// 2. ICN_PASSPHRASE (legacy fallback)
+/// 3. Interactive prompt
 fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
-    // Check for ICN_PASSPHRASE environment variable first
-    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+    if let Some(passphrase) = passphrase_from_env() {
         return Ok(passphrase.into_bytes());
     }
 
@@ -1966,8 +1982,7 @@ fn read_passphrase(prompt: &str) -> Result<Vec<u8>> {
 }
 
 fn confirm_passphrase() -> Result<Vec<u8>> {
-    // If ICN_PASSPHRASE is set, use it without confirmation
-    if let Ok(passphrase) = std::env::var("ICN_PASSPHRASE") {
+    if let Some(passphrase) = passphrase_from_env() {
         return Ok(passphrase.into_bytes());
     }
 
@@ -2786,7 +2801,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
     println!("  RPC endpoint:   {endpoint}");
     println!();
 
-    // Try to connect to daemon (auto-authenticate if ICN_PASSPHRASE is set)
+    // Try to connect to daemon (auto-authenticate if ICN_KEYSTORE_PASSPHRASE or ICN_PASSPHRASE is set)
     let mut client = match create_rpc_client(endpoint, data_dir, false) {
         Ok(c) => c,
         Err(e) => {
@@ -2828,7 +2843,7 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
                 } else {
                     println!("Daemon Status: AUTH REQUIRED");
                     println!("  No identity found. Run 'icnctl id init' first.");
-                    println!("  Or set ICN_PASSPHRASE env var for non-interactive auth.");
+                    println!("  Or set ICN_KEYSTORE_PASSPHRASE (preferred) or ICN_PASSPHRASE env var for non-interactive auth.");
                     return Ok(());
                 }
             } else {
