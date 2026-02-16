@@ -2994,6 +2994,42 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 t!("cli.network.status.listening"),
                 status.listen_addr
             );
+
+            // NAT Traversal section
+            match client.get_nat_status().await {
+                Ok(nat) => {
+                    println!();
+                    println!("  NAT Traversal:");
+                    println!(
+                        "    Public endpoint:  {}",
+                        nat.public_endpoint
+                            .map(|a| a.to_string())
+                            .unwrap_or_else(|| "none (STUN disabled or failed)".to_string())
+                    );
+                    println!(
+                        "    TURN relay:       {}",
+                        nat.relay_addr
+                            .map(|a| format!("{a} (allocated)"))
+                            .unwrap_or_else(|| "none".to_string())
+                    );
+                    println!("    Active relays:    {}", nat.active_relay_count);
+                    println!("    Last traversal:   {}", nat.last_traversal_mode);
+                    println!(
+                        "    Last direct err:  {}",
+                        nat.last_direct_error.as_deref().unwrap_or("none")
+                    );
+                    println!(
+                        "    Last relay err:   {}",
+                        nat.last_relay_error.as_deref().unwrap_or("none")
+                    );
+                }
+                Err(_) => {
+                    println!();
+                    println!(
+                        "  NAT Traversal:     unavailable (daemon may not support NatStatus yet)"
+                    );
+                }
+            }
         }
     }
 
