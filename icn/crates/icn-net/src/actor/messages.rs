@@ -166,14 +166,16 @@ impl NetworkActor {
                     ));
                 }
 
-                let turn_server = match self.session_manager.read().await.turn_server_addr().await {
-                    Some(ts) => ts,
+                let turn_config = match self.session_manager.read().await.turn_config().await {
+                    Some(tc) => tc,
                     None => {
                         return Err(direct_err.context(
                             "direct dial failed and no TURN server configured; cannot relay",
                         ));
                     }
                 };
+
+                let turn_server = turn_config.server;
 
                 // ── Step 3: Start relay proxy ────────────────────────
                 info!(
@@ -183,8 +185,7 @@ impl NetworkActor {
                     "Attempting TURN relay fallback"
                 );
 
-                let turn_client =
-                    Arc::new(crate::TurnClient::new(crate::TurnConfig::new(turn_server)));
+                let turn_client = Arc::new(crate::TurnClient::new(turn_config));
 
                 let proxy =
                     crate::relay_proxy::TurnRelayProxy::start(turn_server, peer_relay, turn_client)
@@ -245,6 +246,7 @@ impl NetworkActor {
 
                         let mut ns = self.nat_status.write().await;
                         ns.last_relay_error = Some(relay_err_msg.clone());
+                        ns.last_traversal_mode = TraversalMode::Unknown;
                         drop(ns);
 
                         Err(anyhow::anyhow!(

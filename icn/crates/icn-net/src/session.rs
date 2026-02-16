@@ -417,6 +417,14 @@ impl SessionManager {
         self.turn_config.read().await.as_ref().map(|c| c.server)
     }
 
+    /// Get a clone of the full TURN config (if configured)
+    ///
+    /// Used by the relay fallback path to construct a TurnClient with
+    /// the same credentials and timeouts as the original allocation.
+    pub async fn turn_config(&self) -> Option<crate::TurnConfig> {
+        self.turn_config.read().await.clone()
+    }
+
     /// Generate a connection candidate for gossip announcement
     ///
     /// Creates a ConnectionCandidate message that can be published to the

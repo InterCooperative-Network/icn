@@ -36,7 +36,7 @@ The NAT Traversal section shows:
 ```
 NAT Traversal:
   Public endpoint:  203.0.113.5:4433
-  Relay address:    198.51.100.1:49152
+  TURN relay:       198.51.100.1:49152 (allocated)
   Active relays:    1
   Last traversal:   Relayed
   Last direct err:  Timeout dialing peer (direct): deadline has elapsed
@@ -46,7 +46,7 @@ NAT Traversal:
 | Field | Meaning |
 |-------|---------|
 | **Public endpoint** | STUN-discovered public IP:port. `none` if STUN failed or is disabled. |
-| **Relay address** | TURN-allocated relay address on the TURN server. `none` if no TURN allocation. |
+| **TURN relay** | TURN-allocated relay address on the TURN server. `none` if no TURN allocation. |
 | **Active relays** | Number of per-peer relay proxies currently running. One proxy per relayed peer. |
 | **Last traversal** | How the most recent dial was established: `Direct`, `Relayed`, or `Unknown` (no dial yet). |
 | **Last direct err** | Error from the most recent direct dial attempt. `none` if the last direct dial succeeded. |
@@ -144,19 +144,16 @@ let stun_servers = vec![
 
 1. **Start coturn** on a publicly reachable server (see above)
 
-2. **Start Node A** with TURN config pointing to coturn:
-   ```bash
-   icnd --listen 0.0.0.0:4433 \
-        --stun stun.l.google.com:19302 \
-        --turn YOUR_COTURN_IP:3478
+2. **Start Node A** with TURN config pointing to coturn (programmatic — CLI flags planned):
+   ```rust
+   // In your icnd startup code:
+   let turn_config = TurnConfig::new("YOUR_COTURN_IP:3478".parse()?)
+       .with_username(Some("icn".to_string()))
+       .with_password(Some("icnpilot".to_string()));
+   let stun_servers = vec!["stun.l.google.com:19302".parse()?];
    ```
 
-3. **Start Node B** on a different network with the same TURN config:
-   ```bash
-   icnd --listen 0.0.0.0:4433 \
-        --stun stun.l.google.com:19302 \
-        --turn YOUR_COTURN_IP:3478
-   ```
+3. **Start Node B** on a different network with the same TURN/STUN config.
 
 4. **Check NAT status** on both nodes:
    ```bash

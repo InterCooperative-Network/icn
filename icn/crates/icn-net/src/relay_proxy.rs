@@ -36,7 +36,10 @@ const XOR_PEER_ADDRESS: u16 = 0x0012;
 const DATA_ATTR: u16 = 0x0013;
 
 /// Maximum UDP datagram size for the relay buffer.
-const MAX_DATAGRAM: usize = 1500;
+///
+/// Sized to hold any UDP datagram Quinn might emit, including on
+/// localhost / high-MTU paths where packets can exceed 1500 bytes.
+const MAX_DATAGRAM: usize = 65535;
 
 /// Handle to a running TURN relay proxy task.
 ///
