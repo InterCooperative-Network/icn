@@ -2014,13 +2014,13 @@ async fn main() -> Result<()> {
             handle_trust_command(trust_cmd, &data_dir, &args.endpoint).await?
         }
 
-        Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint)?,
+        Commands::Ledger(ledger_cmd) => handle_ledger_command(ledger_cmd, &args.endpoint).await?,
 
         Commands::Contract(contract_cmd) => {
             handle_contract_command(contract_cmd, &args.endpoint, &data_dir).await?
         }
 
-        Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint)?,
+        Commands::Network(net_cmd) => handle_network_command(net_cmd, &args.endpoint).await?,
 
         Commands::Federation(fed_cmd) => {
             handle_federation_command(fed_cmd, &data_dir, &args.endpoint).await?
@@ -2907,7 +2907,6 @@ async fn handle_status_command(data_dir: &std::path::Path, endpoint: &str) -> Re
     Ok(())
 }
 
-#[tokio::main]
 async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<()> {
     // Network commands communicate with daemon via RPC
     let rpc_addr = endpoint.parse()?;
@@ -3958,7 +3957,6 @@ fn parse_peer_url(url: &str) -> Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
-#[tokio::main]
 async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()> {
     // Ledger commands communicate with daemon via RPC
     let rpc_addr = endpoint.parse()?;
