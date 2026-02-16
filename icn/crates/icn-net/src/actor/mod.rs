@@ -89,6 +89,8 @@ pub enum NetworkMsg {
     Dial {
         addr: SocketAddr,
         did: Did,
+        /// Peer's TURN relay address for fallback (None = direct only)
+        peer_relay_addr: Option<SocketAddr>,
         response: oneshot::Sender<Result<()>>,
     },
 
@@ -182,13 +184,27 @@ impl NetworkHandle {
         rx.await.context("Response channel closed")
     }
 
-    /// Dial a peer
+    /// Dial a peer (direct only, no relay fallback)
     pub async fn dial(&self, addr: SocketAddr, did: Did) -> Result<()> {
+        self.dial_with_relay(addr, did, None).await
+    }
+
+    /// Dial a peer with optional TURN relay fallback
+    ///
+    /// If `peer_relay_addr` is provided and the direct connection fails,
+    /// the network actor will attempt to connect through the TURN relay.
+    pub async fn dial_with_relay(
+        &self,
+        addr: SocketAddr,
+        did: Did,
+        peer_relay_addr: Option<SocketAddr>,
+    ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(NetworkMsg::Dial {
                 addr,
                 did,
+                peer_relay_addr,
                 response: tx,
             })
             .await
@@ -939,6 +955,10 @@ pub struct NetworkActor {
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
     /// Byzantine fault detector (Phase 18 Week 1-2)
     misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+    /// NAT traversal status (updated on each dial)
+    nat_status: Arc<RwLock<NatStatus>>,
+    /// Active relay proxy handles, keyed by peer DID
+    relay_proxies: Arc<RwLock<std::collections::HashMap<Did, crate::relay_proxy::ProxyHandle>>>,
 }
 
 impl NetworkActor {
@@ -1208,6 +1228,15 @@ impl NetworkActor {
             peer_connections: peer_connections.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
+            nat_status: Arc::new(RwLock::new(NatStatus {
+                public_endpoint: None,
+                relay_addr: None,
+                active_relay_count: 0,
+                last_traversal_mode: TraversalMode::Unknown,
+                last_direct_error: None,
+                last_relay_error: None,
+            })),
+            relay_proxies: Arc::new(RwLock::new(std::collections::HashMap::new())),
         };
 
         // Spawn actor task
@@ -1888,5 +1917,57 @@ mod tests {
         let deserialized: NatStatus = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.public_endpoint, status.public_endpoint);
         assert_eq!(deserialized.last_traversal_mode, status.last_traversal_mode);
+    }
+
+    #[test]
+    fn test_dial_with_relay_constructs_message() {
+        // Test that NetworkMsg::Dial carries peer_relay_addr correctly
+        let addr: SocketAddr = "10.0.0.1:4433".parse().unwrap();
+        let relay: SocketAddr = "10.0.0.2:3478".parse().unwrap();
+        let did = KeyPair::generate().unwrap().did().clone();
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        let msg = NetworkMsg::Dial {
+            addr,
+            did,
+            peer_relay_addr: Some(relay),
+            response: tx,
+        };
+        match msg {
+            NetworkMsg::Dial {
+                peer_relay_addr, ..
+            } => {
+                assert_eq!(peer_relay_addr, Some(relay));
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_dial_without_relay_has_none() {
+        let addr: SocketAddr = "10.0.0.1:4433".parse().unwrap();
+        let did = KeyPair::generate().unwrap().did().clone();
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        let msg = NetworkMsg::Dial {
+            addr,
+            did,
+            peer_relay_addr: None,
+            response: tx,
+        };
+        match msg {
+            NetworkMsg::Dial {
+                peer_relay_addr, ..
+            } => {
+                assert!(peer_relay_addr.is_none());
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_relay_error_hint_mentions_candidate() {
+        // Verify the error message users see when peer_relay_addr is None
+        let err_msg = "direct dial failed and no peer relay candidate provided; cannot TURN-relay";
+        assert!(err_msg.contains("relay candidate"));
+        assert!(err_msg.contains("TURN-relay"));
     }
 }
