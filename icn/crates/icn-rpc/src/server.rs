@@ -592,6 +592,7 @@ async fn dispatch_request(
         "network.dial" => handler::network::handle_network_dial(req.id, &req.params, state).await,
         "network.stats" => handler::network::handle_network_stats(req.id, state).await,
         "network.status" => handler::network::handle_network_status(req.id, state).await,
+        "network.nat_status" => handler::network::handle_network_nat_status(req.id, state).await,
 
         // Ledger methods (coop-scoped, ctx passed for future isolation)
         "ledger.head" => handler::ledger::handle_ledger_head(req.id, state, ctx.as_ref()).await,

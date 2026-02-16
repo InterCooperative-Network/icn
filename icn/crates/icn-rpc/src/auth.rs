@@ -988,7 +988,9 @@ pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
         "auth.challenge" | "auth.verify" | "auth.revoke" => None,
 
         // Network methods
-        "network.peers" | "network.stats" | "network.status" => Some(scopes::NETWORK_READ),
+        "network.peers" | "network.stats" | "network.status" | "network.nat_status" => {
+            Some(scopes::NETWORK_READ)
+        }
         "network.dial" => Some(scopes::NETWORK_WRITE),
 
         // Ledger methods

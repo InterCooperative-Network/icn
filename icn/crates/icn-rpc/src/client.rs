@@ -229,6 +229,16 @@ impl RpcClient {
         Ok(status)
     }
 
+    /// Get NAT traversal status
+    pub async fn get_nat_status(&mut self) -> Result<icn_net::NatStatus> {
+        let result = self
+            .call("network.nat_status", serde_json::json!({}))
+            .await?;
+        let status: icn_net::NatStatus =
+            serde_json::from_value(result).context("Failed to deserialize NAT status")?;
+        Ok(status)
+    }
+
     /// Get the most recent ledger entry (head)
     pub async fn get_ledger_head(&mut self) -> Result<Option<LedgerEntry>> {
         let result = self.call("ledger.head", serde_json::json!({})).await?;
