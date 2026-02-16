@@ -23,7 +23,7 @@ use tracing::{info, instrument, warn};
 
 use crate::{
     protocol::{write_message, write_message_negotiated, NetworkMessage},
-    NetworkMsg, NetworkStats, SessionManager,
+    NatStatus, NetworkMsg, NetworkStats, SessionManager, TraversalMode,
 };
 
 use super::NetworkActor;
@@ -203,6 +203,19 @@ impl NetworkActor {
                 icn_obs::metrics::network::connections_active_set(stats.connections_active as u64);
 
                 let _ = tx.send(stats);
+            }
+
+            NetworkMsg::GetNatStatus(tx) => {
+                // Stub: returns default values. Real implementation in Task 3.
+                let status = NatStatus {
+                    public_endpoint: None,
+                    relay_addr: None,
+                    active_relay_count: 0,
+                    last_traversal_mode: TraversalMode::Unknown,
+                    last_direct_error: None,
+                    last_relay_error: None,
+                };
+                let _ = tx.send(status);
             }
         }
     }

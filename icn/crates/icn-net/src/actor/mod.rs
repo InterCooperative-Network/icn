@@ -107,6 +107,9 @@ pub enum NetworkMsg {
 
     /// Get connection statistics
     GetStats(oneshot::Sender<NetworkStats>),
+
+    /// Get NAT traversal status
+    GetNatStatus(oneshot::Sender<NatStatus>),
 }
 
 /// Network statistics
@@ -115,6 +118,46 @@ pub struct NetworkStats {
     pub peers_discovered: usize,
     pub connections_active: usize,
     pub connections_total: u64,
+}
+
+/// NAT traversal status report (observational, not speculative).
+///
+/// Populated from SessionManager state. Exposed via `GetNatStatus` message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NatStatus {
+    /// STUN-discovered public endpoint (None if STUN failed/disabled)
+    pub public_endpoint: Option<SocketAddr>,
+    /// TURN relay address (None if not allocated)
+    pub relay_addr: Option<SocketAddr>,
+    /// Number of active relay proxies (per-peer)
+    pub active_relay_count: usize,
+    /// Last traversal mode used for any dial
+    pub last_traversal_mode: TraversalMode,
+    /// Last direct connection error (if any)
+    pub last_direct_error: Option<String>,
+    /// Last relay connection error (if any)
+    pub last_relay_error: Option<String>,
+}
+
+/// How the last connection was established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TraversalMode {
+    /// Direct QUIC connection succeeded
+    Direct,
+    /// Connected via TURN relay
+    Relayed,
+    /// No dial attempted yet
+    Unknown,
+}
+
+impl std::fmt::Display for TraversalMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TraversalMode::Direct => write!(f, "Direct"),
+            TraversalMode::Relayed => write!(f, "Relayed"),
+            TraversalMode::Unknown => write!(f, "Unknown"),
+        }
+    }
 }
 
 /// Handle to interact with the network actor
@@ -265,6 +308,16 @@ impl NetworkHandle {
             .await
             .context("Network actor closed")?;
         rx.await.context("Response channel closed")
+    }
+
+    /// Get NAT traversal status
+    pub async fn get_nat_status(&self) -> Result<NatStatus> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(NetworkMsg::GetNatStatus(tx))
+            .await
+            .context("Network actor closed")?;
+        rx.await.context("Network actor dropped response")
     }
 
     /// Sample peers based on scope (for gossip fanout)
@@ -1776,5 +1829,64 @@ mod tests {
             );
             assert!(!use_compression, "Unknown peer should NOT use compression");
         }
+    }
+
+    #[test]
+    fn test_default_nat_status_is_sane() {
+        let status = NatStatus {
+            public_endpoint: None,
+            relay_addr: None,
+            active_relay_count: 0,
+            last_traversal_mode: TraversalMode::Unknown,
+            last_direct_error: None,
+            last_relay_error: None,
+        };
+        assert_eq!(status.active_relay_count, 0);
+        assert_eq!(status.last_traversal_mode, TraversalMode::Unknown);
+        assert!(status.public_endpoint.is_none());
+        assert!(status.relay_addr.is_none());
+    }
+
+    #[test]
+    fn test_nat_status_reflects_injected_values() {
+        let addr: std::net::SocketAddr = "203.0.113.5:4433".parse().unwrap();
+        let relay: std::net::SocketAddr = "198.51.100.1:3478".parse().unwrap();
+        let status = NatStatus {
+            public_endpoint: Some(addr),
+            relay_addr: Some(relay),
+            active_relay_count: 2,
+            last_traversal_mode: TraversalMode::Relayed,
+            last_direct_error: Some("timeout".to_string()),
+            last_relay_error: None,
+        };
+        assert_eq!(status.public_endpoint, Some(addr));
+        assert_eq!(status.relay_addr, Some(relay));
+        assert_eq!(status.active_relay_count, 2);
+        assert_eq!(status.last_traversal_mode, TraversalMode::Relayed);
+        assert_eq!(status.last_direct_error.as_deref(), Some("timeout"));
+        assert!(status.last_relay_error.is_none());
+    }
+
+    #[test]
+    fn test_traversal_mode_display() {
+        assert_eq!(TraversalMode::Direct.to_string(), "Direct");
+        assert_eq!(TraversalMode::Relayed.to_string(), "Relayed");
+        assert_eq!(TraversalMode::Unknown.to_string(), "Unknown");
+    }
+
+    #[test]
+    fn test_nat_status_serialization_roundtrip() {
+        let status = NatStatus {
+            public_endpoint: Some("1.2.3.4:5678".parse().unwrap()),
+            relay_addr: None,
+            active_relay_count: 0,
+            last_traversal_mode: TraversalMode::Direct,
+            last_direct_error: None,
+            last_relay_error: None,
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: NatStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.public_endpoint, status.public_endpoint);
+        assert_eq!(deserialized.last_traversal_mode, status.last_traversal_mode);
     }
 }

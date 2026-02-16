@@ -30,7 +30,10 @@ pub mod topology;
 pub mod turn;
 pub mod version;
 
-pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
+pub use actor::{
+    IncomingMessageHandler, NatStatus, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats,
+    TraversalMode,
+};
 pub use blob_registry::{
     BlobLocation, BlobLocationRegistry, BlobRegistryConfig, BlobRegistryError,
 };
