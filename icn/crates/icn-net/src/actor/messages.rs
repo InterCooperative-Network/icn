@@ -11,7 +11,7 @@
 //!
 //! Messages are processed sequentially in the actor's event loop.
 //! Timeouts are applied to prevent resource exhaustion:
-//! - `DIAL_TIMEOUT`: 30 seconds for establishing new connections
+//! - Dial timeout: 30 seconds default (configurable via `NetworkHandle::set_dial_timeout`)
 //! - `RELAY_TIMEOUT`: 15 seconds for relay connection attempts
 //! - `SEND_TIMEOUT`: 10 seconds for sending messages to peers
 //! - `PEER_TIMEOUT`: 5 seconds for peer lookup operations
@@ -105,13 +105,16 @@ impl NetworkActor {
         did: Did,
         peer_relay_addr: Option<std::net::SocketAddr>,
     ) -> Result<()> {
-        /// Timeout for direct dial (30 seconds to allow for slow networks)
-        const DIAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        // Read configurable dial timeout (default 30s, overridable via NetworkHandle::set_dial_timeout)
+        let dial_timeout_ms = self
+            .dial_timeout_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let dial_timeout = std::time::Duration::from_millis(dial_timeout_ms);
         /// Timeout for relay dial (15 seconds)
         const RELAY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
         // ── Step 1: Try direct connection ────────────────────────────
-        let direct_result = tokio::time::timeout(DIAL_TIMEOUT, {
+        let direct_result = tokio::time::timeout(dial_timeout, {
             let sm = self.session_manager.clone();
             let did_str = did.as_str().to_string();
             async move { sm.read().await.dial(addr, did_str).await }

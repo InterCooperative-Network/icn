@@ -375,7 +375,7 @@ async fn test_relay_fallback_establishes_connection() {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     // Overall test timeout to prevent CI hangs
-    let test_result = timeout(Duration::from_secs(120), async {
+    let test_result = timeout(Duration::from_secs(30), async {
         // ── Step 1: Start TURN stub ─────────────────────────────────────
         let (turn_stub_addr, turn_stub_handle) = spawn_turn_stub().await;
         info!("TURN stub at {}", turn_stub_addr);
@@ -413,6 +413,11 @@ async fn test_relay_fallback_establishes_connection() {
 
         info!("Node A listening on {}", addr_a);
 
+        // Shorten the direct dial timeout from 30s → 2s for fast CI.
+        // Production default is 30s; this override proves the relay fallback
+        // path without waiting for the full timeout.
+        handle_a.set_dial_timeout(Duration::from_secs(2));
+
         // Give Node A a moment to complete TURN allocation
         tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -427,7 +432,7 @@ async fn test_relay_fallback_establishes_connection() {
         );
 
         let dial_result = timeout(
-            Duration::from_secs(60),
+            Duration::from_secs(30),
             handle_a.dial_with_relay(dead_addr, did_b.clone(), Some(addr_b)),
         )
         .await;

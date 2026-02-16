@@ -171,6 +171,8 @@ pub struct NetworkHandle {
     session_manager: Arc<RwLock<SessionManager>>,
     own_did: Did,
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
+    /// Direct dial timeout in milliseconds (shared with actor via atomic)
+    dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NetworkHandle {
@@ -210,6 +212,17 @@ impl NetworkHandle {
             .await
             .context("Network actor closed")?;
         rx.await.context("Response channel closed")?
+    }
+
+    /// Override the direct dial timeout (default: 30 seconds).
+    ///
+    /// This is useful in tests to avoid waiting the full 30 seconds for
+    /// a direct connection to fail before relay fallback activates.
+    pub fn set_dial_timeout(&self, timeout: std::time::Duration) {
+        self.dial_timeout_ms.store(
+            timeout.as_millis() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
     }
 
     /// Dial a peer by address only (DID learned from Hello handshake).
@@ -959,6 +972,8 @@ pub struct NetworkActor {
     nat_status: Arc<RwLock<NatStatus>>,
     /// Active relay proxy handles, keyed by peer DID
     relay_proxies: Arc<RwLock<std::collections::HashMap<Did, crate::relay_proxy::ProxyHandle>>>,
+    /// Direct dial timeout in milliseconds (shared with handle via atomic)
+    dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NetworkActor {
@@ -1212,6 +1227,9 @@ impl NetworkActor {
             });
         }
 
+        // Shared dial timeout (default 30s, overridable via NetworkHandle::set_dial_timeout)
+        let dial_timeout_ms = Arc::new(std::sync::atomic::AtomicU64::new(30_000));
+
         // Create actor
         let actor = NetworkActor {
             discovery,
@@ -1237,6 +1255,7 @@ impl NetworkActor {
                 last_relay_error: None,
             })),
             relay_proxies: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            dial_timeout_ms: dial_timeout_ms.clone(),
         };
 
         // Spawn actor task
@@ -1254,6 +1273,7 @@ impl NetworkActor {
             session_manager,
             own_did: did,
             blob_registry: blob_registry.clone(),
+            dial_timeout_ms,
         })
     }
 
@@ -1465,6 +1485,7 @@ mod tests {
             session_manager: session_mgr,
             own_did: own_did.clone(),
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Alice supports E2E encryption
@@ -1569,6 +1590,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
@@ -1646,6 +1668,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get versions
@@ -1690,6 +1713,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get full connection info
@@ -1728,6 +1752,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: own_did.clone(),
             blob_registry: Some(blob_registry.clone()),
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Spawn task to handle response channel (prevents hanging)

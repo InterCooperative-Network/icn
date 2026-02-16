@@ -227,4 +227,4 @@ Tailscale assigns stable IPs and handles NAT traversal transparently.
 - **IPv4 only**: TURN relay proxy currently supports IPv4 peer addresses only.
 - **No CLI flags yet**: TURN/STUN config is passed programmatically. CLI flags (`--turn`, `--stun`) are planned but not yet implemented.
 - **Single TURN server**: Each node can be configured with one TURN server. Multi-server failover is not implemented.
-- **30-second direct dial timeout**: The direct dial timeout is hardcoded. In environments where direct connectivity is known to be impossible, this adds latency to the first connection.
+- **30-second direct dial timeout**: The default direct dial timeout is 30 seconds (configurable via `NetworkHandle::set_dial_timeout()`). In environments where direct connectivity is known to be impossible, this adds latency to the first connection.
