@@ -523,7 +523,7 @@ impl fmt::Display for MembershipStatus {
 /// # Example
 ///
 /// ```rust
-/// use icn_entity::membership::UnifiedMembershipStatus;
+/// use icn_membership_app::UnifiedMembershipStatus;
 ///
 /// let status = UnifiedMembershipStatus::Applicant;
 /// assert!(!status.is_active());
