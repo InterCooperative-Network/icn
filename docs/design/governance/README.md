@@ -2,7 +2,11 @@
 
 This directory contains documentation related to ICN's governance systems and decision-making processes.
 
-## Documents
+## Truth Contracts (Authoritative)
+
+- **model-validation.md** - Ground-truth audit of governance model invariants with test evidence
+
+## Design Documents
 
 - **PROJECT_GOVERNANCE.md** - ICN project governance structure
 - **governance.md** - Core governance concepts and mechanisms
@@ -12,5 +16,6 @@ This directory contains documentation related to ICN's governance systems and de
 ## Related Documentation
 
 - [Design Overview](../)
+- [Execution Bridge Spec](../execution-bridge-spec.md) - Governance -> economics pipeline
 - [Economic Design](../economics/)
 - [Architecture](../../ARCHITECTURE.md)
