@@ -15,7 +15,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect, MembershipEffect};
+use icn_kernel_api::effects::{
+    ControlEffect, EffectResult, KernelEffect, MembershipEffect, TreasuryEffect,
+};
+use icn_kernel_api::escrow::{EscrowReleaseError, EscrowStore};
 use icn_kernel_api::governance::{
     federation_effect_to_operation, DecisionReceiptId, EffectExecutor, ExecutionOutcome,
     FederationExecutor, FederationOperation, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
@@ -37,6 +40,8 @@ pub struct KernelGovernanceExecutor {
     federation: Arc<KernelFederationExecutor>,
     control: Arc<KernelControlExecutor>,
     membership: Arc<KernelMembershipExecutor>,
+    /// Escrow store for domain-level idempotency on escrow releases.
+    escrow_store: Option<Arc<dyn EscrowStore>>,
 }
 
 impl KernelGovernanceExecutor {
@@ -51,6 +56,7 @@ impl KernelGovernanceExecutor {
             federation: Arc::new(KernelFederationExecutor::new()),
             control: Arc::new(KernelControlExecutor::new()),
             membership: Arc::new(KernelMembershipExecutor::new()),
+            escrow_store: None,
         }
     }
 
@@ -83,6 +89,12 @@ impl KernelGovernanceExecutor {
         self.membership = Arc::new(KernelMembershipExecutor::with_service(service));
         self
     }
+
+    /// Set the escrow store for domain-level idempotency on escrow releases.
+    pub fn with_escrow_store(mut self, store: Arc<dyn EscrowStore>) -> Self {
+        self.escrow_store = Some(store);
+        self
+    }
 }
 
 impl GovernanceExecutor for KernelGovernanceExecutor {
@@ -109,6 +121,123 @@ impl EffectExecutor for KernelGovernanceExecutor {
         let receipt_id = DecisionReceiptId::new(decision_receipt_id);
 
         match effect {
+            KernelEffect::Treasury(TreasuryEffect::ReleaseEscrow {
+                ref escrow_id,
+                ref decision_hash,
+                ..
+            }) => {
+                // Domain-level idempotency: check escrow store BEFORE ledger mutation.
+                let escrow_store = match &self.escrow_store {
+                    Some(store) => store,
+                    None => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Escrow store not configured — cannot release escrow"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: "Escrow store not configured".to_string(),
+                            state_change_hash: None,
+                        });
+                    }
+                };
+
+                // Look up escrow
+                let mut escrow = match escrow_store.get(escrow_id)? {
+                    Some(e) => e,
+                    None => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Escrow not found"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Escrow not found: {}", escrow_id),
+                            state_change_hash: None,
+                        });
+                    }
+                };
+
+                // Domain-level idempotency check
+                match escrow.release(decision_hash) {
+                    Ok(()) => {
+                        // Persist the Released status
+                        escrow_store.put(&escrow)?;
+                        info!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow released, proceeding to ledger mutation"
+                        );
+                    }
+                    Err(EscrowReleaseError::AlreadyReleasedSameDecision) => {
+                        // Idempotent — same decision already released this escrow.
+                        // Return success (not an error from the caller's perspective).
+                        info!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow already released by this decision (idempotent)"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Escrow {} already released by this decision (idempotent)",
+                                escrow_id
+                            ),
+                            state_change_hash: None,
+                        });
+                    }
+                    Err(EscrowReleaseError::AlreadyReleasedByOther {
+                        existing_decision_hash,
+                    }) => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            existing_decision_hash = %existing_decision_hash,
+                            "Escrow already released by a different decision — conflict"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!(
+                                "Escrow {} already released by decision {}",
+                                escrow_id, existing_decision_hash
+                            ),
+                            state_change_hash: None,
+                        });
+                    }
+                    Err(EscrowReleaseError::Cancelled) => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Cannot release cancelled escrow"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Escrow {} was cancelled", escrow_id),
+                            state_change_hash: None,
+                        });
+                    }
+                }
+
+                // Escrow is now Released — delegate to treasury for the actual ledger mutation.
+                // We destructure here to get owned values for TreasuryOperation.
+                if let KernelEffect::Treasury(ref treasury_effect) = effect {
+                    let operation = treasury_effect_to_operation(treasury_effect);
+                    let outcome = self
+                        .treasury
+                        .execute_treasury_operation(&receipt_id, operation)
+                        .await?;
+                    Ok(execution_outcome_to_effect_result(
+                        outcome,
+                        decision_receipt_id,
+                    ))
+                } else {
+                    unreachable!("already matched Treasury variant")
+                }
+            }
             KernelEffect::Treasury(treasury_effect) => {
                 // Convert TreasuryEffect to TreasuryOperation
                 let operation = treasury_effect_to_operation(&treasury_effect);
@@ -786,6 +915,23 @@ fn treasury_effect_to_operation(
             recipient: Some(to_did.clone()),
             memo: memo.clone(),
             decision_hash: None, // No decision provenance for this variant
+        },
+        TreasuryEffect::ReleaseEscrow {
+            treasury_did,
+            beneficiary_did,
+            amount,
+            currency,
+            escrow_id,
+            decision_hash,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: icn_kernel_api::governance::TreasuryOperationType::Release,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(beneficiary_did.clone()),
+            memo: format!("Escrow release: {}", escrow_id),
+            decision_hash: Some(decision_hash.clone()),
         },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {

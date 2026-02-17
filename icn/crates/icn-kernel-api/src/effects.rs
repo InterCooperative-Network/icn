@@ -115,6 +115,27 @@ pub enum TreasuryEffect {
         maturity_date: u64,
         currency: String,
     },
+    /// Release an escrow — governance decided, now move the money.
+    ///
+    /// The escrow store provides domain-level idempotency: even if the
+    /// decision-level executor replays this effect, the escrow record's
+    /// `release_decision_hash` prevents double-disbursement.
+    ReleaseEscrow {
+        /// The escrow being released.
+        escrow_id: String,
+        /// Treasury funding the escrow (debit side).
+        treasury_did: String,
+        /// Beneficiary receiving funds (credit side).
+        beneficiary_did: String,
+        /// Amount to release.
+        amount: i64,
+        /// Currency / asset type.
+        currency: String,
+        /// Links back to governance decision receipt.
+        decision_receipt_id: String,
+        /// Canonical content hash for verification + idempotency.
+        decision_hash: String,
+    },
 }
 
 // =============================================================================
@@ -602,6 +623,15 @@ mod tests {
                 interest_rate_bps: 500,
                 maturity_date: 1750000000,
                 currency: "USD".into(),
+            },
+            TreasuryEffect::ReleaseEscrow {
+                escrow_id: "esc-1".into(),
+                treasury_did: "did:icn:t1".into(),
+                beneficiary_did: "did:icn:alice".into(),
+                amount: 5000,
+                currency: "HOURS".into(),
+                decision_receipt_id: "r1".into(),
+                decision_hash: "h1".into(),
             },
         ];
 

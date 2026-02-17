@@ -334,6 +334,23 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             memo: memo.clone(),
             decision_hash: None,
         },
+        TreasuryEffect::ReleaseEscrow {
+            treasury_did,
+            beneficiary_did,
+            amount,
+            currency,
+            escrow_id,
+            decision_hash,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Release,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(beneficiary_did.clone()),
+            memo: format!("Escrow release: {}", escrow_id),
+            decision_hash: Some(decision_hash.clone()),
+        },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
             treasury_id: String::new(),

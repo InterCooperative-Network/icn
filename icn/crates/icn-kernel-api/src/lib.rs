@@ -40,6 +40,7 @@ pub mod coord;
 pub mod economics;
 pub mod effects;
 pub mod error;
+pub mod escrow;
 pub mod events;
 pub mod execution;
 pub mod governance;
@@ -75,6 +76,7 @@ pub use effects::{
     ProtocolEffect, ResourceEffect, SdisEffect, TreasuryEffect,
 };
 pub use error::{ErrCode, IcnError};
+pub use escrow::{EscrowRecord, EscrowReleaseError, EscrowStatus, EscrowStore};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 pub use governance::{
