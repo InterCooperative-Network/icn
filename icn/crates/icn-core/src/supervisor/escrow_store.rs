@@ -123,8 +123,9 @@ mod tests {
         );
         escrow_store.put(&record).unwrap();
 
-        // Release the escrow
-        record.release("decision-hash-1").unwrap();
+        // Release the escrow (two-phase saga)
+        record.begin_release("decision-hash-1").unwrap();
+        record.confirm_release();
         escrow_store.put(&record).unwrap();
 
         let retrieved = escrow_store.get("esc-2").unwrap().unwrap();

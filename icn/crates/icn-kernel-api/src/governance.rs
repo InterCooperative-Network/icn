@@ -268,8 +268,10 @@ impl EffectExecutor for DefaultEffectExecutor {
     }
 }
 
-/// Convert a TreasuryEffect to a TreasuryOperation
-fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
+/// Convert a TreasuryEffect to a TreasuryOperation.
+///
+/// This is the canonical mapping — icn-core delegates here to avoid drift.
+pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
     match effect {
         TreasuryEffect::Spend {
             treasury_did,

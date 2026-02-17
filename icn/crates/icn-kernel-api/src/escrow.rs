@@ -4,6 +4,21 @@
 //! governance decision within the escrow's governing scope. The kernel enforces
 //! the lock; the app layer decides when to release.
 //!
+//! # Saga State Machine
+//!
+//! ```text
+//! Locked → Releasing(decision_hash) → Released(decision_hash)
+//!                                   ↘ (crash) → Releasing → retry
+//! ```
+//!
+//! The `Releasing` state prevents the "state flip before side-effect" bug:
+//! - `begin_release()` transitions to `Releasing` (intent recorded)
+//! - Ledger mutation happens
+//! - `confirm_release()` transitions to `Released` (side-effect confirmed)
+//!
+//! On crash between `Releasing` and `Released`, replay detects `Releasing`
+//! with the same `decision_hash` and re-attempts the ledger mutation.
+//!
 //! # Domain-Level Idempotency
 //!
 //! `EscrowRecord.release_decision_hash` provides the second idempotency lock:
@@ -20,7 +35,10 @@ use serde::{Deserialize, Serialize};
 pub enum EscrowStatus {
     /// Funds are locked, awaiting governance decision.
     Locked,
-    /// Funds have been released to the beneficiary.
+    /// Release in progress — intent recorded, ledger mutation pending.
+    /// On crash recovery, this state triggers a retry of the ledger mutation.
+    Releasing,
+    /// Funds have been released to the beneficiary (ledger mutation confirmed).
     Released,
     /// Escrow was cancelled, funds returned to funder.
     Cancelled,
@@ -94,29 +112,45 @@ impl EscrowRecord {
         self.status == EscrowStatus::Locked
     }
 
-    /// Mark as released with the authorizing decision hash.
+    /// Phase 1 of the saga: record intent to release.
     ///
-    /// Returns `Err` if already released (with the conflicting decision hash).
-    pub fn release(&mut self, decision_hash: &str) -> Result<(), EscrowReleaseError> {
+    /// Transitions `Locked → Releasing` and records the `decision_hash`.
+    /// This MUST be persisted BEFORE attempting the ledger mutation.
+    ///
+    /// If the escrow is already `Releasing` with the same decision_hash,
+    /// returns `Ok(BeginReleaseOutcome::RetryNeeded)` — the caller should
+    /// re-attempt the ledger mutation (crash recovery path).
+    ///
+    /// If the escrow is already `Released` with the same decision_hash,
+    /// returns `Err(AlreadyReleasedSameDecision)` — fully idempotent.
+    pub fn begin_release(
+        &mut self,
+        decision_hash: &str,
+    ) -> Result<BeginReleaseOutcome, EscrowReleaseError> {
         match self.status {
             EscrowStatus::Locked => {
-                self.status = EscrowStatus::Released;
+                self.status = EscrowStatus::Releasing;
                 self.release_decision_hash = Some(decision_hash.to_string());
-                self.released_at = Some(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0),
-                );
-                Ok(())
+                Ok(BeginReleaseOutcome::Proceed)
+            }
+            EscrowStatus::Releasing => {
+                let existing_hash = self.release_decision_hash.as_deref().unwrap_or("unknown");
+                if existing_hash == decision_hash {
+                    // Same decision in Releasing state — crash recovery.
+                    // The ledger mutation may not have completed. Caller should retry.
+                    Ok(BeginReleaseOutcome::RetryNeeded)
+                } else {
+                    // Different decision trying to release — conflict.
+                    Err(EscrowReleaseError::AlreadyReleasedByOther {
+                        existing_decision_hash: existing_hash.to_string(),
+                    })
+                }
             }
             EscrowStatus::Released => {
                 let existing_hash = self.release_decision_hash.as_deref().unwrap_or("unknown");
                 if existing_hash == decision_hash {
-                    // Same decision — idempotent, already released
                     Err(EscrowReleaseError::AlreadyReleasedSameDecision)
                 } else {
-                    // Different decision — conflict
                     Err(EscrowReleaseError::AlreadyReleasedByOther {
                         existing_decision_hash: existing_hash.to_string(),
                     })
@@ -125,6 +159,35 @@ impl EscrowRecord {
             EscrowStatus::Cancelled => Err(EscrowReleaseError::Cancelled),
         }
     }
+
+    /// Phase 2 of the saga: confirm release after successful ledger mutation.
+    ///
+    /// Transitions `Releasing → Released` and sets `released_at`.
+    /// Only valid when status is `Releasing`.
+    pub fn confirm_release(&mut self) {
+        debug_assert_eq!(
+            self.status,
+            EscrowStatus::Releasing,
+            "confirm_release called on non-Releasing escrow"
+        );
+        self.status = EscrowStatus::Released;
+        self.released_at = Some(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        );
+    }
+}
+
+/// Outcome of `begin_release()` — tells the caller what to do next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeginReleaseOutcome {
+    /// Fresh release — proceed with ledger mutation.
+    Proceed,
+    /// Crash recovery — the escrow was already in `Releasing` state
+    /// with the same decision_hash. Re-attempt the ledger mutation.
+    RetryNeeded,
 }
 
 /// Error returned when an escrow release fails.
@@ -193,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn test_release_success() {
+    fn test_saga_begin_and_confirm() {
         let mut escrow = EscrowRecord::new_locked(
             "esc-1",
             "coop-alpha",
@@ -202,14 +265,22 @@ mod tests {
             5000,
             "HOURS",
         );
-        assert!(escrow.release("hash-1").is_ok());
-        assert_eq!(escrow.status, EscrowStatus::Released);
+
+        // Phase 1: begin_release → Releasing
+        let outcome = escrow.begin_release("hash-1").unwrap();
+        assert_eq!(outcome, BeginReleaseOutcome::Proceed);
+        assert_eq!(escrow.status, EscrowStatus::Releasing);
         assert_eq!(escrow.release_decision_hash.as_deref(), Some("hash-1"));
+        assert!(escrow.released_at.is_none()); // Not yet finalized
+
+        // Phase 2: confirm_release → Released
+        escrow.confirm_release();
+        assert_eq!(escrow.status, EscrowStatus::Released);
         assert!(escrow.released_at.is_some());
     }
 
     #[test]
-    fn test_release_idempotent_same_decision() {
+    fn test_saga_crash_recovery_same_decision() {
         let mut escrow = EscrowRecord::new_locked(
             "esc-1",
             "coop-alpha",
@@ -218,14 +289,65 @@ mod tests {
             5000,
             "HOURS",
         );
-        escrow.release("hash-1").unwrap();
 
-        let err = escrow.release("hash-1").unwrap_err();
+        // Phase 1: begin_release → Releasing
+        escrow.begin_release("hash-1").unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Releasing);
+
+        // Simulate crash (no confirm_release). On recovery, same decision retries:
+        let outcome = escrow.begin_release("hash-1").unwrap();
+        assert_eq!(
+            outcome,
+            BeginReleaseOutcome::RetryNeeded,
+            "Same decision in Releasing should signal retry"
+        );
+    }
+
+    #[test]
+    fn test_saga_releasing_conflict_different_decision() {
+        let mut escrow = EscrowRecord::new_locked(
+            "esc-1",
+            "coop-alpha",
+            "did:treasury",
+            "did:alice",
+            5000,
+            "HOURS",
+        );
+
+        // Phase 1: begin_release with decision A
+        escrow.begin_release("hash-A").unwrap();
+        assert_eq!(escrow.status, EscrowStatus::Releasing);
+
+        // Different decision B tries during Releasing → conflict
+        let err = escrow.begin_release("hash-B").unwrap_err();
+        assert_eq!(
+            err,
+            EscrowReleaseError::AlreadyReleasedByOther {
+                existing_decision_hash: "hash-A".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_released_idempotent_same_decision() {
+        let mut escrow = EscrowRecord::new_locked(
+            "esc-1",
+            "coop-alpha",
+            "did:treasury",
+            "did:alice",
+            5000,
+            "HOURS",
+        );
+        escrow.begin_release("hash-1").unwrap();
+        escrow.confirm_release();
+
+        // Same decision on fully Released escrow → idempotent
+        let err = escrow.begin_release("hash-1").unwrap_err();
         assert_eq!(err, EscrowReleaseError::AlreadyReleasedSameDecision);
     }
 
     #[test]
-    fn test_release_conflict_different_decision() {
+    fn test_released_conflict_different_decision() {
         let mut escrow = EscrowRecord::new_locked(
             "esc-1",
             "coop-alpha",
@@ -234,9 +356,10 @@ mod tests {
             5000,
             "HOURS",
         );
-        escrow.release("hash-1").unwrap();
+        escrow.begin_release("hash-1").unwrap();
+        escrow.confirm_release();
 
-        let err = escrow.release("hash-2").unwrap_err();
+        let err = escrow.begin_release("hash-2").unwrap_err();
         assert_eq!(
             err,
             EscrowReleaseError::AlreadyReleasedByOther {
@@ -257,7 +380,7 @@ mod tests {
         );
         escrow.status = EscrowStatus::Cancelled;
 
-        let err = escrow.release("hash-1").unwrap_err();
+        let err = escrow.begin_release("hash-1").unwrap_err();
         assert_eq!(err, EscrowReleaseError::Cancelled);
     }
 
@@ -265,11 +388,26 @@ mod tests {
     fn test_serde_roundtrip() {
         let mut escrow =
             EscrowRecord::new_locked("esc-1", "scope", "funder", "beneficiary", 1000, "USD");
-        escrow.release("hash-x").unwrap();
+        escrow.begin_release("hash-x").unwrap();
+        escrow.confirm_release();
 
         let json = serde_json::to_string(&escrow).unwrap();
         let parsed: EscrowRecord = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.status, EscrowStatus::Released);
         assert_eq!(parsed.release_decision_hash.as_deref(), Some("hash-x"));
+    }
+
+    #[test]
+    fn test_serde_roundtrip_releasing() {
+        let mut escrow =
+            EscrowRecord::new_locked("esc-2", "scope", "funder", "beneficiary", 2000, "USD");
+        escrow.begin_release("hash-y").unwrap();
+        // Deliberately NOT calling confirm_release — testing Releasing state
+
+        let json = serde_json::to_string(&escrow).unwrap();
+        let parsed: EscrowRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.status, EscrowStatus::Releasing);
+        assert_eq!(parsed.release_decision_hash.as_deref(), Some("hash-y"));
+        assert!(parsed.released_at.is_none());
     }
 }
