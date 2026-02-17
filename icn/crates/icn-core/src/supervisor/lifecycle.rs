@@ -632,9 +632,27 @@ async fn spawn_actors_with_identity(
             Arc::new(kernel_executor),
         ));
 
-        // Create callback that routes effects through dispatcher
+        // Create execution store for persistent idempotency tracking
+        let exec_store_path = config.store_path().join("execution");
+        let exec_sled_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&exec_store_path)?);
+        let execution_store: Arc<dyn icn_kernel_api::execution::ExecutionStore> = Arc::new(
+            super::execution_store::SledExecutionStore::new(exec_sled_store),
+        );
+        info!(
+            "Execution store opened at {} for decision idempotency",
+            exec_store_path.display()
+        );
+
+        // Wrap dispatcher with DecisionExecutor for idempotent execution
+        let decision_executor = Arc::new(super::decision_executor::DecisionExecutor::new(
+            effect_dispatcher,
+            execution_store,
+        ));
+
+        // Create callback that routes effects through DecisionExecutor
         let effect_callback =
-            super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
+            super::decision_executor::create_decision_executor_callback(decision_executor);
 
         // Create effect-based subscription via factory from BootstrapHandles
         // (avoids direct icn_governance_actor reference from lifecycle.rs)

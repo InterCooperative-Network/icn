@@ -41,6 +41,7 @@ pub mod economics;
 pub mod effects;
 pub mod error;
 pub mod events;
+pub mod execution;
 pub mod governance;
 pub mod identity;
 pub mod naming;
@@ -75,6 +76,7 @@ pub use effects::{
 };
 pub use error::{ErrCode, IcnError};
 pub use events::{EventCallback, EventEmitter, SystemEvent};
+pub use execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 pub use governance::{
     federation_effect_to_operation, DecisionReceiptId, DefaultEffectExecutor, EffectExecutor,
     ExecutionOutcome, FederationExecutor, FederationOperation, FederationOperationType,
