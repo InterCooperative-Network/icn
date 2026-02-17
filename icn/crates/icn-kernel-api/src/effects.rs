@@ -70,6 +70,11 @@ pub enum TreasuryEffect {
         amount: i64,
         currency: String,
         memo: String,
+        /// Optional budget to charge this spend against.
+        /// When present, the executor enforces the budget limit
+        /// before submitting the ledger entry.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        budget_id: Option<String>,
         /// Links back to governance decision receipt
         decision_receipt_id: String,
         /// Canonical content hash for verification
@@ -362,6 +367,7 @@ mod tests {
             amount: 100,
             currency: "HOURS".into(),
             memo: "Tool purchase".into(),
+            budget_id: None,
             decision_receipt_id: "receipt-456".into(),
             decision_hash: "abc123".into(),
         };
@@ -385,6 +391,7 @@ mod tests {
             amount: 50,
             currency: "USD".into(),
             memo: "test".into(),
+            budget_id: None,
             decision_receipt_id: "r1".into(),
             decision_hash: "hash1".into(),
         });
@@ -418,6 +425,7 @@ mod tests {
             amount: 0i64,
             currency: String::new(),
             memo: String::new(),
+            budget_id: None,
             decision_receipt_id: String::new(),
             decision_hash: String::new(),
         };
@@ -463,6 +471,7 @@ mod tests {
                 amount: 100,
                 currency: "HOURS".into(),
                 memo: "Tool purchase".into(),
+                budget_id: None,
                 decision_receipt_id: "receipt-456".into(),
                 decision_hash: "abc123".into(),
             }),
@@ -587,6 +596,7 @@ mod tests {
                 amount: 100,
                 currency: "USD".into(),
                 memo: "test".into(),
+                budget_id: None,
                 decision_receipt_id: "r1".into(),
                 decision_hash: "h1".into(),
             },
