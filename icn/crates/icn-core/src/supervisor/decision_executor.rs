@@ -335,13 +335,15 @@ impl DecisionExecutor {
         // 5. Check results and record outcome
         let all_success = results.iter().all(|r| r.success);
         if all_success {
+            let ledger_entry_ids: Vec<String> = results
+                .iter()
+                .filter_map(|r| extract_ledger_entry_id(&r.message))
+                .collect();
             let state_change_hashes: Vec<String> = results
                 .iter()
                 .filter_map(|r| r.state_change_hash.clone())
                 .collect();
-            // Note: ledger_entry_ids will be populated when treasury executor
-            // is wired to return entry IDs in EffectResult.
-            record.mark_confirmed(vec![], state_change_hashes);
+            record.mark_confirmed(ledger_entry_ids, state_change_hashes);
             self.store.put(&record)?;
 
             info!(
@@ -512,6 +514,20 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
         }
     }
     None
+}
+
+fn extract_ledger_entry_id(message: &str) -> Option<String> {
+    const MARKER: &str = "-> ledger entry ";
+
+    message.split(';').map(str::trim).find_map(|segment| {
+        let (_, hash) = segment.rsplit_once(MARKER)?;
+        let trimmed = hash.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }
 
 #[cfg(test)]
@@ -690,6 +706,17 @@ mod tests {
         let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
 
         (decision_executor, exec_store)
+    }
+
+    #[test]
+    fn test_extract_ledger_entry_id_from_message() {
+        let message = "Spend 100 HOURS from treasury did:icn:treasury -> ledger entry abc123";
+        assert_eq!(extract_ledger_entry_id(message).as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_extract_ledger_entry_id_missing_marker() {
+        assert!(extract_ledger_entry_id("No ledger append").is_none());
     }
 
     #[tokio::test]

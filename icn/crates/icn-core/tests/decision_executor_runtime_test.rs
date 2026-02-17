@@ -11,9 +11,16 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use anyhow::Result;
+use icn_core::services::LedgerServiceImpl;
+use icn_core::supervisor::execution_store::SledExecutionStore;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
+use icn_kernel_api::AllowAllOracle;
+use icn_ledger::types::ContentHash;
+use icn_ledger::Ledger;
+use icn_store::SledStore;
+use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
 // In-memory stores for testing
@@ -321,6 +328,12 @@ fn create_budget_effect(decision_hash: &str, budget_id: &str, limit: i64) -> Vec
     })]
 }
 
+fn content_hash_from_hex(hash_hex: &str) -> ContentHash {
+    let bytes = hex::decode(hash_hex).unwrap();
+    let bytes: [u8; 32] = bytes.try_into().unwrap();
+    ContentHash::from_bytes(bytes)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -608,4 +621,97 @@ async fn test_recovery_does_not_re_execute_confirmed() {
     let after = exec_store.get("hash-confirmed-already").unwrap().unwrap();
     assert_eq!(after.status, ExecutionStatus::Confirmed);
     assert_eq!(after.ledger_entry_ids, vec!["entry-1"]);
+}
+
+/// Test 10: Treasury execution appends a real ledger entry with governance provenance,
+/// and the entry + execution record survive restart.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_treasury_entry_persisted_with_provenance() {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+
+    let tmp = TempDir::new().unwrap();
+    let ledger_store_path = tmp.path().join("ledger");
+    let exec_store_path = tmp.path().join("execution");
+    std::fs::create_dir_all(&ledger_store_path).unwrap();
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-ledger-provenance-1";
+    let decision_receipt_id = "receipt-ledger-provenance-1";
+    let treasury_did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
+    let entry_hash = {
+        let ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+        let ledger = Ledger::new(ledger_store).unwrap();
+        let ledger = Arc::new(tokio::sync::RwLock::new(ledger));
+
+        let ledger_service = Arc::new(LedgerServiceImpl::new(
+            ledger.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.parse().unwrap(),
+        ));
+        let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+            .with_ledger_service(ledger_service);
+
+        let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+        let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+        let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+        let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+        let effects = vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+            treasury_did: treasury_did.to_string(),
+            recipient_did: treasury_did.to_string(),
+            amount: 100,
+            currency: "HOURS".to_string(),
+            memo: "Provenance persistence test".to_string(),
+            budget_id: None,
+            decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: decision_hash.to_string(),
+        })];
+
+        let results = executor
+            .execute(
+                effects,
+                decision_receipt_id,
+                decision_hash,
+                "proposal-ledger-provenance-1",
+            )
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+
+        let record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Confirmed);
+        assert_eq!(record.ledger_entry_ids.len(), 1);
+        let entry_hash = record.ledger_entry_ids[0].clone();
+
+        let hash = content_hash_from_hex(&entry_hash);
+        let ledger_guard = ledger.read().await;
+        let entry = ledger_guard.get_entry(&hash).unwrap().unwrap();
+        assert_eq!(
+            entry.decision_receipt_id.as_deref(),
+            Some(decision_receipt_id)
+        );
+        assert_eq!(entry.decision_hash.as_deref(), Some(decision_hash));
+        drop(ledger_guard);
+
+        entry_hash
+    };
+
+    let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+    let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
+    let reopened_hash = content_hash_from_hex(&entry_hash);
+    let reopened_entry = reopened_ledger.get_entry(&reopened_hash).unwrap().unwrap();
+    assert_eq!(
+        reopened_entry.decision_receipt_id.as_deref(),
+        Some(decision_receipt_id)
+    );
+    assert_eq!(reopened_entry.decision_hash.as_deref(), Some(decision_hash));
+
+    let reopened_exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+    let reopened_exec_store = SledExecutionStore::new(reopened_exec_backend);
+    let reopened_record = reopened_exec_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
 }
