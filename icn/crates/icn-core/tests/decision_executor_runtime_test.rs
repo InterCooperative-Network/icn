@@ -328,10 +328,12 @@ fn create_budget_effect(decision_hash: &str, budget_id: &str, limit: i64) -> Vec
     })]
 }
 
-fn content_hash_from_hex(hash_hex: &str) -> ContentHash {
-    let bytes = hex::decode(hash_hex).unwrap();
-    let bytes: [u8; 32] = bytes.try_into().unwrap();
-    ContentHash::from_bytes(bytes)
+fn content_hash_from_hex(hash_hex: &str) -> Result<ContentHash> {
+    let bytes = hex::decode(hash_hex).map_err(|e| anyhow::anyhow!("invalid hex: {e}"))?;
+    let bytes: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("expected 32-byte content hash"))?;
+    Ok(ContentHash::from_bytes(bytes))
 }
 
 // ---------------------------------------------------------------------------
@@ -688,6 +690,8 @@ async fn test_treasury_entry_persisted_with_provenance() {
         let entry_hash = record.ledger_entry_ids[0].clone();
 
         let hash = content_hash_from_hex(&entry_hash);
+        assert!(hash.is_ok(), "ledger entry id must parse as ContentHash");
+        let hash = hash.unwrap();
         let ledger_guard = ledger.read().await;
         let entry = ledger_guard.get_entry(&hash).unwrap().unwrap();
         assert_eq!(
@@ -702,7 +706,7 @@ async fn test_treasury_entry_persisted_with_provenance() {
 
     let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
     let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
-    let reopened_hash = content_hash_from_hex(&entry_hash);
+    let reopened_hash = content_hash_from_hex(&entry_hash).unwrap();
     let reopened_entry = reopened_ledger.get_entry(&reopened_hash).unwrap().unwrap();
     assert_eq!(
         reopened_entry.decision_receipt_id.as_deref(),
