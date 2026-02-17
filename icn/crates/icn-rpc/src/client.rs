@@ -190,9 +190,9 @@ impl RpcClient {
             anyhow::bail!("RPC error {}: {}", error.code, error.message);
         }
 
-        rpc_response
-            .result
-            .context("RPC response missing result field")
+        // serde deserializes JSON `null` as `None` for Option<Value>,
+        // so treat missing result (with no error) as Value::Null
+        Ok(rpc_response.result.unwrap_or(serde_json::Value::Null))
     }
 
     /// Get list of discovered peers
