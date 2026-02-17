@@ -22,7 +22,7 @@ use crate::tls;
 const TURN_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Create transport configuration with DoS protection limits
-fn create_transport_config() -> quinn::TransportConfig {
+pub(crate) fn create_transport_config() -> quinn::TransportConfig {
     let mut config = quinn::TransportConfig::default();
 
     // Limit concurrent streams to prevent resource exhaustion
@@ -408,6 +408,21 @@ impl SessionManager {
     /// Returns None if TURN is disabled or allocation failed.
     pub async fn relay_addr(&self) -> Option<SocketAddr> {
         *self.relay_addr.read().await
+    }
+
+    /// Get the TURN server address (if configured)
+    ///
+    /// Returns None if TURN was not configured at startup.
+    pub async fn turn_server_addr(&self) -> Option<SocketAddr> {
+        self.turn_config.read().await.as_ref().map(|c| c.server)
+    }
+
+    /// Get a clone of the full TURN config (if configured)
+    ///
+    /// Used by the relay fallback path to construct a TurnClient with
+    /// the same credentials and timeouts as the original allocation.
+    pub async fn turn_config(&self) -> Option<crate::TurnConfig> {
+        self.turn_config.read().await.clone()
     }
 
     /// Generate a connection candidate for gossip announcement

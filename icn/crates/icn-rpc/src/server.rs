@@ -61,32 +61,23 @@ use crate::receipt::ReceiptStore;
 use crate::types::{RpcRequest, RpcResponse};
 
 use icn_gossip::GossipActor;
-use icn_identity::KeyPair;
 use std::sync::LazyLock;
 
-/// Synthetic DID for rate-limiting anonymous/unauthenticated requests
+/// Synthetic DID for rate-limiting anonymous/unauthenticated requests.
 /// All anonymous requests share this single DID bucket, applying
 /// Isolated-level limits (10 req/sec, burst 2) to the aggregate.
 ///
-/// Uses a deterministic keypair derived from all-zero seed so the DID
-/// is consistent across restarts.
-///
-/// SAFETY: The keypair is created from fixed bytes which always succeeds.
-/// The expect runs once during initialization, not in response to user input.
-#[allow(clippy::expect_used)]
+/// Derives the DID from the Ed25519 public key corresponding to an
+/// all-zero secret seed. We only need the DID string (not a signing
+/// capability), so we derive the verifying key directly without
+/// constructing a full KeyPair.
 static ANONYMOUS_DID: LazyLock<Did> = LazyLock::new(|| {
-    // Generate a deterministic keypair from fixed seed
-    // The seed is all zeros - this creates a valid DID that:
-    // 1. Is extremely unlikely to match any real keypair (no one would use all-zeros)
-    //    Note: Even if someone did, authenticated users get their own rate limit bucket
-    //    based on their JWT claims.sub, so this only affects truly unauthenticated requests.
-    // 2. Is consistent across restarts (same bucket)
-    // 3. Passes DID format validation
-    let seed = [0u8; 32];
-    let public_seed = [0u8; 32];
-    let kp = KeyPair::from_bytes(&seed, &public_seed)
-        .expect("Fixed-seed keypair creation is infallible");
-    kp.did().clone()
+    use ed25519_dalek::SigningKey;
+    // Derive the verifying (public) key from a fixed all-zero seed.
+    // This is deterministic across restarts and extremely unlikely to
+    // collide with any real identity.
+    let signing_key = SigningKey::from_bytes(&[0u8; 32]);
+    Did::from_public_key(&signing_key.verifying_key())
 });
 
 /// Get the synthetic anonymous DID for rate limiting
@@ -601,6 +592,7 @@ async fn dispatch_request(
         "network.dial" => handler::network::handle_network_dial(req.id, &req.params, state).await,
         "network.stats" => handler::network::handle_network_stats(req.id, state).await,
         "network.status" => handler::network::handle_network_status(req.id, state).await,
+        "network.nat_status" => handler::network::handle_network_nat_status(req.id, state).await,
 
         // Ledger methods (coop-scoped, ctx passed for future isolation)
         "ledger.head" => handler::ledger::handle_ledger_head(req.id, state, ctx.as_ref()).await,

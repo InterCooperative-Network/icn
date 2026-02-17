@@ -111,6 +111,25 @@ pub async fn handle_network_stats(id: u64, state: &Arc<RpcServer>) -> RpcRespons
     }
 }
 
+/// Handle network.nat_status RPC call
+pub async fn handle_network_nat_status(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+    let network_handle = match state.network_handle() {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(id, -32000, "Network actor not available".to_string());
+        }
+    };
+
+    let handle = network_handle.read().await;
+    match handle.get_nat_status().await {
+        Ok(status) => match serde_json::to_value(&status) {
+            Ok(value) => RpcResponse::success(id, value),
+            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+        },
+        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get NAT status: {e}")),
+    }
+}
+
 /// Handle network.status RPC call
 pub async fn handle_network_status(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
     let status = if state.network_handle().is_some() {

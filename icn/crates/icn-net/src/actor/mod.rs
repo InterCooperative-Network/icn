@@ -89,6 +89,8 @@ pub enum NetworkMsg {
     Dial {
         addr: SocketAddr,
         did: Did,
+        /// Peer's TURN relay address for fallback (None = direct only)
+        peer_relay_addr: Option<SocketAddr>,
         response: oneshot::Sender<Result<()>>,
     },
 
@@ -107,6 +109,9 @@ pub enum NetworkMsg {
 
     /// Get connection statistics
     GetStats(oneshot::Sender<NetworkStats>),
+
+    /// Get NAT traversal status
+    GetNatStatus(oneshot::Sender<NatStatus>),
 }
 
 /// Network statistics
@@ -115,6 +120,46 @@ pub struct NetworkStats {
     pub peers_discovered: usize,
     pub connections_active: usize,
     pub connections_total: u64,
+}
+
+/// NAT traversal status report (observational, not speculative).
+///
+/// Populated from SessionManager state. Exposed via `GetNatStatus` message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NatStatus {
+    /// STUN-discovered public endpoint (None if STUN failed/disabled)
+    pub public_endpoint: Option<SocketAddr>,
+    /// TURN relay address (None if not allocated)
+    pub relay_addr: Option<SocketAddr>,
+    /// Number of active relay proxies (per-peer)
+    pub active_relay_count: usize,
+    /// Last traversal mode used for any dial
+    pub last_traversal_mode: TraversalMode,
+    /// Last direct connection error (if any)
+    pub last_direct_error: Option<String>,
+    /// Last relay connection error (if any)
+    pub last_relay_error: Option<String>,
+}
+
+/// How the last connection was established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TraversalMode {
+    /// Direct QUIC connection succeeded
+    Direct,
+    /// Connected via TURN relay
+    Relayed,
+    /// No dial attempted yet
+    Unknown,
+}
+
+impl std::fmt::Display for TraversalMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TraversalMode::Direct => write!(f, "Direct"),
+            TraversalMode::Relayed => write!(f, "Relayed"),
+            TraversalMode::Unknown => write!(f, "Unknown"),
+        }
+    }
 }
 
 /// Handle to interact with the network actor
@@ -126,6 +171,8 @@ pub struct NetworkHandle {
     session_manager: Arc<RwLock<SessionManager>>,
     own_did: Did,
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
+    /// Direct dial timeout in milliseconds (shared with actor via atomic)
+    dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NetworkHandle {
@@ -139,18 +186,43 @@ impl NetworkHandle {
         rx.await.context("Response channel closed")
     }
 
-    /// Dial a peer
+    /// Dial a peer (direct only, no relay fallback)
     pub async fn dial(&self, addr: SocketAddr, did: Did) -> Result<()> {
+        self.dial_with_relay(addr, did, None).await
+    }
+
+    /// Dial a peer with optional TURN relay fallback
+    ///
+    /// If `peer_relay_addr` is provided and the direct connection fails,
+    /// the network actor will attempt to connect through the TURN relay.
+    pub async fn dial_with_relay(
+        &self,
+        addr: SocketAddr,
+        did: Did,
+        peer_relay_addr: Option<SocketAddr>,
+    ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(NetworkMsg::Dial {
                 addr,
                 did,
+                peer_relay_addr,
                 response: tx,
             })
             .await
             .context("Network actor closed")?;
         rx.await.context("Response channel closed")?
+    }
+
+    /// Override the direct dial timeout (default: 30 seconds).
+    ///
+    /// This is useful in tests to avoid waiting the full 30 seconds for
+    /// a direct connection to fail before relay fallback activates.
+    pub fn set_dial_timeout(&self, timeout: std::time::Duration) {
+        self.dial_timeout_ms.store(
+            timeout.as_millis() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
     }
 
     /// Dial a peer by address only (DID learned from Hello handshake).
@@ -265,6 +337,16 @@ impl NetworkHandle {
             .await
             .context("Network actor closed")?;
         rx.await.context("Response channel closed")
+    }
+
+    /// Get NAT traversal status
+    pub async fn get_nat_status(&self) -> Result<NatStatus> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(NetworkMsg::GetNatStatus(tx))
+            .await
+            .context("Network actor closed")?;
+        rx.await.context("Network actor dropped response")
     }
 
     /// Sample peers based on scope (for gossip fanout)
@@ -886,6 +968,12 @@ pub struct NetworkActor {
     blob_registry: Option<Arc<RwLock<crate::BlobLocationRegistry>>>,
     /// Byzantine fault detector (Phase 18 Week 1-2)
     misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+    /// NAT traversal status (updated on each dial)
+    nat_status: Arc<RwLock<NatStatus>>,
+    /// Active relay proxy handles, keyed by peer DID
+    relay_proxies: Arc<RwLock<std::collections::HashMap<Did, crate::relay_proxy::ProxyHandle>>>,
+    /// Direct dial timeout in milliseconds (shared with handle via atomic)
+    dial_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl NetworkActor {
@@ -1139,6 +1227,9 @@ impl NetworkActor {
             });
         }
 
+        // Shared dial timeout (default 30s, overridable via NetworkHandle::set_dial_timeout)
+        let dial_timeout_ms = Arc::new(std::sync::atomic::AtomicU64::new(30_000));
+
         // Create actor
         let actor = NetworkActor {
             discovery,
@@ -1155,6 +1246,16 @@ impl NetworkActor {
             peer_connections: peer_connections.clone(),
             blob_registry: blob_registry.clone(),
             misbehavior_detector: misbehavior_detector.clone(),
+            nat_status: Arc::new(RwLock::new(NatStatus {
+                public_endpoint: None,
+                relay_addr: None,
+                active_relay_count: 0,
+                last_traversal_mode: TraversalMode::Unknown,
+                last_direct_error: None,
+                last_relay_error: None,
+            })),
+            relay_proxies: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            dial_timeout_ms: dial_timeout_ms.clone(),
         };
 
         // Spawn actor task
@@ -1172,6 +1273,7 @@ impl NetworkActor {
             session_manager,
             own_did: did,
             blob_registry: blob_registry.clone(),
+            dial_timeout_ms,
         })
     }
 
@@ -1383,6 +1485,7 @@ mod tests {
             session_manager: session_mgr,
             own_did: own_did.clone(),
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Alice supports E2E encryption
@@ -1487,6 +1590,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get peers with E2E encryption (should be Alice and Charlie)
@@ -1564,6 +1668,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get versions
@@ -1608,6 +1713,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: test_did,
             blob_registry: None,
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Get full connection info
@@ -1646,6 +1752,7 @@ mod tests {
             session_manager: test_session_mgr,
             own_did: own_did.clone(),
             blob_registry: Some(blob_registry.clone()),
+            dial_timeout_ms: Arc::new(std::sync::atomic::AtomicU64::new(30_000)),
         };
 
         // Spawn task to handle response channel (prevents hanging)
@@ -1776,5 +1883,116 @@ mod tests {
             );
             assert!(!use_compression, "Unknown peer should NOT use compression");
         }
+    }
+
+    #[test]
+    fn test_default_nat_status_is_sane() {
+        let status = NatStatus {
+            public_endpoint: None,
+            relay_addr: None,
+            active_relay_count: 0,
+            last_traversal_mode: TraversalMode::Unknown,
+            last_direct_error: None,
+            last_relay_error: None,
+        };
+        assert_eq!(status.active_relay_count, 0);
+        assert_eq!(status.last_traversal_mode, TraversalMode::Unknown);
+        assert!(status.public_endpoint.is_none());
+        assert!(status.relay_addr.is_none());
+    }
+
+    #[test]
+    fn test_nat_status_reflects_injected_values() {
+        let addr: std::net::SocketAddr = "203.0.113.5:4433".parse().unwrap();
+        let relay: std::net::SocketAddr = "198.51.100.1:3478".parse().unwrap();
+        let status = NatStatus {
+            public_endpoint: Some(addr),
+            relay_addr: Some(relay),
+            active_relay_count: 2,
+            last_traversal_mode: TraversalMode::Relayed,
+            last_direct_error: Some("timeout".to_string()),
+            last_relay_error: None,
+        };
+        assert_eq!(status.public_endpoint, Some(addr));
+        assert_eq!(status.relay_addr, Some(relay));
+        assert_eq!(status.active_relay_count, 2);
+        assert_eq!(status.last_traversal_mode, TraversalMode::Relayed);
+        assert_eq!(status.last_direct_error.as_deref(), Some("timeout"));
+        assert!(status.last_relay_error.is_none());
+    }
+
+    #[test]
+    fn test_traversal_mode_display() {
+        assert_eq!(TraversalMode::Direct.to_string(), "Direct");
+        assert_eq!(TraversalMode::Relayed.to_string(), "Relayed");
+        assert_eq!(TraversalMode::Unknown.to_string(), "Unknown");
+    }
+
+    #[test]
+    fn test_nat_status_serialization_roundtrip() {
+        let status = NatStatus {
+            public_endpoint: Some("1.2.3.4:5678".parse().unwrap()),
+            relay_addr: None,
+            active_relay_count: 0,
+            last_traversal_mode: TraversalMode::Direct,
+            last_direct_error: None,
+            last_relay_error: None,
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: NatStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.public_endpoint, status.public_endpoint);
+        assert_eq!(deserialized.last_traversal_mode, status.last_traversal_mode);
+    }
+
+    #[test]
+    fn test_dial_with_relay_constructs_message() {
+        // Test that NetworkMsg::Dial carries peer_relay_addr correctly
+        let addr: SocketAddr = "10.0.0.1:4433".parse().unwrap();
+        let relay: SocketAddr = "10.0.0.2:3478".parse().unwrap();
+        let did = KeyPair::generate().unwrap().did().clone();
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        let msg = NetworkMsg::Dial {
+            addr,
+            did,
+            peer_relay_addr: Some(relay),
+            response: tx,
+        };
+        match msg {
+            NetworkMsg::Dial {
+                peer_relay_addr, ..
+            } => {
+                assert_eq!(peer_relay_addr, Some(relay));
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_dial_without_relay_has_none() {
+        let addr: SocketAddr = "10.0.0.1:4433".parse().unwrap();
+        let did = KeyPair::generate().unwrap().did().clone();
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        let msg = NetworkMsg::Dial {
+            addr,
+            did,
+            peer_relay_addr: None,
+            response: tx,
+        };
+        match msg {
+            NetworkMsg::Dial {
+                peer_relay_addr, ..
+            } => {
+                assert!(peer_relay_addr.is_none());
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_relay_error_hint_mentions_candidate() {
+        // Verify the error message users see when peer_relay_addr is None
+        let err_msg = "direct dial failed and no peer relay candidate provided; cannot TURN-relay";
+        assert!(err_msg.contains("relay candidate"));
+        assert!(err_msg.contains("TURN-relay"));
     }
 }

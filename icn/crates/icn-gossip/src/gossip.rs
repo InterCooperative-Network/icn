@@ -243,6 +243,15 @@ impl GossipActor {
             .with_scope(crate::types::Scope::Global), // Key rotations propagate globally
         );
 
+        // NAT traversal connection candidate topic (#1144)
+        gossip.create_topic(
+            Topic::new(
+                "network:candidates".to_string(),
+                AccessControl::Public, // All peers need candidate exchange for connectivity
+            )
+            .with_scope(crate::types::Scope::Regional), // Candidates are relevant within a region
+        );
+
         gossip
     }
 
