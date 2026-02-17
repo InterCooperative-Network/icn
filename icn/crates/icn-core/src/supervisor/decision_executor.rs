@@ -33,6 +33,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
 use icn_kernel_api::effects::{EffectResult, KernelEffect};
@@ -43,16 +44,138 @@ use super::effect_dispatcher::EffectDispatcher;
 /// Maximum number of automatic retries before marking permanently failed.
 const MAX_RETRIES: u32 = 3;
 
+/// Maximum number of concurrent decision executions (backpressure).
+const MAX_CONCURRENT_EXECUTIONS: usize = 16;
+
 /// Wraps `EffectDispatcher` with persistent idempotency and execution logging.
 pub struct DecisionExecutor {
     dispatcher: Arc<EffectDispatcher>,
     store: Arc<dyn ExecutionStore>,
+    /// Bounded semaphore for backpressure on concurrent executions.
+    concurrency_limit: Arc<Semaphore>,
 }
 
 impl DecisionExecutor {
     /// Create a new DecisionExecutor.
     pub fn new(dispatcher: Arc<EffectDispatcher>, store: Arc<dyn ExecutionStore>) -> Self {
-        Self { dispatcher, store }
+        Self {
+            dispatcher,
+            store,
+            concurrency_limit: Arc::new(Semaphore::new(MAX_CONCURRENT_EXECUTIONS)),
+        }
+    }
+
+    /// Get a reference to the execution store.
+    pub fn store(&self) -> &Arc<dyn ExecutionStore> {
+        &self.store
+    }
+
+    /// Recover in-flight executions from a prior crash.
+    ///
+    /// Scans the ExecutionStore for records in non-terminal states
+    /// (Pending, Executing, Failed with retries remaining) and re-executes
+    /// them using the stored effects.
+    ///
+    /// Call this once at startup, after constructing the executor.
+    pub async fn recover_in_flight(&self) -> Result<RecoveryReport> {
+        let mut report = RecoveryReport::default();
+
+        // Collect records that need recovery
+        let mut recoverable = Vec::new();
+
+        for status in [
+            ExecutionStatus::Executing,
+            ExecutionStatus::Pending,
+            ExecutionStatus::Failed,
+        ] {
+            let records = self.store.list_by_status(status)?;
+            for record in records {
+                if record.effects.is_empty() {
+                    // Pre-existing record without stored effects — can't recover
+                    warn!(
+                        decision_hash = %record.decision_hash,
+                        status = ?record.status,
+                        "Cannot recover decision: no stored effects (pre-upgrade record)"
+                    );
+                    report.skipped_no_effects += 1;
+                    continue;
+                }
+
+                if record.status == ExecutionStatus::Failed && record.retries >= MAX_RETRIES {
+                    // Exhausted retries — mark permanently failed
+                    let mut rec = record;
+                    rec.mark_permanently_failed("Max retries exceeded (recovery)");
+                    if let Err(e) = self.store.put(&rec) {
+                        warn!(
+                            decision_hash = %rec.decision_hash,
+                            error = %e,
+                            "Failed to mark exhausted decision as PermanentlyFailed"
+                        );
+                    }
+                    report.skipped_max_retries += 1;
+                    continue;
+                }
+
+                recoverable.push(record);
+            }
+        }
+
+        if recoverable.is_empty() {
+            debug!("No in-flight decisions to recover");
+            return Ok(report);
+        }
+
+        info!(
+            count = recoverable.len(),
+            "Recovering in-flight decisions from prior crash"
+        );
+
+        for record in recoverable {
+            let decision_hash = record.decision_hash.clone();
+            let receipt_id = record.decision_receipt_id.clone();
+            let proposal_id = record.proposal_id.clone();
+            let effects = record.effects.clone();
+
+            match self
+                .execute(effects, &receipt_id, &decision_hash, &proposal_id)
+                .await
+            {
+                Ok(results) => {
+                    let all_success = results.iter().all(|r| r.success);
+                    if all_success {
+                        info!(
+                            decision_hash = %decision_hash,
+                            "Recovered decision: confirmed"
+                        );
+                        report.recovered_confirmed += 1;
+                    } else {
+                        warn!(
+                            decision_hash = %decision_hash,
+                            "Recovered decision: some effects failed"
+                        );
+                        report.recovered_failed += 1;
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        decision_hash = %decision_hash,
+                        error = %e,
+                        "Recovery failed for decision"
+                    );
+                    report.recovered_failed += 1;
+                }
+            }
+        }
+
+        info!(
+            confirmed = report.recovered_confirmed,
+            failed = report.recovered_failed,
+            skipped_no_effects = report.skipped_no_effects,
+            skipped_max_retries = report.skipped_max_retries,
+            "Decision recovery complete"
+        );
+
+        Ok(report)
     }
 
     /// Execute effects for a governance decision, with idempotency.
@@ -106,9 +229,33 @@ impl DecisionExecutor {
             }
         }
 
-        // 2. Record Pending
-        let mut record =
-            ExecutionRecord::new_pending(decision_hash, proposal_id, decision_receipt_id);
+        // 2. Preserve existing record if present (retains retry count),
+        //    otherwise create a new Pending record.
+        let mut record = if let Some(existing) = self.store.get(decision_hash)? {
+            if !existing.is_terminal() {
+                // Preserve retry count, update effects for this attempt
+                let mut rec = existing;
+                rec.effects = effects.clone();
+                rec
+            } else {
+                // Terminal records were already caught by idempotency check above,
+                // but handle defensively.
+                ExecutionRecord::new_pending(
+                    decision_hash,
+                    proposal_id,
+                    decision_receipt_id,
+                    effects.clone(),
+                )
+            }
+        } else {
+            ExecutionRecord::new_pending(
+                decision_hash,
+                proposal_id,
+                decision_receipt_id,
+                effects.clone(),
+            )
+        };
+        record.status = ExecutionStatus::Pending;
         self.store.put(&record)?;
 
         // 3. Transition to Executing
@@ -190,11 +337,34 @@ impl DecisionExecutor {
     }
 }
 
+/// Report from startup recovery scan.
+#[derive(Debug, Default)]
+pub struct RecoveryReport {
+    /// Decisions that were re-executed and confirmed.
+    pub recovered_confirmed: usize,
+    /// Decisions that were re-executed but failed again.
+    pub recovered_failed: usize,
+    /// Decisions skipped because they have no stored effects (pre-upgrade records).
+    pub skipped_no_effects: usize,
+    /// Decisions skipped because they exhausted retry limits.
+    pub skipped_max_retries: usize,
+}
+
+impl RecoveryReport {
+    /// Total decisions processed during recovery.
+    pub fn total(&self) -> usize {
+        self.recovered_confirmed
+            + self.recovered_failed
+            + self.skipped_no_effects
+            + self.skipped_max_retries
+    }
+}
+
 /// Create an effect executor callback that routes through the DecisionExecutor.
 ///
-/// This replaces `create_effect_executor_callback` from `effect_dispatcher.rs`
-/// when the DecisionExecutor is wired. The callback extracts decision_hash
-/// from the effects (if present) and delegates to DecisionExecutor::execute.
+/// The callback acquires a semaphore permit (backpressure) before spawning
+/// the execution task. If the semaphore is full, the task waits until a
+/// slot opens, preventing unbounded concurrent executions.
 pub fn create_decision_executor_callback(
     executor: Arc<DecisionExecutor>,
 ) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
@@ -208,6 +378,7 @@ pub fn create_decision_executor_callback(
         }
 
         let executor = executor.clone();
+        let semaphore = executor.concurrency_limit.clone();
         let effect_count = effects.len();
 
         // Extract decision_hash from first effect that carries one.
@@ -220,6 +391,18 @@ pub fn create_decision_executor_callback(
         let proposal_id = decision_receipt_id.clone();
 
         tokio::spawn(async move {
+            // Backpressure: wait for a slot before executing
+            let _permit = match semaphore.acquire().await {
+                Ok(permit) => permit,
+                Err(_) => {
+                    error!(
+                        decision_hash = %decision_hash,
+                        "Semaphore closed — executor shutting down"
+                    );
+                    return;
+                }
+            };
+
             match executor
                 .execute(effects, &decision_receipt_id, &decision_hash, &proposal_id)
                 .await
@@ -244,6 +427,7 @@ pub fn create_decision_executor_callback(
                     );
                 }
             }
+            // _permit drops here, releasing the semaphore slot
         });
     })
 }
@@ -504,7 +688,7 @@ mod tests {
         let (executor, store) = make_test_executor();
 
         // Manually insert a permanently failed record
-        let mut record = ExecutionRecord::new_pending("hash-pf", "p-1", "r-1");
+        let mut record = ExecutionRecord::new_pending("hash-pf", "p-1", "r-1", vec![]);
         record.mark_permanently_failed("Non-recoverable");
         store.put(&record).unwrap();
 

@@ -636,6 +636,14 @@ async fn spawn_actors_with_identity(
         kernel_executor = kernel_executor.with_escrow_store(escrow_store);
         info!("✓ Escrow store wired to governance executor");
 
+        // Create budget store for budget enforcement
+        let budget_store_path = config.store_path().join("budget");
+        let budget_sled_db = sled::open(&budget_store_path)?;
+        let budget_store: Arc<dyn icn_kernel_api::budget::BudgetStore> =
+            Arc::new(super::budget_store::SledBudgetStore::new(&budget_sled_db)?);
+        kernel_executor = kernel_executor.with_budget_store(budget_store);
+        info!("✓ Budget store wired to governance executor");
+
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
             Arc::new(kernel_executor),
@@ -658,6 +666,31 @@ async fn spawn_actors_with_identity(
             effect_dispatcher,
             execution_store,
         ));
+
+        // Recover in-flight decisions from prior crash
+        // This must run BEFORE the event subscription is established
+        // so we don't race with new incoming decisions.
+        match decision_executor.recover_in_flight().await {
+            Ok(report) => {
+                if report.total() > 0 {
+                    info!(
+                        confirmed = report.recovered_confirmed,
+                        failed = report.recovered_failed,
+                        skipped = report.skipped_no_effects + report.skipped_max_retries,
+                        "Startup recovery: processed {} in-flight decisions",
+                        report.total()
+                    );
+                } else {
+                    debug!("Startup recovery: no in-flight decisions found");
+                }
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    "Startup recovery failed (non-fatal, new decisions will still process)"
+                );
+            }
+        }
 
         // Create callback that routes effects through DecisionExecutor
         let effect_callback =

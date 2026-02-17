@@ -429,7 +429,7 @@ async fn test_crash_recovery_no_double_spend() {
 
     // Manually insert an Executing record (simulates mid-flight crash)
     let mut crashed_record =
-        ExecutionRecord::new_pending("hash-midcrash", "proposal-mid", "receipt-mid");
+        ExecutionRecord::new_pending("hash-midcrash", "proposal-mid", "receipt-mid", vec![]);
     crashed_record.mark_executing();
     exec_store3.put(&crashed_record).unwrap();
 
