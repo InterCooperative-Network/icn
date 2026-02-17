@@ -466,7 +466,53 @@ async fn test_startup_recovery_retries_failed_decision() {
     assert_eq!(after.status, ExecutionStatus::Confirmed);
 }
 
-/// Test 6: Full end-to-end: create budget → spend against it → auto-execute.
+/// Test 6: Retry counter accumulates across recovery attempts
+/// and enforces MAX_RETRIES → PermanentlyFailed.
+///
+/// This uses a budget spend against a non-existent budget so the
+/// effect fails deterministically on every attempt.
+#[tokio::test]
+async fn test_retry_accumulation_and_max_retries() {
+    // Budget store with NO budgets — spend effects will always fail
+    let budget_store = Arc::new(MemoryBudgetStore::new());
+    let (executor, exec_store) = make_executor_with_budget(budget_store);
+
+    // Pre-seed a Failed record with 1 prior retry
+    let effects = budget_spend_effect("hash-retry-acc", "nonexistent-budget", 100);
+    let mut record =
+        ExecutionRecord::new_pending("hash-retry-acc", "proposal-retry", "receipt-retry", effects);
+    record.mark_executing();
+    record.mark_failed("First failure");
+    assert_eq!(record.retries, 1);
+    exec_store.put(&record).unwrap();
+
+    // Recovery attempt 2: should fail again, retries → 2
+    let _report = executor.recover_in_flight().await.unwrap();
+    let after = exec_store.get("hash-retry-acc").unwrap().unwrap();
+    assert_eq!(after.retries, 2, "Retry counter should accumulate to 2");
+    assert_eq!(
+        after.status,
+        ExecutionStatus::Failed,
+        "Should still be Failed (under MAX_RETRIES=3)"
+    );
+
+    // Recovery attempt 3: should fail, retries → 3 → hits MAX_RETRIES
+    let _report = executor.recover_in_flight().await.unwrap();
+    let after = exec_store.get("hash-retry-acc").unwrap().unwrap();
+    // At retries == 3 (== MAX_RETRIES), the next recovery call should mark PermanentlyFailed
+    assert_eq!(after.retries, 3);
+
+    // Recovery attempt 4: should hit MAX_RETRIES gate → PermanentlyFailed
+    let _report = executor.recover_in_flight().await.unwrap();
+    let after = exec_store.get("hash-retry-acc").unwrap().unwrap();
+    assert_eq!(
+        after.status,
+        ExecutionStatus::PermanentlyFailed,
+        "Should be PermanentlyFailed after exhausting MAX_RETRIES"
+    );
+}
+
+/// Test 7 (was 6): Full end-to-end: create budget → spend against it → auto-execute.
 /// This proves the complete pipeline works through the callback.
 #[tokio::test]
 async fn test_callback_e2e_budget_create_and_spend() {
@@ -505,7 +551,7 @@ async fn test_callback_e2e_budget_create_and_spend() {
     assert_eq!(spend_record.status, ExecutionStatus::Confirmed);
 }
 
-/// Test 7: Backpressure does not deadlock under concurrent load.
+/// Test 8: Backpressure does not deadlock under concurrent load.
 #[tokio::test]
 async fn test_backpressure_no_deadlock() {
     use icn_core::supervisor::decision_executor::create_decision_executor_callback;
@@ -513,17 +559,14 @@ async fn test_backpressure_no_deadlock() {
     let (executor, exec_store) = make_executor();
     let callback = create_decision_executor_callback(executor);
 
-    // Fire 32 decisions concurrently (exceeds MAX_CONCURRENT_EXECUTIONS = 16)
+    // Fire 32 decisions concurrently (exceeds MAX_CONCURRENT_EXECUTIONS = 16).
+    // NoOp effects don't carry a decision_hash, so the callback uses
+    // receipt_id as the decision_hash fallback.
     for i in 0..32 {
-        let hash = format!("hash-bp-{}", i);
         let effects = vec![KernelEffect::NoOp {
             reason: format!("backpressure-test-{}", i),
         }];
         callback(effects, format!("receipt-bp-{}", i));
-
-        // Cheat: the NoOp effects use receipt_id as decision_hash fallback
-        // since NoOp doesn't carry a decision_hash field.
-        let _ = hash; // hash unused — callback extracts from receipt_id
     }
 
     // Wait for all to complete (with backpressure, some will queue)
@@ -540,7 +583,7 @@ async fn test_backpressure_no_deadlock() {
     );
 }
 
-/// Test 8: Recovery after restart does not re-execute already confirmed decisions.
+/// Test 9: Recovery after restart does not re-execute already confirmed decisions.
 #[tokio::test]
 async fn test_recovery_does_not_re_execute_confirmed() {
     let (executor, exec_store) = make_executor();

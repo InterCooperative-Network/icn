@@ -102,7 +102,16 @@ impl DecisionExecutor {
                 }
 
                 if record.status == ExecutionStatus::Failed && record.retries >= MAX_RETRIES {
-                    // Already exhausted retries
+                    // Exhausted retries — mark permanently failed
+                    let mut rec = record;
+                    rec.mark_permanently_failed("Max retries exceeded (recovery)");
+                    if let Err(e) = self.store.put(&rec) {
+                        warn!(
+                            decision_hash = %rec.decision_hash,
+                            error = %e,
+                            "Failed to mark exhausted decision as PermanentlyFailed"
+                        );
+                    }
                     report.skipped_max_retries += 1;
                     continue;
                 }
@@ -220,13 +229,33 @@ impl DecisionExecutor {
             }
         }
 
-        // 2. Record Pending (store effects for crash recovery)
-        let mut record = ExecutionRecord::new_pending(
-            decision_hash,
-            proposal_id,
-            decision_receipt_id,
-            effects.clone(),
-        );
+        // 2. Preserve existing record if present (retains retry count),
+        //    otherwise create a new Pending record.
+        let mut record = if let Some(existing) = self.store.get(decision_hash)? {
+            if !existing.is_terminal() {
+                // Preserve retry count, update effects for this attempt
+                let mut rec = existing;
+                rec.effects = effects.clone();
+                rec
+            } else {
+                // Terminal records were already caught by idempotency check above,
+                // but handle defensively.
+                ExecutionRecord::new_pending(
+                    decision_hash,
+                    proposal_id,
+                    decision_receipt_id,
+                    effects.clone(),
+                )
+            }
+        } else {
+            ExecutionRecord::new_pending(
+                decision_hash,
+                proposal_id,
+                decision_receipt_id,
+                effects.clone(),
+            )
+        };
+        record.status = ExecutionStatus::Pending;
         self.store.put(&record)?;
 
         // 3. Transition to Executing

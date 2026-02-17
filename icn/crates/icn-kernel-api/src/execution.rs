@@ -245,4 +245,30 @@ mod tests {
         assert_eq!(parsed.status, ExecutionStatus::Confirmed);
         assert_eq!(parsed.ledger_entry_ids, vec!["e1"]);
     }
+
+    #[test]
+    fn test_execution_record_backward_compat_without_effects() {
+        // Pre-upgrade records serialized without the `effects` field
+        // must deserialize successfully with an empty effects vec.
+        let json = r#"{
+            "decision_hash": "old-hash",
+            "proposal_id": "old-proposal",
+            "decision_receipt_id": "old-receipt",
+            "status": "confirmed",
+            "started_at": 1700000000,
+            "finished_at": 1700000001,
+            "ledger_entry_ids": ["e1"],
+            "state_change_hashes": [],
+            "error": null,
+            "retries": 0
+        }"#;
+
+        let record: ExecutionRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(record.decision_hash, "old-hash");
+        assert_eq!(record.status, ExecutionStatus::Confirmed);
+        assert!(
+            record.effects.is_empty(),
+            "effects should default to empty vec"
+        );
+    }
 }
