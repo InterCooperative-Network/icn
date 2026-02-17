@@ -82,6 +82,14 @@ pub fn create_executor(
 /// The kernel's EffectDispatcher typically wraps this.
 pub type EffectExecutionCallback = std::sync::Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync>;
 
+fn compute_decision_hash(decision_receipt_id: &str) -> String {
+    // Temporary deterministic bridge for effect routing; replace with
+    // canonical decision artifact hash when available at this boundary.
+    blake3::hash(decision_receipt_id.as_bytes())
+        .to_hex()
+        .to_string()
+}
+
 /// Create an event subscription that routes proposals through the effect system.
 ///
 /// This subscription:
@@ -117,13 +125,17 @@ where
         {
             // Generate decision_receipt_id from proposal_id and domain
             let decision_receipt_id = format!("gov:{domain_id}:{proposal_id}:receipt");
+            let decision_hash = compute_decision_hash(&decision_receipt_id);
 
             // Deserialize payload
             match serde_json::from_value::<ProposalPayload>(payload.clone()) {
                 Ok(proposal_payload) => {
                     // Translate to effects
-                    let effects =
-                        translate_payload_to_effects(&proposal_payload, &decision_receipt_id);
+                    let effects = translate_payload_to_effects(
+                        &proposal_payload,
+                        &decision_receipt_id,
+                        &decision_hash,
+                    );
 
                     if effects.is_empty() {
                         debug!(
