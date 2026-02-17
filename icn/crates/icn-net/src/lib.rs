@@ -20,6 +20,7 @@ mod handlers;
 pub mod nat;
 pub mod protocol;
 pub mod rate_limit;
+pub mod relay_proxy;
 pub mod replay_guard;
 pub mod sequence_tracker;
 pub mod session;
@@ -29,7 +30,10 @@ pub mod topology;
 pub mod turn;
 pub mod version;
 
-pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
+pub use actor::{
+    IncomingMessageHandler, NatStatus, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats,
+    TraversalMode,
+};
 pub use blob_registry::{
     BlobLocation, BlobLocationRegistry, BlobRegistryConfig, BlobRegistryError,
 };
@@ -47,6 +51,7 @@ pub use protocol::{
     KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage, COMPRESSION_THRESHOLD,
 };
 pub use rate_limit::{RateLimitConfig, RateLimiter};
+pub use relay_proxy::{ProxyHandle, TurnRelayProxy};
 pub use replay_guard::ReplayGuard;
 pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::SessionManager;

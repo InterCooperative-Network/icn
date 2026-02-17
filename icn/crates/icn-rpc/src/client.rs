@@ -190,9 +190,9 @@ impl RpcClient {
             anyhow::bail!("RPC error {}: {}", error.code, error.message);
         }
 
-        rpc_response
-            .result
-            .context("RPC response missing result field")
+        // serde deserializes JSON `null` as `None` for Option<Value>,
+        // so treat missing result (with no error) as Value::Null
+        Ok(rpc_response.result.unwrap_or(serde_json::Value::Null))
     }
 
     /// Get list of discovered peers
@@ -226,6 +226,16 @@ impl RpcClient {
         let result = self.call("network.status", serde_json::json!({})).await?;
         let status: NetworkStatus =
             serde_json::from_value(result).context("Failed to deserialize status")?;
+        Ok(status)
+    }
+
+    /// Get NAT traversal status
+    pub async fn get_nat_status(&mut self) -> Result<icn_net::NatStatus> {
+        let result = self
+            .call("network.nat_status", serde_json::json!({}))
+            .await?;
+        let status: icn_net::NatStatus =
+            serde_json::from_value(result).context("Failed to deserialize NAT status")?;
         Ok(status)
     }
 
