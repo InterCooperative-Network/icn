@@ -78,6 +78,32 @@ impl DecisionExecutor {
     ///
     /// Call this once at startup, after constructing the executor.
     pub async fn recover_in_flight(&self) -> Result<RecoveryReport> {
+        // Log the store's status distribution before recovery begins
+        match self.store.count_by_status() {
+            Ok(counts) => {
+                info!(
+                    pending = counts.get(&ExecutionStatus::Pending).copied().unwrap_or(0),
+                    executing = counts
+                        .get(&ExecutionStatus::Executing)
+                        .copied()
+                        .unwrap_or(0),
+                    failed = counts.get(&ExecutionStatus::Failed).copied().unwrap_or(0),
+                    confirmed = counts
+                        .get(&ExecutionStatus::Confirmed)
+                        .copied()
+                        .unwrap_or(0),
+                    permanently_failed = counts
+                        .get(&ExecutionStatus::PermanentlyFailed)
+                        .copied()
+                        .unwrap_or(0),
+                    "Recovery scan starting — execution store status distribution"
+                );
+            }
+            Err(e) => {
+                warn!(error = %e, "Could not read execution store counts before recovery");
+            }
+        }
+
         let mut report = RecoveryReport::default();
 
         // Collect records that need recovery
@@ -219,8 +245,11 @@ impl DecisionExecutor {
             if existing.status == ExecutionStatus::Failed && existing.retries >= MAX_RETRIES {
                 warn!(
                     decision_hash = %decision_hash,
+                    receipt_id = %decision_receipt_id,
                     retries = existing.retries,
-                    "Decision exceeded max retries, marking permanently failed"
+                    status_before = ?ExecutionStatus::Failed,
+                    status_after = ?ExecutionStatus::PermanentlyFailed,
+                    "Decision state transition: Failed → PermanentlyFailed (max retries)"
                 );
                 let mut record = existing;
                 record.mark_permanently_failed("Max retries exceeded");
@@ -231,28 +260,35 @@ impl DecisionExecutor {
 
         // 2. Preserve existing record if present (retains retry count),
         //    otherwise create a new Pending record.
-        let mut record = if let Some(existing) = self.store.get(decision_hash)? {
+        let (mut record, status_before) = if let Some(existing) = self.store.get(decision_hash)? {
             if !existing.is_terminal() {
                 // Preserve retry count, update effects for this attempt
+                let prev = existing.status;
                 let mut rec = existing;
                 rec.effects = effects.clone();
-                rec
+                (rec, Some(prev))
             } else {
                 // Terminal records were already caught by idempotency check above,
                 // but handle defensively.
+                (
+                    ExecutionRecord::new_pending(
+                        decision_hash,
+                        proposal_id,
+                        decision_receipt_id,
+                        effects.clone(),
+                    ),
+                    None,
+                )
+            }
+        } else {
+            (
                 ExecutionRecord::new_pending(
                     decision_hash,
                     proposal_id,
                     decision_receipt_id,
                     effects.clone(),
-                )
-            }
-        } else {
-            ExecutionRecord::new_pending(
-                decision_hash,
-                proposal_id,
-                decision_receipt_id,
-                effects.clone(),
+                ),
+                None,
             )
         };
         record.status = ExecutionStatus::Pending;
@@ -265,8 +301,12 @@ impl DecisionExecutor {
         info!(
             decision_hash = %decision_hash,
             proposal_id = %proposal_id,
+            receipt_id = %decision_receipt_id,
             effect_count = effects.len(),
-            "Executing governance decision"
+            attempt = record.retries + 1,
+            status_before = ?status_before.unwrap_or(ExecutionStatus::Pending),
+            status_after = ?ExecutionStatus::Executing,
+            "Decision state transition: → Executing"
         );
 
         // 4. Delegate to EffectDispatcher
@@ -279,8 +319,12 @@ impl DecisionExecutor {
             Err(e) => {
                 error!(
                     decision_hash = %decision_hash,
+                    receipt_id = %decision_receipt_id,
+                    attempt = record.retries + 1,
+                    status_before = ?ExecutionStatus::Executing,
+                    status_after = ?ExecutionStatus::Failed,
                     error = %e,
-                    "Effect dispatcher returned error"
+                    "Decision state transition: Executing → Failed (dispatcher error)"
                 );
                 record.mark_failed(e.to_string());
                 self.store.put(&record)?;
@@ -302,8 +346,12 @@ impl DecisionExecutor {
 
             info!(
                 decision_hash = %decision_hash,
+                receipt_id = %decision_receipt_id,
                 result_count = results.len(),
-                "Decision execution confirmed"
+                attempt = record.retries + 1,
+                status_before = ?ExecutionStatus::Executing,
+                status_after = ?ExecutionStatus::Confirmed,
+                "Decision state transition: Executing → Confirmed"
             );
         } else {
             let failures: Vec<String> = results
@@ -315,8 +363,12 @@ impl DecisionExecutor {
 
             warn!(
                 decision_hash = %decision_hash,
+                receipt_id = %decision_receipt_id,
+                attempt = record.retries,
+                status_before = ?ExecutionStatus::Executing,
+                status_after = ?ExecutionStatus::Failed,
                 failures = ?failures,
-                "Decision execution had failures"
+                "Decision state transition: Executing → Failed"
             );
 
             record.mark_failed(error_msg);
@@ -391,9 +443,21 @@ pub fn create_decision_executor_callback(
         let proposal_id = decision_receipt_id.clone();
 
         tokio::spawn(async move {
-            // Backpressure: wait for a slot before executing
+            // Backpressure: wait for a slot before executing.
+            // Track wait time to detect saturation.
+            let wait_start = std::time::Instant::now();
             let _permit = match semaphore.acquire().await {
-                Ok(permit) => permit,
+                Ok(permit) => {
+                    let waited = wait_start.elapsed();
+                    if waited > std::time::Duration::from_millis(100) {
+                        warn!(
+                            decision_hash = %decision_hash,
+                            waited_ms = waited.as_millis() as u64,
+                            "Semaphore saturation: decision waited for execution slot"
+                        );
+                    }
+                    permit
+                }
                 Err(_) => {
                     error!(
                         decision_hash = %decision_hash,
