@@ -349,6 +349,11 @@ pub struct EffectResult {
     pub message: String,
     /// Optional hash of state change (for audit)
     pub state_change_hash: Option<String>,
+    /// Optional ledger entry id produced by this effect.
+    ///
+    /// Present for treasury effects that append a journal entry.
+    #[serde(default)]
+    pub ledger_entry_id: Option<String>,
 }
 
 // =============================================================================
@@ -560,12 +565,14 @@ mod tests {
                 success: true,
                 message: "Budget created successfully".into(),
                 state_change_hash: Some("statehash123".into()),
+                ledger_entry_id: Some("entry-123".into()),
             },
             EffectResult {
                 effect_id: "eff-2".into(),
                 success: false,
                 message: "Insufficient funds".into(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             },
         ];
 

@@ -335,13 +335,15 @@ impl DecisionExecutor {
         // 5. Check results and record outcome
         let all_success = results.iter().all(|r| r.success);
         if all_success {
+            let ledger_entry_ids: Vec<String> = results
+                .iter()
+                .filter_map(|r| r.ledger_entry_id.clone())
+                .collect();
             let state_change_hashes: Vec<String> = results
                 .iter()
                 .filter_map(|r| r.state_change_hash.clone())
                 .collect();
-            // Note: ledger_entry_ids will be populated when treasury executor
-            // is wired to return entry IDs in EffectResult.
-            record.mark_confirmed(vec![], state_change_hashes);
+            record.mark_confirmed(ledger_entry_ids, state_change_hashes);
             self.store.put(&record)?;
 
             info!(
