@@ -20,6 +20,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::effects::KernelEffect;
+
 /// Status of a governance decision's execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -72,6 +74,11 @@ pub struct ExecutionRecord {
 
     /// Number of retry attempts.
     pub retries: u32,
+
+    /// The kernel effects to execute (stored for crash recovery).
+    /// Empty for pre-existing records that don't have effects stored.
+    #[serde(default)]
+    pub effects: Vec<KernelEffect>,
 }
 
 impl ExecutionRecord {
@@ -80,6 +87,7 @@ impl ExecutionRecord {
         decision_hash: impl Into<String>,
         proposal_id: impl Into<String>,
         decision_receipt_id: impl Into<String>,
+        effects: Vec<KernelEffect>,
     ) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -97,6 +105,7 @@ impl ExecutionRecord {
             state_change_hashes: Vec::new(),
             error: None,
             retries: 0,
+            effects,
         }
     }
 
@@ -180,7 +189,8 @@ mod tests {
 
     #[test]
     fn test_execution_record_lifecycle() {
-        let mut record = ExecutionRecord::new_pending("abc123hash", "proposal-42", "receipt-42");
+        let mut record =
+            ExecutionRecord::new_pending("abc123hash", "proposal-42", "receipt-42", vec![]);
 
         assert_eq!(record.status, ExecutionStatus::Pending);
         assert!(!record.is_terminal());
@@ -197,7 +207,8 @@ mod tests {
 
     #[test]
     fn test_execution_record_failure_path() {
-        let mut record = ExecutionRecord::new_pending("abc123hash", "proposal-42", "receipt-42");
+        let mut record =
+            ExecutionRecord::new_pending("abc123hash", "proposal-42", "receipt-42", vec![]);
 
         record.mark_executing();
         record.mark_failed("Ledger unavailable");
@@ -223,7 +234,8 @@ mod tests {
 
     #[test]
     fn test_execution_record_serde_roundtrip() {
-        let mut record = ExecutionRecord::new_pending("deadbeef", "proposal-1", "receipt-1");
+        let mut record =
+            ExecutionRecord::new_pending("deadbeef", "proposal-1", "receipt-1", vec![]);
         record.mark_confirmed(vec!["e1".into()], vec!["h1".into()]);
 
         let json = serde_json::to_string(&record).unwrap();

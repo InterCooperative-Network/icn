@@ -97,7 +97,7 @@ mod tests {
         let store = test_store();
         let exec_store = SledExecutionStore::new(store);
 
-        let record = ExecutionRecord::new_pending("hash123", "proposal-1", "receipt-1");
+        let record = ExecutionRecord::new_pending("hash123", "proposal-1", "receipt-1", vec![]);
         exec_store.put(&record).unwrap();
 
         let retrieved = exec_store.get("hash123").unwrap().unwrap();
@@ -119,7 +119,7 @@ mod tests {
         let store = test_store();
         let exec_store = SledExecutionStore::new(store);
 
-        let mut record = ExecutionRecord::new_pending("hash456", "proposal-2", "receipt-2");
+        let mut record = ExecutionRecord::new_pending("hash456", "proposal-2", "receipt-2", vec![]);
         exec_store.put(&record).unwrap();
 
         record.mark_executing();
@@ -139,14 +139,14 @@ mod tests {
         let exec_store = SledExecutionStore::new(store);
 
         // Add records in different states
-        let pending = ExecutionRecord::new_pending("h1", "p1", "r1");
+        let pending = ExecutionRecord::new_pending("h1", "p1", "r1", vec![]);
         exec_store.put(&pending).unwrap();
 
-        let mut confirmed = ExecutionRecord::new_pending("h2", "p2", "r2");
+        let mut confirmed = ExecutionRecord::new_pending("h2", "p2", "r2", vec![]);
         confirmed.mark_confirmed(vec![], vec![]);
         exec_store.put(&confirmed).unwrap();
 
-        let mut failed = ExecutionRecord::new_pending("h3", "p3", "r3");
+        let mut failed = ExecutionRecord::new_pending("h3", "p3", "r3", vec![]);
         failed.mark_failed("oops");
         exec_store.put(&failed).unwrap();
 
@@ -165,9 +165,9 @@ mod tests {
         let store = test_store();
         let exec_store = SledExecutionStore::new(store);
 
-        let r1 = ExecutionRecord::new_pending("a", "p1", "r1");
-        let r2 = ExecutionRecord::new_pending("b", "p2", "r2");
-        let mut r3 = ExecutionRecord::new_pending("c", "p3", "r3");
+        let r1 = ExecutionRecord::new_pending("a", "p1", "r1", vec![]);
+        let r2 = ExecutionRecord::new_pending("b", "p2", "r2", vec![]);
+        let mut r3 = ExecutionRecord::new_pending("c", "p3", "r3", vec![]);
         r3.mark_confirmed(vec![], vec![]);
 
         exec_store.put(&r1).unwrap();
