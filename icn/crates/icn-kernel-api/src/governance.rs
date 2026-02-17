@@ -268,8 +268,10 @@ impl EffectExecutor for DefaultEffectExecutor {
     }
 }
 
-/// Convert a TreasuryEffect to a TreasuryOperation
-fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
+/// Convert a TreasuryEffect to a TreasuryOperation.
+///
+/// This is the canonical mapping — icn-core delegates here to avoid drift.
+pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
     match effect {
         TreasuryEffect::Spend {
             treasury_did,
@@ -333,6 +335,23 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             recipient: Some(to_did.clone()),
             memo: memo.clone(),
             decision_hash: None,
+        },
+        TreasuryEffect::ReleaseEscrow {
+            treasury_did,
+            beneficiary_did,
+            amount,
+            currency,
+            escrow_id,
+            decision_hash,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Release,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(beneficiary_did.clone()),
+            memo: format!("Escrow release: {}", escrow_id),
+            decision_hash: Some(decision_hash.clone()),
         },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {

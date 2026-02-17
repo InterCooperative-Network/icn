@@ -254,7 +254,8 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
     for effect in effects {
         if let KernelEffect::Treasury(
             TreasuryEffect::Spend { decision_hash, .. }
-            | TreasuryEffect::CreateBudget { decision_hash, .. },
+            | TreasuryEffect::CreateBudget { decision_hash, .. }
+            | TreasuryEffect::ReleaseEscrow { decision_hash, .. },
         ) = effect
         {
             if !decision_hash.is_empty() {

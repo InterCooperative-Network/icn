@@ -627,6 +627,15 @@ async fn spawn_actors_with_identity(
         kernel_executor = kernel_executor.with_membership_service(membership_service);
         info!("✓ Membership service wired to governance executor");
 
+        // Create escrow store for domain-level idempotency
+        let escrow_store_path = config.store_path().join("escrow");
+        let escrow_sled_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&escrow_store_path)?);
+        let escrow_store: Arc<dyn icn_kernel_api::escrow::EscrowStore> =
+            Arc::new(super::escrow_store::SledEscrowStore::new(escrow_sled_store));
+        kernel_executor = kernel_executor.with_escrow_store(escrow_store);
+        info!("✓ Escrow store wired to governance executor");
+
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
             Arc::new(kernel_executor),
