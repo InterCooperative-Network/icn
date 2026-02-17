@@ -30,6 +30,8 @@ use icn_kernel_api::{ControlService, ForceCloseProposalRequest, VetoProposalRequ
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
+const LEDGER_ENTRY_MARKER: &str = "-> ledger entry ";
+
 /// Adapter that implements [`GovernanceExecutor`] by delegating to kernel services.
 ///
 /// This is the bridge between the governance app (domain logic) and the kernel's
@@ -144,6 +146,7 @@ impl KernelGovernanceExecutor {
                                     budget_id
                                 ),
                                 state_change_hash: None,
+                                ledger_entry_id: None,
                             });
                         }
                     }
@@ -201,6 +204,7 @@ impl KernelGovernanceExecutor {
                             success: false,
                             message: "Budget store not configured".to_string(),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 };
@@ -213,6 +217,7 @@ impl KernelGovernanceExecutor {
                             success: false,
                             message: format!("Budget {} not found", budget_id),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 };
@@ -234,6 +239,7 @@ impl KernelGovernanceExecutor {
                                 budget_id
                             ),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                     Err(e) => {
@@ -247,6 +253,7 @@ impl KernelGovernanceExecutor {
                             success: false,
                             message: e.to_string(),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 }
@@ -344,6 +351,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             success: false,
                             message: "Escrow store not configured".to_string(),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 };
@@ -361,6 +369,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             success: false,
                             message: format!("Escrow not found: {}", escrow_id),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 };
@@ -401,6 +410,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                                 escrow_id
                             ),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                     Err(EscrowReleaseError::AlreadyReleasedByOther {
@@ -420,6 +430,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                                 escrow_id, existing_decision_hash
                             ),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                     Err(EscrowReleaseError::Cancelled) => {
@@ -432,6 +443,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             success: false,
                             message: format!("Escrow {} was cancelled", escrow_id),
                             state_change_hash: None,
+                            ledger_entry_id: None,
                         });
                     }
                 }
@@ -523,6 +535,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             protocol_effect
                         ),
                         state_change_hash: None,
+                        ledger_entry_id: None,
                     })
                 }
             }
@@ -543,6 +556,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                 success: true,
                 message: format!("NoOp: {}", reason),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
             KernelEffect::Control(control_effect) => {
                 // Execute control effect (veto, force close)
@@ -643,11 +657,12 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                         return Ok(ExecutionOutcome::Success {
                             receipt_id: receipt_id.clone(),
                             effects: vec![format!(
-                                "{:?} {} {} from treasury {} -> ledger entry {}",
+                                "{:?} {} {} from treasury {} {}{}",
                                 operation.operation_type,
                                 operation.amount,
                                 operation.currency,
                                 operation.treasury_id,
+                                LEDGER_ENTRY_MARKER,
                                 result.entry_hash
                             )],
                         });
@@ -1134,12 +1149,22 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
                     e[pos + 14..].to_string() // Skip "-> state_hash="
                 })
             });
+            let ledger_entry_id = effects.iter().find_map(|e| {
+                let (_, entry_id) = e.rsplit_once(LEDGER_ENTRY_MARKER)?;
+                let entry_id = entry_id.trim();
+                if entry_id.is_empty() {
+                    None
+                } else {
+                    Some(entry_id.to_string())
+                }
+            });
 
             EffectResult {
                 effect_id: effect_id.to_string(),
                 success: true,
                 message: effects.join("; "),
                 state_change_hash,
+                ledger_entry_id,
             }
         }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
@@ -1147,12 +1172,14 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             success: false,
             message: reason,
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: true,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
     }
 }
@@ -1877,6 +1904,20 @@ mod tests {
         let result = executor.get_treasury_balance("treasury-1", "HOURS").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0); // Placeholder returns 0
+    }
+
+    #[test]
+    fn test_execution_outcome_maps_ledger_entry_id() {
+        let outcome = ExecutionOutcome::Success {
+            receipt_id: DecisionReceiptId::new("receipt-1"),
+            effects: vec![format!(
+                "Spend 10 HOURS from treasury did:icn:t1 {}abc123",
+                LEDGER_ENTRY_MARKER
+            )],
+        };
+
+        let result = execution_outcome_to_effect_result(outcome, "receipt-1");
+        assert_eq!(result.ledger_entry_id.as_deref(), Some("abc123"));
     }
 
     #[test]

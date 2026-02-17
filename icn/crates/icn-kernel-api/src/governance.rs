@@ -248,6 +248,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                         success: true,
                         message: "Protocol effect applied".to_string(),
                         state_change_hash: None,
+                        ledger_entry_id: None,
                     })
                 }
             }
@@ -256,6 +257,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 success: true,
                 message: format!("NoOp: {}", reason),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
             // For other effect types, return success placeholder
             _ => Ok(EffectResult {
@@ -263,6 +265,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 success: true,
                 message: "Effect type not yet implemented".to_string(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
         }
     }
@@ -404,18 +407,21 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             success: true,
             message: effects.join("; "),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: false,
             message: reason,
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: true,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
     }
 }
