@@ -34,6 +34,7 @@
 
 pub mod authz;
 pub mod bootstrap;
+pub mod budget;
 pub mod comms;
 pub mod compute;
 pub mod coord;
@@ -67,6 +68,9 @@ pub use bootstrap::{
     BootstrapPhase, CacheStats, CapabilityRequest, CapabilitySet, DecisionCache,
     GenesisCapabilities, OracleRegistry,
 };
+pub use budget::{
+    BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStatus, BudgetStore, PendingSpend,
+};
 pub use comms::{PubSub, RequestResponse, Streams};
 pub use compute::{ComputeEngine, DeterminismClass, Job, OperatorMode, PrivacyClass, Trigger};
 pub use coord::Coordination;
@@ -82,10 +86,10 @@ pub use escrow::{
 pub use events::{EventCallback, EventEmitter, SystemEvent};
 pub use execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 pub use governance::{
-    federation_effect_to_operation, DecisionReceiptId, DefaultEffectExecutor, EffectExecutor,
-    ExecutionOutcome, FederationExecutor, FederationOperation, FederationOperationType,
-    GovernanceExecutor, ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
-    TreasuryOperationType,
+    federation_effect_to_operation, treasury_effect_to_operation, DecisionReceiptId,
+    DefaultEffectExecutor, EffectExecutor, ExecutionOutcome, FederationExecutor,
+    FederationOperation, FederationOperationType, GovernanceExecutor, ProtocolChange,
+    ProtocolExecutor, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
 };
 pub use identity::{DidResolver, IdentityService, Keystore};
 pub use naming::{

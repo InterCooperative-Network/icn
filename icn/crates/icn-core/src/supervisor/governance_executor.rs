@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use icn_kernel_api::budget::{BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStore};
 use icn_kernel_api::effects::{
     ControlEffect, EffectResult, KernelEffect, MembershipEffect, TreasuryEffect,
 };
@@ -42,6 +43,8 @@ pub struct KernelGovernanceExecutor {
     membership: Arc<KernelMembershipExecutor>,
     /// Escrow store for domain-level idempotency on escrow releases.
     escrow_store: Option<Arc<dyn EscrowStore>>,
+    /// Budget store for budget enforcement.
+    budget_store: Option<Arc<dyn BudgetStore>>,
 }
 
 impl KernelGovernanceExecutor {
@@ -57,6 +60,7 @@ impl KernelGovernanceExecutor {
             control: Arc::new(KernelControlExecutor::new()),
             membership: Arc::new(KernelMembershipExecutor::new()),
             escrow_store: None,
+            budget_store: None,
         }
     }
 
@@ -94,6 +98,205 @@ impl KernelGovernanceExecutor {
     pub fn with_escrow_store(mut self, store: Arc<dyn EscrowStore>) -> Self {
         self.escrow_store = Some(store);
         self
+    }
+
+    /// Set the budget store for budget enforcement.
+    pub fn with_budget_store(mut self, store: Arc<dyn BudgetStore>) -> Self {
+        self.budget_store = Some(store);
+        self
+    }
+
+    /// Execute a treasury effect with optional budget enforcement.
+    ///
+    /// Three paths:
+    /// 1. `CreateBudget` → create a BudgetRecord in the store, then delegate to treasury
+    /// 2. `Spend { budget_id: Some(...) }` → saga-enforced budget check, then treasury
+    /// 3. All other treasury effects → delegate directly to treasury executor
+    async fn execute_treasury_with_budget(
+        &self,
+        treasury_effect: TreasuryEffect,
+        receipt_id: &DecisionReceiptId,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        match &treasury_effect {
+            // Path 1: CreateBudget → persist BudgetRecord
+            TreasuryEffect::CreateBudget {
+                treasury_did,
+                budget_id,
+                total_amount,
+                currency,
+                decision_hash,
+                ..
+            } => {
+                if let Some(ref budget_store) = self.budget_store {
+                    // Check for idempotent re-creation
+                    if let Some(existing) = budget_store.get(budget_id)? {
+                        if existing.decision_hash == *decision_hash {
+                            info!(
+                                budget_id = %budget_id,
+                                "Budget already created (idempotent)"
+                            );
+                            return Ok(EffectResult {
+                                effect_id: decision_receipt_id.to_string(),
+                                success: true,
+                                message: format!(
+                                    "Budget {} already exists (idempotent)",
+                                    budget_id
+                                ),
+                                state_change_hash: None,
+                            });
+                        }
+                    }
+
+                    // Use treasury_did as scope_id (the treasury owns the budget)
+                    let record = BudgetRecord::new(
+                        budget_id.clone(),
+                        treasury_did.clone(),
+                        treasury_did.clone(),
+                        currency.clone(),
+                        *total_amount,
+                        decision_hash.clone(),
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    );
+                    budget_store.put(&record)?;
+                    info!(
+                        budget_id = %budget_id,
+                        total_limit = total_amount,
+                        currency = %currency,
+                        "Budget record created"
+                    );
+                }
+
+                // Also delegate to treasury executor for ledger entry
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+
+            // Path 2: Spend with budget_id → saga-enforced budget check
+            TreasuryEffect::Spend {
+                budget_id: Some(budget_id),
+                decision_hash,
+                amount,
+                ..
+            } => {
+                let budget_store = match &self.budget_store {
+                    Some(store) => store,
+                    None => {
+                        warn!(
+                            budget_id = %budget_id,
+                            "Spend references budget but no budget store configured"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: "Budget store not configured".to_string(),
+                            state_change_hash: None,
+                        });
+                    }
+                };
+
+                let mut budget = match budget_store.get(budget_id)? {
+                    Some(b) => b,
+                    None => {
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Budget {} not found", budget_id),
+                            state_change_hash: None,
+                        });
+                    }
+                };
+
+                // Phase 1: begin_spend (validates capacity, records pending)
+                match budget.begin_spend(decision_hash, *amount) {
+                    Ok(BeginSpendOutcome::Proceed) => {
+                        budget_store.put(&budget)?;
+                    }
+                    Ok(BeginSpendOutcome::RetryNeeded) => {
+                        // Crash recovery — pending spend already recorded, skip persist
+                    }
+                    Err(BudgetSpendError::AlreadySpentSameDecision) => {
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Budget spend already confirmed (idempotent, budget={})",
+                                budget_id
+                            ),
+                            state_change_hash: None,
+                        });
+                    }
+                    Err(e) => {
+                        warn!(
+                            budget_id = %budget_id,
+                            error = %e,
+                            "Budget spend rejected"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: e.to_string(),
+                            state_change_hash: None,
+                        });
+                    }
+                }
+
+                // Phase 2: Ledger mutation
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                match self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await
+                {
+                    Ok(outcome) => {
+                        let result =
+                            execution_outcome_to_effect_result(outcome, decision_receipt_id);
+                        if result.success {
+                            // Phase 3: confirm_spend
+                            budget.confirm_spend();
+                            budget_store.put(&budget)?;
+                            info!(
+                                budget_id = %budget_id,
+                                spent_total = budget.spent_total,
+                                remaining = budget.remaining(),
+                                "Budget spend confirmed"
+                            );
+                        }
+                        // If !result.success, budget stays with pending_spend
+                        // for crash recovery
+                        Ok(result)
+                    }
+                    Err(e) => {
+                        // Ledger error — budget stays in pending state
+                        // for retry by DecisionExecutor
+                        Err(e)
+                    }
+                }
+            }
+
+            // Path 3: All other treasury effects → direct delegation
+            _ => {
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+        }
     }
 }
 
@@ -278,17 +481,15 @@ impl EffectExecutor for KernelGovernanceExecutor {
                     unreachable!("already matched Treasury variant")
                 }
             }
-            KernelEffect::Treasury(treasury_effect) => {
-                // Convert TreasuryEffect to TreasuryOperation
-                let operation = treasury_effect_to_operation(&treasury_effect);
-                let outcome = self
-                    .treasury
-                    .execute_treasury_operation(&receipt_id, operation)
-                    .await?;
-                Ok(execution_outcome_to_effect_result(
-                    outcome,
+            KernelEffect::Treasury(ref treasury_effect) => {
+                // Budget-aware treasury dispatch: handles CreateBudget, Spend with budget_id,
+                // and all other treasury effects (direct passthrough).
+                self.execute_treasury_with_budget(
+                    treasury_effect.clone(),
+                    &receipt_id,
                     decision_receipt_id,
-                ))
+                )
+                .await
             }
             KernelEffect::Protocol(protocol_effect) => {
                 // Convert ProtocolEffect to ProtocolChange

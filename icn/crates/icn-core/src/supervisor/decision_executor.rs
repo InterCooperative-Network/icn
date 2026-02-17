@@ -529,6 +529,7 @@ mod tests {
             amount: 500,
             currency: "HOURS".to_string(),
             memo: "Test".to_string(),
+            budget_id: None,
             decision_receipt_id: "receipt-t1".to_string(),
             decision_hash: "sha256:treasury-hash-1".to_string(),
         })];
@@ -562,6 +563,7 @@ mod tests {
                 amount: 100,
                 currency: "ICN".to_string(),
                 memo: "m".to_string(),
+                budget_id: None,
                 decision_receipt_id: "r1".to_string(),
                 decision_hash: "extracted-hash".to_string(),
             }),

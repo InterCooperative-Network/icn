@@ -294,6 +294,7 @@ fn translate_treasury_operation(
             amount: *amount,
             currency: currency.clone(),
             memo: purpose.clone(),
+            budget_id: None, // TODO: wire budget_id from proposal payload
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: "pending".to_string(), // Wired when full context available
         })],

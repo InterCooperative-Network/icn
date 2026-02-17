@@ -129,6 +129,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         amount,
         currency: currency.clone(),
         memo: "Pilot equipment purchase".to_string(),
+        budget_id: None,
         decision_receipt_id: decision_receipt_id.to_string(),
         decision_hash: decision_hash.clone(),
     };
