@@ -20,8 +20,45 @@ env:
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
 jobs:
+  changes:
+    name: Change Scope
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Classify change scope
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_ref="origin/${{ github.base_ref }}"
+          git fetch --no-tags origin "${{ github.base_ref }}" --depth=1
+          files="$(git diff --name-only "${base_ref}...HEAD")"
+
+          if [ -z "$files" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if echo "$files" | grep -qvE '^(docs/|[^/]+\.md$)'; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          fi
+
   secrets-check:
     name: Secrets Placeholder Check
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -63,20 +100,28 @@ jobs:
 
   fmt:
     name: Format Check
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping rustfmt check."
+
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
         with:
           components: rustfmt
 
       - name: Check formatting
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo fmt --all --check
         working-directory: ./icn
 
   meaning-firewall:
     name: Meaning Firewall Check
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -106,6 +151,7 @@ jobs:
 
   kernel-deps:
     name: Kernel Forbidden Dependencies
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -190,6 +236,7 @@ jobs:
 
   firewall-contract:
     name: Firewall Contract Enforcement
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -221,62 +268,86 @@ jobs:
 
   clippy:
     name: Clippy
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping clippy."
+
       - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/free-disk-space
 
       - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
         with:
           components: clippy
 
       - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
         with:
           workspaces: "icn -> target"
 
       - name: Run Clippy
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo clippy --workspace --all-targets --features "hsm,post-quantum" -- -D warnings
         working-directory: ./icn
 
   test:
     name: Test
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping test suites."
+
       - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/free-disk-space
         with:
           verbose: 'true'
 
       - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
 
       - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
         with:
           workspaces: "icn -> target"
 
       - name: Run unit tests (parallel)
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo test --workspace --lib
         working-directory: ./icn
 
       - name: Run integration tests (serial to avoid port conflicts)
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo test --workspace --test '*' -- --test-threads=1
         working-directory: ./icn
 
       - name: Run sled storage tests
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo test -p icn-gateway --features sled-storage
         working-directory: ./icn
 
   backup-validation:
     name: Backup Validation
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -318,6 +389,8 @@ jobs:
 
   coverage:
     name: Test Coverage
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -365,6 +438,8 @@ jobs:
 
   security:
     name: Security Audit
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -397,27 +472,38 @@ jobs:
 
   build:
     name: Build Release
+    needs: [changes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true'
+        run: echo "Docs-only PR; skipping release build."
+
       - name: Free disk space
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/free-disk-space
 
       - name: Install build tools
+        if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
+        if: needs.changes.outputs.docs_only != 'true'
 
       - uses: Swatinem/rust-cache@v2
+        if: needs.changes.outputs.docs_only != 'true'
         with:
           workspaces: "icn -> target"
 
       - name: Build release binaries
+        if: needs.changes.outputs.docs_only != 'true'
         run: cargo build --release
         working-directory: ./icn
 
       - name: Upload binaries
+        if: needs.changes.outputs.docs_only != 'true'
         uses: actions/upload-artifact@v6
         with:
           name: icn-binaries
@@ -428,6 +514,8 @@ jobs:
 
   sdk:
     name: TypeScript SDK
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -456,6 +544,8 @@ jobs:
 
   web-ui:
     name: Web UI
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -480,6 +570,8 @@ jobs:
 
   accessibility:
     name: Accessibility Tests
+    needs: [changes]
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -513,8 +605,9 @@ jobs:
 
   pilot-provenance:
     name: Pilot Provenance Invariant
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [changes, test]
     steps:
       - uses: actions/checkout@v6
 
