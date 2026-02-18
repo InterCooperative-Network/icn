@@ -24,37 +24,17 @@ jobs:
     name: Change Scope
     runs-on: ubuntu-latest
     outputs:
-      docs_only: ${{ steps.classify.outputs.docs_only }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
     steps:
       - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          fetch-depth: 0
-
-      - name: Classify change scope
-        id: classify
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          base_ref="origin/${{ github.base_ref }}"
-          git fetch --no-tags origin "${{ github.base_ref }}" --depth=1
-          files="$(git diff --name-only "${base_ref}...HEAD")"
-
-          if [ -z "$files" ]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if echo "$files" | grep -qvE '^(docs/|[^/]+\.md$)'; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "docs_only=true" >> "$GITHUB_OUTPUT"
-          fi
+          filters: |
+            docs_only:
+              - 'docs/**'
+              - '*.md'
+              - '.github/**/*.md'
 
   secrets-check:
     name: Secrets Placeholder Check
