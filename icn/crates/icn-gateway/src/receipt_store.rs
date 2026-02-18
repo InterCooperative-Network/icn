@@ -118,22 +118,17 @@ impl ReceiptStore {
         Ok(hash)
     }
 
-    /// Test helper: store a governance receipt with explicit decision provenance fields.
+    /// Test helper: store a governance receipt for a proposal in the test domain.
     #[cfg(test)]
-    pub fn put_test_governance_receipt(
-        &self,
-        proposal_id: &str,
-        decision_hash: Hash,
-    ) -> Result<Hash, String> {
+    pub fn put_test_governance_receipt(&self, proposal_id: &str) -> Result<Hash, String> {
         let votes = vec![];
-        let mut receipt = GovernanceDecisionReceipt::new(
+        let receipt = GovernanceDecisionReceipt::new(
             proposal_id.to_string(),
             "test-domain".to_string(),
             ProofOutcome::Accepted,
             VoteTally::empty(),
             &votes,
         );
-        receipt.decision_hash = decision_hash;
         self.put_governance(&receipt)
     }
 

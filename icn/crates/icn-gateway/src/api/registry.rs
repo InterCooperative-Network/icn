@@ -592,14 +592,15 @@ pub async fn index_decision_endpoint(
     let now = icn_time::current_timestamp_secs();
     let receipt_id = format!("receipt-{}", &uuid::Uuid::new_v4().to_string()[..12]);
 
-    // Generate canonical hash from content
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    req.coop_id.hash(&mut hasher);
-    req.title.hash(&mut hasher);
-    now.hash(&mut hasher);
-    let decision_hash = format!("{:016x}", hasher.finish());
+    // Generate 32-byte canonical hash from stable decision content.
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(req.coop_id.as_bytes());
+    hasher.update([0x1f]);
+    hasher.update(req.title.as_bytes());
+    hasher.update([0x1f]);
+    hasher.update(now.to_be_bytes());
+    let decision_hash = hex::encode(hasher.finalize());
 
     // Handle treasury effect if present
     let treasury_effect_id = req
@@ -706,16 +707,22 @@ pub async fn get_decision(
         .get_decision(&decision_id)
         .ok_or_else(|| GatewayError::NotFound(format!("Decision not found: {}", decision_id)))?;
 
-    let receipt =
-        receipt_store.as_ref().and_then(|store| {
-            parse_decision_hash_hex(&decision.decision_hash)
-                .ok()
-                .and_then(|hash| {
-                    store.get_governance(&hash).ok().flatten().and_then(|r| {
-                        serde_json::to_value(GovernanceReceiptResponse::from(&r)).ok()
-                    })
-                })
-        });
+    let receipt = receipt_store.as_ref().and_then(|store| {
+        lookup_governance_receipt(store.get_ref().as_ref(), &decision.decision_hash).and_then(|r| {
+            match serde_json::to_value(r) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        decision_id = %decision_id,
+                        decision_hash = %decision.decision_hash,
+                        "failed to serialize governance receipt for decision response"
+                    );
+                    None
+                }
+            }
+        })
+    });
 
     Ok(HttpResponse::Ok().json(GetDecisionResponse { decision, receipt }))
 }
@@ -757,9 +764,7 @@ pub async fn get_decision_trace(
     let has_receipt = receipt_store
         .as_ref()
         .and_then(|store| {
-            parse_decision_hash_hex(&decision.decision_hash)
-                .ok()
-                .and_then(|hash| store.get_governance(&hash).ok().flatten())
+            lookup_governance_receipt(store.get_ref().as_ref(), &decision.decision_hash)
         })
         .is_some();
 
@@ -804,6 +809,36 @@ fn parse_decision_hash_hex(hex_str: &str) -> anyhow::Result<[u8; 32]> {
         .try_into()
         .map_err(|_| anyhow::anyhow!("decision hash must be 32 bytes"))?;
     Ok(hash)
+}
+
+fn lookup_governance_receipt(
+    store: &ReceiptStore,
+    decision_hash_hex: &str,
+) -> Option<GovernanceReceiptResponse> {
+    let hash = match parse_decision_hash_hex(decision_hash_hex) {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                decision_hash = %decision_hash_hex,
+                "failed to parse decision hash while hydrating governance receipt"
+            );
+            return None;
+        }
+    };
+
+    match store.get_governance(&hash) {
+        Ok(Some(receipt)) => Some(GovernanceReceiptResponse::from(&receipt)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                decision_hash = %decision_hash_hex,
+                "failed to read governance receipt from receipt store"
+            );
+            None
+        }
+    }
 }
 
 // ============================================================================
@@ -1113,9 +1148,8 @@ mod tests {
         let proposal_id = "proposal-pilot-1".to_string();
         let decision_receipt_id = "receipt-pilot-1".to_string();
 
-        let decision_hash = [42u8; 32];
-        receipt_store
-            .put_test_governance_receipt(&proposal_id, decision_hash)
+        let decision_hash = receipt_store
+            .put_test_governance_receipt(&proposal_id)
             .unwrap();
         let decision_hash_hex = hex::encode(decision_hash);
 
