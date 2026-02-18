@@ -11,7 +11,8 @@ The smoke command fails fast with actionable output and exits non-zero on any br
 ## Preconditions
 
 - Run from repo root.
-- `cargo`, `rg`, and `tee` installed.
+- `cargo`, `rg`, `tee`, and either `timeout` or `gtimeout` installed.
+- `curl` installed if running the optional daemon health check.
 - Rust dependencies already fetched.
 
 ## Fresh Environment Setup
@@ -30,7 +31,7 @@ cd ..
 cd icn
 RUSTC_WRAPPER= cargo run --bin icnd > /tmp/icnd-pilot.log 2>&1 &
 ICN_DAEMON_PID=$!
-curl -sf http://localhost:8000/v1/healthz
+curl -sf http://localhost:8000/healthz
 ```
 
 ## One-Command Smoke
@@ -53,6 +54,7 @@ ledger_entry_hash=...
 - Default timeout per test command: `120s`
 - Override timeout: `ICN_SMOKE_TIMEOUT_SECS=180 bash scripts/pilot_smoke.sh`
 - Override logfile path: `ICN_SMOKE_LOGFILE=/tmp/pilot-smoke.log bash scripts/pilot_smoke.sh`
+- Preserve default tempfile logs: `ICN_SMOKE_KEEP_LOG=1 bash scripts/pilot_smoke.sh`
 - Exit code `0`: linkage verified
 - Exit code `1`: linkage/assertion failure
 - Exit code `2`: misconfiguration or missing local dependency
@@ -90,7 +92,8 @@ RUSTC_WRAPPER= cargo test -p icn-core --test treasury_integration test_ledger_en
 
 ## Reset / Cleanup
 
-- Smoke script auto-removes its temporary logfile on success.
+- Smoke script auto-removes its generated tempfile on success.
+- If `ICN_SMOKE_LOGFILE` or `ICN_SMOKE_KEEP_LOG` is set, logfile is preserved and printed.
 - If daemon was started for optional health check:
 
 ```bash

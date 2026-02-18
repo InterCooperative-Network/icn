@@ -19,7 +19,8 @@ if command -v timeout >/dev/null 2>&1; then
 elif command -v gtimeout >/dev/null 2>&1; then
     TIMEOUT_BIN="gtimeout"
 else
-    TIMEOUT_BIN=""
+    echo "ERROR: no suitable timeout command found (tried 'timeout' and 'gtimeout'); deterministic smoke run requires a timeout."
+    exit 2
 fi
 
 require_cmd() {
@@ -54,8 +55,14 @@ run_test() {
     if [ -n "$TIMEOUT_BIN" ]; then
         set +e
         "$TIMEOUT_BIN" "${TIMEOUT_SECS}s" "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
-        status=${PIPESTATUS[0]}
+        local cmd_status=${PIPESTATUS[0]:-1}
+        local tee_status=${PIPESTATUS[1]:-0}
         set -e
+        if [ "$tee_status" -ne 0 ]; then
+            echo "ERROR: failed to write smoke test output to log file '$LOGFILE' (tee exit code $tee_status)." >&2
+            exit 2
+        fi
+        status=$cmd_status
         if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
             fail_with_hint "$description exceeded ${TIMEOUT_SECS}s timeout (try warm-cache: 'cd icn && RUSTC_WRAPPER= cargo test -p icn-core --test treasury_integration --no-run')"
         elif [ "$status" -ne 0 ]; then
@@ -102,6 +109,10 @@ assert_log_contains "decision_hash:[[:space:]]+✅ MATCHES" \
     "decision_hash linkage assertion missing"
 assert_log_contains "test result: ok\\. 1 passed" \
     "expected test pass summary missing"
+test_runs="$(rg -c "running 1 test" "$LOGFILE" || true)"
+if [ "$test_runs" -ne 2 ]; then
+    fail_with_hint "expected 2 cargo test runs of exactly one test each (found $test_runs); a cargo test filter may have matched 0 tests"
+fi
 
 decision_receipt_id="$(rg -o "PILOT_DECISION_RECEIPT_ID=.*" "$LOGFILE" | tail -n1 | cut -d= -f2-)"
 decision_hash="$(rg -o "PILOT_DECISION_HASH=.*" "$LOGFILE" | tail -n1 | cut -d= -f2-)"
@@ -117,4 +128,8 @@ echo "decision_receipt_id=$decision_receipt_id"
 echo "decision_hash=$decision_hash"
 echo "ledger_entry_hash=$ledger_entry_hash"
 
-rm -f "$LOGFILE"
+if [ -n "${ICN_SMOKE_KEEP_LOG:-}" ] || [ -n "${ICN_SMOKE_LOGFILE:-}" ]; then
+    echo "logfile=$LOGFILE"
+else
+    rm -f "$LOGFILE"
+fi
