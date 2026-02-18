@@ -159,8 +159,15 @@ import {
   // Treasury types
   TreasuryStatus,
   TreasuryBalance,
+  TreasuryBalanceResponse,
   ProposeTreasurySpendRequest,
   ProposeTreasurySpendResponse,
+  ProposeSpendRequest,
+  ProposeSpendResponse,
+  ProposalResponse,
+  GovernanceReceiptResponse,
+  TreasuryClient,
+  GovernanceClient,
   // Service discovery types
   ServiceEndpointInfo,
   AnnounceServiceRequest,
@@ -314,6 +321,8 @@ export class ICNClient {
   private did?: string;
   private coopId?: string;
   private scopes?: string[];
+  public readonly treasury: TreasuryClient;
+  public readonly governance: GovernanceClient;
 
   constructor(options: ICNClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
@@ -324,6 +333,35 @@ export class ICNClient {
     this.retryOptions = { ...DEFAULT_RETRY, ...options.retry };
     this.autoRefresh = options.autoRefresh ?? false;
     this.refreshBeforeExpiry = options.refreshBeforeExpiry ?? 60;
+    this.treasury = {
+      balance: async (coopId: string): Promise<TreasuryBalanceResponse> =>
+        this.get<TreasuryBalanceResponse>(
+          `/coops/${encodeURIComponent(coopId)}/treasury/balance`
+        ),
+    };
+    this.governance = {
+      proposeSpend: async (
+        coopId: string,
+        req: ProposeSpendRequest
+      ): Promise<ProposeSpendResponse> =>
+        this.post<ProposeSpendResponse>(
+          `/coops/${encodeURIComponent(coopId)}/proposals`,
+          req
+        ),
+      vote: async (
+        proposalId: string,
+        choice: 'for' | 'against' | 'abstain',
+        comment?: string
+      ): Promise<ProposalResponse> =>
+        this.post<ProposalResponse>(`/proposals/${encodeURIComponent(proposalId)}/vote`, {
+          choice,
+          ...(comment !== undefined ? { comment } : {}),
+        }),
+      getProof: async (proposalId: string): Promise<GovernanceReceiptResponse> =>
+        this.get<GovernanceReceiptResponse>(
+          `/proposals/${encodeURIComponent(proposalId)}/proof`
+        ),
+    };
   }
 
   /**

@@ -335,6 +335,7 @@ export interface VoteTally {
 
 export interface CastVoteRequest {
   choice: VoteChoice;
+  comment?: string;
 }
 
 export interface ProposalOutcome {
@@ -1786,6 +1787,14 @@ export interface TreasuryBalance {
   currency: string;
 }
 
+/** Flow C treasury balance response */
+export interface TreasuryBalanceResponse {
+  /** Treasury DID */
+  treasury_did: string;
+  /** Balances by currency code */
+  balances: Record<string, number>;
+}
+
 /** Request to propose a treasury spend */
 export interface ProposeTreasurySpendRequest {
   /** Amount to spend */
@@ -1798,6 +1807,20 @@ export interface ProposeTreasurySpendRequest {
   memo: string;
 }
 
+/** Flow C request to propose a treasury spend */
+export interface ProposeSpendRequest {
+  /** Amount to spend */
+  amount: number;
+  /** Recipient DID */
+  recipient: string;
+  /** Memo/reason for the spend */
+  memo: string;
+  /** Currency (defaults to credits in gateway) */
+  currency?: string;
+  /** Optional nonce to enforce expected treasury ordering */
+  expected_nonce?: number;
+}
+
 /** Response from proposing a treasury spend */
 export interface ProposeTreasurySpendResponse {
   /** ID of the created governance proposal */
@@ -1806,6 +1829,73 @@ export interface ProposeTreasurySpendResponse {
   domain_id: string;
   /** Status message */
   status: string;
+}
+
+/** Flow C response from proposing a treasury spend */
+export interface ProposeSpendResponse {
+  status: string;
+  message: string;
+  operation: string;
+  proposal_id: string;
+  coop_id: string;
+  amount: number;
+  currency: string;
+  recipient: string;
+  memo: string;
+  nonce: number;
+}
+
+/** Flow C proposal response returned by vote endpoint */
+export interface ProposalResponse {
+  id: string;
+  domain_id: string;
+  proposer: string;
+  title: string;
+  description: string;
+  payload: unknown;
+  state: unknown;
+  created_at: number;
+  updated_at: number;
+  scope?: unknown;
+}
+
+/** Flow C governance decision receipt and attestation types */
+export interface GovernanceDecisionReceipt {
+  proposal_id: string;
+  domain_id: string;
+  outcome: 'accepted' | 'rejected' | 'no_quorum';
+  vote_tally: {
+    for_votes: number;
+    against_votes: number;
+    abstain_votes: number;
+  };
+  vote_hash: number[];
+  decision_hash: number[];
+}
+
+export interface GovernanceDecisionAttestation {
+  decision_hash: number[];
+  signer_did: string;
+  timestamp: number;
+  signature: number[];
+}
+
+/** Flow C proof response from /v1/proposals/{id}/proof */
+export interface GovernanceReceiptResponse {
+  receipt: GovernanceDecisionReceipt;
+  attestations: GovernanceDecisionAttestation[];
+}
+
+/** Flow C treasury sub-client surface */
+export interface TreasuryClient {
+  balance(coopId: string): Promise<TreasuryBalanceResponse>;
+}
+
+/** Flow C governance sub-client surface */
+export interface GovernanceClient {
+  proposeSpend(coopId: string, req: ProposeSpendRequest): Promise<ProposeSpendResponse>;
+  vote(proposalId: string, choice: VoteChoice, comment?: string): Promise<ProposalResponse>;
+  getProof(proposalId: string): Promise<GovernanceReceiptResponse>;
 }
 
 // ============================================================================
