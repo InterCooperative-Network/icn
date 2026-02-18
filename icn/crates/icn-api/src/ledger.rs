@@ -17,6 +17,33 @@ pub struct AccountBalance {
     pub amount: i64,
 }
 
+/// Canonical account delta for ledger history/read endpoints.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LedgerAccountDeltaView {
+    pub account_id: String,
+    pub currency: String,
+    pub debit: Option<i64>,
+    pub credit: Option<i64>,
+}
+
+/// Canonical ledger entry view used by shared ledger service consumers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LedgerEntryView {
+    pub id: String,
+    pub timestamp: u64,
+    pub author: String,
+    pub accounts: Vec<LedgerAccountDeltaView>,
+    pub decision_receipt_id: Option<String>,
+    pub decision_hash: Option<String>,
+}
+
+/// Bounded decision-read page returned by the shared ledger service.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DecisionEntriesPage {
+    pub entries: Vec<LedgerEntryView>,
+    pub has_more: bool,
+}
+
 /// Shared ledger service used by both RPC and gateway layers.
 pub struct LedgerService {
     ledger: Arc<RwLock<Ledger>>,
@@ -62,5 +89,62 @@ impl LedgerService {
                 })
                 .collect())
         }
+    }
+
+    /// Get ledger entries authorized by a decision hash.
+    ///
+    /// This is intentionally scoped for current gateway boundary work:
+    /// it provides a stable DTO surface while keeping storage/query details internal.
+    pub async fn get_entries_by_decision(
+        &self,
+        decision_hash: &str,
+        limit: usize,
+    ) -> Result<DecisionEntriesPage, ApiError> {
+        const PILOT_MAX_SCAN_SIZE: usize = 1000;
+        let scan_size = limit
+            .saturating_mul(10)
+            .clamp(limit.max(1), PILOT_MAX_SCAN_SIZE);
+
+        let ledger = self.ledger.read().await;
+        let (entries, _total) = ledger
+            .get_entries_paginated_asc(0, scan_size)
+            .map_err(|e| ApiError::LedgerError(e.to_string()))?;
+
+        let mut matched_count = 0usize;
+        let mut page_entries = Vec::new();
+
+        for entry in entries {
+            if entry.decision_hash.as_deref() != Some(decision_hash) {
+                continue;
+            }
+
+            matched_count += 1;
+            if page_entries.len() >= limit {
+                continue;
+            }
+
+            page_entries.push(LedgerEntryView {
+                id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
+                timestamp: entry.timestamp,
+                author: entry.author.to_string(),
+                accounts: entry
+                    .accounts
+                    .iter()
+                    .map(|delta| LedgerAccountDeltaView {
+                        account_id: delta.account_id.to_string(),
+                        currency: delta.currency.clone(),
+                        debit: delta.debit,
+                        credit: delta.credit,
+                    })
+                    .collect(),
+                decision_receipt_id: entry.decision_receipt_id.clone(),
+                decision_hash: entry.decision_hash.clone(),
+            });
+        }
+
+        Ok(DecisionEntriesPage {
+            entries: page_entries,
+            has_more: matched_count > limit,
+        })
     }
 }
