@@ -12,16 +12,11 @@
 //! kernel implementations, maintaining clean separation between kernel
 //! mechanisms and domain semantics.
 //!
-//! ## Handlers
+//! ## Effect Translation Boundary
 //!
-//! The [`handlers`] module provides the execution callback infrastructure for
-//! processing accepted proposals. Each handler type (treasury, protocol,
-//! federation) implements the [`handlers::ExecutionCallback`] trait.
-//!
-//! When kernel executors are configured via [`GovernanceHandle::with_executor`],
-//! handlers can delegate execution to the kernel-provided executor traits:
-//! - [`TreasuryExecutor`] for treasury operations
-//! - [`ProtocolExecutor`] for protocol parameter changes
+//! The [`handlers`] module translates accepted domain proposals into
+//! kernel-safe effects. Proposal execution is then delegated to kernel
+//! effect dispatch.
 //!
 //! [`EventEmitter`]: icn_kernel_api::events::EventEmitter
 //! [`ProtocolParameterStore`]: icn_kernel_api::protocol_params::ProtocolParameterStore
@@ -37,11 +32,7 @@ pub mod registry;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
-pub use handlers::{
-    translate_payload_to_effects, Allocation, AllocationReceipt, DisburseParams,
-    ExecutionCallback as HandlerCallback, FederationHandler, ProposalExecutionContext,
-    ProposalType, ProtocolHandler, TreasuryHandler,
-};
+pub use handlers::translate_payload_to_effects;
 
 // Re-export registry types for decision/meeting management
 pub use registry::{DecisionFilter, DecisionIndexEntry, DecisionRegistry, DecisionStatus, Meeting};
