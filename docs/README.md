@@ -11,7 +11,7 @@ This directory contains comprehensive documentation for the ICN project.
 - **[Developer Guides](guides/developer/README.md)** - Development guides
 - **[Operations Guides](guides/operations/README.md)** - Deployment and ops
 - **[Security Documentation](security/FINAL_SECURITY_STATUS.md)** - Security overview
-- **[Current Status](status/PROJECT_STATE_2026-02-09.md)** - Project state snapshot
+- **[Current Status](STATE.md)** - Canonical current project state (dated snapshots live in `docs/status/`)
 
 ## Directory Structure
 

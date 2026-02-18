@@ -180,6 +180,6 @@ kubectl logs -n icn deployment/icn-daemon | grep "Governance actor"
 
 ## References
 
-- [Governance Architecture](/home/ubuntu/projects/icn-wt-ops-security/docs/ARCHITECTURE.md#governance)
-- [Receipt Chain Spec](/home/ubuntu/projects/icn-wt-ops-security/docs/plans/2026-02-14-icn-consensus-stack-a-to-b.md#receipts-infrastructure-5-tasks)
-- [Deployment Guide](/home/ubuntu/projects/icn-wt-ops-security/docs/HOMELAB_DEPLOYMENT.md)
+- [Governance Architecture](../../ARCHITECTURE.md#governance)
+- [Receipt Chain Spec](../../plans/2026-02-14-icn-consensus-stack-a-to-b.md#receipts-infrastructure-5-tasks)
+- [Deployment Guide](../../operations/deployment/HOMELAB_DEPLOYMENT.md)

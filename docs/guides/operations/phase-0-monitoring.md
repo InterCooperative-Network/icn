@@ -271,6 +271,6 @@ This is expected cardinality protection. Not a failure.
 
 ## References
 
-- [ServiceMonitor YAML](/home/ubuntu/projects/icn-wt-ops-security/deploy/k8s/monitoring/servicemonitor.yaml)
-- [Prometheus Metrics](/home/ubuntu/projects/icn-wt-ops-security/icn/crates/icn-obs/src/metrics/gateway.rs)
-- [Phase 0 Spec](/home/ubuntu/projects/icn-wt-ops-security/docs/plans/2026-02-14-icn-consensus-stack-a-to-b.md#operational-monitoring-for-demo)
+- [ServiceMonitor YAML](../../../deploy/k8s/monitoring/servicemonitor.yaml)
+- [Prometheus Metrics](../../../icn/crates/icn-obs/src/metrics/gateway.rs)
+- [Phase 0 Spec](../../plans/2026-02-14-icn-consensus-stack-a-to-b.md#operational-monitoring-for-demo)
