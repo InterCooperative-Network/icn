@@ -724,6 +724,14 @@ pub async fn get_proposal_proof(
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
+    do_get_proposal_proof(http_req, gov_mgr, id).await
+}
+
+pub(crate) async fn do_get_proposal_proof(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
     require_scope(&http_req, "governance:read")?;
 
     let proposal_id = ProposalId(id.into_inner());
@@ -1413,6 +1421,25 @@ pub async fn create_update_federation_policy_proposal(
 /// POST /gov/proposals/{id}/vote - Cast a vote on a proposal
 #[post("/proposals/{id}/vote")]
 pub async fn cast_vote(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
+    id: web::Path<String>,
+    req: web::Json<CastVoteRequest>,
+) -> Result<HttpResponse> {
+    do_cast_vote(
+        http_req,
+        gov_mgr,
+        event_broadcaster,
+        notification_service,
+        id,
+        req,
+    )
+    .await
+}
+
+pub(crate) async fn do_cast_vote(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,

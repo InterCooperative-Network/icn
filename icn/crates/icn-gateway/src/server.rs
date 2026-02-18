@@ -1045,6 +1045,24 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
+                        // Flow C convenience aliases under /v1/coops
+                        .service(
+                            web::scope("/coops")
+                                .configure(api::flow_c::configure_coops)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Flow C convenience aliases under /v1/proposals
+                        .service(
+                            web::scope("/proposals")
+                                .configure(api::flow_c::configure_proposals)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Protected ledger endpoints (auth + rate limiting)
                         .service(
                             web::scope("/ledger")
