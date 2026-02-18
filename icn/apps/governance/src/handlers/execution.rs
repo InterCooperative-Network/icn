@@ -281,8 +281,6 @@ fn translate_treasury_operation(
     decision_hash: &str,
 ) -> Vec<KernelEffect> {
     use icn_governance::TreasuryProposalOperation;
-    const TREASURY_SPEND_UNSUPPORTED_REASON: &str =
-        "Treasury Spend translation unsupported: missing treasury_did and currency in payload";
 
     match operation {
         TreasuryProposalOperation::Withdraw {
@@ -305,9 +303,24 @@ fn translate_treasury_operation(
             decision_hash: decision_hash.to_string(),
         })],
 
-        TreasuryProposalOperation::Spend { .. } => vec![KernelEffect::NoOp {
-            reason: TREASURY_SPEND_UNSUPPORTED_REASON.to_string(),
-        }],
+        TreasuryProposalOperation::Spend {
+            treasury_did,
+            recipient,
+            amount,
+            currency,
+            memo,
+            nonce,
+        } => vec![KernelEffect::Treasury(TreasuryEffect::Spend {
+            treasury_did: treasury_did.to_string(),
+            recipient_did: recipient.to_string(),
+            amount: *amount,
+            currency: currency.clone(),
+            memo: memo.clone(),
+            budget_id: None,
+            expected_nonce: *nonce,
+            decision_receipt_id: decision_receipt_id.to_string(),
+            decision_hash: decision_hash.to_string(),
+        })],
 
         TreasuryProposalOperation::CreateBudget {
             treasury_did,

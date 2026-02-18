@@ -947,11 +947,6 @@ fn default_spend_currency() -> String {
 /// Creates a governance proposal for a direct treasury disbursement.
 /// The spend is charged against the treasury's unallocated balance.
 /// Requires governance approval before execution.
-///
-/// Implementation note:
-/// This route emits a `TreasuryProposalOperation::Withdraw` payload because
-/// that operation currently carries the full treasury identity/currency fields
-/// required by production effect translation/execution.
 #[post("/{coop_id}/spend")]
 pub async fn propose_spend(
     req: HttpRequest,
@@ -1023,13 +1018,12 @@ pub async fn propose_spend(
     let domain_id = GovernanceDomainId::new(&coop_id);
 
     let payload = ProposalPayload::Treasury {
-        operation: TreasuryProposalOperation::Withdraw {
+        operation: TreasuryProposalOperation::Spend {
             treasury_did: treasury.treasury_did.clone(),
-            currency: body.currency.clone(),
             amount: body.amount,
+            currency: body.currency.clone(),
             recipient: recipient_did,
-            purpose: body.memo.clone(),
-            budget_id: None,
+            memo: body.memo.clone(),
             nonce,
         },
     };
@@ -1061,7 +1055,7 @@ pub async fn propose_spend(
     let response = serde_json::json!({
         "status": "proposal_created",
         "message": "Treasury spend requires governance approval",
-        "operation": "withdraw",
+        "operation": "spend",
         "proposal_id": created_proposal_id.to_string(),
         "coop_id": coop_id,
         "amount": body.amount,
@@ -1275,7 +1269,7 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_propose_spend_creates_withdraw_operation_payload() {
+    async fn test_propose_spend_creates_spend_operation_payload() {
         let proposer = KeyPair::generate().unwrap();
         let recipient = KeyPair::generate().unwrap();
         let treasury_did = KeyPair::generate().unwrap().did().clone();
@@ -1337,24 +1331,22 @@ mod tests {
         assert_eq!(proposals.len(), 1);
         match &proposals[0].payload {
             ProposalPayload::Treasury { operation } => match operation {
-                TreasuryProposalOperation::Withdraw {
+                TreasuryProposalOperation::Spend {
                     treasury_did: op_treasury_did,
                     recipient: op_recipient,
                     amount,
                     currency,
-                    purpose,
-                    budget_id,
+                    memo,
                     nonce,
                 } => {
                     assert_eq!(op_treasury_did, &treasury_did);
                     assert_eq!(op_recipient, recipient.did());
                     assert_eq!(*amount, 42);
                     assert_eq!(currency, "credits");
-                    assert_eq!(purpose, "Ops budget");
-                    assert_eq!(budget_id, &None);
+                    assert_eq!(memo, "Ops budget");
                     assert_eq!(*nonce, 0);
                 }
-                other => panic!("expected Withdraw payload, got {other:?}"),
+                other => panic!("expected Spend payload, got {other:?}"),
             },
             other => panic!("expected Treasury payload, got {other:?}"),
         }
