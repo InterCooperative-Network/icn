@@ -659,13 +659,13 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                         return Ok(ExecutionOutcome::Success {
                             receipt_id: receipt_id.clone(),
                             effects: vec![format!(
-                                "{:?} {} {} from treasury {} {}{} -> state_hash={}",
+                                "{:?} {} {} from treasury {} -> state_hash={} {}{}",
                                 operation.operation_type,
                                 operation.amount,
                                 operation.currency,
                                 operation.treasury_id,
-                                LEDGER_ENTRY_MARKER,
                                 result.entry_hash,
+                                LEDGER_ENTRY_MARKER,
                                 result.entry_hash
                             )],
                         });
@@ -1149,7 +1149,11 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             // Format: "... -> state_hash=<hash>"
             let state_change_hash = effects.iter().find_map(|e| {
                 e.find("-> state_hash=").map(|pos| {
-                    e[pos + 14..].to_string() // Skip "-> state_hash="
+                    e[pos + 14..]
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or_default()
+                        .to_string() // Skip "-> state_hash="
                 })
             });
             let ledger_entry_id = effects.iter().find_map(|e| {
