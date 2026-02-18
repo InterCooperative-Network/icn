@@ -23,6 +23,14 @@ cd "$(git rev-parse --show-toplevel)"
 bash scripts/pilot_chain_demo.sh
 ```
 
+Deterministic mode (run-twice invariant comparison + JSON artifact):
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+PILOT_DETERMINISTIC=1 bash scripts/pilot_chain_demo.sh
+cat tmp/pilot_chain_summary.json
+```
+
 2. The script executes two tests:
    - `test_decision_to_ledger_provenance_end_to_end`
    - `test_ledger_entry_carries_decision_provenance`
@@ -37,8 +45,24 @@ Confirm all of the following in output:
 2. `PILOT_LEDGER_ENTRY_HASH=...`
 3. `TRIPWIRE: Tests passed`
 4. Final banner: `PILOT INVARIANT PROVEN`
+5. In deterministic mode:
+   - `DETERMINISM VERIFIED` when all compared fields match under active policy
+   - `DETERMINISM PARTIAL` when `decision_receipt_id` and `decision_hash` match but `ledger_entry_hash` differs (non-strict mode)
 
 The script exit code must be `0`.
+
+Deterministic mode writes `tmp/pilot_chain_summary.json` with:
+
+- `deterministic_mode`
+- `timestamp_utc`
+- `gateway_url`
+- `decision_receipt_id`
+- `decision_hash`
+- `ledger_entry_hash`
+
+Strict toggle:
+
+- `PILOT_DETERMINISTIC_STRICT=1` makes `ledger_entry_hash` mismatch a hard failure.
 
 ## Failure Handling
 
