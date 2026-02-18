@@ -160,6 +160,7 @@ if [ "$DETERMINISTIC_MODE" = "1" ]; then
     RUN2_LEDGER_ENTRY_HASH="$LEDGER_ENTRY_HASH"
 
     DET_FAIL=0
+    LEDGER_HASH_MISMATCH=0
     if [ "$RUN1_DECISION_RECEIPT_ID" != "$RUN2_DECISION_RECEIPT_ID" ]; then
         echo "❌ DETERMINISM FAILED: decision_receipt_id mismatch"
         echo "  run1: $RUN1_DECISION_RECEIPT_ID"
@@ -173,6 +174,7 @@ if [ "$DETERMINISTIC_MODE" = "1" ]; then
         DET_FAIL=1
     fi
     if [ "$RUN1_LEDGER_ENTRY_HASH" != "$RUN2_LEDGER_ENTRY_HASH" ]; then
+        LEDGER_HASH_MISMATCH=1
         if [ "$DETERMINISTIC_STRICT" = "1" ]; then
             echo "❌ DETERMINISM FAILED: ledger_entry_hash mismatch"
             echo "  run1: $RUN1_LEDGER_ENTRY_HASH"
@@ -190,7 +192,11 @@ if [ "$DETERMINISTIC_MODE" = "1" ]; then
         echo "Deterministic check failed."
         exit 1
     fi
-    echo "✅ DETERMINISM VERIFIED: run1 and run2 invariant identifiers match"
+    if [ "$LEDGER_HASH_MISMATCH" -eq 1 ] && [ "$DETERMINISTIC_STRICT" != "1" ]; then
+        echo "⚠️ DETERMINISM PARTIAL: decision ids/hashes match; ledger_entry_hash differs (set PILOT_DETERMINISTIC_STRICT=1 to enforce)"
+    else
+        echo "✅ DETERMINISM VERIFIED: run1 and run2 invariant identifiers match under active policy"
+    fi
     DECISION_RECEIPT_ID="$RUN1_DECISION_RECEIPT_ID"
     DECISION_HASH="$RUN1_DECISION_HASH"
     LEDGER_ENTRY_HASH="$RUN1_LEDGER_ENTRY_HASH"

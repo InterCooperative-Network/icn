@@ -45,7 +45,9 @@ Confirm all of the following in output:
 2. `PILOT_LEDGER_ENTRY_HASH=...`
 3. `TRIPWIRE: Tests passed`
 4. Final banner: `PILOT INVARIANT PROVEN`
-5. In deterministic mode: `DETERMINISM VERIFIED`
+5. In deterministic mode:
+   - `DETERMINISM VERIFIED` when all compared fields match under active policy
+   - `DETERMINISM PARTIAL` when `decision_receipt_id` and `decision_hash` match but `ledger_entry_hash` differs (non-strict mode)
 
 The script exit code must be `0`.
 
@@ -57,6 +59,10 @@ Deterministic mode writes `tmp/pilot_chain_summary.json` with:
 - `decision_receipt_id`
 - `decision_hash`
 - `ledger_entry_hash`
+
+Strict toggle:
+
+- `PILOT_DETERMINISTIC_STRICT=1` makes `ledger_entry_hash` mismatch a hard failure.
 
 ## Failure Handling
 
