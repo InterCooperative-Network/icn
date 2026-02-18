@@ -22,6 +22,7 @@ use crate::types::{
 };
 
 /// Handle governance.domain.list RPC call - list all governance domains
+/// Handle governance.domain.list RPC call - list all governance domains
 pub async fn handle_governance_domain_list(
     id: u64,
     state: &Arc<RpcServer>,
@@ -35,8 +36,8 @@ pub async fn handle_governance_domain_list(
         );
     }
 
-    let governance_handle = match state.governance_handle() {
-        Some(handle) => handle,
+    let governance_service = match state.governance_service() {
+        Some(service) => service,
         None => {
             return RpcResponse::error(
                 id,
@@ -46,7 +47,7 @@ pub async fn handle_governance_domain_list(
         }
     };
 
-    match governance_handle.list_domains().await {
+    match governance_service.list_domains().await {
         Ok(domains) => {
             let domain_infos: Vec<GovernanceDomainInfo> = domains
                 .into_iter()
@@ -75,10 +76,9 @@ pub async fn handle_governance_domain_list(
                 Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::internal_error(id, e),
+        Err(e) => RpcResponse::error(id, e.to_rpc_code(), e.to_string()),
     }
 }
-
 /// Handle governance.domain.get RPC call - get a specific domain
 pub async fn handle_governance_domain_get(
     id: u64,

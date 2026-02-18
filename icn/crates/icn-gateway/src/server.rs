@@ -467,6 +467,8 @@ impl GatewayServer {
         let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
         info!("Receipt store initialized");
 
+        let governance_handle_for_service = self.governance_handle.clone();
+
         // Create governance manager with Sled-backed action items
         // (uses GovernanceActor if handle available for proposals/votes/domains)
         let governance_manager: Arc<GovernanceManager> =
@@ -483,6 +485,10 @@ impl GatewayServer {
                         .with_receipt_store(receipt_store.clone()),
                 )
             };
+        let governance_service: Option<Arc<icn_api::GovernanceService>> =
+            governance_handle_for_service
+                .map(|handle| Arc::new(icn_api::GovernanceService::new(handle)));
+
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 
@@ -910,6 +916,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(community_manager.clone()))
                 .app_data(web::Data::new(steward_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
+                .app_data(web::Data::new(governance_service.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(session_manager.clone()))
                 .app_data(web::Data::new(trust_manager.clone()))

@@ -11,6 +11,8 @@ description = "Shared API service layer for ICN"
 icn-compute = { path = "../icn-compute" }
 icn-identity = { path = "../icn-identity" }
 icn-time = { path = "../icn-time" }
+icn-governance = { path = "../icn-governance" }
+icn-ledger = { path = "../icn-ledger" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
