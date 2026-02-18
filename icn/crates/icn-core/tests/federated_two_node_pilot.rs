@@ -130,6 +130,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         currency: currency.clone(),
         memo: "Pilot equipment purchase".to_string(),
         budget_id: None,
+        expected_nonce: 0,
         decision_receipt_id: decision_receipt_id.to_string(),
         decision_hash: decision_hash.clone(),
     };
@@ -155,6 +156,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         currency: currency.clone(),
         recipient: Some(recipient_did.to_string()),
         memo: "Pilot equipment purchase".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 
@@ -203,6 +205,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         currency: currency.clone(),
         recipient: Some(recipient_did.to_string()),
         memo: "Pilot equipment purchase".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 

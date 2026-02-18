@@ -887,6 +887,7 @@ mod tests {
                 currency: "COOP".to_string(),
                 purpose: "Equipment purchase".to_string(),
                 budget_id: None,
+                nonce: 0,
             },
         };
         let thresholds = config.thresholds_for_proposal(&payload);

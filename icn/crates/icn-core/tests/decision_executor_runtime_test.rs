@@ -298,6 +298,7 @@ fn spend_effect(decision_hash: &str) -> Vec<KernelEffect> {
         currency: "HOURS".to_string(),
         memo: "Test spend".to_string(),
         budget_id: None,
+        expected_nonce: 0,
         decision_receipt_id: "receipt-1".to_string(),
         decision_hash: decision_hash.to_string(),
     })]
@@ -311,6 +312,7 @@ fn budget_spend_effect(decision_hash: &str, budget_id: &str, amount: i64) -> Vec
         currency: "HOURS".to_string(),
         memo: "Budget spend".to_string(),
         budget_id: Some(budget_id.to_string()),
+        expected_nonce: 0,
         decision_receipt_id: "receipt-budget".to_string(),
         decision_hash: decision_hash.to_string(),
     })]
@@ -670,6 +672,7 @@ async fn test_treasury_entry_persisted_with_provenance() {
             currency: "HOURS".to_string(),
             memo: "Provenance persistence test".to_string(),
             budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
         })];

@@ -634,6 +634,11 @@ pub struct TreasuryEntryRequest {
     pub recipient: Option<String>,
     /// Human-readable memo
     pub memo: String,
+    /// Expected treasury nonce for spend replay protection.
+    ///
+    /// `Some(n)` is required for `Spend`; ignored for other operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_nonce: Option<u64>,
 
     // Provenance fields (pilot-critical)
     /// Decision receipt ID that authorized this entry (node-local reference)
@@ -713,6 +718,7 @@ impl TreasuryEntryRequest {
             currency: intent.unit.clone(),
             recipient: Some(intent.to.clone()),
             memo: intent.memo.clone().unwrap_or_default(),
+            expected_nonce: None,
             decision_receipt_id: intent.decision_receipt_id.clone(),
             decision_hash: decision_hash_hex,
         })

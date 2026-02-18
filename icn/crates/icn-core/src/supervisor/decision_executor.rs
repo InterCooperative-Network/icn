@@ -780,6 +780,7 @@ mod tests {
             currency: "HOURS".to_string(),
             memo: "Test".to_string(),
             budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: "receipt-t1".to_string(),
             decision_hash: "sha256:treasury-hash-1".to_string(),
         })];
@@ -814,6 +815,7 @@ mod tests {
                 currency: "ICN".to_string(),
                 memo: "m".to_string(),
                 budget_id: None,
+                expected_nonce: 0,
                 decision_receipt_id: "r1".to_string(),
                 decision_hash: "extracted-hash".to_string(),
             }),

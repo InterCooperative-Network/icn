@@ -75,6 +75,12 @@ pub enum TreasuryEffect {
         /// before submitting the ledger entry.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         budget_id: Option<String>,
+        /// Expected treasury nonce at execution time for replay protection.
+        ///
+        /// The executor checks this against the current stored treasury nonce
+        /// before append. Mismatch rejects the spend.
+        #[serde(default)]
+        expected_nonce: u64,
         /// Links back to governance decision receipt
         decision_receipt_id: String,
         /// Canonical content hash for verification
@@ -373,6 +379,7 @@ mod tests {
             currency: "HOURS".into(),
             memo: "Tool purchase".into(),
             budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: "receipt-456".into(),
             decision_hash: "abc123".into(),
         };
@@ -397,6 +404,7 @@ mod tests {
             currency: "USD".into(),
             memo: "test".into(),
             budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: "r1".into(),
             decision_hash: "hash1".into(),
         });
@@ -431,6 +439,7 @@ mod tests {
             currency: String::new(),
             memo: String::new(),
             budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: String::new(),
             decision_hash: String::new(),
         };
@@ -477,6 +486,7 @@ mod tests {
                 currency: "HOURS".into(),
                 memo: "Tool purchase".into(),
                 budget_id: None,
+                expected_nonce: 0,
                 decision_receipt_id: "receipt-456".into(),
                 decision_hash: "abc123".into(),
             }),
@@ -604,6 +614,7 @@ mod tests {
                 currency: "USD".into(),
                 memo: "test".into(),
                 budget_id: None,
+                expected_nonce: 0,
                 decision_receipt_id: "r1".into(),
                 decision_hash: "h1".into(),
             },
