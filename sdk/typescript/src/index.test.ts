@@ -589,6 +589,157 @@ describe('compute task cancellation', () => {
   });
 });
 
+describe('flow c sdk methods', () => {
+  it('should get treasury balance via flow c alias route', async () => {
+    const mockResponse = {
+      treasury_did: 'did:icn:treasury123',
+      balances: { credits: 4200 },
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.treasury.balance('coop-alpha');
+
+    expect(result).toEqual(mockResponse);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/coops/coop-alpha/treasury/balance');
+    expect(options.method).toBe('GET');
+  });
+
+  it('should propose treasury spend via flow c alias route', async () => {
+    const mockResponse = {
+      status: 'proposal_created',
+      message: 'Treasury spend requires governance approval',
+      operation: 'spend',
+      proposal_id: 'prop-abc',
+      coop_id: 'coop-alpha',
+      amount: 150,
+      currency: 'credits',
+      recipient: 'did:icn:bob',
+      memo: 'equipment',
+      nonce: 7,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const req = {
+      amount: 150,
+      recipient: 'did:icn:bob',
+      memo: 'equipment',
+      currency: 'credits',
+    };
+    const result = await client.governance.proposeSpend('coop-alpha', req);
+
+    expect(result).toEqual(mockResponse);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/coops/coop-alpha/proposals');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual(req);
+  });
+
+  it('should vote via flow c alias route with choice and comment', async () => {
+    const mockResponse = {
+      id: 'prop-abc',
+      domain_id: 'coop-alpha',
+      proposer: 'did:icn:alice',
+      title: 'Treasury Spend: 150 credits',
+      description: 'Proposal to spend 150 credits',
+      payload: { type: 'treasury' },
+      state: { open: { opened_at: 1700000000, closes_at: 1700003600 } },
+      created_at: 1700000000,
+      updated_at: 1700000100,
+      scope: 'local',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.governance.vote('prop-abc', 'for', 'looks good');
+
+    expect(result).toEqual(mockResponse);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/proposals/prop-abc/vote');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({
+      choice: 'for',
+      comment: 'looks good',
+    });
+  });
+
+  it('should fetch governance proof via flow c alias route', async () => {
+    const mockResponse = {
+      receipt: {
+        proposal_id: 'prop-abc',
+        domain_id: 'coop-alpha',
+        outcome: 'accepted',
+        vote_tally: {
+          for_votes: 3,
+          against_votes: 1,
+          abstain_votes: 0,
+        },
+        vote_hash: Array(32).fill(1),
+        decision_hash: Array(32).fill(2),
+      },
+      attestations: [
+        {
+          decision_hash: Array(32).fill(2),
+          signer_did: 'did:icn:validator1',
+          timestamp: 1700000200,
+          signature: Array(64).fill(3),
+        },
+      ],
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.governance.getProof('prop-abc');
+
+    expect(result).toEqual(mockResponse);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/proposals/prop-abc/proof');
+    expect(options.method).toBe('GET');
+  });
+});
+
 describe('compute task status', () => {
   it('should get task status', async () => {
     const mockResponse = {
