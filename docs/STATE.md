@@ -24,7 +24,7 @@
 - No panics in protocol/network/actor runtime paths.
 - Demo status docs note STUN discovery disabled for local-only testing; re-validate before demo.
 
-## Current status (2026-02-11 snapshot)
+## Current status (2026-02-18 snapshot)
 - **Sprint 8-10 Economics Consolidation complete** - Full deterministic economic receipt chain implemented:
   - CanonicalReceipt trait with Blake3-based deterministic hashing
   - AllocationReceipt and SettlementIntent types with order-independent canonical hashes
@@ -35,11 +35,11 @@
   - Demo scripts and E2E tests for cross-node determinism
 - Historical roadmap reference: `docs/development/sessions/undated/ROADMAP.md` (point-in-time planning document).
 - Current architecture and migration direction: `docs/PHASE_HISTORY.md` and `docs/architecture/KERNEL_APP_SEPARATION.md`.
-- CI status docs (docs/ci/CI_CURRENT_STATUS.md) last updated 2026-01-20.
+- CI status docs (docs/ci/CI_CURRENT_STATUS.md) are snapshot-based; re-verify before release decisions.
 - Local CI baseline 2026-02-11 passed with rustc 1.88.0 (icn/rust-toolchain.toml).
 - K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.
-- Demo status doc (2025-12-18) reports daemon/gateway/UI running; re-validate before presenting.
-- Homelab deployment (docs/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).
+- Demo status docs include 2025-12 historical snapshots; use docs/demo/ and live smoke checks for current operational truth.
+- Homelab deployment (docs/operations/deployment/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).
 
 
 ## Code review findings (2026-01-20)
@@ -74,5 +74,5 @@
 - docs/ci/CI_CURRENT_STATUS.md
 - docs/status/TESTS_FIXED_STATUS.md
 - docs/status/CURRENT_SYSTEM_STATUS.md
-- docs/HOMELAB_DEPLOYMENT.md
+- docs/operations/deployment/HOMELAB_DEPLOYMENT.md
 - deploy/README.md

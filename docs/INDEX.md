@@ -2,7 +2,7 @@
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
 
-**Last Updated**: 2026-02-10  
+**Last Updated**: 2026-02-18  
 **Version**: 2.0 (Post-Phase 2C Reorganization)
 
 ---
@@ -160,6 +160,7 @@ Deployment and operations documentation:
 - [operations-guide.md](guides/operations/operations-guide.md) - General operations
 - [backup-and-recovery.md](guides/operations/backup-and-recovery.md) - Backup procedures
 - [replication-operations.md](guides/operations/replication-operations.md) - Storage replication
+- [pilot-smoke.md](guides/operations/pilot-smoke.md) - Deterministic pilot linkage smoke runbook
 - [troubleshooting.md](guides/operations/troubleshooting.md) - Common issues and solutions
 
 ### Quick References
