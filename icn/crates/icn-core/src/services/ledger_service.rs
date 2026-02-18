@@ -135,6 +135,38 @@ impl LedgerServiceImpl {
             }
         }
     }
+
+    /// Find an existing journal entry by governance decision receipt id.
+    ///
+    /// This provides ledger-bound idempotency for treasury mutations:
+    /// a receipt id may map to at most one durable entry.
+    fn find_existing_entry_for_receipt(
+        ledger: &Ledger,
+        decision_receipt_id: &str,
+    ) -> Result<Option<(String, Option<String>)>, String> {
+        let entries = ledger
+            .get_all_entries()
+            .map_err(|e| format!("Failed to query ledger entries: {e}"))?;
+
+        for mut existing_entry in entries {
+            if existing_entry.decision_receipt_id.as_deref() != Some(decision_receipt_id) {
+                continue;
+            }
+
+            let entry_hash_hex = if let Some(existing_hash) = existing_entry.id.clone() {
+                existing_hash.to_hex()
+            } else {
+                existing_entry
+                    .get_hash()
+                    .map_err(|e| format!("Failed to compute existing entry hash: {e}"))?
+                    .to_hex()
+            };
+
+            return Ok(Some((entry_hash_hex, existing_entry.decision_hash.clone())));
+        }
+
+        Ok(None)
+    }
 }
 
 impl LedgerService for LedgerServiceImpl {
@@ -225,25 +257,52 @@ impl LedgerService for LedgerServiceImpl {
             .build()
             .map_err(|e| format!("Failed to build journal entry: {e}"))?;
 
-        // Append to ledger (async operation in sync context)
-        let entry_hash = tokio::task::block_in_place(|| {
+        // Idempotent append at ledger boundary:
+        // - If receipt_id already exists, return existing entry hash.
+        // - Otherwise append exactly once.
+        let (entry_hash_hex, was_idempotent_replay) = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let mut ledger = self.ledger.write().await;
-                ledger
+
+                if let Some((existing_entry_hash, existing_decision_hash)) =
+                    Self::find_existing_entry_for_receipt(&ledger, &req.decision_receipt_id)?
+                {
+                    if let Some(existing_decision_hash) = existing_decision_hash {
+                        if existing_decision_hash != req.decision_hash {
+                            return Err(format!(
+                                "Decision hash mismatch for receipt {}: existing={}, requested={}",
+                                req.decision_receipt_id, existing_decision_hash, req.decision_hash
+                            ));
+                        }
+                    }
+
+                    return Ok((existing_entry_hash, true));
+                }
+
+                let entry_hash = ledger
                     .append_entry(entry)
                     .await
-                    .map_err(|e| format!("Failed to append ledger entry: {e}"))
+                    .map_err(|e| format!("Failed to append ledger entry: {e}"))?;
+
+                Ok((entry_hash.to_hex(), false))
             })
         })?;
 
-        let entry_hash_hex = entry_hash.to_hex();
-
-        info!(
-            entry_hash = %entry_hash_hex,
-            decision_receipt_id = %req.decision_receipt_id,
-            decision_hash = %req.decision_hash,
-            "Treasury entry submitted to ledger"
-        );
+        if was_idempotent_replay {
+            info!(
+                entry_hash = %entry_hash_hex,
+                decision_receipt_id = %req.decision_receipt_id,
+                decision_hash = %req.decision_hash,
+                "Treasury entry already exists for decision receipt (idempotent replay)"
+            );
+        } else {
+            info!(
+                entry_hash = %entry_hash_hex,
+                decision_receipt_id = %req.decision_receipt_id,
+                decision_hash = %req.decision_hash,
+                "Treasury entry submitted to ledger"
+            );
+        }
 
         Ok(TreasuryEntryResult {
             entry_hash: entry_hash_hex,
@@ -256,6 +315,10 @@ impl LedgerService for LedgerServiceImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_identity::KeyPair;
+    use icn_kernel_api::AllowAllOracle;
+    use icn_store::SledStore;
+    use tempfile::TempDir;
 
     // Note: Full integration tests require a real ledger instance.
     // These unit tests verify the basic structure.
@@ -277,5 +340,105 @@ mod tests {
         // These must be non-empty for pilot invariant
         assert!(!req.decision_receipt_id.is_empty());
         assert!(!req.decision_hash.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_treasury_entry_is_idempotent_by_receipt_id() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let recipient_did = KeyPair::generate().unwrap().did().clone();
+
+        let ledger_store = Arc::new(SledStore::temporary().unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+        let service = LedgerServiceImpl::new(
+            ledger.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.clone(),
+        );
+
+        let request = TreasuryEntryRequest {
+            treasury_id: "t1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 50,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "idempotency check".to_string(),
+            decision_receipt_id: "gov:proposal:pr3:idempotency:001".to_string(),
+            decision_hash: "decision-hash-pr3-001".to_string(),
+        };
+
+        let first = service.submit_treasury_entry(request.clone()).unwrap();
+        let count_after_first = ledger.read().await.count_entries().unwrap();
+        let treasury_balance_after_first = ledger.read().await.get_balance(&treasury_did, "HOURS");
+        assert_eq!(count_after_first, 1);
+
+        let second = service.submit_treasury_entry(request).unwrap();
+        let count_after_second = ledger.read().await.count_entries().unwrap();
+        let treasury_balance_after_second = ledger.read().await.get_balance(&treasury_did, "HOURS");
+
+        assert_eq!(
+            second.entry_hash, first.entry_hash,
+            "replayed decision receipt id must return existing entry hash"
+        );
+        assert_eq!(
+            count_after_second, 1,
+            "ledger must append at most one entry per decision receipt id"
+        );
+        assert_eq!(
+            treasury_balance_after_second, treasury_balance_after_first,
+            "idempotent replay must not mutate balances"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_treasury_entry_idempotency_survives_restart() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let recipient_did = KeyPair::generate().unwrap().did().clone();
+        let tmp = TempDir::new().unwrap();
+        let ledger_path = tmp.path().join("ledger");
+        std::fs::create_dir_all(&ledger_path).unwrap();
+
+        let request = TreasuryEntryRequest {
+            treasury_id: "t1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 75,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "restart idempotency".to_string(),
+            decision_receipt_id: "gov:proposal:pr3:idempotency:restart".to_string(),
+            decision_hash: "decision-hash-pr3-restart".to_string(),
+        };
+
+        let first_hash = {
+            let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+            let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+            let service = LedgerServiceImpl::new(
+                ledger.clone(),
+                Arc::new(AllowAllOracle::wildcard()),
+                treasury_did.clone(),
+            );
+
+            let first = service.submit_treasury_entry(request.clone()).unwrap();
+            assert_eq!(ledger.read().await.count_entries().unwrap(), 1);
+            first.entry_hash
+        };
+
+        let second_hash = {
+            let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+            let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+            let service = LedgerServiceImpl::new(
+                ledger.clone(),
+                Arc::new(AllowAllOracle::wildcard()),
+                treasury_did,
+            );
+
+            let second = service.submit_treasury_entry(request).unwrap();
+            assert_eq!(ledger.read().await.count_entries().unwrap(), 1);
+            second.entry_hash
+        };
+
+        assert_eq!(
+            second_hash, first_hash,
+            "receipt-based idempotency must survive process restart"
+        );
     }
 }
