@@ -286,6 +286,9 @@ mod tests {
     use super::*;
     use icn_governance::TreasuryProposalOperation;
     use icn_identity::Did;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_translate_treasury_spend_preserves_decision_provenance() {
@@ -347,6 +350,7 @@ mod tests {
 
     #[test]
     fn test_pilot_treasury_ops_do_not_fall_back_to_noop_with_legacy_env_flag() {
+        let _env_guard = ENV_LOCK.lock().expect("env lock");
         // Legacy env gating was removed from runtime; keep this regression test to
         // ensure pilot treasury operations remain effect-path translated even when
         // old env flags are present.

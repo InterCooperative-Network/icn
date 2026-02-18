@@ -164,8 +164,11 @@ mod tests {
     use icn_kernel_api::events::SystemEvent;
     use std::sync::{Arc, Mutex};
 
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
     #[test]
     fn test_pilot_proposal_uses_effect_subscription_even_with_legacy_env_flag() {
+        let _env_guard = ENV_LOCK.lock().expect("env lock");
         // Legacy env switch was removed; this test proves pilot treasury proposals
         // still route through the effect-path subscription callback.
         std::env::set_var("ICN_USE_EFFECT_PATH", "0");
