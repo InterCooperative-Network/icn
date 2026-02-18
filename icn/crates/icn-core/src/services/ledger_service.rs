@@ -265,6 +265,19 @@ impl LedgerServiceImpl {
         Ok(())
     }
 
+    // Treasury Spend enforcement contract:
+    //
+    // 1) Receipt idempotency (`decision_receipt_id`) prevents re-applying the same decision.
+    //    Same receipt returns an existing entry hash with no new append.
+    // 2) Nonce enforcement prevents stale/out-of-order spends.
+    //    It is evaluated only when receipt idempotency does not short-circuit.
+    // 3) Nonce check + append must run under the same ledger write lock in
+    //    `submit_treasury_entry`, so mismatch rejects without partial mutation.
+    //
+    // Meaning Firewall note:
+    // - `expected_nonce` is supplied at the policy boundary (wallet/proposal payload).
+    // - Translator/wiring does not read ledger state to derive nonce.
+    // - Ledger is the enforcement boundary and returns deterministic mismatch errors.
     fn check_spend_nonce(&self, req: &TreasuryEntryRequest) -> Result<(), String> {
         if req.operation_type != TreasuryOperationType::Spend {
             return Ok(());

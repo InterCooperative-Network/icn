@@ -75,10 +75,11 @@ pub enum TreasuryEffect {
         /// before submitting the ledger entry.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         budget_id: Option<String>,
-        /// Expected treasury nonce at execution time for replay protection.
+        /// Expected treasury nonce provided by the policy layer for spend ordering.
         ///
-        /// The executor checks this against the current stored treasury nonce
-        /// before append. Mismatch rejects the spend.
+        /// The translator/wiring passes this value through without reading ledger
+        /// state. The ledger boundary enforces it against stored nonce before append.
+        /// Mismatch rejects stale/out-of-order spends deterministically.
         #[serde(default)]
         expected_nonce: u64,
         /// Links back to governance decision receipt
