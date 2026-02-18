@@ -52,6 +52,9 @@ pub struct TreasuryOperation {
     pub currency: String,
     pub recipient: Option<String>,
     pub memo: String,
+    /// Expected treasury nonce (Spend only). `None` for operations without nonce checks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_nonce: Option<u64>,
     /// Canonical decision hash for provenance (cross-node anchor)
     pub decision_hash: Option<String>,
 }
@@ -248,6 +251,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                         success: true,
                         message: "Protocol effect applied".to_string(),
                         state_change_hash: None,
+                        ledger_entry_id: None,
                     })
                 }
             }
@@ -256,6 +260,7 @@ impl EffectExecutor for DefaultEffectExecutor {
                 success: true,
                 message: format!("NoOp: {}", reason),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
             // For other effect types, return success placeholder
             _ => Ok(EffectResult {
@@ -263,13 +268,16 @@ impl EffectExecutor for DefaultEffectExecutor {
                 success: true,
                 message: "Effect type not yet implemented".to_string(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
         }
     }
 }
 
-/// Convert a TreasuryEffect to a TreasuryOperation
-fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
+/// Convert a TreasuryEffect to a TreasuryOperation.
+///
+/// This is the canonical mapping — icn-core delegates here to avoid drift.
+pub fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
     match effect {
         TreasuryEffect::Spend {
             treasury_did,
@@ -277,6 +285,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             amount,
             currency,
             memo,
+            expected_nonce,
             decision_hash,
             ..
         } => TreasuryOperation {
@@ -286,6 +295,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(recipient_did.clone()),
             memo: memo.clone(),
+            expected_nonce: Some(*expected_nonce),
             decision_hash: Some(decision_hash.clone()),
         },
         TreasuryEffect::CreateBudget {
@@ -303,6 +313,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: name.clone(),
+            expected_nonce: None,
             decision_hash: Some(decision_hash.clone()),
         },
         TreasuryEffect::Allocate {
@@ -317,6 +328,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(budget_id.clone()),
             memo: "Budget allocation".to_string(),
+            expected_nonce: None,
             decision_hash: None,
         },
         TreasuryEffect::Transfer {
@@ -332,7 +344,26 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: currency.clone(),
             recipient: Some(to_did.clone()),
             memo: memo.clone(),
+            expected_nonce: None,
             decision_hash: None,
+        },
+        TreasuryEffect::ReleaseEscrow {
+            treasury_did,
+            beneficiary_did,
+            amount,
+            currency,
+            escrow_id,
+            decision_hash,
+            ..
+        } => TreasuryOperation {
+            treasury_id: treasury_did.clone(),
+            operation_type: TreasuryOperationType::Release,
+            amount: *amount,
+            currency: currency.clone(),
+            recipient: Some(beneficiary_did.clone()),
+            memo: format!("Escrow release: {}", escrow_id),
+            expected_nonce: None,
+            decision_hash: Some(decision_hash.clone()),
         },
         // Other treasury effects mapped to basic operations
         _ => TreasuryOperation {
@@ -342,6 +373,7 @@ fn treasury_effect_to_operation(effect: &TreasuryEffect) -> TreasuryOperation {
             currency: "UNKNOWN".to_string(),
             recipient: None,
             memo: "Unmapped treasury effect".to_string(),
+            expected_nonce: None,
             decision_hash: None,
         },
     }
@@ -385,18 +417,21 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             success: true,
             message: effects.join("; "),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: false,
             message: reason,
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: true,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
     }
 }
@@ -468,11 +503,13 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some("did:icn:abc123".to_string()),
             memo: "Equipment purchase".to_string(),
+            expected_nonce: Some(7),
             decision_hash: Some("sha256:abc123".to_string()),
         };
         let json = serde_json::to_string(&op).unwrap();
         let parsed: TreasuryOperation = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.amount, 1000);
+        assert_eq!(parsed.expected_nonce, Some(7));
         assert_eq!(parsed.decision_hash, Some("sha256:abc123".to_string()));
     }
 

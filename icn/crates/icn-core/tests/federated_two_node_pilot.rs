@@ -129,6 +129,8 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         amount,
         currency: currency.clone(),
         memo: "Pilot equipment purchase".to_string(),
+        budget_id: None,
+        expected_nonce: 0,
         decision_receipt_id: decision_receipt_id.to_string(),
         decision_hash: decision_hash.clone(),
     };
@@ -154,6 +156,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         currency: currency.clone(),
         recipient: Some(recipient_did.to_string()),
         memo: "Pilot equipment purchase".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 
@@ -202,6 +205,7 @@ async fn test_two_node_treasury_spend_determinism() -> Result<()> {
         currency: currency.clone(),
         recipient: Some(recipient_did.to_string()),
         memo: "Pilot equipment purchase".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 
@@ -714,6 +718,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             success: true,
                             message: effects.join("; "),
                             state_change_hash: extract_state_hash_from_effects(&effects),
+                            ledger_entry_id: None,
                         }
                     }
                     _ => panic!("Batch effect failed on Node A"),
@@ -724,6 +729,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                 success: true,
                 message: reason.clone(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             },
             _ => panic!("Unexpected effect type in batch"),
         };
@@ -759,6 +765,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                             success: true,
                             message: effects.join("; "),
                             state_change_hash: extract_state_hash_from_effects(&effects),
+                            ledger_entry_id: None,
                         }
                     }
                     _ => panic!("Batch effect failed on Node B"),
@@ -769,6 +776,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
                 success: true,
                 message: reason.clone(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             },
             _ => panic!("Unexpected effect type in batch"),
         };

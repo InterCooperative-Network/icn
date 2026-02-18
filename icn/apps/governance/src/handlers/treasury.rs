@@ -282,6 +282,7 @@ impl TreasuryHandler {
                 currency: currency.clone(),
                 recipient: Some(recipient.clone()),
                 memo: disburse_params.memo.clone(),
+                expected_nonce: Some(0),
                 decision_hash: Some(decision_hash_hex),
             };
 
@@ -418,6 +419,15 @@ fn to_kernel_operation(
         .and_then(|v| v.as_str())
         .unwrap_or(&ctx.domain_id)
         .to_string();
+    let expected_nonce = match operation_type {
+        TreasuryOperationType::Spend => Some(
+            ctx.payload
+                .get("nonce")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0),
+        ),
+        _ => None,
+    };
 
     KernelTreasuryOperation {
         treasury_id,
@@ -426,6 +436,7 @@ fn to_kernel_operation(
         currency,
         recipient,
         memo,
+        expected_nonce,
         decision_hash: None, // Set by caller with actual decision hash
     }
 }

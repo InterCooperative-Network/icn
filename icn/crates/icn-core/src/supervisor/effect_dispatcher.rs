@@ -115,6 +115,7 @@ impl EffectDispatcher {
                         success: false,
                         message: format!("Execution error: {}", e),
                         state_change_hash: None,
+                        ledger_entry_id: None,
                     });
                 }
             }
@@ -383,6 +384,8 @@ mod tests {
             amount: 1000,
             currency: "ICN".to_string(),
             memo: "Test payment".to_string(),
+            budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: "test-receipt-001".to_string(),
             decision_hash: "sha256:abc123".to_string(),
         })];
@@ -446,6 +449,8 @@ mod tests {
                     amount: 100,
                     currency: "ICN".to_string(),
                     memo: "test".to_string(),
+                    budget_id: None,
+                    expected_nonce: 0,
                     decision_receipt_id: "r1".to_string(),
                     decision_hash: "sha256:test".to_string(),
                 }
@@ -594,6 +599,8 @@ mod tests {
             amount,
             currency: currency.to_string(),
             memo: "Development grant for Q1".to_string(),
+            budget_id: None,
+            expected_nonce: 0,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: "sha256:governance-decision-2024-001".to_string(),
         };

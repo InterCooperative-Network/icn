@@ -113,6 +113,7 @@ pub async fn run_supervisor(
             coop: gateway_handles.coop,
             community: gateway_handles.community,
             trust_service: gateway_handles.trust_service,
+            ledger_service: gateway_handles.ledger_service,
             governance: gateway_handles.governance,
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
@@ -599,11 +600,17 @@ async fn spawn_actors_with_identity(
         // Wire ledger service adapter
         let oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle> =
             Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
-        let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new(
-            ledger_handle.clone(),
-            oracle,
-            treasury_did.clone(),
-        ));
+        let receipt_index_path = config.store_path().join("ledger-receipt-index");
+        let receipt_index_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&receipt_index_path)?);
+        let ledger_service: Arc<dyn icn_kernel_api::services::LedgerService> =
+            Arc::new(crate::services::LedgerServiceImpl::new_with_receipt_index(
+                ledger_handle.clone(),
+                oracle,
+                treasury_did.clone(),
+                receipt_index_store,
+            ));
+        gateway_handles.ledger_service = Some(ledger_service.clone());
         kernel_executor = kernel_executor.with_ledger_service(ledger_service);
 
         // Wire federation service adapter if available
@@ -627,14 +634,74 @@ async fn spawn_actors_with_identity(
         kernel_executor = kernel_executor.with_membership_service(membership_service);
         info!("✓ Membership service wired to governance executor");
 
+        // Create escrow store for domain-level idempotency
+        let escrow_store_path = config.store_path().join("escrow");
+        let escrow_sled_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&escrow_store_path)?);
+        let escrow_store: Arc<dyn icn_kernel_api::escrow::EscrowStore> =
+            Arc::new(super::escrow_store::SledEscrowStore::new(escrow_sled_store));
+        kernel_executor = kernel_executor.with_escrow_store(escrow_store);
+        info!("✓ Escrow store wired to governance executor");
+
+        // Create budget store for budget enforcement
+        let budget_store_path = config.store_path().join("budget");
+        let budget_sled_db = sled::open(&budget_store_path)?;
+        let budget_store: Arc<dyn icn_kernel_api::budget::BudgetStore> =
+            Arc::new(super::budget_store::SledBudgetStore::new(&budget_sled_db)?);
+        kernel_executor = kernel_executor.with_budget_store(budget_store);
+        info!("✓ Budget store wired to governance executor");
+
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
             Arc::new(kernel_executor),
         ));
 
-        // Create callback that routes effects through dispatcher
+        // Create execution store for persistent idempotency tracking
+        let exec_store_path = config.store_path().join("execution");
+        let exec_sled_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&exec_store_path)?);
+        let execution_store: Arc<dyn icn_kernel_api::execution::ExecutionStore> = Arc::new(
+            super::execution_store::SledExecutionStore::new(exec_sled_store),
+        );
+        info!(
+            "Execution store opened at {} for decision idempotency",
+            exec_store_path.display()
+        );
+
+        // Wrap dispatcher with DecisionExecutor for idempotent execution
+        let decision_executor = Arc::new(super::decision_executor::DecisionExecutor::new(
+            effect_dispatcher,
+            execution_store,
+        ));
+
+        // Recover in-flight decisions from prior crash
+        // This must run BEFORE the event subscription is established
+        // so we don't race with new incoming decisions.
+        match decision_executor.recover_in_flight().await {
+            Ok(report) => {
+                if report.total() > 0 {
+                    info!(
+                        confirmed = report.recovered_confirmed,
+                        failed = report.recovered_failed,
+                        skipped = report.skipped_no_effects + report.skipped_max_retries,
+                        "Startup recovery: processed {} in-flight decisions",
+                        report.total()
+                    );
+                } else {
+                    debug!("Startup recovery: no in-flight decisions found");
+                }
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    "Startup recovery failed (non-fatal, new decisions will still process)"
+                );
+            }
+        }
+
+        // Create callback that routes effects through DecisionExecutor
         let effect_callback =
-            super::effect_dispatcher::create_effect_executor_callback(effect_dispatcher);
+            super::decision_executor::create_decision_executor_callback(decision_executor);
 
         // Create effect-based subscription via factory from BootstrapHandles
         // (avoids direct icn_governance_actor reference from lifecycle.rs)

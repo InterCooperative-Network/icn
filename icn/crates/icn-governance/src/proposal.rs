@@ -756,6 +756,12 @@ pub enum TreasuryProposalOperation {
         purpose: String,
         /// Optional budget to charge against
         budget_id: Option<String>,
+        /// Expected treasury nonce at execution time.
+        ///
+        /// Defaults to 0 for backwards-compatible deserialization of older
+        /// proposals that did not carry a nonce field.
+        #[serde(default)]
+        nonce: u64,
     },
 
     /// Transfer funds between budgets
