@@ -12,13 +12,14 @@ The smoke command runs targeted integration tests and fails fast if linkage brea
 
 1. Repository checked out locally.
 2. Rust toolchain installed for the workspace.
-3. Run from repo root (`/home/ubuntu/projects/icn`).
+3. Run from the repository root (the directory that contains `icn/`, `scripts/`, and `docs/`).
 
 ## Procedure
 
 1. Run the one-command smoke verification:
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 bash scripts/pilot_chain_demo.sh
 ```
 
