@@ -692,7 +692,9 @@ async fn test_treasury_entry_persisted_with_provenance() {
         let record = exec_store.get(decision_hash).unwrap().unwrap();
         assert_eq!(record.status, ExecutionStatus::Confirmed);
         assert_eq!(record.ledger_entry_ids.len(), 1);
+        assert_eq!(record.state_change_hashes.len(), 1);
         let entry_hash = record.ledger_entry_ids[0].clone();
+        assert_eq!(record.state_change_hashes[0], entry_hash);
 
         let hash = content_hash_from_hex(&entry_hash);
         assert!(hash.is_ok(), "ledger entry id must parse as ContentHash");
@@ -873,6 +875,10 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
     let reopened_record = reopened_exec_store.get(decision_hash).unwrap().unwrap();
     assert_eq!(reopened_record.status, ExecutionStatus::Confirmed);
     assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
+    assert_eq!(
+        reopened_record.state_change_hashes,
+        reopened_record.ledger_entry_ids
+    );
 }
 
 /// Test 12: Treasury Spend payload translates to a treasury spend effect.
