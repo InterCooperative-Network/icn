@@ -259,6 +259,18 @@ components:
             format: int64
           propertyNames:
             type: string
+        credit_limits:
+          type:
+          - object
+          - 'null'
+          description: |-
+            Credit limits per currency (max negative balance allowed)
+            Absence of a key means no credit limit for that currency
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
         did:
           type: string
     BanMemberRequest:

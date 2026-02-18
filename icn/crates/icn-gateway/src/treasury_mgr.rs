@@ -53,6 +53,8 @@ pub struct GatewayTreasuryManager {
     treasury_handle: Option<TreasuryHandle>,
     /// Optional handle to daemon's Ledger (for balance queries)
     ledger_handle: Option<LedgerHandle>,
+    /// Optional ledger service handle for treasury nonce queries.
+    ledger_service_handle: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
 }
 
 impl GatewayTreasuryManager {
@@ -66,6 +68,7 @@ impl GatewayTreasuryManager {
             standalone: Some(LedgerTreasuryManager::new()),
             treasury_handle: None,
             ledger_handle: None,
+            ledger_service_handle: None,
         }
     }
 
@@ -82,6 +85,7 @@ impl GatewayTreasuryManager {
             standalone: None,
             treasury_handle: Some(handle),
             ledger_handle: None,
+            ledger_service_handle: None,
         }
     }
 
@@ -92,6 +96,15 @@ impl GatewayTreasuryManager {
     pub fn set_ledger_handle(&mut self, handle: LedgerHandle) {
         debug!("GatewayTreasuryManager wired to daemon Ledger for balance queries");
         self.ledger_handle = Some(handle);
+    }
+
+    /// Set ledger service handle for nonce queries.
+    pub fn set_ledger_service_handle(
+        &mut self,
+        handle: Arc<dyn icn_kernel_api::services::LedgerService>,
+    ) {
+        debug!("GatewayTreasuryManager wired to daemon LedgerService for nonce queries");
+        self.ledger_service_handle = Some(handle);
     }
 
     /// Check if running in actor-backed mode
@@ -388,6 +401,19 @@ impl GatewayTreasuryManager {
             return Ok(account_balances.balances);
         }
         Ok(HashMap::new()) // Ledger not wired
+    }
+
+    /// Get current nonce for a treasury identity from the ledger service.
+    ///
+    /// Returns `None` when no ledger service is wired.
+    pub async fn get_treasury_nonce(&self, treasury_id: &str) -> Result<Option<u64>> {
+        if let Some(ref service) = self.ledger_service_handle {
+            let nonce = service
+                .get_treasury_nonce(treasury_id)
+                .map_err(anyhow::Error::msg)?;
+            return Ok(Some(nonce));
+        }
+        Ok(None)
     }
 
     // ============================================================================
