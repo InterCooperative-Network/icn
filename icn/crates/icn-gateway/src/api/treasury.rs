@@ -358,6 +358,14 @@ pub async fn get_treasury_balance(
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
+    do_get_treasury_balance(req, path, treasury_mgr).await
+}
+
+pub(crate) async fn do_get_treasury_balance(
+    req: HttpRequest,
+    path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
     let coop_id = path.into_inner();
@@ -949,6 +957,16 @@ fn default_spend_currency() -> String {
 /// Requires governance approval before execution.
 #[post("/{coop_id}/spend")]
 pub async fn propose_spend(
+    req: HttpRequest,
+    path: web::Path<String>,
+    body: web::Json<SpendRequest>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    governance_mgr: web::Data<Arc<GovernanceManager>>,
+) -> Result<HttpResponse> {
+    do_propose_spend(req, path, body, treasury_mgr, governance_mgr).await
+}
+
+pub(crate) async fn do_propose_spend(
     req: HttpRequest,
     path: web::Path<String>,
     body: web::Json<SpendRequest>,
