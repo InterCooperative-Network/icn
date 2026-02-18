@@ -1158,7 +1158,7 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             });
             let ledger_entry_id = effects.iter().find_map(|e| {
                 let (_, entry_id) = e.rsplit_once(LEDGER_ENTRY_MARKER)?;
-                let entry_id = entry_id.split_whitespace().next()?.trim();
+                let entry_id = entry_id.split_whitespace().next()?;
                 if entry_id.is_empty() {
                     None
                 } else {
