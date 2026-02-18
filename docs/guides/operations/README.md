@@ -8,6 +8,7 @@ This directory contains operational guides for running and maintaining ICN nodes
 - **troubleshooting.md** - Troubleshooting common issues
 - **operations-guide.md** - General operations guide
 - **replication-operations.md** - Storage replication operations
+- **pilot-smoke.md** - One-command pilot linkage smoke verification
 
 ## Related Documentation
 
