@@ -811,8 +811,12 @@ pub enum TreasuryProposalOperation {
     ///
     /// Requires governance approval (same thresholds as `Withdraw`).
     Spend {
+        /// Treasury DID
+        treasury_did: Did,
         /// Amount to spend (must be positive)
         amount: i64,
+        /// Currency
+        currency: String,
         /// Recipient DID (must be a valid `did:icn:` identifier)
         recipient: Did,
         /// Human-readable description of the spend (must be non-empty)
@@ -2361,10 +2365,13 @@ mod tests {
 
     #[test]
     fn test_treasury_spend_serialization_roundtrip() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
         let recipient = KeyPair::generate().unwrap().did().clone();
 
         let operation = TreasuryProposalOperation::Spend {
+            treasury_did: treasury_did.clone(),
             amount: 5000,
+            currency: "credits".to_string(),
             recipient: recipient.clone(),
             memo: "Office supplies reimbursement".to_string(),
             nonce: 0,
@@ -2375,12 +2382,16 @@ mod tests {
 
         match deserialized {
             TreasuryProposalOperation::Spend {
+                treasury_did: parsed_treasury_did,
                 amount,
+                currency,
                 recipient: r,
                 memo,
                 nonce,
             } => {
+                assert_eq!(parsed_treasury_did, treasury_did);
                 assert_eq!(amount, 5000);
+                assert_eq!(currency, "credits");
                 assert_eq!(r, recipient);
                 assert_eq!(memo, "Office supplies reimbursement");
                 assert_eq!(nonce, 0);
@@ -2394,6 +2405,7 @@ mod tests {
         let kp = KeyPair::generate().unwrap();
         let did = kp.did().clone();
         let domain_id = GovernanceDomainId::new("test-coop");
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
         let recipient = KeyPair::generate().unwrap().did().clone();
 
         let proposal = Proposal::new(
@@ -2403,7 +2415,9 @@ mod tests {
             "Purchase supplies for the community garden project".to_string(),
             ProposalPayload::Treasury {
                 operation: TreasuryProposalOperation::Spend {
+                    treasury_did,
                     amount: 2500,
+                    currency: "credits".to_string(),
                     recipient: recipient.clone(),
                     memo: "Garden tools and seeds".to_string(),
                     nonce: 0,
@@ -2425,10 +2439,13 @@ mod tests {
     fn test_treasury_spend_zero_amount_is_representable() {
         // Zero amount is structurally valid at the type level; validation
         // happens at the handler level (handler rejects amount <= 0).
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
         let recipient = KeyPair::generate().unwrap().did().clone();
 
         let operation = TreasuryProposalOperation::Spend {
+            treasury_did,
             amount: 0,
+            currency: "credits".to_string(),
             recipient,
             memo: "Should be rejected by handler".to_string(),
             nonce: 0,
@@ -2442,10 +2459,13 @@ mod tests {
     #[test]
     fn test_treasury_spend_empty_memo_is_representable() {
         // Empty memo is structurally valid; handler-level validation rejects it.
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
         let recipient = KeyPair::generate().unwrap().did().clone();
 
         let operation = TreasuryProposalOperation::Spend {
+            treasury_did,
             amount: 100,
+            currency: "credits".to_string(),
             recipient,
             memo: String::new(),
             nonce: 0,
@@ -2460,6 +2480,7 @@ mod tests {
         let kp = KeyPair::generate().unwrap();
         let did = kp.did().clone();
         let domain_id = GovernanceDomainId::new("test-coop");
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
         let recipient = KeyPair::generate().unwrap().did().clone();
 
         let mut proposal = Proposal::new(
@@ -2469,7 +2490,9 @@ mod tests {
             "Approve spend for emergency roof repair".to_string(),
             ProposalPayload::Treasury {
                 operation: TreasuryProposalOperation::Spend {
+                    treasury_did,
                     amount: 15000,
+                    currency: "credits".to_string(),
                     recipient,
                     memo: "Roof repair after storm damage".to_string(),
                     nonce: 0,

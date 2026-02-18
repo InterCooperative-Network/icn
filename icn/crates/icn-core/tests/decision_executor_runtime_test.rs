@@ -875,21 +875,25 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
     assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
 }
 
-/// Test 12: Treasury Spend payload is explicitly unsupported at translation
-/// boundary until payload carries treasury identity + currency.
+/// Test 12: Treasury Spend payload translates to a treasury spend effect.
 #[test]
-fn test_treasury_spend_payload_translation_is_explicitly_unsupported() {
+fn test_treasury_spend_payload_translation_produces_treasury_spend_effect() {
     use icn_identity::Did;
 
     let decision_receipt_id = "gov:test-domain:test-proposal:receipt";
     let decision_hash = "test-decision-hash";
+    let treasury_did: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+        .parse()
+        .unwrap();
     let recipient: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
         .parse()
         .unwrap();
 
     let payload = ProposalPayload::Treasury {
         operation: TreasuryProposalOperation::Spend {
+            treasury_did: treasury_did.clone(),
             amount: 100,
+            currency: "HOURS".to_string(),
             recipient,
             memo: "PR-2 treasury spend".to_string(),
             nonce: 0,
@@ -899,14 +903,18 @@ fn test_treasury_spend_payload_translation_is_explicitly_unsupported() {
     let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
     assert_eq!(effects.len(), 1);
     match &effects[0] {
-        KernelEffect::NoOp { reason } => {
-            assert!(
-                reason.contains(
-                    "Treasury Spend translation unsupported: missing treasury_did and currency in payload"
-                ),
-                "NoOp reason must explain unsupported Spend translation boundary"
-            );
+        KernelEffect::Treasury(TreasuryEffect::Spend {
+            treasury_did: effect_treasury_did,
+            currency,
+            decision_receipt_id: rid,
+            decision_hash: dh,
+            ..
+        }) => {
+            assert_eq!(effect_treasury_did, &treasury_did.to_string());
+            assert_eq!(currency, "HOURS");
+            assert_eq!(rid, decision_receipt_id);
+            assert_eq!(dh, decision_hash);
         }
-        other => panic!("expected NoOp for unsupported Spend payload, got {other:?}"),
+        other => panic!("expected Treasury Spend effect, got {other:?}"),
     }
 }
