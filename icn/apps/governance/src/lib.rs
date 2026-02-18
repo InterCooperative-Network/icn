@@ -155,3 +155,72 @@ where
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_governance::{ProposalPayload, TreasuryProposalOperation};
+    use icn_identity::Did;
+    use icn_kernel_api::events::SystemEvent;
+    use std::sync::{Arc, Mutex};
+
+    type CapturedEffects = Arc<Mutex<Vec<(Vec<KernelEffect>, String)>>>;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_pilot_proposal_uses_effect_subscription_even_with_legacy_env_flag() {
+        let _env_guard = ENV_LOCK.lock().expect("env lock");
+        // Legacy env switch was removed; this test proves pilot treasury proposals
+        // still route through the effect-path subscription callback.
+        std::env::set_var("ICN_USE_EFFECT_PATH", "0");
+
+        let captured: CapturedEffects = Arc::new(Mutex::new(vec![]));
+        let sink = captured.clone();
+        let subscription = create_effect_subscription(move |effects, decision_receipt_id| {
+            sink.lock()
+                .expect("capture lock")
+                .push((effects, decision_receipt_id));
+        });
+
+        let treasury_did: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+            .parse()
+            .expect("valid did");
+        let recipient: Did = "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t"
+            .parse()
+            .expect("valid did");
+
+        let payload = ProposalPayload::Treasury {
+            operation: TreasuryProposalOperation::Spend {
+                treasury_did,
+                amount: 5,
+                currency: "hours".to_string(),
+                recipient,
+                memo: "pilot".to_string(),
+                nonce: 7,
+            },
+        };
+
+        let event = SystemEvent::ProposalAccepted {
+            proposal_id: "pr-pilot-1".to_string(),
+            domain_id: "domain-pilot".to_string(),
+            payload: serde_json::to_value(payload).expect("serialize payload"),
+            decided_at: 1_700_000_000,
+        };
+
+        subscription(event);
+
+        let got = captured.lock().expect("capture lock");
+        assert_eq!(got.len(), 1, "effect callback should fire exactly once");
+        assert_eq!(got[0].1, "gov:domain-pilot:pr-pilot-1:receipt");
+        assert!(
+            matches!(
+                got[0].0.first(),
+                Some(KernelEffect::Treasury(TreasuryEffect::Spend { .. }))
+            ),
+            "pilot treasury proposal should route to TreasuryEffect::Spend via effect path"
+        );
+
+        std::env::remove_var("ICN_USE_EFFECT_PATH");
+    }
+}
