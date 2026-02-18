@@ -86,6 +86,8 @@ pub struct GatewayServer {
     coop_handle: Option<icn_coop::CoopHandle>,
     /// Optional TrustService for kernel/app separation
     trust_service_handle: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    /// Optional LedgerService for treasury nonce queries
+    ledger_service_handle: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
     /// Optional handle to daemon's ContractRegistryActor (for contract management)
@@ -125,6 +127,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_service_handle: None,
+            ledger_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -164,6 +167,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_service_handle: None,
+            ledger_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -204,6 +208,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_service_handle: None,
+            ledger_service_handle: None,
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
@@ -276,6 +281,18 @@ impl GatewayServer {
         service: Arc<dyn icn_kernel_api::services::TrustService>,
     ) -> Self {
         self.trust_service_handle = Some(service);
+        self
+    }
+
+    /// Set ledger service for treasury nonce queries.
+    ///
+    /// When set, treasury nonce endpoints query the same nonce source-of-truth
+    /// used by ledger spend enforcement.
+    pub fn with_ledger_service(
+        mut self,
+        service: Arc<dyn icn_kernel_api::services::LedgerService>,
+    ) -> Self {
+        self.ledger_service_handle = Some(service);
         self
     }
 
@@ -553,6 +570,9 @@ impl GatewayServer {
                 info!("Treasury manager connected to daemon (TreasuryManager + Ledger handles)");
             } else {
                 info!("Treasury manager connected to daemon (TreasuryManager handle only)");
+            }
+            if let Some(ledger_service) = self.ledger_service_handle.clone() {
+                mgr.set_ledger_service_handle(ledger_service);
             }
             Arc::new(mgr)
         } else {

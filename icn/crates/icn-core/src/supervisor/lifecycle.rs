@@ -113,6 +113,7 @@ pub async fn run_supervisor(
             coop: gateway_handles.coop,
             community: gateway_handles.community,
             trust_service: gateway_handles.trust_service,
+            ledger_service: gateway_handles.ledger_service,
             governance: gateway_handles.governance,
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
@@ -602,12 +603,14 @@ async fn spawn_actors_with_identity(
         let receipt_index_path = config.store_path().join("ledger-receipt-index");
         let receipt_index_store: Arc<icn_store::SledStore> =
             Arc::new(icn_store::SledStore::open(&receipt_index_path)?);
-        let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new_with_receipt_index(
-            ledger_handle.clone(),
-            oracle,
-            treasury_did.clone(),
-            receipt_index_store,
-        ));
+        let ledger_service: Arc<dyn icn_kernel_api::services::LedgerService> =
+            Arc::new(crate::services::LedgerServiceImpl::new_with_receipt_index(
+                ledger_handle.clone(),
+                oracle,
+                treasury_did.clone(),
+                receipt_index_store,
+            ));
+        gateway_handles.ledger_service = Some(ledger_service.clone());
         kernel_executor = kernel_executor.with_ledger_service(ledger_service);
 
         // Wire federation service adapter if available

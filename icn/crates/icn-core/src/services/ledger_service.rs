@@ -549,6 +549,10 @@ impl LedgerService for LedgerServiceImpl {
         Err("Resource access revocation not supported by treasury ledger service".to_string())
     }
 
+    fn get_treasury_nonce(&self, treasury_id: &str) -> Result<u64, String> {
+        self.current_treasury_nonce(treasury_id)
+    }
+
     fn submit_treasury_entry(
         &self,
         req: TreasuryEntryRequest,
@@ -896,5 +900,41 @@ mod tests {
             balance_after_stale, balance_after_first,
             "stale nonce must not mutate balances"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_treasury_entry_nonce_query_tracks_successful_spend() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let recipient_did = KeyPair::generate().unwrap().did().clone();
+
+        let ledger_store = Arc::new(SledStore::temporary().unwrap());
+        let receipt_index = Arc::new(SledStore::temporary().unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+        let service = LedgerServiceImpl::new_with_receipt_index(
+            ledger,
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did,
+            receipt_index,
+        );
+
+        let treasury_id = "did:icn:treasury:nonce-test";
+        let baseline = service.get_treasury_nonce(treasury_id).unwrap();
+        assert_eq!(baseline, 0);
+
+        let request = TreasuryEntryRequest {
+            treasury_id: treasury_id.to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 30,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "nonce query coherence".to_string(),
+            expected_nonce: Some(baseline),
+            decision_receipt_id: "gov:proposal:pr5:nonce:coherence".to_string(),
+            decision_hash: "decision-hash-pr5-nonce-coherence".to_string(),
+        };
+        service.submit_treasury_entry(request).unwrap();
+
+        let after = service.get_treasury_nonce(treasury_id).unwrap();
+        assert_eq!(after, baseline + 1);
     }
 }

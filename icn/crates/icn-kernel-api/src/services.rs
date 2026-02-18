@@ -569,6 +569,14 @@ pub trait LedgerService: Send + Sync {
     ) -> Result<TreasuryEntryResult, String> {
         Err("Treasury entry submission not supported".to_string())
     }
+
+    /// Get the current treasury nonce used for spend ordering enforcement.
+    ///
+    /// The returned value must come from the same source-of-truth used by
+    /// `submit_treasury_entry` nonce checks.
+    fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+        Err("Treasury nonce query not supported".to_string())
+    }
 }
 
 // ============================================================================
