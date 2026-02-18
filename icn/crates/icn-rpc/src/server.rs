@@ -91,7 +91,9 @@ pub struct RpcServer {
     ledger_handle: Option<Arc<RwLock<Ledger>>>,
     contract_runtime: Option<Arc<RwLock<ContractRuntime>>>,
     gossip_handle: Option<Arc<RwLock<GossipActor>>>,
-    governance_handle: Option<Box<dyn GovernanceOps>>,
+    governance_handle: Option<Arc<dyn GovernanceOps + Send + Sync>>,
+    governance_service: Option<Arc<icn_api::GovernanceService>>,
+    ledger_service: Option<Arc<icn_api::LedgerService>>,
     compute_handle: Option<ComputeHandle>,
     compute_service: Option<Arc<icn_api::ComputeService>>,
     trust_service: Option<Arc<dyn TrustService>>,
@@ -117,6 +119,8 @@ impl RpcServer {
             contract_runtime: None,
             gossip_handle: None,
             governance_handle: None,
+            governance_service: None,
+            ledger_service: None,
             compute_handle: None,
             compute_service: None,
             trust_service: None,
@@ -144,6 +148,8 @@ impl RpcServer {
             contract_runtime: None,
             gossip_handle: None,
             governance_handle: None,
+            governance_service: None,
+            ledger_service: None,
             compute_handle: None,
             compute_service: None,
             trust_service: None,
@@ -217,7 +223,8 @@ impl RpcServer {
 
     /// Set the ledger handle (called after Ledger initializes)
     pub fn set_ledger_handle(&mut self, handle: Arc<RwLock<Ledger>>) {
-        self.ledger_handle = Some(handle);
+        self.ledger_handle = Some(handle.clone());
+        self.ledger_service = Some(Arc::new(icn_api::LedgerService::new(handle)));
     }
 
     /// Set the contract runtime handle (called after ContractRuntime initializes)
@@ -232,7 +239,9 @@ impl RpcServer {
 
     /// Set the governance handle (called after GovernanceActor initializes)
     pub fn set_governance_handle(&mut self, handle: impl GovernanceOps + 'static) {
-        self.governance_handle = Some(Box::new(handle));
+        let handle = Arc::new(handle);
+        self.governance_service = Some(Arc::new(icn_api::GovernanceService::new(handle.clone())));
+        self.governance_handle = Some(handle);
     }
 
     /// Set the compute handle (called after ComputeActor spawns)
@@ -298,7 +307,9 @@ impl RpcServer {
 
     /// Get governance handle (for handler modules)
     pub fn governance_handle(&self) -> Option<&dyn GovernanceOps> {
-        self.governance_handle.as_deref()
+        self.governance_handle
+            .as_ref()
+            .map(|handle| handle.as_ref() as &dyn GovernanceOps)
     }
 
     /// Get ledger handle (for handler modules)
@@ -329,6 +340,16 @@ impl RpcServer {
     /// Get compute service (for handler modules)
     pub fn compute_service(&self) -> Option<&Arc<icn_api::ComputeService>> {
         self.compute_service.as_ref()
+    }
+
+    /// Get governance service (for handler modules)
+    pub fn governance_service(&self) -> Option<&Arc<icn_api::GovernanceService>> {
+        self.governance_service.as_ref()
+    }
+
+    /// Get ledger service (for handler modules)
+    pub fn ledger_service(&self) -> Option<&Arc<icn_api::LedgerService>> {
+        self.ledger_service.as_ref()
     }
 
     /// Get store handle (for handler modules)
