@@ -287,8 +287,12 @@ mod tests {
 
     #[test]
     fn test_translate_treasury_spend_preserves_decision_provenance() {
-        let treasury_did: icn_identity::Did = "did:icn:treasury:test".parse().expect("valid did");
-        let recipient: icn_identity::Did = "did:icn:recipient:test".parse().expect("valid did");
+        let treasury_did: icn_identity::Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+            .parse()
+            .expect("valid did");
+        let recipient: icn_identity::Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+            .parse()
+            .expect("valid did");
         let payload = icn_governance::ProposalPayload::Treasury {
             operation: icn_governance::TreasuryProposalOperation::Spend {
                 treasury_did: treasury_did.clone(),
@@ -326,7 +330,9 @@ mod tests {
     fn test_translate_unhandled_payload_to_noop() {
         let payload = icn_governance::ProposalPayload::DisputeResolution {
             dispute_entry_hash: "hash-001".to_string(),
-            filer: "did:icn:filer:test".parse().expect("valid did"),
+            filer: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+                .parse()
+                .expect("valid did"),
             reason: "insufficient evidence".to_string(),
             escalation_reason: "requires community vote".to_string(),
             proposed_outcome: icn_governance::DisputeResolutionOutcome::Reject,
