@@ -11,7 +11,11 @@
 //! proposal system.
 
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
-use icn_governance::{GovernanceDomainId, ProposalId, ProposalPayload, TreasuryProposalOperation};
+#[cfg_attr(not(test), allow(unused_imports))]
+use icn_governance::{
+    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
+    TreasuryProposalOperation,
+};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1093,7 +1097,6 @@ mod tests {
     use super::*;
     use crate::auth::TokenClaims;
     use actix_web::{test, App, HttpMessage};
-    use icn_governance::{GovernanceParams, MembershipConfig};
     use icn_identity::KeyPair;
     use icn_ledger::TreasuryManager as LedgerTreasuryManager;
 
