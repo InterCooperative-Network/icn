@@ -12,6 +12,7 @@ Production runbooks for ICN daemon operations.
 | [Security Incident](./04-security-incident.md) | Suspected security breach |
 | [Troubleshooting](./05-troubleshooting.md) | Common issues and fixes |
 | [Secrets Rotation](./06-secrets-rotation.md) | Rotating keys, passphrases, certificates |
+| [Pilot Vertical Slice Smoke](./07-pilot-vertical-slice-smoke.md) | Verify decision→effect→ledger linkage in one command |
 
 ## Quick Reference
 
