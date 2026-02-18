@@ -628,6 +628,7 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
             currency = %operation.currency,
             recipient = ?operation.recipient,
             memo = %operation.memo,
+            expected_nonce = ?operation.expected_nonce,
             decision_hash = ?operation.decision_hash,
             "Executing treasury operation"
         );
@@ -642,6 +643,7 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                     currency: operation.currency.clone(),
                     recipient: operation.recipient.clone(),
                     memo: operation.memo.clone(),
+                    expected_nonce: operation.expected_nonce,
                     decision_receipt_id: receipt_id.to_string(),
                     decision_hash: decision_hash.clone(),
                 };
@@ -1781,6 +1783,7 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some("did:icn:recipient".to_string()),
             memo: "Test payment".to_string(),
+            expected_nonce: Some(0),
             decision_hash: Some("sha256:abc123".to_string()),
         };
 

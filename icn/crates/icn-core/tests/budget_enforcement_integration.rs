@@ -299,6 +299,7 @@ fn spend_from_budget_effect(
         currency: "HOURS".to_string(),
         memo: "Test spend".to_string(),
         budget_id: Some(budget_id.to_string()),
+        expected_nonce: 0,
         decision_receipt_id: format!("receipt:{}", decision_hash),
         decision_hash: decision_hash.to_string(),
     })
@@ -646,6 +647,7 @@ async fn test_spend_without_budget_passes_through() {
         currency: "HOURS".to_string(),
         memo: "No budget".to_string(),
         budget_id: None,
+        expected_nonce: 0,
         decision_receipt_id: "receipt:no-budget".to_string(),
         decision_hash: "hash:no-budget".to_string(),
     })];

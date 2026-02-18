@@ -1169,6 +1169,7 @@ async fn test_ledger_entry_carries_decision_provenance() -> Result<()> {
         currency: "HOURS".to_string(),
         recipient: Some(recipient_did.to_string()),
         memo: "Pilot test payment".to_string(),
+        expected_nonce: Some(0),
         decision_receipt_id: decision_receipt_id.clone(),
         decision_hash: decision_hash.clone(),
     };
@@ -1304,6 +1305,7 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
         currency: "HOURS".to_string(),
         recipient: Some(recipient_did.to_string()),
         memo: "E2E provenance test payment".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 

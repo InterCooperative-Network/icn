@@ -291,6 +291,7 @@ fn translate_treasury_operation(
             amount,
             currency,
             purpose,
+            nonce,
             ..
         } => vec![KernelEffect::Treasury(TreasuryEffect::Spend {
             treasury_did: treasury_did.to_string(),
@@ -299,6 +300,7 @@ fn translate_treasury_operation(
             currency: currency.clone(),
             memo: purpose.clone(),
             budget_id: None, // TODO: wire budget_id from proposal payload
+            expected_nonce: *nonce,
             decision_receipt_id: decision_receipt_id.to_string(),
             decision_hash: decision_hash.to_string(),
         })],

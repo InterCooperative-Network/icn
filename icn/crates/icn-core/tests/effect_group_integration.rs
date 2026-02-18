@@ -97,6 +97,7 @@ async fn test_treasury_create_budget_provenance_chain() -> Result<()> {
         currency: "HOURS".to_string(),
         recipient: Some(recipient_did.to_string()),
         memo: "2024 Operations Budget".to_string(),
+        expected_nonce: Some(0),
         decision_hash: Some(decision_hash.clone()),
     };
 

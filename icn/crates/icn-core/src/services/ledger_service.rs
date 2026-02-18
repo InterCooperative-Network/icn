@@ -12,7 +12,8 @@
 //!
 //! This enables the provenance chain: governance decision → treasury effect → ledger entry.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use icn_kernel_api::services::{
@@ -27,6 +28,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 const RECEIPT_INDEX_PREFIX: &str = "ledger:receipt_index:";
+const TREASURY_NONCE_PREFIX: &str = "ledger:treasury_nonce:";
 const RECEIPT_INDEX_PENDING: &[u8] = b"__pending__";
 const RECEIPT_INDEX_WAIT_ATTEMPTS: usize = 25;
 const RECEIPT_INDEX_WAIT_MS: u64 = 20;
@@ -57,6 +59,9 @@ pub struct LedgerServiceImpl {
     /// Keys: `ledger:receipt_index:{decision_receipt_id}`
     /// Values: `ReceiptIndexRecord` JSON or pending marker during in-flight append.
     receipt_index: Option<Arc<SledStore>>,
+
+    /// Fallback in-memory nonce state when no index store is configured.
+    treasury_nonce_cache: Mutex<HashMap<String, u64>>,
 }
 
 impl LedgerServiceImpl {
@@ -76,6 +81,7 @@ impl LedgerServiceImpl {
             oracle,
             treasury_did,
             receipt_index: None,
+            treasury_nonce_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -91,6 +97,7 @@ impl LedgerServiceImpl {
             oracle,
             treasury_did,
             receipt_index: Some(receipt_index),
+            treasury_nonce_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -202,6 +209,99 @@ impl LedgerServiceImpl {
 
     fn receipt_index_key(decision_receipt_id: &str) -> Vec<u8> {
         format!("{RECEIPT_INDEX_PREFIX}{decision_receipt_id}").into_bytes()
+    }
+
+    fn treasury_nonce_key(treasury_id: &str) -> Vec<u8> {
+        format!("{TREASURY_NONCE_PREFIX}{treasury_id}").into_bytes()
+    }
+
+    fn current_treasury_nonce(&self, treasury_id: &str) -> Result<u64, String> {
+        if let Some(index) = self.receipt_index.as_ref() {
+            let key = Self::treasury_nonce_key(treasury_id);
+            let raw = index
+                .db()
+                .get(key.as_slice())
+                .map_err(|e| format!("Failed to read treasury nonce from index: {e}"))?;
+            return match raw {
+                Some(bytes) => {
+                    if bytes.len() != 8 {
+                        Err(format!(
+                            "Corrupt treasury nonce for {}: expected 8 bytes, got {}",
+                            treasury_id,
+                            bytes.len()
+                        ))
+                    } else {
+                        let mut arr = [0u8; 8];
+                        arr.copy_from_slice(bytes.as_ref());
+                        Ok(u64::from_le_bytes(arr))
+                    }
+                }
+                None => Ok(0),
+            };
+        }
+
+        let cache = self
+            .treasury_nonce_cache
+            .lock()
+            .map_err(|_| "Treasury nonce cache lock poisoned".to_string())?;
+        Ok(*cache.get(treasury_id).unwrap_or(&0))
+    }
+
+    fn set_treasury_nonce(&self, treasury_id: &str, nonce: u64) -> Result<(), String> {
+        if let Some(index) = self.receipt_index.as_ref() {
+            let key = Self::treasury_nonce_key(treasury_id);
+            index
+                .db()
+                .insert(key.as_slice(), nonce.to_le_bytes().as_slice())
+                .map_err(|e| format!("Failed to persist treasury nonce: {e}"))?;
+            return Ok(());
+        }
+
+        let mut cache = self
+            .treasury_nonce_cache
+            .lock()
+            .map_err(|_| "Treasury nonce cache lock poisoned".to_string())?;
+        cache.insert(treasury_id.to_string(), nonce);
+        Ok(())
+    }
+
+    fn check_spend_nonce(&self, req: &TreasuryEntryRequest) -> Result<(), String> {
+        if req.operation_type != TreasuryOperationType::Spend {
+            return Ok(());
+        }
+        let expected_nonce = req.expected_nonce.ok_or_else(|| {
+            format!(
+                "Missing expected_nonce for treasury spend: receipt={}",
+                req.decision_receipt_id
+            )
+        })?;
+        let stored_nonce = self.current_treasury_nonce(&req.treasury_id)?;
+        if stored_nonce != expected_nonce {
+            return Err(format!(
+                "Treasury nonce mismatch for {}: expected {}, stored {}",
+                req.treasury_id, expected_nonce, stored_nonce
+            ));
+        }
+        Ok(())
+    }
+
+    fn advance_spend_nonce(&self, req: &TreasuryEntryRequest) -> Result<(), String> {
+        if req.operation_type != TreasuryOperationType::Spend {
+            return Ok(());
+        }
+        let expected_nonce = req.expected_nonce.ok_or_else(|| {
+            format!(
+                "Missing expected_nonce for treasury spend: receipt={}",
+                req.decision_receipt_id
+            )
+        })?;
+        let next_nonce = expected_nonce.checked_add(1).ok_or_else(|| {
+            format!(
+                "Treasury nonce overflow for {} at {}",
+                req.treasury_id, expected_nonce
+            )
+        })?;
+        self.set_treasury_nonce(&req.treasury_id, next_nonce)
     }
 
     /// Try to claim a decision receipt for append, or return an existing entry hash.
@@ -504,10 +604,13 @@ impl LedgerService for LedgerServiceImpl {
         let append_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let mut ledger = self.ledger.write().await;
-                ledger
+                self.check_spend_nonce(&req)?;
+                let entry_hash = ledger
                     .append_entry(entry)
                     .await
-                    .map_err(|e| format!("Failed to append ledger entry: {e}"))
+                    .map_err(|e| format!("Failed to append ledger entry: {e}"))?;
+                self.advance_spend_nonce(&req)?;
+                Ok(entry_hash)
             })
         });
 
@@ -564,6 +667,7 @@ mod tests {
             currency: "USD".to_string(),
             recipient: Some("did:icn:recipient".to_string()),
             memo: "payment".to_string(),
+            expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:2024-001:receipt:abc".to_string(),
             decision_hash: "sha256:deadbeef".to_string(),
         };
@@ -595,6 +699,7 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some(recipient_did.to_string()),
             memo: "idempotency check".to_string(),
+            expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:001".to_string(),
             decision_hash: "decision-hash-pr3-001".to_string(),
         };
@@ -639,6 +744,7 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some(recipient_did.to_string()),
             memo: "restart idempotency".to_string(),
+            expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:restart".to_string(),
             decision_hash: "decision-hash-pr3-restart".to_string(),
         };
@@ -703,6 +809,7 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some(recipient_did.to_string()),
             memo: "concurrency idempotency".to_string(),
+            expected_nonce: Some(0),
             decision_receipt_id: "gov:proposal:pr3:idempotency:concurrent".to_string(),
             decision_hash: "decision-hash-pr3-concurrent".to_string(),
         };
@@ -726,6 +833,68 @@ mod tests {
             ledger.read().await.count_entries().unwrap(),
             1,
             "concurrent same-receipt submissions must append exactly one entry"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_treasury_entry_rejects_stale_expected_nonce() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let recipient_did = KeyPair::generate().unwrap().did().clone();
+
+        let ledger_store = Arc::new(SledStore::temporary().unwrap());
+        let receipt_index = Arc::new(SledStore::temporary().unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+        let service = LedgerServiceImpl::new_with_receipt_index(
+            ledger.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did.clone(),
+            receipt_index,
+        );
+
+        let first = TreasuryEntryRequest {
+            treasury_id: "t1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 40,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "nonce baseline".to_string(),
+            expected_nonce: Some(0),
+            decision_receipt_id: "gov:proposal:pr4:nonce:first".to_string(),
+            decision_hash: "decision-hash-pr4-nonce-first".to_string(),
+        };
+        service.submit_treasury_entry(first).unwrap();
+
+        let count_after_first = ledger.read().await.count_entries().unwrap();
+        let balance_after_first = ledger.read().await.get_balance(&treasury_did, "HOURS");
+        assert_eq!(count_after_first, 1);
+
+        // Use a different receipt id so the idempotency short-circuit does not hide nonce checks.
+        let stale = TreasuryEntryRequest {
+            treasury_id: "t1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 10,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "stale nonce replay".to_string(),
+            expected_nonce: Some(0),
+            decision_receipt_id: "gov:proposal:pr4:nonce:stale".to_string(),
+            decision_hash: "decision-hash-pr4-nonce-stale".to_string(),
+        };
+        let err = service.submit_treasury_entry(stale).unwrap_err();
+        assert!(
+            err.contains("Treasury nonce mismatch"),
+            "expected nonce mismatch error, got: {err}"
+        );
+
+        let count_after_stale = ledger.read().await.count_entries().unwrap();
+        let balance_after_stale = ledger.read().await.get_balance(&treasury_did, "HOURS");
+        assert_eq!(
+            count_after_stale, count_after_first,
+            "stale nonce must not append a new ledger entry"
+        );
+        assert_eq!(
+            balance_after_stale, balance_after_first,
+            "stale nonce must not mutate balances"
         );
     }
 }
