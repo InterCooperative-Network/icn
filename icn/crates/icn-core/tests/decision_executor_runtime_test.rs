@@ -725,7 +725,157 @@ async fn test_treasury_entry_persisted_with_provenance() {
     assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
 }
 
-/// Test 11: Treasury Spend payload is explicitly unsupported at translation
+/// Test 11: Withdraw proposal payload translates through the real boundary and
+/// executes as a single durable treasury mutation across restart/replay.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_withdraw_payload_restart_resume_single_mutation() {
+    use icn_core::supervisor::decision_executor::DecisionExecutor;
+    use icn_core::supervisor::effect_dispatcher::EffectDispatcher;
+    use icn_core::supervisor::governance_executor::KernelGovernanceExecutor;
+    use icn_identity::Did;
+
+    let tmp = TempDir::new().unwrap();
+    let ledger_store_path = tmp.path().join("ledger");
+    let exec_store_path = tmp.path().join("execution");
+    std::fs::create_dir_all(&ledger_store_path).unwrap();
+    std::fs::create_dir_all(&exec_store_path).unwrap();
+
+    let decision_hash = "hash-withdraw-restart-1";
+    let decision_receipt_id = "receipt-withdraw-restart-1";
+    let treasury_did_str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+    let treasury_did: Did = treasury_did_str.parse().unwrap();
+    let recipient_did: Did = treasury_did_str.parse().unwrap();
+
+    let payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::Withdraw {
+            treasury_did: treasury_did.clone(),
+            recipient: recipient_did,
+            amount: 100,
+            currency: "HOURS".to_string(),
+            purpose: "Withdraw restart safety test".to_string(),
+            budget_id: None,
+            nonce: 0,
+        },
+    };
+
+    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    assert_eq!(effects.len(), 1);
+    match &effects[0] {
+        KernelEffect::Treasury(TreasuryEffect::Spend {
+            decision_receipt_id: rid,
+            decision_hash: dh,
+            ..
+        }) => {
+            assert_eq!(rid, decision_receipt_id);
+            assert_eq!(dh, decision_hash);
+        }
+        other => panic!("expected translated treasury spend effect, got {other:?}"),
+    }
+
+    let entry_hash = {
+        let ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+        let ledger = Ledger::new(ledger_store).unwrap();
+        let ledger = Arc::new(tokio::sync::RwLock::new(ledger));
+
+        let ledger_service = Arc::new(LedgerServiceImpl::new(
+            ledger.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did_str.parse().unwrap(),
+        ));
+        let kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+            .with_ledger_service(ledger_service);
+        let dispatcher = Arc::new(EffectDispatcher::new(Arc::new(kernel_executor)));
+        let exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+        let exec_store = Arc::new(SledExecutionStore::new(exec_backend));
+        let executor = DecisionExecutor::new(dispatcher, exec_store.clone());
+
+        let results = executor
+            .execute(
+                effects.clone(),
+                decision_receipt_id,
+                decision_hash,
+                "proposal-withdraw-restart-1",
+            )
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+
+        let record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(record.status, ExecutionStatus::Confirmed);
+        assert_eq!(record.ledger_entry_ids.len(), 1);
+        let entry_hash = record.ledger_entry_ids[0].clone();
+
+        let parsed = content_hash_from_hex(&entry_hash).unwrap();
+        let entry = ledger.read().await.get_entry(&parsed).unwrap().unwrap();
+        assert_eq!(
+            entry.decision_receipt_id.as_deref(),
+            Some(decision_receipt_id)
+        );
+        assert_eq!(entry.decision_hash.as_deref(), Some(decision_hash));
+        assert_eq!(ledger.read().await.count_entries().unwrap(), 1);
+
+        entry_hash
+    };
+
+    let replay_effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    let reopened_ledger_store = Arc::new(SledStore::open(&ledger_store_path).unwrap());
+    let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
+    let reopened_ledger = Arc::new(tokio::sync::RwLock::new(reopened_ledger));
+
+    let reopened_ledger_service = Arc::new(LedgerServiceImpl::new(
+        reopened_ledger.clone(),
+        Arc::new(AllowAllOracle::wildcard()),
+        treasury_did_str.parse().unwrap(),
+    ));
+    let reopened_kernel_executor = KernelGovernanceExecutor::new(Arc::new(StubParamStore))
+        .with_ledger_service(reopened_ledger_service);
+    let reopened_dispatcher = Arc::new(EffectDispatcher::new(Arc::new(reopened_kernel_executor)));
+    let reopened_exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
+    let reopened_exec_store = Arc::new(SledExecutionStore::new(reopened_exec_backend));
+    let reopened_executor = DecisionExecutor::new(reopened_dispatcher, reopened_exec_store.clone());
+
+    let report = reopened_executor.recover_in_flight().await.unwrap();
+    assert_eq!(
+        report.total(),
+        0,
+        "confirmed records should not be re-executed"
+    );
+
+    let replay_results = reopened_executor
+        .execute(
+            replay_effects,
+            decision_receipt_id,
+            decision_hash,
+            "proposal-withdraw-restart-1",
+        )
+        .await
+        .unwrap();
+    assert!(
+        replay_results.is_empty(),
+        "terminal decision replay should be skipped by idempotency gate"
+    );
+    assert_eq!(reopened_ledger.read().await.count_entries().unwrap(), 1);
+
+    let parsed = content_hash_from_hex(&entry_hash).unwrap();
+    let reopened_entry = reopened_ledger
+        .read()
+        .await
+        .get_entry(&parsed)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        reopened_entry.decision_receipt_id.as_deref(),
+        Some(decision_receipt_id)
+    );
+    assert_eq!(reopened_entry.decision_hash.as_deref(), Some(decision_hash));
+
+    let reopened_record = reopened_exec_store.get(decision_hash).unwrap().unwrap();
+    assert_eq!(reopened_record.status, ExecutionStatus::Confirmed);
+    assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
+}
+
+/// Test 12: Treasury Spend payload is explicitly unsupported at translation
 /// boundary until payload carries treasury identity + currency.
 #[test]
 fn test_treasury_spend_payload_translation_is_explicitly_unsupported() {

@@ -943,6 +943,11 @@ fn default_spend_currency() -> String {
 /// Creates a governance proposal for a direct treasury disbursement.
 /// The spend is charged against the treasury's unallocated balance.
 /// Requires governance approval before execution.
+///
+/// Implementation note:
+/// This route emits a `TreasuryProposalOperation::Withdraw` payload because
+/// that operation currently carries the full treasury identity/currency fields
+/// required by production effect translation/execution.
 #[post("/{coop_id}/spend")]
 pub async fn propose_spend(
     req: HttpRequest,
@@ -1014,10 +1019,13 @@ pub async fn propose_spend(
     let domain_id = GovernanceDomainId::new(&coop_id);
 
     let payload = ProposalPayload::Treasury {
-        operation: TreasuryProposalOperation::Spend {
+        operation: TreasuryProposalOperation::Withdraw {
+            treasury_did: treasury.treasury_did.clone(),
+            currency: body.currency.clone(),
             amount: body.amount,
             recipient: recipient_did,
-            memo: body.memo.clone(),
+            purpose: body.memo.clone(),
+            budget_id: None,
             nonce,
         },
     };
@@ -1049,6 +1057,7 @@ pub async fn propose_spend(
     let response = serde_json::json!({
         "status": "proposal_created",
         "message": "Treasury spend requires governance approval",
+        "operation": "withdraw",
         "proposal_id": created_proposal_id.to_string(),
         "coop_id": coop_id,
         "amount": body.amount,
@@ -1084,6 +1093,9 @@ mod tests {
     use super::*;
     use crate::auth::TokenClaims;
     use actix_web::{test, App, HttpMessage};
+    use icn_governance::{GovernanceParams, MembershipConfig};
+    use icn_identity::KeyPair;
+    use icn_ledger::TreasuryManager as LedgerTreasuryManager;
 
     fn test_claims(coop_id: &str) -> TokenClaims {
         TokenClaims {
@@ -1257,5 +1269,91 @@ mod tests {
         let resp: AuditTrailResponse = test::call_and_read_body_json(&app, req).await;
         assert_eq!(resp.limit, 50);
         assert_eq!(resp.offset, 10);
+    }
+
+    #[actix_web::test]
+    async fn test_propose_spend_creates_withdraw_operation_payload() {
+        let proposer = KeyPair::generate().unwrap();
+        let recipient = KeyPair::generate().unwrap();
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+
+        let treasury_handle = Arc::new(tokio::sync::RwLock::new(LedgerTreasuryManager::new()));
+        let treasury_mgr = Arc::new(GatewayTreasuryManager::with_handle(treasury_handle));
+        treasury_mgr
+            .register_treasury(
+                treasury_did.clone(),
+                "test-coop".to_string(),
+                "credits".to_string(),
+                proposer.did().clone(),
+                Some("test treasury".to_string()),
+            )
+            .await
+            .unwrap();
+
+        let governance_mgr = create_test_governance_manager();
+        governance_mgr
+            .create_domain(
+                GovernanceDomainId("test-coop".to_string()),
+                "Test Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![proposer.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr.clone()))
+                .app_data(web::Data::new(governance_mgr.clone()))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::post()
+            .uri("/treasury/test-coop/spend")
+            .set_json(serde_json::json!({
+                "amount": 42,
+                "recipient": recipient.did().to_string(),
+                "memo": "Ops budget",
+                "currency": "credits",
+                "expected_nonce": 0
+            }))
+            .to_request();
+        req.extensions_mut().insert(TokenClaims {
+            sub: proposer.did().to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["treasury:write".to_string()],
+            exp: 9_999_999_999,
+        });
+
+        let _resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+
+        let proposals = governance_mgr.list_proposals().await.unwrap();
+        assert_eq!(proposals.len(), 1);
+        match &proposals[0].payload {
+            ProposalPayload::Treasury { operation } => match operation {
+                TreasuryProposalOperation::Withdraw {
+                    treasury_did: op_treasury_did,
+                    recipient: op_recipient,
+                    amount,
+                    currency,
+                    purpose,
+                    budget_id,
+                    nonce,
+                } => {
+                    assert_eq!(op_treasury_did, &treasury_did);
+                    assert_eq!(op_recipient, recipient.did());
+                    assert_eq!(*amount, 42);
+                    assert_eq!(currency, "credits");
+                    assert_eq!(purpose, "Ops budget");
+                    assert_eq!(budget_id, &None);
+                    assert_eq!(*nonce, 0);
+                }
+                other => panic!("expected Withdraw payload, got {other:?}"),
+            },
+            other => panic!("expected Treasury payload, got {other:?}"),
+        }
     }
 }
