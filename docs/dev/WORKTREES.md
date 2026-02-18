@@ -30,8 +30,15 @@ $REPO_ROOT/../icn-wt/           # Worktree workspace (sibling directory)
 
 1. **One agent = one branch = one worktree.** Never share a worktree between agents.
 2. **Never commit to `main`.** All work happens on feature branches.
-3. **Never checkout `main`** in a worktree — use `origin/main` as a read-only base.
-4. **Isolate build output** — set `CARGO_TARGET_DIR` per worktree (see below).
+3. **Use the root repo as a manager checkout.** Keep `$REPO_ROOT` on a clean `main` and do edits/builds/tests in `../icn-wt/*`.
+4. **Keep one dedicated `main` worktree** (for rebases/cherry-picks and fresh branch creation) plus feature worktrees.
+5. **Isolate build output** — set `CARGO_TARGET_DIR` per worktree (see below).
+
+## Recommended Operating Layout
+
+- `$REPO_ROOT` (manager): clean `main`, run `git worktree` commands, avoid day-to-day edits/builds.
+- `../icn-wt/main`: tracked `main` worktree used as the branch source for new slices.
+- `../icn-wt/<pr-or-slice>`: active feature worktrees for implementation and testing.
 
 ## Rust Build Isolation
 
@@ -51,6 +58,9 @@ export CARGO_TARGET_DIR="$PWD/target"
 ```bash
 # From primary repo root
 git worktree add ../icn-wt/<agent-name> -b feat/<agent-name> origin/main
+
+# Optional dedicated main worktree
+git worktree add -B wt-main ../icn-wt/main origin/main
 ```
 
 ### List worktrees
@@ -122,6 +132,7 @@ When an agent's work is merged:
 - [ ] `git push origin --delete feat/<agent-name>` — delete the remote branch (if not auto-deleted by PR merge)
 - [ ] `git worktree prune` — clean up stale refs
 - [ ] Remove any per-worktree `target/` directory if disk space is needed
+- [ ] `cd ../icn-wt/main && git pull --ff-only` — keep the dedicated main worktree current
 
 ## Line Endings
 
