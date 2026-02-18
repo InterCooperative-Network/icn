@@ -287,9 +287,10 @@ mod tests {
 
     #[test]
     fn test_translate_treasury_spend_preserves_decision_provenance() {
-        let treasury_did: icn_identity::Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
-            .parse()
-            .expect("valid did");
+        let treasury_did: icn_identity::Did =
+            "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+                .parse()
+                .expect("valid did");
         let recipient: icn_identity::Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
             .parse()
             .expect("valid did");
