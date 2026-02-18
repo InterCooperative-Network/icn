@@ -47,7 +47,7 @@ pub mod scopes;
 pub use compute::{ComputeService, SubmitTaskParams};
 pub use error::ApiError;
 pub use governance::GovernanceService;
-pub use ledger::{AccountBalance, LedgerService};
+pub use ledger::{AccountBalance, LedgerAccountDeltaView, LedgerEntryView, LedgerService};
 
 /// API context passed to service methods
 #[derive(Debug, Clone)]
