@@ -102,8 +102,8 @@ pub async fn handle_ledger_balance(
         );
     }
 
-    let ledger_handle = match state.ledger_handle() {
-        Some(handle) => handle,
+    let ledger_service = match state.ledger_service() {
+        Some(service) => service,
         None => {
             return RpcResponse::error(
                 id,
@@ -113,7 +113,6 @@ pub async fn handle_ledger_balance(
         }
     };
 
-    // Parse parameters
     #[derive(serde::Deserialize)]
     struct BalanceParams {
         account_id: String,
@@ -127,50 +126,42 @@ pub async fn handle_ledger_balance(
         }
     };
 
-    let account_did = match serde_json::from_value(serde_json::Value::String(
-        balance_params.account_id.clone(),
-    )) {
-        Ok(d) => d,
-        Err(e) => {
-            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid DID: {e}"));
+    match ledger_service
+        .get_balances(
+            &balance_params.account_id,
+            balance_params.currency.as_deref(),
+        )
+        .await
+    {
+        Ok(mut balances) => {
+            if balance_params.currency.is_some() {
+                let first = balances.pop().unwrap_or(icn_api::AccountBalance {
+                    account_id: balance_params.account_id,
+                    currency: String::new(),
+                    amount: 0,
+                });
+                match serde_json::to_value(&first) {
+                    Ok(value) => RpcResponse::success(id, value),
+                    Err(e) => RpcResponse::internal_error(id, e),
+                }
+            } else {
+                let balances: Vec<LedgerBalance> = balances
+                    .into_iter()
+                    .map(|b| LedgerBalance {
+                        account_id: b.account_id,
+                        currency: b.currency,
+                        amount: b.amount,
+                    })
+                    .collect();
+                match serde_json::to_value(&balances) {
+                    Ok(value) => RpcResponse::success(id, value),
+                    Err(e) => RpcResponse::internal_error(id, e),
+                }
+            }
         }
-    };
-
-    let ledger = ledger_handle.read().await;
-
-    if let Some(currency) = balance_params.currency {
-        // Get balance for specific currency
-        let amount = ledger.get_balance(&account_did, &currency);
-        let balance = LedgerBalance {
-            account_id: balance_params.account_id,
-            currency,
-            amount,
-        };
-
-        match serde_json::to_value(&balance) {
-            Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::internal_error(id, e),
-        }
-    } else {
-        // Get all balances for account
-        let account_balances = ledger.get_account_balances(&account_did);
-        let balances: Vec<LedgerBalance> = account_balances
-            .balances
-            .iter()
-            .map(|(currency, amount)| LedgerBalance {
-                account_id: balance_params.account_id.clone(),
-                currency: currency.clone(),
-                amount: *amount,
-            })
-            .collect();
-
-        match serde_json::to_value(&balances) {
-            Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::internal_error(id, e),
-        }
+        Err(e) => RpcResponse::error(id, e.to_rpc_code(), e.to_string()),
     }
 }
-
 /// Handle ledger.history RPC call - get recent ledger entries (paginated)
 ///
 /// Uses the ledger's efficient pagination API to avoid loading all entries

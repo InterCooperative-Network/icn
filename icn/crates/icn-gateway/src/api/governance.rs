@@ -152,6 +152,7 @@ pub async fn create_domain(
 pub async fn list_domains(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    governance_service: Option<web::Data<Option<Arc<icn_api::GovernanceService>>>>,
     query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -174,7 +175,18 @@ pub async fn list_domains(
     // TODO(performance): For very large domain counts (10K+), consider:
     // - Adding a name-sorted secondary index in storage
     // - Offering an unsorted API variant for raw pagination
-    let mut domains = gov_mgr.list_domains().await?;
+    let mut domains = if let Some(service_data) = governance_service {
+        if let Some(service) = service_data.get_ref().as_ref() {
+            service
+                .list_domains()
+                .await
+                .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+        } else {
+            gov_mgr.list_domains().await?
+        }
+    } else {
+        gov_mgr.list_domains().await?
+    };
 
     // Apply filters
     if let Some(name_filter) = query.filter("name") {
