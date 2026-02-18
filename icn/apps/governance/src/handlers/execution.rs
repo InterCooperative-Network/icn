@@ -399,7 +399,9 @@ mod tests {
         for payload in pilot_cases {
             let effects = translate_payload_to_effects(&payload, "receipt-pilot", "hash-pilot");
             assert!(
-                !effects.iter().any(|e| matches!(e, KernelEffect::NoOp { .. })),
+                !effects
+                    .iter()
+                    .any(|e| matches!(e, KernelEffect::NoOp { .. })),
                 "pilot treasury operation must not translate to NoOp: {payload:?}"
             );
         }

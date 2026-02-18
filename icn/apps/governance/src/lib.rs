@@ -164,6 +164,8 @@ mod tests {
     use icn_kernel_api::events::SystemEvent;
     use std::sync::{Arc, Mutex};
 
+    type CapturedEffects = Arc<Mutex<Vec<(Vec<KernelEffect>, String)>>>;
+
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
@@ -173,7 +175,7 @@ mod tests {
         // still route through the effect-path subscription callback.
         std::env::set_var("ICN_USE_EFFECT_PATH", "0");
 
-        let captured: Arc<Mutex<Vec<(Vec<KernelEffect>, String)>>> = Arc::new(Mutex::new(vec![]));
+        let captured: CapturedEffects = Arc::new(Mutex::new(vec![]));
         let sink = captured.clone();
         let subscription = create_effect_subscription(move |effects, decision_receipt_id| {
             sink.lock()
@@ -212,7 +214,10 @@ mod tests {
         assert_eq!(got.len(), 1, "effect callback should fire exactly once");
         assert_eq!(got[0].1, "gov:domain-pilot:pr-pilot-1:receipt");
         assert!(
-            matches!(got[0].0.first(), Some(KernelEffect::Treasury(TreasuryEffect::Spend { .. }))),
+            matches!(
+                got[0].0.first(),
+                Some(KernelEffect::Treasury(TreasuryEffect::Spend { .. }))
+            ),
             "pilot treasury proposal should route to TreasuryEffect::Spend via effect path"
         );
 
