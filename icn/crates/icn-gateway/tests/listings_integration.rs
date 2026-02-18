@@ -694,11 +694,25 @@ async fn test_interest_persists_across_manager_instances() {
         // releases its file lock before we re-open in the next block.
         drop(mgr);
         db.flush().unwrap();
+        drop(db);
     }
 
     // Open new manager instance and verify interest exists
     {
-        let db = sled::open(db_path.path()).unwrap();
+        let mut db = None;
+        for _ in 0..20 {
+            match sled::open(db_path.path()) {
+                Ok(opened) => {
+                    db = Some(opened);
+                    break;
+                }
+                Err(err) if err.to_string().contains("Resource temporarily unavailable") => {
+                    std::thread::sleep(std::time::Duration::from_millis(25));
+                }
+                Err(err) => panic!("failed to re-open persisted sled db: {err}"),
+            }
+        }
+        let db = db.expect("failed to re-open persisted sled db after retries");
         let mgr = ListingsManager::with_sled(Arc::new(db));
 
         let interests = mgr.get_interests(&listing_id).unwrap();

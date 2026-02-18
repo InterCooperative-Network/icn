@@ -25,6 +25,8 @@ pub struct GatewayHandles {
     pub community: Option<icn_community::CommunityHandle>,
     /// Trust service for trust queries (kernel/app separated)
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
+    /// Ledger service for treasury nonce queries
+    pub ledger_service: Option<Arc<dyn icn_kernel_api::services::LedgerService>>,
     /// Governance handle for governance operations
     pub governance: Option<icn_gateway::governance_mgr::GovernanceHandle>,
     /// Treasury handle for treasury operations
@@ -93,6 +95,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let coop_handle = handles.coop;
     let community_handle = handles.community;
     let trust_service_handle = handles.trust_service;
+    let ledger_service_handle = handles.ledger_service;
     let governance_handle = handles.governance;
     let treasury_handle = handles.treasury;
     let ledger_handle = handles.ledger;
@@ -134,6 +137,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(service) = trust_service_handle {
                 gateway_server = gateway_server.with_trust_service(service);
+            }
+
+            if let Some(service) = ledger_service_handle {
+                gateway_server = gateway_server.with_ledger_service(service);
             }
 
             if let Some(handle) = governance_handle {

@@ -159,11 +159,12 @@ use icn_kernel_api::effects::{
 pub fn translate_payload_to_effects(
     payload: &ProposalPayload,
     decision_receipt_id: &str,
+    decision_hash: &str,
 ) -> Vec<KernelEffect> {
     match payload {
         // Treasury proposals
         ProposalPayload::Treasury { operation } => {
-            translate_treasury_operation(operation, decision_receipt_id)
+            translate_treasury_operation(operation, decision_receipt_id, decision_hash)
         }
 
         ProposalPayload::Budget {
@@ -180,7 +181,7 @@ pub fn translate_payload_to_effects(
             validity_start: 0,
             validity_end: u64::MAX,
             decision_receipt_id: decision_receipt_id.to_string(),
-            decision_hash: "pending".to_string(), // Wired when full context available
+            decision_hash: decision_hash.to_string(),
         })],
 
         // Membership proposals
@@ -277,8 +278,11 @@ pub fn translate_payload_to_effects(
 fn translate_treasury_operation(
     operation: &icn_governance::TreasuryProposalOperation,
     decision_receipt_id: &str,
+    decision_hash: &str,
 ) -> Vec<KernelEffect> {
     use icn_governance::TreasuryProposalOperation;
+    const TREASURY_SPEND_UNSUPPORTED_REASON: &str =
+        "Treasury Spend translation unsupported: missing treasury_did and currency in payload";
 
     match operation {
         TreasuryProposalOperation::Withdraw {
@@ -287,6 +291,7 @@ fn translate_treasury_operation(
             amount,
             currency,
             purpose,
+            nonce,
             ..
         } => vec![KernelEffect::Treasury(TreasuryEffect::Spend {
             treasury_did: treasury_did.to_string(),
@@ -295,9 +300,14 @@ fn translate_treasury_operation(
             currency: currency.clone(),
             memo: purpose.clone(),
             budget_id: None, // TODO: wire budget_id from proposal payload
+            expected_nonce: *nonce,
             decision_receipt_id: decision_receipt_id.to_string(),
-            decision_hash: "pending".to_string(), // Wired when full context available
+            decision_hash: decision_hash.to_string(),
         })],
+
+        TreasuryProposalOperation::Spend { .. } => vec![KernelEffect::NoOp {
+            reason: TREASURY_SPEND_UNSUPPORTED_REASON.to_string(),
+        }],
 
         TreasuryProposalOperation::CreateBudget {
             treasury_did,
@@ -314,7 +324,7 @@ fn translate_treasury_operation(
             validity_start: 0,
             validity_end: period_end.unwrap_or(u64::MAX),
             decision_receipt_id: decision_receipt_id.to_string(),
-            decision_hash: "pending".to_string(), // Wired when full context available
+            decision_hash: decision_hash.to_string(),
         })],
 
         // Fallback for other treasury operations
