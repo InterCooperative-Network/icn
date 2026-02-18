@@ -291,7 +291,7 @@ mod tests {
             "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
                 .parse()
                 .expect("valid did");
-        let recipient: icn_identity::Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+        let recipient: icn_identity::Did = "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t"
             .parse()
             .expect("valid did");
         let payload = icn_governance::ProposalPayload::Treasury {
