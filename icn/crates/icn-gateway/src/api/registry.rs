@@ -21,8 +21,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use crate::api::receipts::GovernanceReceiptResponse;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
+use crate::receipt_store::ReceiptStore;
 
 // ============================================================================
 // Types (mirrors icn-governance-actor/src/registry/models.rs)
@@ -590,14 +592,15 @@ pub async fn index_decision_endpoint(
     let now = icn_time::current_timestamp_secs();
     let receipt_id = format!("receipt-{}", &uuid::Uuid::new_v4().to_string()[..12]);
 
-    // Generate canonical hash from content
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut hasher = DefaultHasher::new();
-    req.coop_id.hash(&mut hasher);
-    req.title.hash(&mut hasher);
-    now.hash(&mut hasher);
-    let decision_hash = format!("{:016x}", hasher.finish());
+    // Generate 32-byte canonical hash from stable decision content.
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(req.coop_id.as_bytes());
+    hasher.update([0x1f]);
+    hasher.update(req.title.as_bytes());
+    hasher.update([0x1f]);
+    hasher.update(now.to_be_bytes());
+    let decision_hash = hex::encode(hasher.finalize());
 
     // Handle treasury effect if present
     let treasury_effect_id = req
@@ -693,6 +696,7 @@ pub async fn list_decisions(
 pub async fn get_decision(
     http_req: HttpRequest,
     registry: web::Data<Arc<DecisionRegistry>>,
+    receipt_store: Option<web::Data<Arc<ReceiptStore>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "governance:read")?;
@@ -703,10 +707,24 @@ pub async fn get_decision(
         .get_decision(&decision_id)
         .ok_or_else(|| GatewayError::NotFound(format!("Decision not found: {}", decision_id)))?;
 
-    Ok(HttpResponse::Ok().json(GetDecisionResponse {
-        decision,
-        receipt: None, // TODO: fetch canonical receipt when available
-    }))
+    let receipt = receipt_store.as_ref().and_then(|store| {
+        lookup_governance_receipt(store.get_ref().as_ref(), &decision.decision_hash).and_then(|r| {
+            match serde_json::to_value(r) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        decision_id = %decision_id,
+                        decision_hash = %decision.decision_hash,
+                        "failed to serialize governance receipt for decision response"
+                    );
+                    None
+                }
+            }
+        })
+    });
+
+    Ok(HttpResponse::Ok().json(GetDecisionResponse { decision, receipt }))
 }
 
 /// GET /registry/decisions/{id}/trace - Get decision trace/provenance
@@ -714,6 +732,7 @@ pub async fn get_decision(
 pub async fn get_decision_trace(
     http_req: HttpRequest,
     registry: web::Data<Arc<DecisionRegistry>>,
+    receipt_store: Option<web::Data<Arc<ReceiptStore>>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "governance:read")?;
@@ -742,10 +761,17 @@ pub async fn get_decision_trace(
         });
     }
 
+    let has_receipt = receipt_store
+        .as_ref()
+        .and_then(|store| {
+            lookup_governance_receipt(store.get_ref().as_ref(), &decision.decision_hash)
+        })
+        .is_some();
+
     // Build honest resolution status
     let resolution = TraceResolution {
         decision_resolved: true, // We found the decision in the registry
-        receipt_resolved: false, // TODO: implement receipt store lookup
+        receipt_resolved: has_receipt,
         effect_resolved: has_verified_ledger_entry, // Only resolved if we have verified the effect
         ledger_entry_resolved: has_verified_ledger_entry, // Only true if we have the actual hash
     };
@@ -777,6 +803,44 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(get_decision_trace);
 }
 
+fn parse_decision_hash_hex(hex_str: &str) -> anyhow::Result<[u8; 32]> {
+    let bytes = hex::decode(hex_str)?;
+    let hash: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("decision hash must be 32 bytes"))?;
+    Ok(hash)
+}
+
+fn lookup_governance_receipt(
+    store: &ReceiptStore,
+    decision_hash_hex: &str,
+) -> Option<GovernanceReceiptResponse> {
+    let hash = match parse_decision_hash_hex(decision_hash_hex) {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                decision_hash = %decision_hash_hex,
+                "failed to parse decision hash while hydrating governance receipt"
+            );
+            return None;
+        }
+    };
+
+    match store.get_governance(&hash) {
+        Ok(Some(receipt)) => Some(GovernanceReceiptResponse::from(&receipt)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                decision_hash = %decision_hash_hex,
+                "failed to read governance receipt from receipt store"
+            );
+            None
+        }
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -784,6 +848,13 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::ledger::get_entries_by_decision;
+    use crate::auth::TokenClaims;
+    use crate::ledger_mgr::LedgerManager;
+    use crate::receipt_store::ReceiptStore;
+    use actix_web::{test as actix_test, App, HttpMessage};
+    use icn_identity::KeyPair;
+    use icn_ledger::entry::JournalEntryBuilder;
 
     fn create_test_registry() -> Arc<DecisionRegistry> {
         let registry = Arc::new(DecisionRegistry::new());
@@ -1064,5 +1135,111 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("ledgerEntryHash"));
         assert!(json.contains("0xabcdef123456"));
+    }
+
+    #[actix_web::test]
+    async fn test_decision_endpoint_hydrates_receipt_and_matches_ledger_by_decision() {
+        let registry = Arc::new(DecisionRegistry::new());
+        let receipt_store = Arc::new(ReceiptStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let coop_id = "test-coop".to_string();
+        let proposal_id = "proposal-pilot-1".to_string();
+        let decision_receipt_id = "receipt-pilot-1".to_string();
+
+        let decision_hash = receipt_store
+            .put_test_governance_receipt(&proposal_id)
+            .unwrap();
+        let decision_hash_hex = hex::encode(decision_hash);
+
+        registry
+            .index_decision(DecisionIndexEntry {
+                decision_receipt_id: decision_receipt_id.clone(),
+                decision_hash: decision_hash_hex.clone(),
+                coop_id: coop_id.clone(),
+                meeting_id: None,
+                title: "Pilot treasury spend".to_string(),
+                tags: vec!["pilot".to_string(), "treasury".to_string()],
+                status: DecisionStatus::Approved,
+                created_at: icn_time::current_timestamp_secs(),
+                proposal_type: "treasury_spend".to_string(),
+                treasury_effect_id: Some("effect-pilot-1".to_string()),
+                ledger_entry_hash: None,
+            })
+            .unwrap();
+
+        // Append a real ledger entry carrying the same decision provenance.
+        let from = KeyPair::generate().unwrap().did().clone();
+        let to = KeyPair::generate().unwrap().did().clone();
+        let ledger = ledger_mgr.get_ledger(&coop_id).await.unwrap();
+        let entry = JournalEntryBuilder::new(from.clone())
+            .debit(from, "credits".to_string(), 25)
+            .credit(to, "credits".to_string(), 25)
+            .with_decision_provenance(&decision_receipt_id, &decision_hash_hex)
+            .build()
+            .unwrap();
+        ledger.write().await.append_entry(entry).await.unwrap();
+
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(registry.clone()))
+                .app_data(web::Data::new(receipt_store.clone()))
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(web::scope("/registry").configure(configure))
+                .service(web::scope("/ledger").service(get_entries_by_decision)),
+        )
+        .await;
+
+        let claims = TokenClaims {
+            sub: KeyPair::generate().unwrap().did().to_string(),
+            iat: 1_000_000_000,
+            coop_id: coop_id.clone(),
+            scopes: vec!["governance:read".to_string(), "ledger:read".to_string()],
+            exp: 9_999_999_999,
+        };
+
+        let req = actix_test::TestRequest::get()
+            .uri(&format!("/registry/decisions/{decision_receipt_id}"))
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+        let decision_resp: serde_json::Value = actix_test::call_and_read_body_json(&app, req).await;
+
+        let hydrated_receipt = decision_resp.get("receipt").cloned().unwrap_or_default();
+        assert!(hydrated_receipt.is_object(), "receipt should be hydrated");
+        assert_eq!(
+            hydrated_receipt
+                .get("decisionHash")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default(),
+            decision_hash_hex
+        );
+        assert_eq!(
+            hydrated_receipt
+                .get("proposalId")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default(),
+            proposal_id
+        );
+
+        let req = actix_test::TestRequest::get()
+            .uri(&format!(
+                "/ledger/{coop_id}/entries/by-decision?decision_hash={decision_hash_hex}"
+            ))
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let ledger_resp: crate::models::TransactionHistoryResponse =
+            actix_test::call_and_read_body_json(&app, req).await;
+
+        assert_eq!(ledger_resp.transactions.len(), 1);
+        let tx = &ledger_resp.transactions[0];
+        assert_eq!(
+            tx.decision_hash.as_deref().unwrap_or_default(),
+            decision_hash_hex
+        );
+        assert_eq!(
+            tx.decision_receipt_id.as_deref().unwrap_or_default(),
+            decision_receipt_id
+        );
     }
 }
