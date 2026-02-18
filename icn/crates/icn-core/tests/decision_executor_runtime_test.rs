@@ -13,6 +13,8 @@ use std::sync::{Arc, RwLock};
 use anyhow::Result;
 use icn_core::services::LedgerServiceImpl;
 use icn_core::supervisor::execution_store::SledExecutionStore;
+use icn_governance::{ProposalPayload, TreasuryProposalOperation};
+use icn_governance_actor::translate_payload_to_effects;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
@@ -718,4 +720,40 @@ async fn test_treasury_entry_persisted_with_provenance() {
     let reopened_exec_store = SledExecutionStore::new(reopened_exec_backend);
     let reopened_record = reopened_exec_store.get(decision_hash).unwrap().unwrap();
     assert_eq!(reopened_record.ledger_entry_ids, vec![entry_hash]);
+}
+
+/// Test 11: Treasury Spend payload is explicitly unsupported at translation
+/// boundary until payload carries treasury identity + currency.
+#[test]
+fn test_treasury_spend_payload_translation_is_explicitly_unsupported() {
+    use icn_identity::Did;
+
+    let decision_receipt_id = "gov:test-domain:test-proposal:receipt";
+    let decision_hash = "test-decision-hash";
+    let recipient: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+        .parse()
+        .unwrap();
+
+    let payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::Spend {
+            amount: 100,
+            recipient,
+            memo: "PR-2 treasury spend".to_string(),
+            nonce: 0,
+        },
+    };
+
+    let effects = translate_payload_to_effects(&payload, decision_receipt_id, decision_hash);
+    assert_eq!(effects.len(), 1);
+    match &effects[0] {
+        KernelEffect::NoOp { reason } => {
+            assert!(
+                reason.contains(
+                    "Treasury Spend translation unsupported: missing treasury_did and currency in payload"
+                ),
+                "NoOp reason must explain unsupported Spend translation boundary"
+            );
+        }
+        other => panic!("expected NoOp for unsupported Spend payload, got {other:?}"),
+    }
 }
