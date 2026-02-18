@@ -37,6 +37,13 @@ pub struct LedgerEntryView {
     pub decision_hash: Option<String>,
 }
 
+/// Bounded decision-read page returned by the shared ledger service.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DecisionEntriesPage {
+    pub entries: Vec<LedgerEntryView>,
+    pub has_more: bool,
+}
+
 /// Shared ledger service used by both RPC and gateway layers.
 pub struct LedgerService {
     ledger: Arc<RwLock<Ledger>>,
@@ -92,17 +99,31 @@ impl LedgerService {
         &self,
         decision_hash: &str,
         limit: usize,
-    ) -> Result<Vec<LedgerEntryView>, ApiError> {
+    ) -> Result<DecisionEntriesPage, ApiError> {
+        const PILOT_MAX_SCAN_SIZE: usize = 1000;
+        let scan_size = limit
+            .saturating_mul(10)
+            .clamp(limit.max(1), PILOT_MAX_SCAN_SIZE);
+
         let ledger = self.ledger.read().await;
         let (entries, _total) = ledger
-            .get_entries_paginated_asc(0, 1000)
+            .get_entries_paginated_asc(0, scan_size)
             .map_err(|e| ApiError::LedgerError(e.to_string()))?;
 
-        Ok(entries
-            .into_iter()
-            .filter(|entry| entry.decision_hash.as_deref() == Some(decision_hash))
-            .take(limit)
-            .map(|entry| LedgerEntryView {
+        let mut matched_count = 0usize;
+        let mut page_entries = Vec::new();
+
+        for entry in entries {
+            if entry.decision_hash.as_deref() != Some(decision_hash) {
+                continue;
+            }
+
+            matched_count += 1;
+            if page_entries.len() >= limit {
+                continue;
+            }
+
+            page_entries.push(LedgerEntryView {
                 id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
                 timestamp: entry.timestamp,
                 author: entry.author.to_string(),
@@ -118,7 +139,12 @@ impl LedgerService {
                     .collect(),
                 decision_receipt_id: entry.decision_receipt_id.clone(),
                 decision_hash: entry.decision_hash.clone(),
-            })
-            .collect())
+            });
+        }
+
+        Ok(DecisionEntriesPage {
+            entries: page_entries,
+            has_more: matched_count > limit,
+        })
     }
 }

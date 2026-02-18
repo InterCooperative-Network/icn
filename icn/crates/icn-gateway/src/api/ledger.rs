@@ -391,10 +391,12 @@ pub async fn get_entries_by_decision(
         .as_ref()
         .and_then(|service| service.get_ref().clone())
     {
-        let filtered = service
+        let page = service
             .get_entries_by_decision(decision_hash, limit)
             .await
-            .map_err(|e| GatewayError::InternalError(e.to_string()))?
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        let filtered = page
+            .entries
             .into_iter()
             .map(|entry| TransactionHistoryEntry {
                 id: entry.id,
@@ -421,7 +423,7 @@ pub async fn get_entries_by_decision(
             next_cursor: None,
             prev_cursor: None,
             count,
-            has_more: false,
+            has_more: page.has_more,
             offset: None,
             limit,
         };
@@ -439,9 +441,14 @@ pub async fn get_entries_by_decision(
     let entries = ledger_mgr.get_history(&coop_id, None, 0, 1000).await?;
 
     // Filter entries by decision_hash
-    let filtered: Vec<TransactionHistoryEntry> = entries
+    let matching_entries: Vec<_> = entries
         .into_iter()
         .filter(|entry| entry.decision_hash.as_deref() == Some(decision_hash.as_str()))
+        .collect();
+    let has_more = matching_entries.len() > limit;
+
+    let filtered: Vec<TransactionHistoryEntry> = matching_entries
+        .into_iter()
         .take(limit)
         .map(|entry| {
             let accounts: Vec<AccountDeltaResponse> = entry
@@ -472,7 +479,7 @@ pub async fn get_entries_by_decision(
         next_cursor: None,
         prev_cursor: None,
         count,
-        has_more: false,
+        has_more,
         offset: None,
         limit,
     };
