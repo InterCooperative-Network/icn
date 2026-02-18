@@ -49,10 +49,17 @@ run_test() {
     local description="$1"
     shift
     local cmd=( "$@" )
+    local status=0
     echo "==> $description"
     if [ -n "$TIMEOUT_BIN" ]; then
-        if ! "$TIMEOUT_BIN" "${TIMEOUT_SECS}s" "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"; then
-            fail_with_hint "$description failed or exceeded ${TIMEOUT_SECS}s timeout"
+        set +e
+        "$TIMEOUT_BIN" "${TIMEOUT_SECS}s" "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
+        status=${PIPESTATUS[0]}
+        set -e
+        if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            fail_with_hint "$description exceeded ${TIMEOUT_SECS}s timeout (try warm-cache: 'cd icn && RUSTC_WRAPPER= cargo test -p icn-core --test treasury_integration --no-run')"
+        elif [ "$status" -ne 0 ]; then
+            fail_with_hint "$description failed"
         fi
     else
         if ! "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"; then
