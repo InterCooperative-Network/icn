@@ -569,6 +569,14 @@ pub trait LedgerService: Send + Sync {
     ) -> Result<TreasuryEntryResult, String> {
         Err("Treasury entry submission not supported".to_string())
     }
+
+    /// Get the current treasury nonce used for spend ordering enforcement.
+    ///
+    /// The returned value must come from the same source-of-truth used by
+    /// `submit_treasury_entry` nonce checks.
+    fn get_treasury_nonce(&self, _treasury_id: &str) -> Result<u64, String> {
+        Err("Treasury nonce query not supported".to_string())
+    }
 }
 
 // ============================================================================
@@ -634,6 +642,11 @@ pub struct TreasuryEntryRequest {
     pub recipient: Option<String>,
     /// Human-readable memo
     pub memo: String,
+    /// Expected treasury nonce for spend replay protection.
+    ///
+    /// `Some(n)` is required for `Spend`; ignored for other operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_nonce: Option<u64>,
 
     // Provenance fields (pilot-critical)
     /// Decision receipt ID that authorized this entry (node-local reference)
@@ -713,6 +726,7 @@ impl TreasuryEntryRequest {
             currency: intent.unit.clone(),
             recipient: Some(intent.to.clone()),
             memo: intent.memo.clone().unwrap_or_default(),
+            expected_nonce: None,
             decision_receipt_id: intent.decision_receipt_id.clone(),
             decision_hash: decision_hash_hex,
         })

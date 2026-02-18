@@ -445,18 +445,21 @@ mod tests {
                 success: true,
                 message: "OK".into(),
                 state_change_hash: Some("hash_t".into()),
+                ledger_entry_id: None,
             },
             EffectResult {
                 effect_id: "membership_0".into(),
                 success: true,
                 message: "OK".into(),
                 state_change_hash: Some("hash_m".into()),
+                ledger_entry_id: None,
             },
             EffectResult {
                 effect_id: "no_hash".into(),
                 success: true,
                 message: "OK".into(),
                 state_change_hash: None,
+                ledger_entry_id: None,
             },
         ];
 
@@ -473,6 +476,7 @@ mod tests {
             success: true,
             message: "OK".into(),
             state_change_hash: Some("same_hash".into()),
+            ledger_entry_id: None,
         }];
 
         let results_b = vec![EffectResult {
@@ -480,6 +484,7 @@ mod tests {
             success: true,
             message: "Different message is OK".into(),
             state_change_hash: Some("same_hash".into()),
+            ledger_entry_id: None,
         }];
 
         assert!(verify_effect_results_match(&results_a, &results_b));
@@ -492,6 +497,7 @@ mod tests {
             success: true,
             message: "OK".into(),
             state_change_hash: Some("hash_a".into()),
+            ledger_entry_id: None,
         }];
 
         let results_b = vec![EffectResult {
@@ -499,6 +505,7 @@ mod tests {
             success: true,
             message: "OK".into(),
             state_change_hash: Some("hash_b".into()),
+            ledger_entry_id: None,
         }];
 
         let comparison = compare_effect_results(&results_a, &results_b);

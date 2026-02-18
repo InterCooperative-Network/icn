@@ -110,6 +110,17 @@ pub struct TreasuryBalanceResponse {
     pub balances: HashMap<String, i64>,
 }
 
+/// Response for treasury nonce
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TreasuryNonceResponse {
+    /// Cooperative ID
+    pub coop_id: String,
+    /// Treasury DID
+    pub treasury_did: String,
+    /// Current spend nonce for this treasury
+    pub nonce: u64,
+}
+
 /// Budget summary for list response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetSummary {
@@ -383,6 +394,50 @@ pub async fn get_treasury_balance(
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+/// GET /treasury/{coop_id}/nonce - Get treasury spend nonce
+///
+/// Returns the current nonce used for treasury spend ordering.
+#[get("/{coop_id}/nonce")]
+pub async fn get_treasury_nonce(
+    req: HttpRequest,
+    path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "treasury:read")?;
+
+    let coop_id = path.into_inner();
+    require_coop_access(&req, &coop_id)?;
+
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        return Err(GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'"
+        )));
+    };
+
+    let treasury_did = treasury.treasury_did.to_string();
+    let nonce = treasury_mgr
+        .get_treasury_nonce(&treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::ServiceUnavailable(
+                "Treasury nonce lookup requires daemon integration with ledger service."
+                    .to_string(),
+            )
+        })?;
+
+    Ok(HttpResponse::Ok().json(TreasuryNonceResponse {
+        coop_id,
+        treasury_did,
+        nonce,
+    }))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets
@@ -874,6 +929,9 @@ pub struct SpendRequest {
     /// Currency (defaults to "credits")
     #[serde(default = "default_spend_currency")]
     pub currency: String,
+    /// Optional expected treasury nonce. If omitted, gateway resolves current nonce.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_nonce: Option<u64>,
 }
 
 fn default_spend_currency() -> String {
@@ -924,15 +982,25 @@ pub async fn propose_spend(
         .get_treasury_by_coop(&coop_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
-    let _treasury = treasury.ok_or_else(|| {
+    let treasury = treasury.ok_or_else(|| {
         GatewayError::NotFound(format!(
             "Treasury not configured for cooperative '{coop_id}'"
         ))
     })?;
 
-    // Nonce is checked at execution time by the TreasuryManager.
-    // For the proposal, we use 0 — the executor reads the current nonce atomically.
-    let nonce = 0u64;
+    let nonce = match body.expected_nonce {
+        Some(n) => n,
+        None => treasury_mgr
+            .get_treasury_nonce(&treasury.treasury_did.to_string())
+            .await
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?
+            .ok_or_else(|| {
+                GatewayError::ServiceUnavailable(
+                    "Treasury nonce lookup requires daemon integration with ledger service."
+                        .to_string(),
+                )
+            })?,
+    };
 
     info!(
         coop_id = %coop_id,
@@ -1001,6 +1069,7 @@ pub async fn propose_spend(
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(get_treasury_status)
         .service(get_treasury_balance)
+        .service(get_treasury_nonce)
         .service(list_budgets)
         .service(get_budget)
         .service(create_budget)
@@ -1046,6 +1115,25 @@ mod tests {
 
         let req = test::TestRequest::get()
             .uri("/treasury/test-coop")
+            .to_request();
+        req.extensions_mut().insert(test_claims("test-coop"));
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::NOT_FOUND);
+    }
+
+    #[actix_web::test]
+    async fn test_get_treasury_nonce_not_found() {
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/treasury/test-coop/nonce")
             .to_request();
         req.extensions_mut().insert(test_claims("test-coop"));
 

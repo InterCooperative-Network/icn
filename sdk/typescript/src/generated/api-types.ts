@@ -35,6 +35,8 @@ export interface components {
         /** @description Add a member to a cooperative */
         AddMemberRequest: {
             did: string;
+            /** @description Optional display name to set when adding the member */
+            display_name?: string | null;
             /**
              * @description Role for the new member: "steward", "facilitator", or "participant"
              *     Legacy names "owner", "admin", "member" are also accepted for backwards compatibility
@@ -103,6 +105,13 @@ export interface components {
             balances: {
                 [key: string]: number;
             };
+            /**
+             * @description Credit limits per currency (max negative balance allowed)
+             *     Absence of a key means no credit limit for that currency
+             */
+            credit_limits?: {
+                [key: string]: number;
+            } | null;
             did: string;
         };
         /** @description Ban member request */

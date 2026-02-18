@@ -15,16 +15,22 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use icn_kernel_api::effects::{ControlEffect, EffectResult, KernelEffect, MembershipEffect};
+use icn_kernel_api::budget::{BeginSpendOutcome, BudgetRecord, BudgetSpendError, BudgetStore};
+use icn_kernel_api::effects::{
+    ControlEffect, EffectResult, KernelEffect, MembershipEffect, TreasuryEffect,
+};
+use icn_kernel_api::escrow::{BeginReleaseOutcome, EscrowReleaseError, EscrowStore};
 use icn_kernel_api::governance::{
-    federation_effect_to_operation, DecisionReceiptId, EffectExecutor, ExecutionOutcome,
-    FederationExecutor, FederationOperation, GovernanceExecutor, ProtocolChange, ProtocolExecutor,
-    TreasuryExecutor, TreasuryOperation,
+    federation_effect_to_operation, treasury_effect_to_operation, DecisionReceiptId,
+    EffectExecutor, ExecutionOutcome, FederationExecutor, FederationOperation, GovernanceExecutor,
+    ProtocolChange, ProtocolExecutor, TreasuryExecutor, TreasuryOperation,
 };
 use icn_kernel_api::protocol_params::ProtocolParameterStore;
 use icn_kernel_api::{ControlService, ForceCloseProposalRequest, VetoProposalRequest};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
+
+const LEDGER_ENTRY_MARKER: &str = "-> ledger entry ";
 
 /// Adapter that implements [`GovernanceExecutor`] by delegating to kernel services.
 ///
@@ -37,6 +43,10 @@ pub struct KernelGovernanceExecutor {
     federation: Arc<KernelFederationExecutor>,
     control: Arc<KernelControlExecutor>,
     membership: Arc<KernelMembershipExecutor>,
+    /// Escrow store for domain-level idempotency on escrow releases.
+    escrow_store: Option<Arc<dyn EscrowStore>>,
+    /// Budget store for budget enforcement.
+    budget_store: Option<Arc<dyn BudgetStore>>,
 }
 
 impl KernelGovernanceExecutor {
@@ -51,6 +61,8 @@ impl KernelGovernanceExecutor {
             federation: Arc::new(KernelFederationExecutor::new()),
             control: Arc::new(KernelControlExecutor::new()),
             membership: Arc::new(KernelMembershipExecutor::new()),
+            escrow_store: None,
+            budget_store: None,
         }
     }
 
@@ -83,6 +95,216 @@ impl KernelGovernanceExecutor {
         self.membership = Arc::new(KernelMembershipExecutor::with_service(service));
         self
     }
+
+    /// Set the escrow store for domain-level idempotency on escrow releases.
+    pub fn with_escrow_store(mut self, store: Arc<dyn EscrowStore>) -> Self {
+        self.escrow_store = Some(store);
+        self
+    }
+
+    /// Set the budget store for budget enforcement.
+    pub fn with_budget_store(mut self, store: Arc<dyn BudgetStore>) -> Self {
+        self.budget_store = Some(store);
+        self
+    }
+
+    /// Execute a treasury effect with optional budget enforcement.
+    ///
+    /// Three paths:
+    /// 1. `CreateBudget` → create a BudgetRecord in the store, then delegate to treasury
+    /// 2. `Spend { budget_id: Some(...) }` → saga-enforced budget check, then treasury
+    /// 3. All other treasury effects → delegate directly to treasury executor
+    async fn execute_treasury_with_budget(
+        &self,
+        treasury_effect: TreasuryEffect,
+        receipt_id: &DecisionReceiptId,
+        decision_receipt_id: &str,
+    ) -> Result<EffectResult> {
+        match &treasury_effect {
+            // Path 1: CreateBudget → persist BudgetRecord
+            TreasuryEffect::CreateBudget {
+                treasury_did,
+                budget_id,
+                total_amount,
+                currency,
+                decision_hash,
+                ..
+            } => {
+                if let Some(ref budget_store) = self.budget_store {
+                    // Check for idempotent re-creation
+                    if let Some(existing) = budget_store.get(budget_id)? {
+                        if existing.decision_hash == *decision_hash {
+                            info!(
+                                budget_id = %budget_id,
+                                "Budget already created (idempotent)"
+                            );
+                            return Ok(EffectResult {
+                                effect_id: decision_receipt_id.to_string(),
+                                success: true,
+                                message: format!(
+                                    "Budget {} already exists (idempotent)",
+                                    budget_id
+                                ),
+                                state_change_hash: None,
+                                ledger_entry_id: None,
+                            });
+                        }
+                    }
+
+                    // Use treasury_did as scope_id (the treasury owns the budget)
+                    let record = BudgetRecord::new(
+                        budget_id.clone(),
+                        treasury_did.clone(),
+                        treasury_did.clone(),
+                        currency.clone(),
+                        *total_amount,
+                        decision_hash.clone(),
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    );
+                    budget_store.put(&record)?;
+                    info!(
+                        budget_id = %budget_id,
+                        total_limit = total_amount,
+                        currency = %currency,
+                        "Budget record created"
+                    );
+                }
+
+                // Also delegate to treasury executor for ledger entry
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+
+            // Path 2: Spend with budget_id → saga-enforced budget check
+            TreasuryEffect::Spend {
+                budget_id: Some(budget_id),
+                decision_hash,
+                amount,
+                ..
+            } => {
+                let budget_store = match &self.budget_store {
+                    Some(store) => store,
+                    None => {
+                        warn!(
+                            budget_id = %budget_id,
+                            "Spend references budget but no budget store configured"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: "Budget store not configured".to_string(),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                };
+
+                let mut budget = match budget_store.get(budget_id)? {
+                    Some(b) => b,
+                    None => {
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Budget {} not found", budget_id),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                };
+
+                // Phase 1: begin_spend (validates capacity, records pending)
+                match budget.begin_spend(decision_hash, *amount) {
+                    Ok(BeginSpendOutcome::Proceed) => {
+                        budget_store.put(&budget)?;
+                    }
+                    Ok(BeginSpendOutcome::RetryNeeded) => {
+                        // Crash recovery — pending spend already recorded, skip persist
+                    }
+                    Err(BudgetSpendError::AlreadySpentSameDecision) => {
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Budget spend already confirmed (idempotent, budget={})",
+                                budget_id
+                            ),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        warn!(
+                            budget_id = %budget_id,
+                            error = %e,
+                            "Budget spend rejected"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: e.to_string(),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                }
+
+                // Phase 2: Ledger mutation
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                match self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await
+                {
+                    Ok(outcome) => {
+                        let result =
+                            execution_outcome_to_effect_result(outcome, decision_receipt_id);
+                        if result.success {
+                            // Phase 3: confirm_spend
+                            budget.confirm_spend();
+                            budget_store.put(&budget)?;
+                            info!(
+                                budget_id = %budget_id,
+                                spent_total = budget.spent_total,
+                                remaining = budget.remaining(),
+                                "Budget spend confirmed"
+                            );
+                        }
+                        // If !result.success, budget stays with pending_spend
+                        // for crash recovery
+                        Ok(result)
+                    }
+                    Err(e) => {
+                        // Ledger error — budget stays in pending state
+                        // for retry by DecisionExecutor
+                        Err(e)
+                    }
+                }
+            }
+
+            // Path 3: All other treasury effects → direct delegation
+            _ => {
+                let operation = treasury_effect_to_operation(&treasury_effect);
+                let outcome = self
+                    .treasury
+                    .execute_treasury_operation(receipt_id, operation)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+        }
+    }
 }
 
 impl GovernanceExecutor for KernelGovernanceExecutor {
@@ -109,17 +331,177 @@ impl EffectExecutor for KernelGovernanceExecutor {
         let receipt_id = DecisionReceiptId::new(decision_receipt_id);
 
         match effect {
-            KernelEffect::Treasury(treasury_effect) => {
-                // Convert TreasuryEffect to TreasuryOperation
-                let operation = treasury_effect_to_operation(&treasury_effect);
-                let outcome = self
-                    .treasury
-                    .execute_treasury_operation(&receipt_id, operation)
-                    .await?;
-                Ok(execution_outcome_to_effect_result(
-                    outcome,
+            KernelEffect::Treasury(TreasuryEffect::ReleaseEscrow {
+                ref escrow_id,
+                ref decision_hash,
+                ..
+            }) => {
+                // Domain-level idempotency via saga: Locked → Releasing → Released.
+                // Releasing is persisted BEFORE ledger mutation so crash recovery
+                // can detect the in-flight state and re-attempt.
+                let escrow_store = match &self.escrow_store {
+                    Some(store) => store,
+                    None => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Escrow store not configured — cannot release escrow"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: "Escrow store not configured".to_string(),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                };
+
+                // Look up escrow
+                let mut escrow = match escrow_store.get(escrow_id)? {
+                    Some(e) => e,
+                    None => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Escrow not found"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Escrow not found: {}", escrow_id),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                };
+
+                // Phase 1: Record intent to release (saga).
+                // begin_release transitions Locked → Releasing, or signals retry/idempotent.
+                match escrow.begin_release(decision_hash) {
+                    Ok(BeginReleaseOutcome::Proceed) => {
+                        // Fresh release — persist Releasing state BEFORE ledger mutation.
+                        escrow_store.put(&escrow)?;
+                        info!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow entering Releasing state, proceeding to ledger mutation"
+                        );
+                    }
+                    Ok(BeginReleaseOutcome::RetryNeeded) => {
+                        // Crash recovery — escrow already in Releasing with same hash.
+                        // Re-attempt the ledger mutation (skip redundant persist).
+                        info!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow in Releasing state (crash recovery), retrying ledger mutation"
+                        );
+                    }
+                    Err(EscrowReleaseError::AlreadyReleasedSameDecision) => {
+                        // Fully released — same decision already completed this escrow.
+                        info!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow already released by this decision (idempotent)"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: true,
+                            message: format!(
+                                "Escrow {} already released by this decision (idempotent)",
+                                escrow_id
+                            ),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                    Err(EscrowReleaseError::AlreadyReleasedByOther {
+                        existing_decision_hash,
+                    }) => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            existing_decision_hash = %existing_decision_hash,
+                            "Escrow already released by a different decision — conflict"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!(
+                                "Escrow {} already released by decision {}",
+                                escrow_id, existing_decision_hash
+                            ),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                    Err(EscrowReleaseError::Cancelled) => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            "Cannot release cancelled escrow"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!("Escrow {} was cancelled", escrow_id),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
+                }
+
+                // Phase 2: Execute ledger mutation (escrow is now in Releasing state).
+                if let KernelEffect::Treasury(ref treasury_effect) = effect {
+                    let operation = treasury_effect_to_operation(treasury_effect);
+                    match self
+                        .treasury
+                        .execute_treasury_operation(&receipt_id, operation)
+                        .await
+                    {
+                        Ok(outcome) => {
+                            let result =
+                                execution_outcome_to_effect_result(outcome, decision_receipt_id);
+                            if result.success {
+                                // Phase 3: Confirm release — ledger mutation succeeded.
+                                // Transition Releasing → Released.
+                                escrow.confirm_release();
+                                escrow_store.put(&escrow)?;
+                                info!(
+                                    escrow_id = %escrow_id,
+                                    "Escrow release confirmed (Released)"
+                                );
+                            } else {
+                                // Treasury returned logical failure (e.g. insufficient funds).
+                                // Escrow stays in Releasing — retry via same decision_hash.
+                                warn!(
+                                    escrow_id = %escrow_id,
+                                    message = %result.message,
+                                    "Treasury operation failed, escrow stays in Releasing for retry"
+                                );
+                            }
+                            Ok(result)
+                        }
+                        Err(e) => {
+                            // System error — escrow stays in Releasing for crash recovery.
+                            warn!(
+                                escrow_id = %escrow_id,
+                                error = %e,
+                                "Ledger mutation error, escrow stays in Releasing"
+                            );
+                            Err(e)
+                        }
+                    }
+                } else {
+                    unreachable!("already matched Treasury variant")
+                }
+            }
+            KernelEffect::Treasury(ref treasury_effect) => {
+                // Budget-aware treasury dispatch: handles CreateBudget, Spend with budget_id,
+                // and all other treasury effects (direct passthrough).
+                self.execute_treasury_with_budget(
+                    treasury_effect.clone(),
+                    &receipt_id,
                     decision_receipt_id,
-                ))
+                )
+                .await
             }
             KernelEffect::Protocol(protocol_effect) => {
                 // Convert ProtocolEffect to ProtocolChange
@@ -153,6 +535,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             protocol_effect
                         ),
                         state_change_hash: None,
+                        ledger_entry_id: None,
                     })
                 }
             }
@@ -173,6 +556,7 @@ impl EffectExecutor for KernelGovernanceExecutor {
                 success: true,
                 message: format!("NoOp: {}", reason),
                 state_change_hash: None,
+                ledger_entry_id: None,
             }),
             KernelEffect::Control(control_effect) => {
                 // Execute control effect (veto, force close)
@@ -244,6 +628,7 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
             currency = %operation.currency,
             recipient = ?operation.recipient,
             memo = %operation.memo,
+            expected_nonce = ?operation.expected_nonce,
             decision_hash = ?operation.decision_hash,
             "Executing treasury operation"
         );
@@ -258,6 +643,7 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                     currency: operation.currency.clone(),
                     recipient: operation.recipient.clone(),
                     memo: operation.memo.clone(),
+                    expected_nonce: operation.expected_nonce,
                     decision_receipt_id: receipt_id.to_string(),
                     decision_hash: decision_hash.clone(),
                 };
@@ -273,11 +659,12 @@ impl TreasuryExecutor for KernelTreasuryExecutor {
                         return Ok(ExecutionOutcome::Success {
                             receipt_id: receipt_id.clone(),
                             effects: vec![format!(
-                                "{:?} {} {} from treasury {} -> ledger entry {}",
+                                "{:?} {} {} from treasury {} {}{}",
                                 operation.operation_type,
                                 operation.amount,
                                 operation.currency,
                                 operation.treasury_id,
+                                LEDGER_ENTRY_MARKER,
                                 result.entry_hash
                             )],
                         });
@@ -718,88 +1105,6 @@ fn parse_bytes(s: &str) -> Result<u64> {
     Ok(num * multiplier)
 }
 
-/// Convert a TreasuryEffect to a TreasuryOperation
-fn treasury_effect_to_operation(
-    effect: &icn_kernel_api::effects::TreasuryEffect,
-) -> TreasuryOperation {
-    use icn_kernel_api::effects::TreasuryEffect;
-    match effect {
-        TreasuryEffect::Spend {
-            treasury_did,
-            recipient_did,
-            amount,
-            currency,
-            memo,
-            decision_hash,
-            ..
-        } => TreasuryOperation {
-            treasury_id: treasury_did.clone(),
-            operation_type: icn_kernel_api::governance::TreasuryOperationType::Spend,
-            amount: *amount,
-            currency: currency.clone(),
-            recipient: Some(recipient_did.clone()),
-            memo: memo.clone(),
-            decision_hash: Some(decision_hash.clone()),
-        },
-        TreasuryEffect::CreateBudget {
-            treasury_did,
-            budget_id,
-            total_amount,
-            currency,
-            name,
-            decision_hash,
-            ..
-        } => TreasuryOperation {
-            treasury_id: treasury_did.clone(),
-            operation_type: icn_kernel_api::governance::TreasuryOperationType::Allocate,
-            amount: *total_amount,
-            currency: currency.clone(),
-            recipient: Some(budget_id.clone()),
-            memo: name.clone(),
-            decision_hash: Some(decision_hash.clone()),
-        },
-        TreasuryEffect::Allocate {
-            treasury_did,
-            budget_id,
-            amount,
-            currency,
-        } => TreasuryOperation {
-            treasury_id: treasury_did.clone(),
-            operation_type: icn_kernel_api::governance::TreasuryOperationType::Allocate,
-            amount: *amount,
-            currency: currency.clone(),
-            recipient: Some(budget_id.clone()),
-            memo: "Budget allocation".to_string(),
-            decision_hash: None, // No decision provenance for this variant
-        },
-        TreasuryEffect::Transfer {
-            from_did,
-            to_did,
-            amount,
-            currency,
-            memo,
-        } => TreasuryOperation {
-            treasury_id: from_did.clone(),
-            operation_type: icn_kernel_api::governance::TreasuryOperationType::Spend,
-            amount: *amount,
-            currency: currency.clone(),
-            recipient: Some(to_did.clone()),
-            memo: memo.clone(),
-            decision_hash: None, // No decision provenance for this variant
-        },
-        // Other treasury effects mapped to basic operations
-        _ => TreasuryOperation {
-            treasury_id: String::new(),
-            operation_type: icn_kernel_api::governance::TreasuryOperationType::Reserve,
-            amount: 0,
-            currency: "UNKNOWN".to_string(),
-            recipient: None,
-            memo: "Unmapped treasury effect".to_string(),
-            decision_hash: None,
-        },
-    }
-}
-
 /// Convert a ProtocolEffect to a ProtocolChange (if applicable)
 fn protocol_effect_to_change(
     effect: &icn_kernel_api::effects::ProtocolEffect,
@@ -846,12 +1151,22 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
                     e[pos + 14..].to_string() // Skip "-> state_hash="
                 })
             });
+            let ledger_entry_id = effects.iter().find_map(|e| {
+                let (_, entry_id) = e.rsplit_once(LEDGER_ENTRY_MARKER)?;
+                let entry_id = entry_id.trim();
+                if entry_id.is_empty() {
+                    None
+                } else {
+                    Some(entry_id.to_string())
+                }
+            });
 
             EffectResult {
                 effect_id: effect_id.to_string(),
                 success: true,
                 message: effects.join("; "),
                 state_change_hash,
+                ledger_entry_id,
             }
         }
         ExecutionOutcome::Failed { reason, .. } => EffectResult {
@@ -859,12 +1174,14 @@ fn execution_outcome_to_effect_result(outcome: ExecutionOutcome, effect_id: &str
             success: false,
             message: reason,
             state_change_hash: None,
+            ledger_entry_id: None,
         },
         ExecutionOutcome::Deferred { reason, .. } => EffectResult {
             effect_id: effect_id.to_string(),
             success: true,
             message: format!("Deferred: {}", reason),
             state_change_hash: None,
+            ledger_entry_id: None,
         },
     }
 }
@@ -1466,6 +1783,7 @@ mod tests {
             currency: "HOURS".to_string(),
             recipient: Some("did:icn:recipient".to_string()),
             memo: "Test payment".to_string(),
+            expected_nonce: Some(0),
             decision_hash: Some("sha256:abc123".to_string()),
         };
 
@@ -1589,6 +1907,20 @@ mod tests {
         let result = executor.get_treasury_balance("treasury-1", "HOURS").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0); // Placeholder returns 0
+    }
+
+    #[test]
+    fn test_execution_outcome_maps_ledger_entry_id() {
+        let outcome = ExecutionOutcome::Success {
+            receipt_id: DecisionReceiptId::new("receipt-1"),
+            effects: vec![format!(
+                "Spend 10 HOURS from treasury did:icn:t1 {}abc123",
+                LEDGER_ENTRY_MARKER
+            )],
+        };
+
+        let result = execution_outcome_to_effect_result(outcome, "receipt-1");
+        assert_eq!(result.ledger_entry_id.as_deref(), Some("abc123"));
     }
 
     #[test]
