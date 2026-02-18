@@ -7,7 +7,8 @@
 //!
 //! Supports lookup by canonical hash, decision_hash, and proposal_id.
 
-use icn_governance::GovernanceDecisionReceipt;
+#[cfg_attr(not(test), allow(unused_imports))]
+use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
 use sled::Db;
@@ -115,6 +116,25 @@ impl ReceiptStore {
             .map_err(|e| format!("Failed to index governance receipt by proposal_id: {}", e))?;
 
         Ok(hash)
+    }
+
+    /// Test helper: store a governance receipt with explicit decision provenance fields.
+    #[cfg(test)]
+    pub fn put_test_governance_receipt(
+        &self,
+        proposal_id: &str,
+        decision_hash: Hash,
+    ) -> Result<Hash, String> {
+        let votes = vec![];
+        let mut receipt = GovernanceDecisionReceipt::new(
+            proposal_id.to_string(),
+            "test-domain".to_string(),
+            ProofOutcome::Accepted,
+            VoteTally::empty(),
+            &votes,
+        );
+        receipt.decision_hash = decision_hash;
+        self.put_governance(&receipt)
     }
 
     /// Get a governance decision receipt by decision_hash.
