@@ -13,6 +13,7 @@
 //! This enables the provenance chain: governance decision → treasury effect → ledger entry.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use icn_kernel_api::services::{
     LedgerEvent, LedgerService, ResourceAccessInfo, RevokeResourceAccessRequest,
@@ -21,8 +22,20 @@ use icn_kernel_api::services::{
 use icn_kernel_api::types::Did;
 use icn_kernel_api::PolicyOracle;
 use icn_ledger::{entry::JournalEntryBuilder, AccountDelta, Ledger};
+use icn_store::SledStore;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
+
+const RECEIPT_INDEX_PREFIX: &str = "ledger:receipt_index:";
+const RECEIPT_INDEX_PENDING: &[u8] = b"__pending__";
+const RECEIPT_INDEX_WAIT_ATTEMPTS: usize = 25;
+const RECEIPT_INDEX_WAIT_MS: u64 = 20;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ReceiptIndexRecord {
+    entry_hash: String,
+    decision_hash: String,
+}
 
 /// Concrete implementation of `LedgerService` backed by the mutual credit ledger.
 ///
@@ -38,6 +51,12 @@ pub struct LedgerServiceImpl {
     /// Treasury DID (used as the source account for treasury operations)
     /// Format: "did:icn:<treasury-pubkey>"
     treasury_did: icn_identity::Did,
+
+    /// Optional receipt-id index store for O(1) treasury idempotency.
+    ///
+    /// Keys: `ledger:receipt_index:{decision_receipt_id}`
+    /// Values: `ReceiptIndexRecord` JSON or pending marker during in-flight append.
+    receipt_index: Option<Arc<SledStore>>,
 }
 
 impl LedgerServiceImpl {
@@ -56,6 +75,22 @@ impl LedgerServiceImpl {
             ledger,
             oracle,
             treasury_did,
+            receipt_index: None,
+        }
+    }
+
+    /// Create a LedgerService with a receipt-id index for idempotent append claims.
+    pub fn new_with_receipt_index(
+        ledger: Arc<RwLock<Ledger>>,
+        oracle: Arc<dyn PolicyOracle>,
+        treasury_did: icn_identity::Did,
+        receipt_index: Arc<SledStore>,
+    ) -> Self {
+        Self {
+            ledger,
+            oracle,
+            treasury_did,
+            receipt_index: Some(receipt_index),
         }
     }
 
@@ -137,9 +172,6 @@ impl LedgerServiceImpl {
     }
 
     /// Find an existing journal entry by governance decision receipt id.
-    ///
-    /// This provides ledger-bound idempotency for treasury mutations:
-    /// a receipt id may map to at most one durable entry.
     fn find_existing_entry_for_receipt(
         ledger: &Ledger,
         decision_receipt_id: &str,
@@ -166,6 +198,200 @@ impl LedgerServiceImpl {
         }
 
         Ok(None)
+    }
+
+    fn receipt_index_key(decision_receipt_id: &str) -> Vec<u8> {
+        format!("{RECEIPT_INDEX_PREFIX}{decision_receipt_id}").into_bytes()
+    }
+
+    /// Try to claim a decision receipt for append, or return an existing entry hash.
+    ///
+    /// Returns:
+    /// - `Ok(None)` when claim succeeds and caller should append.
+    /// - `Ok(Some(entry_hash))` when an existing finalized entry is found.
+    fn claim_or_get_existing_entry_hash(
+        &self,
+        decision_receipt_id: &str,
+        decision_hash: &str,
+    ) -> Result<Option<String>, String> {
+        let Some(index) = self.receipt_index.as_ref() else {
+            // Compatibility fallback when no index store is configured.
+            return tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let ledger = self.ledger.write().await;
+                    if let Some((entry_hash, existing_decision_hash)) =
+                        Self::find_existing_entry_for_receipt(&ledger, decision_receipt_id)?
+                    {
+                        if let Some(existing_decision_hash) = existing_decision_hash {
+                            if existing_decision_hash != decision_hash {
+                                return Err(format!(
+                                    "Decision hash mismatch for receipt {}: existing={}, requested={}",
+                                    decision_receipt_id, existing_decision_hash, decision_hash
+                                ));
+                            }
+                        }
+                        Ok(Some(entry_hash))
+                    } else {
+                        Ok(None)
+                    }
+                })
+            });
+        };
+
+        let key = Self::receipt_index_key(decision_receipt_id);
+        let db = index.db();
+
+        for _ in 0..RECEIPT_INDEX_WAIT_ATTEMPTS {
+            match db
+                .compare_and_swap(key.as_slice(), None::<&[u8]>, Some(RECEIPT_INDEX_PENDING))
+                .map_err(|e| format!("Failed to claim receipt index: {e}"))?
+            {
+                Ok(()) => return Ok(None),
+                Err(cas_err) => {
+                    let Some(current) = cas_err.current else {
+                        // Key was concurrently removed; retry claim.
+                        continue;
+                    };
+
+                    if current.as_ref() == RECEIPT_INDEX_PENDING {
+                        // Another executor is finalizing this receipt; wait briefly.
+                        std::thread::sleep(Duration::from_millis(RECEIPT_INDEX_WAIT_MS));
+                        continue;
+                    }
+
+                    let record: ReceiptIndexRecord = serde_json::from_slice(current.as_ref())
+                        .map_err(|e| {
+                            format!("Failed to decode receipt index record for replay: {e}")
+                        })?;
+                    if record.decision_hash != decision_hash {
+                        return Err(format!(
+                            "Decision hash mismatch for receipt {}: existing={}, requested={}",
+                            decision_receipt_id, record.decision_hash, decision_hash
+                        ));
+                    }
+                    return Ok(Some(record.entry_hash));
+                }
+            }
+        }
+
+        // Pending marker exceeded wait budget. Attempt bounded recovery by scanning ledger
+        // once and finalizing the index if the entry already exists.
+        self.resolve_pending_claim_from_ledger(decision_receipt_id, decision_hash)
+    }
+
+    fn resolve_pending_claim_from_ledger(
+        &self,
+        decision_receipt_id: &str,
+        decision_hash: &str,
+    ) -> Result<Option<String>, String> {
+        let maybe_existing = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let ledger = self.ledger.write().await;
+                Self::find_existing_entry_for_receipt(&ledger, decision_receipt_id)
+            })
+        })?;
+
+        let Some((entry_hash, existing_decision_hash)) = maybe_existing else {
+            return Err(format!(
+                "Receipt {} is currently in-flight (pending index claim), retry",
+                decision_receipt_id
+            ));
+        };
+
+        if let Some(existing_decision_hash) = existing_decision_hash {
+            if existing_decision_hash != decision_hash {
+                return Err(format!(
+                    "Decision hash mismatch for receipt {}: existing={}, requested={}",
+                    decision_receipt_id, existing_decision_hash, decision_hash
+                ));
+            }
+        }
+
+        self.finalize_receipt_claim(
+            decision_receipt_id,
+            &ReceiptIndexRecord {
+                entry_hash: entry_hash.clone(),
+                decision_hash: decision_hash.to_string(),
+            },
+        )?;
+        Ok(Some(entry_hash))
+    }
+
+    fn finalize_receipt_claim(
+        &self,
+        decision_receipt_id: &str,
+        record: &ReceiptIndexRecord,
+    ) -> Result<(), String> {
+        let Some(index) = self.receipt_index.as_ref() else {
+            return Ok(());
+        };
+
+        let key = Self::receipt_index_key(decision_receipt_id);
+        let encoded = serde_json::to_vec(record)
+            .map_err(|e| format!("Failed to encode receipt index record: {e}"))?;
+
+        match index
+            .db()
+            .compare_and_swap(
+                key.as_slice(),
+                Some(RECEIPT_INDEX_PENDING),
+                Some(encoded.as_slice()),
+            )
+            .map_err(|e| format!("Failed to finalize receipt index claim: {e}"))?
+        {
+            Ok(()) => Ok(()),
+            Err(cas_err) => {
+                if let Some(current) = cas_err.current {
+                    if current.as_ref() == encoded.as_slice() {
+                        return Ok(());
+                    }
+
+                    if current.as_ref() == RECEIPT_INDEX_PENDING {
+                        // Fall back to direct set if pending marker still present.
+                        index
+                            .db()
+                            .insert(key.as_slice(), encoded.as_slice())
+                            .map_err(|e| {
+                                format!("Failed to persist finalized receipt index: {e}")
+                            })?;
+                        return Ok(());
+                    }
+
+                    let existing: ReceiptIndexRecord = serde_json::from_slice(current.as_ref())
+                        .map_err(|e| {
+                            format!("Failed to decode existing finalized receipt index record: {e}")
+                        })?;
+                    if existing.entry_hash == record.entry_hash
+                        && existing.decision_hash == record.decision_hash
+                    {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "Receipt index conflict for {}: existing hash {}, new hash {}",
+                            decision_receipt_id, existing.entry_hash, record.entry_hash
+                        ))
+                    }
+                } else {
+                    index
+                        .db()
+                        .insert(key.as_slice(), encoded.as_slice())
+                        .map_err(|e| format!("Failed to restore missing receipt index key: {e}"))?;
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn clear_pending_receipt_claim(&self, decision_receipt_id: &str) {
+        let Some(index) = self.receipt_index.as_ref() else {
+            return;
+        };
+
+        let key = Self::receipt_index_key(decision_receipt_id);
+        let _ =
+            index
+                .db()
+                .compare_and_swap(key.as_slice(), Some(RECEIPT_INDEX_PENDING), None::<&[u8]>);
     }
 }
 
@@ -238,6 +464,23 @@ impl LedgerService for LedgerServiceImpl {
             "Submitting treasury entry to ledger"
         );
 
+        // Claim receipt idempotency key (or return existing entry hash on replay).
+        if let Some(existing_entry_hash) =
+            self.claim_or_get_existing_entry_hash(&req.decision_receipt_id, &req.decision_hash)?
+        {
+            info!(
+                entry_hash = %existing_entry_hash,
+                decision_receipt_id = %req.decision_receipt_id,
+                decision_hash = %req.decision_hash,
+                "Treasury entry already exists for decision receipt (idempotent replay)"
+            );
+            return Ok(TreasuryEntryResult {
+                entry_hash: existing_entry_hash,
+                decision_receipt_id: req.decision_receipt_id,
+                decision_hash: req.decision_hash,
+            });
+        }
+
         // Build account deltas for double-entry bookkeeping
         let deltas = self.build_account_deltas(&req)?;
 
@@ -257,52 +500,40 @@ impl LedgerService for LedgerServiceImpl {
             .build()
             .map_err(|e| format!("Failed to build journal entry: {e}"))?;
 
-        // Idempotent append at ledger boundary:
-        // - If receipt_id already exists, return existing entry hash.
-        // - Otherwise append exactly once.
-        let (entry_hash_hex, was_idempotent_replay) = tokio::task::block_in_place(|| {
+        // Append to ledger (async operation in sync context)
+        let append_result = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let mut ledger = self.ledger.write().await;
-
-                if let Some((existing_entry_hash, existing_decision_hash)) =
-                    Self::find_existing_entry_for_receipt(&ledger, &req.decision_receipt_id)?
-                {
-                    if let Some(existing_decision_hash) = existing_decision_hash {
-                        if existing_decision_hash != req.decision_hash {
-                            return Err(format!(
-                                "Decision hash mismatch for receipt {}: existing={}, requested={}",
-                                req.decision_receipt_id, existing_decision_hash, req.decision_hash
-                            ));
-                        }
-                    }
-
-                    return Ok((existing_entry_hash, true));
-                }
-
-                let entry_hash = ledger
+                ledger
                     .append_entry(entry)
                     .await
-                    .map_err(|e| format!("Failed to append ledger entry: {e}"))?;
-
-                Ok((entry_hash.to_hex(), false))
+                    .map_err(|e| format!("Failed to append ledger entry: {e}"))
             })
-        })?;
+        });
 
-        if was_idempotent_replay {
-            info!(
-                entry_hash = %entry_hash_hex,
-                decision_receipt_id = %req.decision_receipt_id,
-                decision_hash = %req.decision_hash,
-                "Treasury entry already exists for decision receipt (idempotent replay)"
-            );
-        } else {
-            info!(
-                entry_hash = %entry_hash_hex,
-                decision_receipt_id = %req.decision_receipt_id,
-                decision_hash = %req.decision_hash,
-                "Treasury entry submitted to ledger"
-            );
-        }
+        let entry_hash = match append_result {
+            Ok(hash) => hash,
+            Err(e) => {
+                self.clear_pending_receipt_claim(&req.decision_receipt_id);
+                return Err(e);
+            }
+        };
+        let entry_hash_hex = entry_hash.to_hex();
+
+        self.finalize_receipt_claim(
+            &req.decision_receipt_id,
+            &ReceiptIndexRecord {
+                entry_hash: entry_hash_hex.clone(),
+                decision_hash: req.decision_hash.clone(),
+            },
+        )?;
+
+        info!(
+            entry_hash = %entry_hash_hex,
+            decision_receipt_id = %req.decision_receipt_id,
+            decision_hash = %req.decision_hash,
+            "Treasury entry submitted to ledger"
+        );
 
         Ok(TreasuryEntryResult {
             entry_hash: entry_hash_hex,
@@ -348,11 +579,13 @@ mod tests {
         let recipient_did = KeyPair::generate().unwrap().did().clone();
 
         let ledger_store = Arc::new(SledStore::temporary().unwrap());
+        let receipt_index = Arc::new(SledStore::temporary().unwrap());
         let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
-        let service = LedgerServiceImpl::new(
+        let service = LedgerServiceImpl::new_with_receipt_index(
             ledger.clone(),
             Arc::new(AllowAllOracle::wildcard()),
             treasury_did.clone(),
+            receipt_index,
         );
 
         let request = TreasuryEntryRequest {
@@ -395,7 +628,9 @@ mod tests {
         let recipient_did = KeyPair::generate().unwrap().did().clone();
         let tmp = TempDir::new().unwrap();
         let ledger_path = tmp.path().join("ledger");
+        let receipt_index_path = tmp.path().join("receipt-index");
         std::fs::create_dir_all(&ledger_path).unwrap();
+        std::fs::create_dir_all(&receipt_index_path).unwrap();
 
         let request = TreasuryEntryRequest {
             treasury_id: "t1".to_string(),
@@ -410,11 +645,13 @@ mod tests {
 
         let first_hash = {
             let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+            let receipt_index = Arc::new(SledStore::open(&receipt_index_path).unwrap());
             let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
-            let service = LedgerServiceImpl::new(
+            let service = LedgerServiceImpl::new_with_receipt_index(
                 ledger.clone(),
                 Arc::new(AllowAllOracle::wildcard()),
                 treasury_did.clone(),
+                receipt_index,
             );
 
             let first = service.submit_treasury_entry(request.clone()).unwrap();
@@ -424,11 +661,13 @@ mod tests {
 
         let second_hash = {
             let ledger_store = Arc::new(SledStore::open(&ledger_path).unwrap());
+            let receipt_index = Arc::new(SledStore::open(&receipt_index_path).unwrap());
             let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
-            let service = LedgerServiceImpl::new(
+            let service = LedgerServiceImpl::new_with_receipt_index(
                 ledger.clone(),
                 Arc::new(AllowAllOracle::wildcard()),
                 treasury_did,
+                receipt_index,
             );
 
             let second = service.submit_treasury_entry(request).unwrap();
@@ -439,6 +678,54 @@ mod tests {
         assert_eq!(
             second_hash, first_hash,
             "receipt-based idempotency must survive process restart"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_submit_treasury_entry_concurrent_same_receipt_single_append() {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let recipient_did = KeyPair::generate().unwrap().did().clone();
+
+        let ledger_store = Arc::new(SledStore::temporary().unwrap());
+        let receipt_index = Arc::new(SledStore::temporary().unwrap());
+        let ledger = Arc::new(RwLock::new(Ledger::new(ledger_store).unwrap()));
+        let service = Arc::new(LedgerServiceImpl::new_with_receipt_index(
+            ledger.clone(),
+            Arc::new(AllowAllOracle::wildcard()),
+            treasury_did,
+            receipt_index,
+        ));
+
+        let request = TreasuryEntryRequest {
+            treasury_id: "t1".to_string(),
+            operation_type: TreasuryOperationType::Spend,
+            amount: 25,
+            currency: "HOURS".to_string(),
+            recipient: Some(recipient_did.to_string()),
+            memo: "concurrency idempotency".to_string(),
+            decision_receipt_id: "gov:proposal:pr3:idempotency:concurrent".to_string(),
+            decision_hash: "decision-hash-pr3-concurrent".to_string(),
+        };
+
+        let req_a = request.clone();
+        let req_b = request;
+        let svc_a = service.clone();
+        let svc_b = service.clone();
+
+        let task_a = tokio::spawn(async move { svc_a.submit_treasury_entry(req_a) });
+        let task_b = tokio::spawn(async move { svc_b.submit_treasury_entry(req_b) });
+
+        let result_a = task_a.await.unwrap().unwrap();
+        let result_b = task_b.await.unwrap().unwrap();
+
+        assert_eq!(
+            result_a.entry_hash, result_b.entry_hash,
+            "concurrent same-receipt submissions must converge to one entry hash"
+        );
+        assert_eq!(
+            ledger.read().await.count_entries().unwrap(),
+            1,
+            "concurrent same-receipt submissions must append exactly one entry"
         );
     }
 }

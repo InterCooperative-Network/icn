@@ -599,10 +599,14 @@ async fn spawn_actors_with_identity(
         // Wire ledger service adapter
         let oracle: Arc<dyn icn_kernel_api::authz::PolicyOracle> =
             Arc::new(icn_kernel_api::authz::AllowAllOracle::wildcard());
-        let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new(
+        let receipt_index_path = config.store_path().join("ledger-receipt-index");
+        let receipt_index_store: Arc<icn_store::SledStore> =
+            Arc::new(icn_store::SledStore::open(&receipt_index_path)?);
+        let ledger_service = Arc::new(crate::services::LedgerServiceImpl::new_with_receipt_index(
             ledger_handle.clone(),
             oracle,
             treasury_did.clone(),
+            receipt_index_store,
         ));
         kernel_executor = kernel_executor.with_ledger_service(ledger_service);
 
