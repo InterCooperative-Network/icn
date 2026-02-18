@@ -356,6 +356,7 @@ pub async fn get_history(
 pub async fn get_entries_by_decision(
     req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
+    ledger_service: Option<web::Data<Option<Arc<icn_api::LedgerService>>>>,
     coop_id: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse> {
@@ -386,14 +387,68 @@ pub async fn get_entries_by_decision(
         .unwrap_or(DEFAULT_PAGE_SIZE)
         .clamp(1, MAX_PAGE_SIZE);
 
+    if let Some(service) = ledger_service
+        .as_ref()
+        .and_then(|service| service.get_ref().clone())
+    {
+        let page = service
+            .get_entries_by_decision(decision_hash, limit)
+            .await
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        let filtered = page
+            .entries
+            .into_iter()
+            .map(|entry| TransactionHistoryEntry {
+                id: entry.id,
+                timestamp: entry.timestamp,
+                author: entry.author,
+                accounts: entry
+                    .accounts
+                    .into_iter()
+                    .map(|delta| AccountDeltaResponse {
+                        account_id: delta.account_id,
+                        currency: delta.currency,
+                        debit: delta.debit,
+                        credit: delta.credit,
+                    })
+                    .collect(),
+                decision_receipt_id: entry.decision_receipt_id,
+                decision_hash: entry.decision_hash,
+            })
+            .collect::<Vec<_>>();
+
+        let count = filtered.len();
+        let pagination = PaginationInfo {
+            total: Some(count),
+            next_cursor: None,
+            prev_cursor: None,
+            count,
+            has_more: page.has_more,
+            offset: None,
+            limit,
+        };
+
+        let response = TransactionHistoryResponse {
+            transactions: filtered,
+            pagination,
+        };
+
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
     // Get all history entries (bounded scan for pilot)
     // TODO: Add index for decision_hash in ledger for efficient queries
     let entries = ledger_mgr.get_history(&coop_id, None, 0, 1000).await?;
 
     // Filter entries by decision_hash
-    let filtered: Vec<TransactionHistoryEntry> = entries
+    let matching_entries: Vec<_> = entries
         .into_iter()
         .filter(|entry| entry.decision_hash.as_deref() == Some(decision_hash.as_str()))
+        .collect();
+    let has_more = matching_entries.len() > limit;
+
+    let filtered: Vec<TransactionHistoryEntry> = matching_entries
+        .into_iter()
         .take(limit)
         .map(|entry| {
             let accounts: Vec<AccountDeltaResponse> = entry
@@ -424,7 +479,7 @@ pub async fn get_entries_by_decision(
         next_cursor: None,
         prev_cursor: None,
         count,
-        has_more: false,
+        has_more,
         offset: None,
         limit,
     };
@@ -753,6 +808,62 @@ mod tests {
         let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
         // With only 1 item, there should be no next_cursor
         assert!(resp.pagination.next_cursor.is_none());
+    }
+
+    #[actix_web::test]
+    async fn test_get_entries_by_decision_prefers_shared_service_boundary() {
+        use crate::models::TransactionHistoryResponse;
+        use icn_ledger::{entry::JournalEntryBuilder, Ledger};
+
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let decision_hash = "a".repeat(64);
+
+        let service_store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut service_ledger = Ledger::new(service_store).unwrap();
+        let service_entry = JournalEntryBuilder::new(alice.did().clone())
+            .debit(alice.did().clone(), "hours".to_string(), 10)
+            .credit(bob.did().clone(), "hours".to_string(), 10)
+            .with_decision_provenance("receipt-123", decision_hash.as_str())
+            .build()
+            .unwrap();
+        service_ledger.append_entry(service_entry).await.unwrap();
+
+        let ledger_service = Arc::new(icn_api::LedgerService::new(Arc::new(
+            tokio::sync::RwLock::new(service_ledger),
+        )));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(Some(ledger_service)))
+                .service(web::scope("/ledger").service(get_entries_by_decision)),
+        )
+        .await;
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let uri = format!(
+            "/ledger/test-coop/entries/by-decision?decision_hash={}",
+            decision_hash
+        );
+        let req = test::TestRequest::get().uri(&uri).to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.transactions.len(), 1);
+        assert_eq!(
+            resp.transactions[0].decision_hash.as_deref(),
+            Some(decision_hash.as_str())
+        );
+        assert_eq!(resp.pagination.count, 1);
     }
 
     #[actix_web::test]
