@@ -587,6 +587,7 @@ jobs:
     name: Pilot Provenance Invariant
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [changes, test]
     steps:
       - uses: actions/checkout@v6
@@ -601,4 +602,6 @@ jobs:
           workspaces: "icn -> target"
 
       - name: Run pilot chain demo
+        env:
+          PILOT_DETERMINISTIC: "1"
         run: ./scripts/pilot_chain_demo.sh
