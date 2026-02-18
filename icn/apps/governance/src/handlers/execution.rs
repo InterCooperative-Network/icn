@@ -284,6 +284,11 @@ fn translate_federation_proposal(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_governance::TreasuryProposalOperation;
+    use icn_identity::Did;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_translate_treasury_spend_preserves_decision_provenance() {
@@ -341,5 +346,66 @@ mod tests {
         let effects = translate_payload_to_effects(&payload, "receipt-abc", "decision-hash-abc");
         assert_eq!(effects.len(), 1);
         assert!(matches!(effects[0], KernelEffect::NoOp { .. }));
+    }
+
+    #[test]
+    fn test_pilot_treasury_ops_do_not_fall_back_to_noop_with_legacy_env_flag() {
+        let _env_guard = ENV_LOCK.lock().expect("env lock");
+        // Legacy env gating was removed from runtime; keep this regression test to
+        // ensure pilot treasury operations remain effect-path translated even when
+        // old env flags are present.
+        std::env::set_var("ICN_USE_EFFECT_PATH", "0");
+
+        let treasury_did: Did = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+            .parse()
+            .expect("valid did");
+        let recipient: Did = "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t"
+            .parse()
+            .expect("valid did");
+
+        let pilot_cases = vec![
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::Spend {
+                    treasury_did: treasury_did.clone(),
+                    amount: 10,
+                    currency: "hours".to_string(),
+                    recipient: recipient.clone(),
+                    memo: "pilot spend".to_string(),
+                    nonce: 1,
+                },
+            },
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::Withdraw {
+                    treasury_did: treasury_did.clone(),
+                    recipient: recipient.clone(),
+                    amount: 11,
+                    currency: "hours".to_string(),
+                    purpose: "pilot withdraw".to_string(),
+                    nonce: 2,
+                    budget_id: None,
+                },
+            },
+            ProposalPayload::Treasury {
+                operation: TreasuryProposalOperation::CreateBudget {
+                    treasury_did,
+                    purpose: "pilot-budget".to_string(),
+                    amount: 12,
+                    currency: "hours".to_string(),
+                    period_end: Some(42),
+                },
+            },
+        ];
+
+        for payload in pilot_cases {
+            let effects = translate_payload_to_effects(&payload, "receipt-pilot", "hash-pilot");
+            assert!(
+                !effects
+                    .iter()
+                    .any(|e| matches!(e, KernelEffect::NoOp { .. })),
+                "pilot treasury operation must not translate to NoOp: {payload:?}"
+            );
+        }
+
+        std::env::remove_var("ICN_USE_EFFECT_PATH");
     }
 }
