@@ -189,11 +189,14 @@ if [ "$DETERMINISTIC_MODE" = "1" ]; then
     fi
 
     if [ "$DET_FAIL" -ne 0 ]; then
+        echo "Strict mode enabled; failing due to ledger_entry_hash drift."
         echo "Deterministic check failed."
         exit 1
     fi
     if [ "$LEDGER_HASH_MISMATCH" -eq 1 ] && [ "$DETERMINISTIC_STRICT" != "1" ]; then
-        echo "⚠️ DETERMINISM PARTIAL: decision ids/hashes match; ledger_entry_hash differs (set PILOT_DETERMINISTIC_STRICT=1 to enforce)"
+        echo "⚠️ DETERMINISM PARTIAL: decision ids/hashes match"
+        echo "ledger_entry_hash differs."
+        echo "set PILOT_DETERMINISTIC_STRICT=1 to enforce ledger hash stability."
     else
         echo "✅ DETERMINISM VERIFIED: run1 and run2 invariant identifiers match under active policy"
     fi
