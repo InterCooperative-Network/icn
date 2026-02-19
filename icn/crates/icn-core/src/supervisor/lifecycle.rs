@@ -121,6 +121,7 @@ pub async fn run_supervisor(
             steward: gateway_handles.steward,
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
+            naming_service: gateway_handles.naming_service,
         },
     );
 
@@ -395,6 +396,13 @@ async fn spawn_actors_with_identity(
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
     gateway_handles.service_discovery_manager = service_discovery_mgr.clone();
+    gateway_handles.naming_service = match super::init_naming::init_naming_service(config) {
+        Ok(service) => Some(service),
+        Err(error) => {
+            warn!("Failed to initialize naming service: {}", error);
+            None
+        }
+    };
 
     // Spawn Identity actor (provides signing and trust service access)
     let identity_handle = crate::identity::IdentityActor::spawn(

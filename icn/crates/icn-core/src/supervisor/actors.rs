@@ -26,6 +26,7 @@ pub struct GatewayActorHandles {
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
     pub service_discovery_manager:
         Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
+    pub naming_service: Option<Arc<dyn icn_kernel_api::naming::NamingService>>,
 }
 
 /// Core actor handles returned from initialization

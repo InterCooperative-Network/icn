@@ -25,6 +25,7 @@ pub mod ledger;
 pub mod listings;
 pub mod members;
 pub mod membership;
+pub mod names;
 pub mod notifications;
 pub mod oracle;
 pub mod receipts;

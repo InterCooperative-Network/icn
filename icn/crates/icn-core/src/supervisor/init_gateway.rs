@@ -42,6 +42,8 @@ pub struct GatewayHandles {
     /// Service discovery manager with gossip wiring
     pub service_discovery_manager:
         Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
+    /// Naming service for Flow B name resolution endpoints
+    pub naming_service: Option<Arc<dyn icn_kernel_api::naming::NamingService>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -103,6 +105,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let steward_handle = handles.steward;
     let agreement_manager_handle = handles.agreement_manager;
     let service_discovery_manager = handles.service_discovery_manager;
+    let naming_service = handles.naming_service;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -169,6 +172,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(mgr) = service_discovery_manager {
                 gateway_server = gateway_server.with_service_discovery_manager(mgr);
+            }
+
+            if let Some(service) = naming_service {
+                gateway_server = gateway_server.with_naming_service(service);
             }
 
             if let Some(score) = default_trust_score {

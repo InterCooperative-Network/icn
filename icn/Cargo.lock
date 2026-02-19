@@ -3118,6 +3118,7 @@ dependencies = [
  "icn-kernel-api",
  "icn-ledger",
  "icn-ledger-app",
+ "icn-naming",
  "icn-net",
  "icn-obs",
  "icn-rpc",

@@ -39,6 +39,7 @@ use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::TrustManager;
 use icn_compute::ComputeHandle;
+use icn_kernel_api::naming::NamingService;
 use icn_store::SledStore;
 use tokio::sync::RwLock;
 
@@ -107,6 +108,8 @@ pub struct GatewayServer {
     /// Optional supervisor-initialized ServiceDiscoveryManager with gossip wiring.
     /// When provided, the gateway uses this instead of creating its own (gossip-less) instance.
     service_discovery_manager: Option<Arc<crate::service_discovery_mgr::ServiceDiscoveryManager>>,
+    /// Optional naming service for `/v1/names/*` resolution.
+    naming_service_handle: Option<Arc<dyn NamingService>>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
     /// Default trust score for unknown peers (overrides DEFAULT_TRUST_SCORE)
@@ -137,6 +140,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             service_discovery_manager: None,
+            naming_service_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -177,6 +181,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             service_discovery_manager: None,
+            naming_service_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -218,6 +223,7 @@ impl GatewayServer {
             steward_handle: None,
             agreement_manager_handle: None,
             service_discovery_manager: None,
+            naming_service_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -366,6 +372,14 @@ impl GatewayServer {
         manager: Arc<crate::service_discovery_mgr::ServiceDiscoveryManager>,
     ) -> Self {
         self.service_discovery_manager = Some(manager);
+        self
+    }
+
+    /// Set naming service for daemon integration.
+    ///
+    /// When set, `/v1/names/*` resolution delegates to this shared service.
+    pub fn with_naming_service(mut self, service: Arc<dyn NamingService>) -> Self {
+        self.naming_service_handle = Some(service);
         self
     }
 
@@ -573,6 +587,29 @@ impl GatewayServer {
             info!("Service discovery manager initialized (local, no gossip)");
             Arc::new(crate::service_discovery_mgr::ServiceDiscoveryManager::new())
         };
+
+        // Use daemon-provided naming service or create a local sled-backed instance.
+        let naming_service: Arc<dyn NamingService> =
+            if let Some(service) = self.naming_service_handle {
+                info!("Naming service initialized (shared from supervisor)");
+                service
+            } else {
+                let store = if let Some(ref data_dir) = self.data_dir {
+                    let store_path = data_dir.join("store").join("naming");
+                    info!("Naming service initialized at {:?}", store_path);
+                    Arc::new(SledStore::open(&store_path).map_err(|e| {
+                        GatewayError::InternalError(format!("Failed to open naming store: {e}"))
+                    })?)
+                } else {
+                    info!("Naming service initialized with temporary storage");
+                    Arc::new(SledStore::temporary().map_err(|e| {
+                        GatewayError::InternalError(format!(
+                            "Failed to create temporary naming store: {e}"
+                        ))
+                    })?)
+                };
+                Arc::new(icn_naming::SledNamingService::new(store))
+            };
 
         // Start background expiry task for service endpoints (every 5 minutes)
         let _service_expiry_handle =
@@ -985,6 +1022,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(agreement_manager.clone()))
                 // Service discovery manager
                 .app_data(web::Data::new(service_discovery_manager.clone()))
+                .app_data(web::Data::new(naming_service.clone()))
                 // Listings manager for cooperative exchange
                 .app_data(web::Data::new(listings_manager.clone()))
                 // Decision registry for governance meetings and decisions
@@ -1249,6 +1287,15 @@ impl GatewayServer {
                                 .wrap(auth.clone()),
                         )
                         // Service discovery endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/names")
+                                .configure(api::names::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected services endpoints (auth + rate limiting)
                         .service(
                             web::scope("/services")
                                 .configure(api::services::configure)
