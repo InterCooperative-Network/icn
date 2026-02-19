@@ -58,6 +58,14 @@ impl ExecutionStore for MemoryExecutionStore {
         Ok(())
     }
 
+    fn delete(&self, decision_hash: &str) -> Result<()> {
+        self.records
+            .write()
+            .map_err(|e| anyhow::anyhow!("lock: {e}"))?
+            .remove(decision_hash);
+        Ok(())
+    }
+
     fn list_by_status(&self, status: ExecutionStatus) -> Result<Vec<ExecutionRecord>> {
         Ok(self
             .records

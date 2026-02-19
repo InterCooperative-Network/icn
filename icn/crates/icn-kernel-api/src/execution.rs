@@ -176,6 +176,9 @@ pub trait ExecutionStore: Send + Sync {
     /// Insert or update an execution record.
     fn put(&self, record: &ExecutionRecord) -> anyhow::Result<()>;
 
+    /// Delete an execution record by decision hash.
+    fn delete(&self, decision_hash: &str) -> anyhow::Result<()>;
+
     /// List records by status.
     fn list_by_status(&self, status: ExecutionStatus) -> anyhow::Result<Vec<ExecutionRecord>>;
 

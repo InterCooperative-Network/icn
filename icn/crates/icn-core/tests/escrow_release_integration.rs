@@ -102,6 +102,11 @@ impl ExecutionStore for MemoryExecutionStore {
         Ok(())
     }
 
+    fn delete(&self, decision_hash: &str) -> anyhow::Result<()> {
+        self.records.write().unwrap().remove(decision_hash);
+        Ok(())
+    }
+
     fn list_by_status(&self, status: ExecutionStatus) -> anyhow::Result<Vec<ExecutionRecord>> {
         Ok(self
             .records
