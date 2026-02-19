@@ -222,3 +222,14 @@ image-count: ## Show container image count on all nodes
 	@ssh $(K3S_WORKER1) "echo -n 'k3s-worker-1: ' && sudo crictl images | grep -c 'icn ' || echo 0"
 	@ssh $(K3S_WORKER2) "echo -n 'k3s-worker-2: ' && sudo crictl images | grep -c 'icn ' || echo 0"
 
+
+REGISTRY ?= 10.8.10.40:30500
+
+push-registry: ## Push image to local in-cluster registry (fast path, no scp)
+	@echo "Pushing $(IMAGE_NAME):$(IMAGE_TAG) to local registry $(REGISTRY)..."
+	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+	docker push $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+fast-deploy: build push-registry ## Build + registry push + rolling deploy (fast iteration)
+	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG) from local registry..."
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) set image deployment/icn-daemon icnd=localhost:30500/$(IMAGE_NAME):$(IMAGE_TAG) && sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s"

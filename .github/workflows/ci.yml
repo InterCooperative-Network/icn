@@ -249,7 +249,7 @@ jobs:
   clippy:
     name: Clippy
     needs: [changes]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -270,20 +270,29 @@ jobs:
         with:
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Configure sccache
         if: needs.changes.outputs.docs_only != 'true'
-        with:
-          workspaces: "icn -> target"
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats
 
       - name: Run Clippy
         if: needs.changes.outputs.docs_only != 'true'
         run: cargo clippy --workspace --all-targets --features "hsm,post-quantum" -- -D warnings
         working-directory: ./icn
 
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
+
   test:
     name: Test
     needs: [changes]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -304,10 +313,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.changes.outputs.docs_only != 'true'
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Configure sccache
         if: needs.changes.outputs.docs_only != 'true'
-        with:
-          workspaces: "icn -> target"
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats
 
       - name: Run unit tests (parallel)
         if: needs.changes.outputs.docs_only != 'true'
@@ -324,11 +338,15 @@ jobs:
         run: cargo test -p icn-gateway --features sled-storage
         working-directory: ./icn
 
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
+
   backup-validation:
     name: Backup Validation
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -340,9 +358,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "icn -> target"
+      - name: Configure sccache
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats
 
       - name: Build icnctl
         run: cargo build -p icnctl --release
@@ -366,6 +388,10 @@ jobs:
           echo "Cleanup..."
           rm -rf "$DATA_DIR" "$BACKUP_FILE"
         working-directory: ./icn
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats
 
   coverage:
     name: Test Coverage
@@ -429,10 +455,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "icn -> target"
-
       - name: Install security tools
         run: |
           cargo install cargo-audit --locked
@@ -453,7 +475,7 @@ jobs:
   build:
     name: Build Release
     needs: [changes]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, homelab, k3s]
     steps:
       - uses: actions/checkout@v6
 
@@ -472,15 +494,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.changes.outputs.docs_only != 'true'
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Configure sccache
         if: needs.changes.outputs.docs_only != 'true'
-        with:
-          workspaces: "icn -> target"
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats
 
       - name: Build release binaries
         if: needs.changes.outputs.docs_only != 'true'
         run: cargo build --release
         working-directory: ./icn
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
 
       - name: Upload binaries
         if: needs.changes.outputs.docs_only != 'true'
@@ -586,7 +617,7 @@ jobs:
   pilot-provenance:
     name: Pilot Provenance Invariant
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, homelab, k3s]
     timeout-minutes: 15
     needs: [changes, test]
     steps:
@@ -597,11 +628,19 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "icn -> target"
+      - name: Configure sccache
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats
 
       - name: Run pilot chain demo
         env:
           PILOT_DETERMINISTIC: "1"
         run: ./scripts/pilot_chain_demo.sh
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats

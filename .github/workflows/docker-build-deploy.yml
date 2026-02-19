@@ -74,9 +74,23 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "icn -> target"
+
+      - name: Configure sccache
+        run: |
+          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
+          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
+          sccache --start-server || true
+          sccache --show-stats || true
+
       - name: Run tests
         run: cargo test --workspace
         working-directory: ./icn
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats || true
 
   # Build and deploy runs on self-hosted runner
   build-and-deploy:
@@ -99,7 +113,7 @@ jobs:
 
       - name: Push to local registry
         run: |
-          REGISTRY="localhost:30500"
+          REGISTRY="10.8.10.40:30500"
 
           echo "Tagging for local registry..."
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
