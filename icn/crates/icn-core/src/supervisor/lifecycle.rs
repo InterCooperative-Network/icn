@@ -699,6 +699,28 @@ async fn spawn_actors_with_identity(
             }
         }
 
+        // Best-effort startup retention cleanup (non-fatal).
+        // Must run after recovery so pending/in-flight records are not pruned.
+        match decision_executor.cleanup_old_records() {
+            Ok(report) => {
+                if report.deleted_old > 0 || report.deleted_excess > 0 {
+                    info!(
+                        deleted_old = report.deleted_old,
+                        deleted_excess = report.deleted_excess,
+                        "Startup cleanup pruned terminal execution records"
+                    );
+                } else {
+                    debug!("Startup cleanup: no terminal execution records pruned");
+                }
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    "Startup cleanup failed (non-fatal, continuing startup)"
+                );
+            }
+        }
+
         // Create callback that routes effects through DecisionExecutor
         let effect_callback =
             super::decision_executor::create_decision_executor_callback(decision_executor);

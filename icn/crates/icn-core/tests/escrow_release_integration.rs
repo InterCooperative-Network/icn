@@ -102,6 +102,11 @@ impl ExecutionStore for MemoryExecutionStore {
         Ok(())
     }
 
+    fn delete(&self, decision_hash: &str) -> anyhow::Result<()> {
+        self.records.write().unwrap().remove(decision_hash);
+        Ok(())
+    }
+
     fn list_by_status(&self, status: ExecutionStatus) -> anyhow::Result<Vec<ExecutionRecord>> {
         Ok(self
             .records
@@ -119,106 +124,6 @@ impl ExecutionStore for MemoryExecutionStore {
             *counts.entry(record.status).or_insert(0) += 1;
         }
         Ok(counts)
-    }
-}
-
-/// Minimal param store stub (no protocol params needed for escrow tests).
-struct StubParamStore;
-
-impl ProtocolParameterStore for StubParamStore {
-    fn get(&self, _: &str) -> anyhow::Result<Option<ProtocolParameter>> {
-        Ok(None)
-    }
-    fn get_effective(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&str>,
-    ) -> anyhow::Result<Option<ProtocolParameter>> {
-        Ok(None)
-    }
-    fn set(
-        &self,
-        _: ProtocolParameter,
-        _: Option<String>,
-        _: Option<String>,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn list(&self) -> anyhow::Result<Vec<ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn list_by_category(&self, _: &str) -> anyhow::Result<Vec<ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn get_history(&self, _: &str) -> anyhow::Result<Vec<ParameterChange>> {
-        Ok(vec![])
-    }
-    fn get_history_paginated(
-        &self,
-        _: &str,
-        _: usize,
-        _: usize,
-    ) -> anyhow::Result<(Vec<ParameterChange>, usize)> {
-        Ok((vec![], 0))
-    }
-    fn prune_history(&self, _: &str, _: usize) -> anyhow::Result<usize> {
-        Ok(0)
-    }
-    fn delete(&self, _: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn exists(&self, _: &str) -> anyhow::Result<bool> {
-        Ok(false)
-    }
-    fn count(&self) -> anyhow::Result<usize> {
-        Ok(0)
-    }
-    fn total_history_count(&self) -> anyhow::Result<usize> {
-        Ok(0)
-    }
-    fn validate(
-        &self,
-        _: &str,
-        _: &ParameterValue,
-    ) -> std::result::Result<(), ParameterValidationError> {
-        Ok(())
-    }
-    fn list_scoped_parameters(&self) -> anyhow::Result<Vec<ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn delete_scoped_parameter(&self, _: &str, _: &ParameterScope) -> anyhow::Result<bool> {
-        Ok(false)
-    }
-    fn add_pending_change(&self, _: PendingParameterChange) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn get_pending_change(
-        &self,
-        _: &PendingChangeId,
-    ) -> anyhow::Result<Option<PendingParameterChange>> {
-        Ok(None)
-    }
-    fn list_pending_changes(&self) -> anyhow::Result<Vec<PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn list_pending_changes_for_parameter(
-        &self,
-        _: &str,
-    ) -> anyhow::Result<Vec<PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn get_changes_due_before(&self, _: u64) -> anyhow::Result<Vec<PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn update_pending_change(&self, _: PendingParameterChange) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn cancel_pending_change(&self, _: &PendingChangeId, _: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
-    fn count_pending_changes(&self) -> anyhow::Result<usize> {
-        Ok(0)
     }
 }
 

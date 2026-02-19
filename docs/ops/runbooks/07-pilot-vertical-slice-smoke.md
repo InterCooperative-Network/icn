@@ -31,6 +31,16 @@ PILOT_DETERMINISTIC=1 bash scripts/pilot_chain_demo.sh
 cat tmp/pilot_chain_summary.json
 ```
 
+Flow C treasury-governance operator demo:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+ICN_BASE_URL=http://127.0.0.1:7845 \
+ICN_TOKEN=<jwt-token> \
+ICN_COOP_ID=<coop-id> \
+bash demo/flow-c-treasury-governance.sh
+```
+
 2. The script executes two tests:
    - `test_decision_to_ledger_provenance_end_to_end`
    - `test_ledger_entry_carries_decision_provenance`
@@ -91,5 +101,6 @@ No operational rollback is required.
 ## Related
 
 - `scripts/pilot_chain_demo.sh`
+- `demo/flow-c-treasury-governance.sh`
 - [Troubleshooting](./05-troubleshooting.md)
 - [Version Upgrade](./03-version-upgrade.md)

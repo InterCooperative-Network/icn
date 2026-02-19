@@ -53,6 +53,14 @@ impl<S: icn_store::Store> ExecutionStore for SledExecutionStore<S> {
         Ok(())
     }
 
+    fn delete(&self, decision_hash: &str) -> Result<()> {
+        let key = Self::entry_key(decision_hash);
+        self.store
+            .delete(&key)
+            .context("Failed to delete execution record")?;
+        Ok(())
+    }
+
     fn list_by_status(&self, status: ExecutionStatus) -> Result<Vec<ExecutionRecord>> {
         let entries = self.store.scan(Self::PREFIX)?;
         let mut result = Vec::new();
@@ -131,6 +139,19 @@ mod tests {
         let retrieved = exec_store.get("hash456").unwrap().unwrap();
         assert_eq!(retrieved.status, ExecutionStatus::Confirmed);
         assert_eq!(retrieved.ledger_entry_ids, vec!["entry-1"]);
+    }
+
+    #[test]
+    fn test_delete() {
+        let store = test_store();
+        let exec_store = SledExecutionStore::new(store);
+
+        let record = ExecutionRecord::new_pending("hash-delete", "proposal-1", "receipt-1", vec![]);
+        exec_store.put(&record).unwrap();
+        assert!(exec_store.get("hash-delete").unwrap().is_some());
+
+        exec_store.delete("hash-delete").unwrap();
+        assert!(exec_store.get("hash-delete").unwrap().is_none());
     }
 
     #[test]

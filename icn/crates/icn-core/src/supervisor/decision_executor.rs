@@ -43,6 +43,10 @@ use super::effect_dispatcher::EffectDispatcher;
 
 /// Maximum number of automatic retries before marking permanently failed.
 const MAX_RETRIES: u32 = 3;
+/// Maximum age of terminal records (seconds) to retain on startup.
+pub const MAX_CONFIRMED_AGE_SECS: u64 = 30 * 24 * 60 * 60;
+/// Maximum number of terminal records to retain after startup cleanup.
+pub const MAX_CONFIRMED_COUNT: usize = 10_000;
 
 /// Maximum number of concurrent decision executions (backpressure).
 const MAX_CONCURRENT_EXECUTIONS: usize = 16;
@@ -200,6 +204,60 @@ impl DecisionExecutor {
             skipped_max_retries = report.skipped_max_retries,
             "Decision recovery complete"
         );
+
+        Ok(report)
+    }
+
+    /// Best-effort startup cleanup of old terminal records.
+    ///
+    /// Deletes `Confirmed` and `PermanentlyFailed` records older than
+    /// `MAX_CONFIRMED_AGE_SECS`. Then enforces `MAX_CONFIRMED_COUNT` cap by
+    /// deleting oldest remaining terminal records.
+    ///
+    /// This method intentionally returns `Result` so callers can log and
+    /// continue startup without aborting.
+    pub fn cleanup_old_records(&self) -> Result<CleanupReport> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let cutoff = now.saturating_sub(MAX_CONFIRMED_AGE_SECS);
+
+        let mut terminal = Vec::new();
+        terminal.extend(self.store.list_by_status(ExecutionStatus::Confirmed)?);
+        terminal.extend(
+            self.store
+                .list_by_status(ExecutionStatus::PermanentlyFailed)?,
+        );
+
+        terminal.sort_by_key(|r| r.finished_at.unwrap_or(r.started_at));
+
+        let mut report = CleanupReport::default();
+
+        for record in &terminal {
+            let finished = record.finished_at.unwrap_or(record.started_at);
+            if finished < cutoff {
+                self.store.delete(&record.decision_hash)?;
+                report.deleted_old += 1;
+            }
+        }
+
+        // Re-query after age-based pruning and enforce count cap.
+        let mut terminal_after = Vec::new();
+        terminal_after.extend(self.store.list_by_status(ExecutionStatus::Confirmed)?);
+        terminal_after.extend(
+            self.store
+                .list_by_status(ExecutionStatus::PermanentlyFailed)?,
+        );
+        terminal_after.sort_by_key(|r| r.finished_at.unwrap_or(r.started_at));
+
+        if terminal_after.len() > MAX_CONFIRMED_COUNT {
+            let excess = terminal_after.len() - MAX_CONFIRMED_COUNT;
+            for record in terminal_after.iter().take(excess) {
+                self.store.delete(&record.decision_hash)?;
+                report.deleted_excess += 1;
+            }
+        }
 
         Ok(report)
     }
@@ -414,6 +472,15 @@ impl RecoveryReport {
     }
 }
 
+/// Report from startup retention cleanup.
+#[derive(Debug, Default)]
+pub struct CleanupReport {
+    /// Number of terminal records deleted for exceeding age threshold.
+    pub deleted_old: usize,
+    /// Number of terminal records deleted to enforce count threshold.
+    pub deleted_excess: usize,
+}
+
 /// Create an effect executor callback that routes through the DecisionExecutor.
 ///
 /// The callback acquires a semaphore permit (backpressure) before spawning
@@ -555,6 +622,14 @@ mod tests {
             Ok(())
         }
 
+        fn delete(&self, decision_hash: &str) -> Result<()> {
+            self.records
+                .write()
+                .map_err(|e| anyhow::anyhow!("lock: {e}"))?
+                .remove(decision_hash);
+            Ok(())
+        }
+
         fn list_by_status(&self, status: ExecutionStatus) -> Result<Vec<ExecutionRecord>> {
             Ok(self
                 .records
@@ -583,105 +658,6 @@ mod tests {
     /// Helper: create a DecisionExecutor with in-memory stores and no ledger.
     fn make_test_executor() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
         use icn_kernel_api::protocol_params::*;
-
-        // Minimal param store stub
-        struct StubParamStore;
-        impl ProtocolParameterStore for StubParamStore {
-            fn get(&self, _: &str) -> Result<Option<ProtocolParameter>> {
-                Ok(None)
-            }
-            fn get_effective(
-                &self,
-                _: &str,
-                _: Option<&str>,
-                _: Option<&str>,
-            ) -> Result<Option<ProtocolParameter>> {
-                Ok(None)
-            }
-            fn set(
-                &self,
-                _: ProtocolParameter,
-                _: Option<String>,
-                _: Option<String>,
-            ) -> Result<()> {
-                Ok(())
-            }
-            fn list(&self) -> Result<Vec<ProtocolParameter>> {
-                Ok(vec![])
-            }
-            fn list_by_category(&self, _: &str) -> Result<Vec<ProtocolParameter>> {
-                Ok(vec![])
-            }
-            fn get_history(&self, _: &str) -> Result<Vec<ParameterChange>> {
-                Ok(vec![])
-            }
-            fn get_history_paginated(
-                &self,
-                _: &str,
-                _: usize,
-                _: usize,
-            ) -> Result<(Vec<ParameterChange>, usize)> {
-                Ok((vec![], 0))
-            }
-            fn prune_history(&self, _: &str, _: usize) -> Result<usize> {
-                Ok(0)
-            }
-            fn delete(&self, _: &str) -> Result<()> {
-                Ok(())
-            }
-            fn exists(&self, _: &str) -> Result<bool> {
-                Ok(false)
-            }
-            fn count(&self) -> Result<usize> {
-                Ok(0)
-            }
-            fn total_history_count(&self) -> Result<usize> {
-                Ok(0)
-            }
-            fn validate(
-                &self,
-                _: &str,
-                _: &ParameterValue,
-            ) -> std::result::Result<(), ParameterValidationError> {
-                Ok(())
-            }
-            fn list_scoped_parameters(&self) -> Result<Vec<ProtocolParameter>> {
-                Ok(vec![])
-            }
-            fn delete_scoped_parameter(&self, _: &str, _: &ParameterScope) -> Result<bool> {
-                Ok(false)
-            }
-            fn add_pending_change(&self, _: PendingParameterChange) -> Result<()> {
-                Ok(())
-            }
-            fn get_pending_change(
-                &self,
-                _: &PendingChangeId,
-            ) -> Result<Option<PendingParameterChange>> {
-                Ok(None)
-            }
-            fn list_pending_changes(&self) -> Result<Vec<PendingParameterChange>> {
-                Ok(vec![])
-            }
-            fn list_pending_changes_for_parameter(
-                &self,
-                _: &str,
-            ) -> Result<Vec<PendingParameterChange>> {
-                Ok(vec![])
-            }
-            fn get_changes_due_before(&self, _: u64) -> Result<Vec<PendingParameterChange>> {
-                Ok(vec![])
-            }
-            fn update_pending_change(&self, _: PendingParameterChange) -> Result<()> {
-                Ok(())
-            }
-            fn cancel_pending_change(&self, _: &PendingChangeId, _: &str) -> Result<()> {
-                Ok(())
-            }
-            fn count_pending_changes(&self) -> Result<usize> {
-                Ok(0)
-            }
-        }
 
         let param_store = Arc::new(StubParamStore);
         let kernel_executor =
@@ -865,5 +841,31 @@ mod tests {
         assert_eq!(a.status, ExecutionStatus::Confirmed);
         assert_eq!(b.status, ExecutionStatus::Confirmed);
         assert_ne!(a.proposal_id, b.proposal_id);
+    }
+
+    #[tokio::test]
+    async fn test_exec_record_retention_cleanup_old_records_but_keeps_recent() {
+        let (executor, store) = make_test_executor();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut old_confirmed = ExecutionRecord::new_pending("old-c", "p-old", "r-old", vec![]);
+        old_confirmed.status = ExecutionStatus::Confirmed;
+        old_confirmed.started_at = now.saturating_sub(MAX_CONFIRMED_AGE_SECS + 100);
+        old_confirmed.finished_at = Some(now.saturating_sub(MAX_CONFIRMED_AGE_SECS + 100));
+        store.put(&old_confirmed).unwrap();
+
+        let mut recent_confirmed = ExecutionRecord::new_pending("new-c", "p-new", "r-new", vec![]);
+        recent_confirmed.status = ExecutionStatus::Confirmed;
+        recent_confirmed.started_at = now.saturating_sub(60);
+        recent_confirmed.finished_at = Some(now.saturating_sub(60));
+        store.put(&recent_confirmed).unwrap();
+
+        let report = executor.cleanup_old_records().unwrap();
+        assert_eq!(report.deleted_old, 1);
+        assert!(store.get("old-c").unwrap().is_none());
+        assert!(store.get("new-c").unwrap().is_some());
     }
 }
