@@ -2957,6 +2957,7 @@ dependencies = [
  "icn-kernel-api",
  "icn-ledger",
  "icn-membership-app",
+ "icn-naming",
  "icn-net",
  "icn-obs",
  "icn-rpc",
@@ -3387,6 +3388,19 @@ dependencies = [
  "tracing",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "icn-naming"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ed25519-dalek",
+ "icn-identity",
+ "icn-kernel-api",
+ "icn-store",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
