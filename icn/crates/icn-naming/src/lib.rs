@@ -46,10 +46,13 @@ impl<S: icn_store::Store> SledNamingService<S> {
     }
 
     fn now_secs() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
+        match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs(),
+            Err(error) => {
+                eprintln!("icn-naming: failed to read system clock for timestamp: {error}");
+                0
+            }
+        }
     }
 
     fn validate_name(name: &Name) -> Result<(), NamingError> {
@@ -295,8 +298,8 @@ impl<S: icn_store::Store> NamingService for SledNamingService<S> {
         options: ResolveOptions,
     ) -> Result<(Target, NameRecord), NamingError> {
         Self::validate_name(name)?;
-        // Scope and cache controls are reserved for distributed resolvers. This
-        // store-backed implementation resolves directly from local storage.
+        // `scope` and `allow_cached` are reserved for distributed resolvers;
+        // this store-backed implementation resolves directly from local storage.
         let _ = (&options.scope, options.allow_cached);
         let max_depth = options.max_depth.unwrap_or(10);
         let (target, record) = self.resolve_record_recursive(name, max_depth)?;
@@ -384,9 +387,9 @@ impl<S: icn_store::Store> NamingService for SledNamingService<S> {
 
     fn watch(&self, name: &Name) -> Result<Subscription, NamingError> {
         Self::validate_name(name)?;
-        Ok(Subscription {
-            id: format!("naming:{}", name.as_str()),
-        })
+        Err(NamingError::Internal(
+            "watch is not yet implemented for SledNamingService".to_string(),
+        ))
     }
 
     fn verify(&self, record: &NameRecord) -> Result<bool, NamingError> {
