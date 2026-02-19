@@ -1,0 +1,25 @@
+[package]
+name = "icn-naming"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "KV-backed NamingService implementation for ICN"
+
+[dependencies]
+icn-kernel-api.workspace = true
+icn-store.workspace = true
+icn-identity.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+ed25519-dalek.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3.24"
+
+[lints]
+workspace = true

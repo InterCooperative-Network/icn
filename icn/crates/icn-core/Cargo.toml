@@ -53,6 +53,7 @@ icn-trust-app = { path = "../../../apps/trust" }
 icn-governance-actor = { path = "../../apps/governance" }
 icn-coop = { path = "../icn-coop" }
 icn-community = { path = "../icn-community" }
+icn-naming.workspace = true
 
 [dev-dependencies]
 rustls.workspace = true
