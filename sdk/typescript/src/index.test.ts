@@ -1485,7 +1485,6 @@ describe('vote delegation', () => {
       await expect(
         client.createDelegation({
           delegate: 'did:icn:zValidKeyABCDEF',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'invalid-scope' as any, // Bypass type check for runtime validation test
         })
       ).rejects.toThrow("scope must be 'blanket'");
@@ -1495,7 +1494,6 @@ describe('vote delegation', () => {
       await expect(
         client.createDelegation({
           delegate: 'did:icn:zValidKeyABCDEF',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'domain:' as any, // Bypass type check for runtime validation test
         })
       ).rejects.toThrow('scope ID cannot be empty');
