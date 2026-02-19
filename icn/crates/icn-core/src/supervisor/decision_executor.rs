@@ -37,6 +37,7 @@ use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
 
 use icn_kernel_api::effects::{EffectResult, KernelEffect};
+use icn_kernel_api::escrow::{EscrowStatus, EscrowStore};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 
 use super::effect_dispatcher::EffectDispatcher;
@@ -55,6 +56,7 @@ const MAX_CONCURRENT_EXECUTIONS: usize = 16;
 pub struct DecisionExecutor {
     dispatcher: Arc<EffectDispatcher>,
     store: Arc<dyn ExecutionStore>,
+    escrow_store: Option<Arc<dyn EscrowStore>>,
     /// Bounded semaphore for backpressure on concurrent executions.
     concurrency_limit: Arc<Semaphore>,
 }
@@ -65,8 +67,15 @@ impl DecisionExecutor {
         Self {
             dispatcher,
             store,
+            escrow_store: None,
             concurrency_limit: Arc::new(Semaphore::new(MAX_CONCURRENT_EXECUTIONS)),
         }
+    }
+
+    /// Attach escrow store for terminal remediation of stuck Releasing escrows.
+    pub fn with_escrow_store(mut self, escrow_store: Arc<dyn EscrowStore>) -> Self {
+        self.escrow_store = Some(escrow_store);
+        self
     }
 
     /// Get a reference to the execution store.
@@ -141,6 +150,8 @@ impl DecisionExecutor {
                             error = %e,
                             "Failed to mark exhausted decision as PermanentlyFailed"
                         );
+                    } else {
+                        self.mark_related_escrows_failed(&rec, "max retries exceeded (recovery)");
                     }
                     report.skipped_max_retries += 1;
                     continue;
@@ -262,6 +273,72 @@ impl DecisionExecutor {
         Ok(report)
     }
 
+    /// Best-effort remediation for escrows stuck in `Releasing` when a decision
+    /// reaches terminal `PermanentlyFailed`.
+    fn mark_related_escrows_failed(&self, record: &ExecutionRecord, reason: &str) {
+        let Some(escrow_store) = &self.escrow_store else {
+            return;
+        };
+
+        use icn_kernel_api::effects::TreasuryEffect;
+
+        for effect in &record.effects {
+            let KernelEffect::Treasury(TreasuryEffect::ReleaseEscrow {
+                escrow_id,
+                decision_hash,
+                ..
+            }) = effect
+            else {
+                continue;
+            };
+
+            if decision_hash != &record.decision_hash {
+                continue;
+            }
+
+            match escrow_store.get(escrow_id) {
+                Ok(Some(mut escrow)) => {
+                    let is_stuck_for_decision = escrow.status == EscrowStatus::Releasing
+                        && escrow.release_decision_hash.as_deref() == Some(decision_hash);
+                    if !is_stuck_for_decision {
+                        continue;
+                    }
+
+                    escrow.mark_failed(decision_hash, reason.to_string());
+                    if let Err(e) = escrow_store.put(&escrow) {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            error = %e,
+                            "Failed to persist terminal escrow failure state"
+                        );
+                    } else {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            "Escrow transitioned Releasing → Failed due to permanent decision failure"
+                        );
+                    }
+                }
+                Ok(None) => {
+                    warn!(
+                        escrow_id = %escrow_id,
+                        decision_hash = %decision_hash,
+                        "Escrow referenced by failed decision was not found"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        escrow_id = %escrow_id,
+                        decision_hash = %decision_hash,
+                        error = %e,
+                        "Failed to read escrow for terminal remediation"
+                    );
+                }
+            }
+        }
+    }
+
     /// Execute effects for a governance decision, with idempotency.
     ///
     /// # Arguments
@@ -312,6 +389,7 @@ impl DecisionExecutor {
                 let mut record = existing;
                 record.mark_permanently_failed("Max retries exceeded");
                 self.store.put(&record)?;
+                self.mark_related_escrows_failed(&record, "max retries exceeded");
                 return Ok(vec![]);
             }
         }
@@ -587,6 +665,7 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
 mod tests {
     use super::*;
     use icn_kernel_api::effects::TreasuryEffect;
+    use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
     use std::collections::HashMap;
     use std::sync::RwLock;
@@ -655,6 +734,49 @@ mod tests {
         }
     }
 
+    /// In-memory escrow store for testing terminal remediation behavior.
+    struct MemoryEscrowStore {
+        records: RwLock<HashMap<String, EscrowRecord>>,
+    }
+
+    impl MemoryEscrowStore {
+        fn new() -> Self {
+            Self {
+                records: RwLock::new(HashMap::new()),
+            }
+        }
+    }
+
+    impl EscrowStore for MemoryEscrowStore {
+        fn get(&self, escrow_id: &str) -> Result<Option<EscrowRecord>> {
+            Ok(self
+                .records
+                .read()
+                .map_err(|e| anyhow::anyhow!("lock: {e}"))?
+                .get(escrow_id)
+                .cloned())
+        }
+
+        fn put(&self, record: &EscrowRecord) -> Result<()> {
+            self.records
+                .write()
+                .map_err(|e| anyhow::anyhow!("lock: {e}"))?
+                .insert(record.escrow_id.clone(), record.clone());
+            Ok(())
+        }
+
+        fn list_by_scope(&self, scope_id: &str) -> Result<Vec<EscrowRecord>> {
+            Ok(self
+                .records
+                .read()
+                .map_err(|e| anyhow::anyhow!("lock: {e}"))?
+                .values()
+                .filter(|r| r.scope_id == scope_id)
+                .cloned()
+                .collect())
+        }
+    }
+
     /// Helper: create a DecisionExecutor with in-memory stores and no ledger.
     fn make_test_executor() -> (Arc<DecisionExecutor>, Arc<MemoryExecutionStore>) {
         use icn_kernel_api::protocol_params::*;
@@ -668,6 +790,28 @@ mod tests {
         let decision_executor = Arc::new(DecisionExecutor::new(dispatcher, exec_store.clone()));
 
         (decision_executor, exec_store)
+    }
+
+    fn make_test_executor_with_escrow() -> (
+        Arc<DecisionExecutor>,
+        Arc<MemoryExecutionStore>,
+        Arc<MemoryEscrowStore>,
+    ) {
+        use icn_kernel_api::protocol_params::*;
+
+        let param_store = Arc::new(StubParamStore);
+        let kernel_executor =
+            Arc::new(super::super::governance_executor::KernelGovernanceExecutor::new(param_store));
+        let dispatcher = Arc::new(EffectDispatcher::new(kernel_executor));
+        let exec_store = Arc::new(MemoryExecutionStore::new());
+        let escrow_store = Arc::new(MemoryEscrowStore::new());
+
+        let decision_executor = Arc::new(
+            DecisionExecutor::new(dispatcher, exec_store.clone())
+                .with_escrow_store(escrow_store.clone()),
+        );
+
+        (decision_executor, exec_store, escrow_store)
     }
 
     #[tokio::test]
@@ -867,5 +1011,71 @@ mod tests {
         assert_eq!(report.deleted_old, 1);
         assert!(store.get("old-c").unwrap().is_none());
         assert!(store.get("new-c").unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_permanent_failure_marks_releasing_escrow_failed() {
+        let (executor, exec_store, escrow_store) = make_test_executor_with_escrow();
+
+        let decision_hash = "sha256:escrow-fail-hash";
+        let escrow_id = "escrow-fail-1";
+
+        let mut escrow = EscrowRecord::new_locked(
+            escrow_id,
+            "coop-alpha",
+            "did:treasury",
+            "did:beneficiary",
+            1000,
+            "HOURS",
+        );
+        escrow.begin_release(decision_hash).unwrap();
+        escrow_store.put(&escrow).unwrap();
+
+        let mut failed_record = ExecutionRecord::new_pending(
+            decision_hash,
+            "proposal-escrow-fail",
+            "receipt-escrow-fail",
+            vec![KernelEffect::Treasury(TreasuryEffect::ReleaseEscrow {
+                escrow_id: escrow_id.to_string(),
+                treasury_did: "did:treasury".to_string(),
+                beneficiary_did: "did:beneficiary".to_string(),
+                amount: 1000,
+                currency: "HOURS".to_string(),
+                decision_receipt_id: "receipt-escrow-fail".to_string(),
+                decision_hash: decision_hash.to_string(),
+            })],
+        );
+        failed_record.status = ExecutionStatus::Failed;
+        failed_record.retries = MAX_RETRIES;
+        failed_record.error = Some("insufficient funds".to_string());
+        exec_store.put(&failed_record).unwrap();
+
+        let results = executor
+            .execute(
+                vec![KernelEffect::NoOp {
+                    reason: "ignored".to_string(),
+                }],
+                "receipt-escrow-fail",
+                decision_hash,
+                "proposal-escrow-fail",
+            )
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+
+        let updated_record = exec_store.get(decision_hash).unwrap().unwrap();
+        assert_eq!(updated_record.status, ExecutionStatus::PermanentlyFailed);
+
+        let updated_escrow = escrow_store.get(escrow_id).unwrap().unwrap();
+        assert_eq!(updated_escrow.status, EscrowStatus::Failed);
+        assert_eq!(
+            updated_escrow.failed_decision_hash.as_deref(),
+            Some(decision_hash)
+        );
+        assert!(updated_escrow
+            .failed_reason
+            .as_deref()
+            .unwrap_or_default()
+            .contains("max retries exceeded"));
     }
 }

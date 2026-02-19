@@ -30,7 +30,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Status of an escrow allocation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EscrowStatus {
     /// Funds are locked, awaiting governance decision.
@@ -40,6 +40,8 @@ pub enum EscrowStatus {
     Releasing,
     /// Funds have been released to the beneficiary (ledger mutation confirmed).
     Released,
+    /// Terminal failure after retries are exhausted.
+    Failed,
     /// Escrow was cancelled, funds returned to funder.
     Cancelled,
 }
@@ -76,6 +78,12 @@ pub struct EscrowRecord {
 
     /// Unix timestamp (seconds) when escrow was released (if any).
     pub released_at: Option<u64>,
+
+    /// Decision hash that terminally failed this escrow (if any).
+    pub failed_decision_hash: Option<String>,
+
+    /// Terminal failure reason (if any).
+    pub failed_reason: Option<String>,
 }
 
 impl EscrowRecord {
@@ -104,6 +112,8 @@ impl EscrowRecord {
             created_at: now,
             release_decision_hash: None,
             released_at: None,
+            failed_decision_hash: None,
+            failed_reason: None,
         }
     }
 
@@ -131,6 +141,8 @@ impl EscrowRecord {
             EscrowStatus::Locked => {
                 self.status = EscrowStatus::Releasing;
                 self.release_decision_hash = Some(decision_hash.to_string());
+                self.failed_decision_hash = None;
+                self.failed_reason = None;
                 Ok(BeginReleaseOutcome::Proceed)
             }
             EscrowStatus::Releasing => {
@@ -156,6 +168,16 @@ impl EscrowRecord {
                     })
                 }
             }
+            EscrowStatus::Failed => Err(EscrowReleaseError::Failed {
+                existing_decision_hash: self
+                    .failed_decision_hash
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
+                reason: self
+                    .failed_reason
+                    .clone()
+                    .unwrap_or_else(|| "terminal failure".to_string()),
+            }),
             EscrowStatus::Cancelled => Err(EscrowReleaseError::Cancelled),
         }
     }
@@ -177,6 +199,15 @@ impl EscrowRecord {
                 .map(|d| d.as_secs())
                 .unwrap_or(0),
         );
+        self.failed_decision_hash = None;
+        self.failed_reason = None;
+    }
+
+    /// Transition escrow to a terminal failed state.
+    pub fn mark_failed(&mut self, decision_hash: &str, reason: impl Into<String>) {
+        self.status = EscrowStatus::Failed;
+        self.failed_decision_hash = Some(decision_hash.to_string());
+        self.failed_reason = Some(reason.into());
     }
 }
 
@@ -199,6 +230,11 @@ pub enum EscrowReleaseError {
     AlreadyReleasedByOther { existing_decision_hash: String },
     /// Escrow was cancelled.
     Cancelled,
+    /// Escrow is terminally failed.
+    Failed {
+        existing_decision_hash: String,
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for EscrowReleaseError {
@@ -217,6 +253,14 @@ impl std::fmt::Display for EscrowReleaseError {
                 )
             }
             Self::Cancelled => write!(f, "escrow was cancelled"),
+            Self::Failed {
+                existing_decision_hash,
+                reason,
+            } => write!(
+                f,
+                "escrow terminally failed by decision {}: {}",
+                existing_decision_hash, reason
+            ),
         }
     }
 }
@@ -253,6 +297,8 @@ mod tests {
         assert!(escrow.is_locked());
         assert_eq!(escrow.status, EscrowStatus::Locked);
         assert!(escrow.release_decision_hash.is_none());
+        assert!(escrow.failed_decision_hash.is_none());
+        assert!(escrow.failed_reason.is_none());
     }
 
     #[test]
@@ -409,5 +455,33 @@ mod tests {
         assert_eq!(parsed.status, EscrowStatus::Releasing);
         assert_eq!(parsed.release_decision_hash.as_deref(), Some("hash-y"));
         assert!(parsed.released_at.is_none());
+    }
+
+    #[test]
+    fn test_terminal_failed_blocks_release() {
+        let mut escrow = EscrowRecord::new_locked(
+            "esc-f",
+            "coop-alpha",
+            "did:treasury",
+            "did:alice",
+            5000,
+            "HOURS",
+        );
+
+        escrow.begin_release("hash-f").unwrap();
+        escrow.mark_failed("hash-f", "insufficient funds");
+
+        assert_eq!(escrow.status, EscrowStatus::Failed);
+        assert_eq!(escrow.failed_decision_hash.as_deref(), Some("hash-f"));
+        assert_eq!(escrow.failed_reason.as_deref(), Some("insufficient funds"));
+
+        let err = escrow.begin_release("hash-f").unwrap_err();
+        assert_eq!(
+            err,
+            EscrowReleaseError::Failed {
+                existing_decision_hash: "hash-f".to_string(),
+                reason: "insufficient funds".to_string(),
+            }
+        );
     }
 }

@@ -446,6 +446,28 @@ impl EffectExecutor for KernelGovernanceExecutor {
                             ledger_entry_id: None,
                         });
                     }
+                    Err(EscrowReleaseError::Failed {
+                        existing_decision_hash,
+                        reason,
+                    }) => {
+                        warn!(
+                            escrow_id = %escrow_id,
+                            decision_hash = %decision_hash,
+                            existing_decision_hash = %existing_decision_hash,
+                            reason = %reason,
+                            "Cannot release terminally failed escrow"
+                        );
+                        return Ok(EffectResult {
+                            effect_id: decision_receipt_id.to_string(),
+                            success: false,
+                            message: format!(
+                                "Escrow {} terminally failed by decision {}: {}",
+                                escrow_id, existing_decision_hash, reason
+                            ),
+                            state_change_hash: None,
+                            ledger_entry_id: None,
+                        });
+                    }
                 }
 
                 // Phase 2: Execute ledger mutation (escrow is now in Releasing state).
