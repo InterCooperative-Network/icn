@@ -295,6 +295,9 @@ impl<S: icn_store::Store> NamingService for SledNamingService<S> {
         options: ResolveOptions,
     ) -> Result<(Target, NameRecord), NamingError> {
         Self::validate_name(name)?;
+        // Scope and cache controls are reserved for distributed resolvers. This
+        // store-backed implementation resolves directly from local storage.
+        let _ = (&options.scope, options.allow_cached);
         let max_depth = options.max_depth.unwrap_or(10);
         let (target, record) = self.resolve_record_recursive(name, max_depth)?;
 
@@ -387,10 +390,28 @@ impl<S: icn_store::Store> NamingService for SledNamingService<S> {
     }
 
     fn verify(&self, record: &NameRecord) -> Result<bool, NamingError> {
-        let payload = Self::register_payload(&record.name, &record.target, record.ttl);
-        match Self::verify_signature(&record.authority, &record.signature, &payload, "verify") {
+        let register_payload = Self::register_payload(&record.name, &record.target, record.ttl);
+        match Self::verify_signature(
+            &record.authority,
+            &record.signature,
+            &register_payload,
+            "verify(register)",
+        ) {
             Ok(()) => Ok(true),
-            Err(NamingError::InvalidSignature(_)) => Ok(false),
+            Err(NamingError::InvalidSignature(_)) => {
+                // Updated records are signed with update domain separation.
+                let update_payload = Self::update_payload(&record.name, &record.target);
+                match Self::verify_signature(
+                    &record.authority,
+                    &record.signature,
+                    &update_payload,
+                    "verify(update)",
+                ) {
+                    Ok(()) => Ok(true),
+                    Err(NamingError::InvalidSignature(_)) => Ok(false),
+                    Err(other) => Err(other),
+                }
+            }
             Err(other) => Err(other),
         }
     }
@@ -497,6 +518,24 @@ mod tests {
         Signature::new(signing_key.sign(&payload).to_bytes().to_vec())
     }
 
+    fn sign_update(
+        signing_key: &ed25519_dalek::SigningKey,
+        name: &Name,
+        target: &Target,
+    ) -> Signature {
+        let payload = SledNamingService::<SledStore>::update_payload(name, target);
+        Signature::new(signing_key.sign(&payload).to_bytes().to_vec())
+    }
+
+    fn sign_delete(
+        signing_key: &ed25519_dalek::SigningKey,
+        name: &Name,
+        target: &Target,
+    ) -> Signature {
+        let payload = SledNamingService::<SledStore>::delete_payload(name, target);
+        Signature::new(signing_key.sign(&payload).to_bytes().to_vec())
+    }
+
     #[test]
     fn naming_register_and_resolve_roundtrip() {
         let service = test_service();
@@ -561,5 +600,247 @@ mod tests {
             NamingError::InvalidSignature(_) => {}
             other => panic!("expected InvalidSignature, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn validate_name_rules() {
+        let valid = Name::new("/org/demo.service/api");
+        assert!(SledNamingService::<SledStore>::validate_name(&valid).is_ok());
+
+        let err =
+            SledNamingService::<SledStore>::validate_name(&Name::new("org/demo")).unwrap_err();
+        assert!(matches!(err, NamingError::InvalidName(msg) if msg.contains("start with '/'")));
+
+        let err =
+            SledNamingService::<SledStore>::validate_name(&Name::new("/org-only")).unwrap_err();
+        assert!(
+            matches!(err, NamingError::InvalidName(msg) if msg.contains("at least two segments"))
+        );
+
+        let err =
+            SledNamingService::<SledStore>::validate_name(&Name::new("/team/demo")).unwrap_err();
+        assert!(matches!(err, NamingError::InvalidName(msg) if msg.contains("root segment")));
+
+        let err = SledNamingService::<SledStore>::validate_name(&Name::new("/org/demo$/svc"))
+            .unwrap_err();
+        assert!(matches!(err, NamingError::InvalidName(msg) if msg.contains("invalid segment")));
+    }
+
+    #[test]
+    fn update_requires_valid_authority_signature_and_verify_accepts_updated_record() {
+        let service = test_service();
+        let authority = icn_identity::KeyPair::generate().unwrap();
+        let attacker = icn_identity::KeyPair::generate().unwrap();
+        let name = Name::new("/org/demo/router");
+        let ttl = Duration::from_secs(300);
+
+        let initial_target = Target::Service {
+            endpoint: Endpoint::new("https", "router-v1.demo", 443),
+        };
+        let updated_target = Target::Service {
+            endpoint: Endpoint::new("https", "router-v2.demo", 443),
+        };
+
+        let authority_key =
+            ed25519_dalek::SigningKey::from_bytes(&authority.to_signing_key_bytes());
+        let attacker_key = ed25519_dalek::SigningKey::from_bytes(&attacker.to_signing_key_bytes());
+
+        let register_sig = sign_register(&authority_key, &name, &initial_target, ttl);
+        service
+            .register(
+                &name,
+                initial_target,
+                &authority.did().to_string(),
+                &register_sig,
+                ttl,
+            )
+            .unwrap();
+
+        let update_sig = sign_update(&authority_key, &name, &updated_target);
+        let updated = service
+            .update(&name, updated_target.clone(), &update_sig)
+            .unwrap();
+
+        match updated.target {
+            Target::Service { ref endpoint } => assert_eq!(endpoint.host, "router-v2.demo"),
+            other => panic!("expected service target, got {other:?}"),
+        }
+
+        assert!(service.verify(&updated).unwrap());
+
+        let forged_update = sign_update(&attacker_key, &name, &updated_target);
+        let err = service
+            .update(&name, updated_target, &forged_update)
+            .unwrap_err();
+        assert!(matches!(err, NamingError::InvalidSignature(_)));
+    }
+
+    #[test]
+    fn delete_requires_valid_signature() {
+        let service = test_service();
+        let authority = icn_identity::KeyPair::generate().unwrap();
+        let attacker = icn_identity::KeyPair::generate().unwrap();
+        let name = Name::new("/org/demo/treasury");
+        let target = Target::Service {
+            endpoint: Endpoint::new("https", "treasury.demo", 443),
+        };
+        let ttl = Duration::from_secs(300);
+
+        let authority_key =
+            ed25519_dalek::SigningKey::from_bytes(&authority.to_signing_key_bytes());
+        let attacker_key = ed25519_dalek::SigningKey::from_bytes(&attacker.to_signing_key_bytes());
+
+        let register_sig = sign_register(&authority_key, &name, &target, ttl);
+        service
+            .register(
+                &name,
+                target.clone(),
+                &authority.did().to_string(),
+                &register_sig,
+                ttl,
+            )
+            .unwrap();
+
+        let forged_delete = sign_delete(&attacker_key, &name, &target);
+        let err = service.delete(&name, &forged_delete).unwrap_err();
+        assert!(matches!(err, NamingError::InvalidSignature(_)));
+
+        let delete_sig = sign_delete(&authority_key, &name, &target);
+        service.delete(&name, &delete_sig).unwrap();
+
+        let err = service.get_record(&name).unwrap_err();
+        assert!(matches!(err, NamingError::NotFound(_)));
+    }
+
+    #[test]
+    fn resolve_alias_chain_and_enforce_max_depth() {
+        let service = test_service();
+        let authority = icn_identity::KeyPair::generate().unwrap();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&authority.to_signing_key_bytes());
+        let ttl = Duration::from_secs(300);
+
+        let a = Name::new("/org/demo/a");
+        let b = Name::new("/org/demo/b");
+        let c = Name::new("/org/demo/c");
+
+        let a_target = Target::Alias { name: b.clone() };
+        let b_target = Target::Alias { name: c.clone() };
+        let c_target = Target::Service {
+            endpoint: Endpoint::new("https", "final.demo", 443),
+        };
+
+        service
+            .register(
+                &a,
+                a_target.clone(),
+                &authority.did().to_string(),
+                &sign_register(&signing_key, &a, &a_target, ttl),
+                ttl,
+            )
+            .unwrap();
+        service
+            .register(
+                &b,
+                b_target.clone(),
+                &authority.did().to_string(),
+                &sign_register(&signing_key, &b, &b_target, ttl),
+                ttl,
+            )
+            .unwrap();
+        service
+            .register(
+                &c,
+                c_target.clone(),
+                &authority.did().to_string(),
+                &sign_register(&signing_key, &c, &c_target, ttl),
+                ttl,
+            )
+            .unwrap();
+
+        let (resolved, record) = service
+            .resolve_with_options(&a, ResolveOptions::new().with_max_depth(5))
+            .unwrap();
+
+        assert_eq!(record.name.as_str(), "/org/demo/c");
+        assert!(matches!(resolved, Target::Service { .. }));
+
+        let err = service
+            .resolve_with_options(&a, ResolveOptions::new().with_max_depth(1))
+            .unwrap_err();
+        assert!(matches!(err, NamingError::TooManyRedirects(1)));
+    }
+
+    #[test]
+    fn circular_alias_hits_redirect_limit() {
+        let service = test_service();
+        let authority = icn_identity::KeyPair::generate().unwrap();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&authority.to_signing_key_bytes());
+        let ttl = Duration::from_secs(300);
+
+        let a = Name::new("/org/demo/x");
+        let b = Name::new("/org/demo/y");
+
+        let a_target = Target::Alias { name: b.clone() };
+        let b_target = Target::Alias { name: a.clone() };
+
+        service
+            .register(
+                &a,
+                a_target.clone(),
+                &authority.did().to_string(),
+                &sign_register(&signing_key, &a, &a_target, ttl),
+                ttl,
+            )
+            .unwrap();
+        service
+            .register(
+                &b,
+                b_target.clone(),
+                &authority.did().to_string(),
+                &sign_register(&signing_key, &b, &b_target, ttl),
+                ttl,
+            )
+            .unwrap();
+
+        let err = service
+            .resolve_with_options(&a, ResolveOptions::new().with_max_depth(3))
+            .unwrap_err();
+        assert!(matches!(err, NamingError::TooManyRedirects(3)));
+    }
+
+    #[test]
+    fn list_filters_by_prefix_and_is_sorted() {
+        let service = test_service();
+        let authority = icn_identity::KeyPair::generate().unwrap();
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&authority.to_signing_key_bytes());
+        let ttl = Duration::from_secs(300);
+
+        let names = vec![
+            Name::new("/org/demo/zeta"),
+            Name::new("/org/demo/alpha"),
+            Name::new("/org/other/beta"),
+            Name::new("/org/demo/gamma"),
+        ];
+
+        for name in &names {
+            let target = Target::Service {
+                endpoint: Endpoint::new("https", "svc.demo", 443),
+            };
+            let sig = sign_register(&signing_key, name, &target, ttl);
+            service
+                .register(name, target, &authority.did().to_string(), &sig, ttl)
+                .unwrap();
+        }
+
+        let listed = service.list(&Name::new("/org/demo")).unwrap();
+        let listed: Vec<String> = listed.into_iter().map(|n| n.as_str().to_string()).collect();
+        assert_eq!(
+            listed,
+            vec![
+                "/org/demo/alpha".to_string(),
+                "/org/demo/gamma".to_string(),
+                "/org/demo/zeta".to_string(),
+            ]
+        );
     }
 }

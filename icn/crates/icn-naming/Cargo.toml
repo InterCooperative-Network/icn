@@ -14,12 +14,7 @@ icn-identity.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
-thiserror.workspace = true
 ed25519-dalek.workspace = true
-tracing.workspace = true
-
-[dev-dependencies]
-tempfile = "3.24"
 
 [lints]
 workspace = true
