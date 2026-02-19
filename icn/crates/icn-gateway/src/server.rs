@@ -467,6 +467,38 @@ impl GatewayServer {
         let receipt_store = Arc::new(crate::receipt_store::ReceiptStore::new(db.clone()));
         info!("Receipt store initialized");
 
+        // Execution record query store (read-only API surface).
+        // Uses the daemon core store path when available: <data_dir>/store/execution
+        // and falls back to a temporary store in standalone mode.
+        let execution_query_store: Arc<dyn icn_store::Store> =
+            if let Some(ref data_dir) = self.data_dir {
+                let exec_path = data_dir.join("store").join("execution");
+                match SledStore::open(&exec_path) {
+                    Ok(store) => {
+                        info!("Execution query store opened at {:?}", exec_path);
+                        Arc::new(store)
+                    }
+                    Err(e) => {
+                        warn!(
+                            error = %e,
+                            path = %exec_path.display(),
+                            "Failed to open execution query store; falling back to temporary store"
+                        );
+                        Arc::new(SledStore::temporary().map_err(|err| {
+                            GatewayError::InternalError(format!(
+                                "Failed to create fallback execution query store: {err}"
+                            ))
+                        })?)
+                    }
+                }
+            } else {
+                Arc::new(SledStore::temporary().map_err(|e| {
+                    GatewayError::InternalError(format!(
+                        "Failed to create temporary execution query store: {e}"
+                    ))
+                })?)
+            };
+
         let governance_handle_for_service = self.governance_handle.clone();
         let ledger_handle_for_service = self.ledger_handle.clone();
 
@@ -959,6 +991,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(decision_registry.clone()))
                 // Economic receipts store (AllocationReceipt, SettlementIntent)
                 .app_data(web::Data::new(receipt_store.clone()))
+                // Execution query store for /v1/execution endpoints
+                .app_data(web::Data::new(execution_query_store.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -1200,6 +1234,15 @@ impl GatewayServer {
                                 .service(api::compute::upload_wasm)
                                 .service(api::compute::list_wasm)
                                 .service(api::compute::get_wasm_metadata)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Execution record query endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/execution")
+                                .configure(api::execution::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))
