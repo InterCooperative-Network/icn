@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
 use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
+use icn_kernel_api::protocol_params::StubParamStore;
 
 use anyhow::Result;
 
@@ -108,133 +109,6 @@ impl BudgetStore for MemoryBudgetStore {
             .filter(|r| r.scope_id == scope_id)
             .cloned()
             .collect())
-    }
-}
-
-/// Stub protocol parameter store.
-struct StubParamStore;
-
-impl icn_kernel_api::protocol_params::ProtocolParameterStore for StubParamStore {
-    fn get(&self, _: &str) -> Result<Option<icn_kernel_api::protocol_params::ProtocolParameter>> {
-        Ok(None)
-    }
-    fn get_effective(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&str>,
-    ) -> Result<Option<icn_kernel_api::protocol_params::ProtocolParameter>> {
-        Ok(None)
-    }
-    fn set(
-        &self,
-        _: icn_kernel_api::protocol_params::ProtocolParameter,
-        _: Option<String>,
-        _: Option<String>,
-    ) -> Result<()> {
-        Ok(())
-    }
-    fn list(&self) -> Result<Vec<icn_kernel_api::protocol_params::ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn list_by_category(
-        &self,
-        _: &str,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn get_history(
-        &self,
-        _: &str,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::ParameterChange>> {
-        Ok(vec![])
-    }
-    fn get_history_paginated(
-        &self,
-        _: &str,
-        _: usize,
-        _: usize,
-    ) -> Result<(Vec<icn_kernel_api::protocol_params::ParameterChange>, usize)> {
-        Ok((vec![], 0))
-    }
-    fn prune_history(&self, _: &str, _: usize) -> Result<usize> {
-        Ok(0)
-    }
-    fn delete(&self, _: &str) -> Result<()> {
-        Ok(())
-    }
-    fn exists(&self, _: &str) -> Result<bool> {
-        Ok(false)
-    }
-    fn count(&self) -> Result<usize> {
-        Ok(0)
-    }
-    fn total_history_count(&self) -> Result<usize> {
-        Ok(0)
-    }
-    fn validate(
-        &self,
-        _: &str,
-        _: &icn_kernel_api::protocol_params::ParameterValue,
-    ) -> std::result::Result<(), icn_kernel_api::protocol_params::ParameterValidationError> {
-        Ok(())
-    }
-    fn list_scoped_parameters(
-        &self,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::ProtocolParameter>> {
-        Ok(vec![])
-    }
-    fn delete_scoped_parameter(
-        &self,
-        _: &str,
-        _: &icn_kernel_api::protocol_params::ParameterScope,
-    ) -> Result<bool> {
-        Ok(false)
-    }
-    fn add_pending_change(
-        &self,
-        _: icn_kernel_api::protocol_params::PendingParameterChange,
-    ) -> Result<()> {
-        Ok(())
-    }
-    fn get_pending_change(
-        &self,
-        _: &icn_kernel_api::protocol_params::PendingChangeId,
-    ) -> Result<Option<icn_kernel_api::protocol_params::PendingParameterChange>> {
-        Ok(None)
-    }
-    fn list_pending_changes(
-        &self,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn list_pending_changes_for_parameter(
-        &self,
-        _: &str,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn get_changes_due_before(
-        &self,
-        _: u64,
-    ) -> Result<Vec<icn_kernel_api::protocol_params::PendingParameterChange>> {
-        Ok(vec![])
-    }
-    fn update_pending_change(
-        &self,
-        _: icn_kernel_api::protocol_params::PendingParameterChange,
-    ) -> Result<()> {
-        Ok(())
-    }
-    fn cancel_pending_change(
-        &self,
-        _: &icn_kernel_api::protocol_params::PendingChangeId,
-        _: &str,
-    ) -> Result<()> {
-        Ok(())
-    }
-    fn count_pending_changes(&self) -> Result<usize> {
-        Ok(0)
     }
 }
 
