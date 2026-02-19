@@ -232,4 +232,5 @@ push-registry: ## Push image to local in-cluster registry (fast path, no scp)
 
 fast-deploy: build push-registry ## Build + registry push + rolling deploy (fast iteration)
 	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG) from local registry..."
+	# Use localhost on k3s-control because this command runs remotely over SSH.
 	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) set image deployment/icn-daemon icnd=localhost:30500/$(IMAGE_NAME):$(IMAGE_TAG) && sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s"

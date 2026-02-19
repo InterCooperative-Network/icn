@@ -71,16 +71,12 @@ jobs:
           echo "Linker: $(mold --version)"
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "icn -> target"
 
       - name: Configure sccache
         run: |
           echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
           echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
           echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
           sccache --start-server || true
           sccache --show-stats || true
 
