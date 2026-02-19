@@ -10,7 +10,11 @@ Sprint documents should follow the naming convention:
 
 ## Active Tracker
 
-- [Sprint 2026-02-18](./sprint-2026-02-18.md) - Sprint 5 Flow C execution tracker and milestones
+- [Sprint 2026-02-19](./sprint-2026-02-19.md) - Sprint 7 Flow B execution tracker and milestones
+
+## Previous Tracker
+
+- [Sprint 2026-02-18](./sprint-2026-02-18.md) - Sprint 5/6 closeout tracker (Flow C + core ops safety net)
 
 ## Related Documentation
 
