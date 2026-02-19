@@ -640,7 +640,7 @@ async fn spawn_actors_with_identity(
             Arc::new(icn_store::SledStore::open(&escrow_store_path)?);
         let escrow_store: Arc<dyn icn_kernel_api::escrow::EscrowStore> =
             Arc::new(super::escrow_store::SledEscrowStore::new(escrow_sled_store));
-        kernel_executor = kernel_executor.with_escrow_store(escrow_store);
+        kernel_executor = kernel_executor.with_escrow_store(escrow_store.clone());
         info!("✓ Escrow store wired to governance executor");
 
         // Create budget store for budget enforcement
@@ -669,10 +669,10 @@ async fn spawn_actors_with_identity(
         );
 
         // Wrap dispatcher with DecisionExecutor for idempotent execution
-        let decision_executor = Arc::new(super::decision_executor::DecisionExecutor::new(
-            effect_dispatcher,
-            execution_store,
-        ));
+        let decision_executor = Arc::new(
+            super::decision_executor::DecisionExecutor::new(effect_dispatcher, execution_store)
+                .with_escrow_store(escrow_store),
+        );
 
         // Recover in-flight decisions from prior crash
         // This must run BEFORE the event subscription is established
