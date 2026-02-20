@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export async function getStaticPaths() {
-  const docsRoot = path.join(process.cwd(), 'src/content/docs');
+  // Docs live at repo root — one level up from website/
+  const docsRoot = path.resolve(process.cwd(), '..', 'docs');
   const paths: { params: { slug: string }; props: { filePath: string } }[] = [];
 
   function scanDir(dir: string, prefix: string = '') {

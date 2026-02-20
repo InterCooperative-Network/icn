@@ -3,9 +3,7 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "sync": "bash scripts/sync-from-icn.sh",
-    "prebuild": "npm run sync",
-    "dev": "npm run sync && astro dev",
+    "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",

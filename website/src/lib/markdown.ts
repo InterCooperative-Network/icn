@@ -9,7 +9,8 @@ import { marked } from 'marked';
  * or fall back to GitHub links for files we don't sync.
  */
 export function renderMarkdown(content: string): string {
-    const docsRoot = path.join(process.cwd(), 'src/content/docs');
+    // Docs live at repo root /docs/ — one level up from website/
+    const docsRoot = path.resolve(process.cwd(), '..', 'docs');
 
     // Build slug inventory
     const allSlugs = new Set<string>();
