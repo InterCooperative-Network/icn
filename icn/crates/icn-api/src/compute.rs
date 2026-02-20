@@ -745,6 +745,7 @@ mod tests {
     /// with a running compute engine. Instead, we replicate the exact hex→WasmRef
     /// conversion logic from submit_task and verify the output matches expectations.
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn compute_submit_wasm_hash_starts_task_param_roundtrip() {
         // 32-byte known hash
         let hash_bytes = [0xab_u8; 32];
@@ -752,7 +753,7 @@ mod tests {
         assert_eq!(hash_hex.len(), 64);
 
         // --- Replicate the exact conversion from submit_task (lines 73-83) ---
-        let decoded = hex::decode(&hash_hex).expect("valid hex should decode");
+        let decoded = hex::decode(&hash_hex).unwrap();
         assert_eq!(decoded.len(), 32, "must decode to exactly 32 bytes");
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&decoded);
