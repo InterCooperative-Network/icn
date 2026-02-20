@@ -3,10 +3,10 @@
 import Layout from '../../layouts/Layout.astro';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveRepoDocsRoot } from '../../lib/paths';
 
 export async function getStaticPaths() {
-  // Docs live at repo root — one level up from website/
-  const docsRoot = path.resolve(process.cwd(), '..', 'docs');
+  const docsRoot = resolveRepoDocsRoot();
   const paths: { params: { slug: string }; props: { filePath: string } }[] = [];
 
   function scanDir(dir: string, prefix: string = '') {
@@ -62,7 +62,7 @@ const segments = slug!.split('/');
 
       <!-- Source link -->
       <div class="doc-meta">
-        <a href={`https://github.com/InterCooperative-Network/icn/blob/main/${filePath.includes('/docs/') ? filePath.split('/content/docs/')[1] : ''}`} target="_blank" class="source-link">
+        <a href={`https://github.com/InterCooperative-Network/icn/blob/main/docs/${slug}`} target="_blank" class="source-link">
           View source on GitHub →
         </a>
       </div>

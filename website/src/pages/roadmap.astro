@@ -2,11 +2,11 @@
 // src/pages/roadmap.astro — Project Roadmap
 import Layout from '../layouts/Layout.astro';
 import fs from 'node:fs';
-import path from 'node:path';
 import { renderMarkdown } from '../lib/markdown';
+import { resolveRepoDoc } from '../lib/paths';
 
-// Try to load phase history from synced docs
-const phaseHistoryPath = path.join(process.cwd(), 'src/content/docs/PHASE_HISTORY.md');
+// Phase history from repo root docs/
+const phaseHistoryPath = resolveRepoDoc('PHASE_HISTORY.md');
 let phaseHtml = '';
 if (fs.existsSync(phaseHistoryPath)) {
   phaseHtml = renderMarkdown(fs.readFileSync(phaseHistoryPath, 'utf-8'));

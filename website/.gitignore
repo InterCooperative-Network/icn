@@ -24,5 +24,7 @@ pnpm-debug.log*
 .idea/
 
 # synced content — no longer used (docs read directly from repo root)
-# src/content/docs/ is not generated anymore; docs are at ../docs/
 src/content/docs/
+
+# generated at build time by scripts/gen-stats.mjs
+src/data/stats.json

@@ -4,9 +4,9 @@ import Layout from '../../layouts/Layout.astro';
 import Search from '../../components/Search.astro';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveRepoDocsRoot } from '../../lib/paths';
 
-// Docs live at repo root /docs/ — one level up from website/
-const docsRoot = path.resolve(process.cwd(), '..', 'docs');
+const docsRoot = resolveRepoDocsRoot();
 
 interface DocFile {
   slug: string;

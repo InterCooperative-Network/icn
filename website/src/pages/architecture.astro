@@ -2,10 +2,10 @@
 // src/pages/architecture.astro — Architecture deep-dive
 import Layout from '../layouts/Layout.astro';
 import fs from 'node:fs';
-import path from 'node:path';
 import { renderMarkdown } from '../lib/markdown';
+import { resolveRepoDoc } from '../lib/paths';
 
-const archPath = path.join(process.cwd(), 'src/content/docs/ARCHITECTURE.md');
+const archPath = resolveRepoDoc('ARCHITECTURE.md');
 let archHtml = '';
 if (fs.existsSync(archPath)) {
   archHtml = renderMarkdown(fs.readFileSync(archPath, 'utf-8'));

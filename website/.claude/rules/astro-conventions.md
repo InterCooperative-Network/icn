@@ -11,7 +11,7 @@ globs: ["src/**/*.astro", "src/**/*.ts", "src/**/*.css"]
 
 **Use Astro content collections for structured data.** Any list of more than ~3 items (blog posts, team members, features) goes in `src/content/` with a Zod schema defined in `src/content/config.ts`. Do not hardcode arrays in `.astro` frontmatter.
 
-**`src/content/docs/` is READ-ONLY synced content.** Never create, edit, or delete files here. They are gitignored and regenerated on every build from `icn/docs/`. If documentation needs updating, edit `icn/docs/` and run `/sync-and-build`.
+**Documentation lives at repo root `docs/`.** The website reads docs directly from `../docs/` via `path.resolve(process.cwd(), '..', 'docs')`. Do not create `src/content/docs/` — that pattern is obsolete. To update documentation, edit files in the repo root `docs/` directory.
 
 ## Styling
 

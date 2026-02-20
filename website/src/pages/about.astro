@@ -2,11 +2,11 @@
 // src/pages/about.astro — About ICN
 import Layout from '../layouts/Layout.astro';
 import fs from 'node:fs';
-import path from 'node:path';
 import { renderMarkdown } from '../lib/markdown';
+import { resolveRepoDoc } from '../lib/paths';
 
-// Read VISION.md from synced content
-const visionPath = path.join(process.cwd(), 'src/content/docs/VISION.md');
+// VISION.md from repo root docs/
+const visionPath = resolveRepoDoc('VISION.md');
 let visionHtml = '';
 if (fs.existsSync(visionPath)) {
   visionHtml = renderMarkdown(fs.readFileSync(visionPath, 'utf-8'));

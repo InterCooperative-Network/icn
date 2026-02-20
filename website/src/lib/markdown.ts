@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
+import { resolveRepoDocsRoot } from './paths';
 
 /**
  * Render markdown to HTML with link rewriting.
@@ -9,8 +10,7 @@ import { marked } from 'marked';
  * or fall back to GitHub links for files we don't sync.
  */
 export function renderMarkdown(content: string): string {
-    // Docs live at repo root /docs/ — one level up from website/
-    const docsRoot = path.resolve(process.cwd(), '..', 'docs');
+    const docsRoot = resolveRepoDocsRoot();
 
     // Build slug inventory
     const allSlugs = new Set<string>();
