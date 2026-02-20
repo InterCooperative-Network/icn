@@ -117,14 +117,24 @@ impl ComputeManager {
             TaskCode::WasmInline(b) => {
                 let encoded =
                     base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &b);
-                (None, Some(encoded), None, icn_api::compute::CodeTypeParam::Wasm)
+                (
+                    None,
+                    Some(encoded),
+                    None,
+                    icn_api::compute::CodeTypeParam::Wasm,
+                )
             }
             TaskCode::CclRef { .. } => {
                 anyhow::bail!("CclRef not supported via gateway API");
             }
             TaskCode::WasmRef(hash) => {
                 let hash_hex = hex::encode(hash);
-                (None, None, Some(hash_hex), icn_api::compute::CodeTypeParam::Wasm)
+                (
+                    None,
+                    None,
+                    Some(hash_hex),
+                    icn_api::compute::CodeTypeParam::Wasm,
+                )
             }
         };
 
