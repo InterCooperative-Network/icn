@@ -1485,7 +1485,6 @@ describe('vote delegation', () => {
       await expect(
         client.createDelegation({
           delegate: 'did:icn:zValidKeyABCDEF',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'invalid-scope' as any, // Bypass type check for runtime validation test
         })
       ).rejects.toThrow("scope must be 'blanket'");
@@ -1495,7 +1494,6 @@ describe('vote delegation', () => {
       await expect(
         client.createDelegation({
           delegate: 'did:icn:zValidKeyABCDEF',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'domain:' as any, // Bypass type check for runtime validation test
         })
       ).rejects.toThrow('scope ID cannot be empty');
@@ -2311,6 +2309,78 @@ describe('identity resolution', () => {
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toBe('http://localhost:8080/v1/identity/health');
     expect(options.headers['Authorization']).toBeUndefined(); // Public endpoint
+  });
+});
+
+describe('name resolution', () => {
+  it('should resolve a name path without leading slash', async () => {
+    const mockResponse = {
+      name: '/org/demo/ledger',
+      resolved_name: '/org/demo/ledger',
+      target: {
+        kind: 'service',
+        endpoint: { protocol: 'https', host: 'ledger.demo', port: 443 },
+      },
+      authority: 'did:icn:alice',
+      ttl_secs: 300,
+      created_at: 1700000000,
+      updated_at: 1700000000,
+      metadata: {},
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.names.resolve('org/demo/ledger');
+
+    expect(result.resolved_name).toBe('/org/demo/ledger');
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/names/org/demo/ledger');
+  });
+
+  it('should resolve a name path with options', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        name: '/org/demo/alias',
+        resolved_name: '/org/demo/service',
+        target: {
+          kind: 'service',
+          endpoint: { protocol: 'https', host: 'service.demo', port: 443 },
+        },
+        authority: 'did:icn:bob',
+        ttl_secs: 300,
+        created_at: 1700000000,
+        updated_at: 1700000001,
+        metadata: {},
+      }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.names.resolve('/org/demo/alias', {
+      verify_signatures: false,
+      max_depth: 4,
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe(
+      'http://localhost:8080/v1/names/org/demo/alias?verify_signatures=false&max_depth=4'
+    );
   });
 });
 

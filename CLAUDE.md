@@ -595,6 +595,8 @@ When applying review feedback or fixing CI:
 ### Do Not "Fix the World"
 - Do NOT upgrade toolchains, refactor unrelated code, or address pre-existing lints unless explicitly asked.
 - If you encounter unrelated failures, report them, but do not start a toolchain/infra project.
+- Toolchain is pinned in `icn/rust-toolchain.toml` — do NOT change it without explicit approval.
+- SIGSEGV or sccache corruption? Run `cargo clean` first before theorizing further.
 
 ### Infrastructure Tasks = No ICN Code Changes
 If the task is homelab/infra/proxmox/networking:
@@ -613,6 +615,10 @@ Do not jump to hardware/compiler blame without strong evidence.
 - Do not make parallel changes without explicit instruction.
 - Do one change-set, verify it works, then proceed to the next.
 - "Implement everything in parallel" requires the user to say "in parallel."
+
+### Long-Running Shell Commands
+- `nohup ... &` is unreliable in the Claude Code bash environment.
+- For polling loops or long waits, use the Bash tool's `run_in_background: true` parameter instead.
 
 ### Prose Mode (when requested)
 - Keep the user's voice: sharp, direct, not formalized, not melodramatic.
@@ -649,3 +655,7 @@ Do not jump to hardware/compiler blame without strong evidence.
 - `--delete-branch` will fail if the branch is checked out in a worktree.
   - Remove the worktree first, then delete the branch.
 - Use `--admin` sparingly (prefer fixing flake sources rather than normalizing bypass).
+- `gh pr checks` exits code 8 on mixed results — always capture with `|| true`.
+- `gh pr checks` output is tab-separated; multi-word check names (e.g. "Test Coverage") need `awk -F'\t' '{print $2}'`, not `awk '{print $2}'`.
+- `claude-review` failure = 15-min job timeout (infra flake). Never blocks merge.
+- "Test Coverage" at `pending / 0s` = queue-stalled, not running. Safe to `--admin` merge when all other required gates are green.

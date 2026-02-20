@@ -80,6 +80,7 @@ pub async fn handle_compute_submit(
         task_id: request.task_id,
         code: request.code,
         wasm_bytes: request.wasm_bytes,
+        wasm_hash: None, // RPC layer uses inline bytes; wasm_hash is a gateway-level concept
         code_type,
         inputs: request.inputs,
         fuel_limit: request.fuel_limit,

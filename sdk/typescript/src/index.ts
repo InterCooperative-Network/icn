@@ -168,15 +168,20 @@ import {
   GovernanceReceiptResponse,
   TreasuryClient,
   GovernanceClient,
+  NamesClient,
   // Service discovery types
   ServiceEndpointInfo,
   AnnounceServiceRequest,
   AnnounceServiceResponse,
   DiscoverServicesRequest,
   DiscoverServicesResponse,
+  ResolveNameOptions,
+  ResolveNameResponse,
 } from './types';
 
 export * from './types';
+export { WasmClient } from './wasm';
+export type { WasmModuleInfo, WasmDeployResult, WasmClientOptions } from './wasm';
 
 /** Default retry options */
 const DEFAULT_RETRY: Required<RetryOptions> = {
@@ -323,6 +328,7 @@ export class ICNClient {
   private scopes?: string[];
   public readonly treasury: TreasuryClient;
   public readonly governance: GovernanceClient;
+  public readonly names: NamesClient;
 
   constructor(options: ICNClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
@@ -361,6 +367,38 @@ export class ICNClient {
         this.get<GovernanceReceiptResponse>(
           `/proposals/${encodeURIComponent(proposalId)}/proof`
         ),
+    };
+    this.names = {
+      resolve: async (
+        path: string,
+        options?: ResolveNameOptions
+      ): Promise<ResolveNameResponse> => {
+        const normalizedPath = path.replace(/^\/+/, '');
+        if (!normalizedPath) {
+          throw new ICNError('name path is required', 400, 'INVALID_NAME_PATH');
+        }
+
+        const encodedPath = normalizedPath
+          .split('/')
+          .filter((segment) => segment.length > 0)
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
+        if (!encodedPath) {
+          throw new ICNError('name path is required', 400, 'INVALID_NAME_PATH');
+        }
+
+        const params = new URLSearchParams();
+        if (options?.verify_signatures !== undefined) {
+          params.set('verify_signatures', String(options.verify_signatures));
+        }
+        if (options?.max_depth !== undefined) {
+          params.set('max_depth', String(options.max_depth));
+        }
+        const query = params.toString();
+        return this.get<ResolveNameResponse>(
+          `/names/${encodedPath}${query ? `?${query}` : ''}`
+        );
+      },
     };
   }
 
