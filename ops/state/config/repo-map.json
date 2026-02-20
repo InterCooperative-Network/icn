@@ -5,26 +5,21 @@
       "remote": "git@github.com:InterCooperative-Network/icn.git",
       "cargo_workspace": "/home/ubuntu/projects/icn/icn",
       "primary_branch": "main",
-      "purpose": "Main ICN daemon and substrate libraries (Rust, 39 crates)",
-      "claude_config": "/home/ubuntu/projects/icn/.claude"
-    },
-    "icn-website": {
-      "local": "/home/ubuntu/projects/icn-website",
-      "remote": "git@github.com:InterCooperative-Network/icn-website.git",
-      "primary_branch": "main",
-      "purpose": "Public website at intercooperative.network (Astro 5 + TypeScript)",
-      "claude_config": "/home/ubuntu/projects/icn-website/.claude",
-      "notes": "src/content/docs/ is gitignored — synced from icn/docs/ at build time"
-    },
-    "icn-ops": {
-      "local": "/home/ubuntu/projects/icn-ops",
-      "remote": "git@github.com:InterCooperative-Network/icn-ops.git",
-      "primary_branch": "main",
-      "purpose": "Orchestration plane: MCP server, automation, CI templates, monitoring, state",
-      "claude_config": "/home/ubuntu/projects/icn-ops/.claude"
+      "purpose": "ICN monorepo: daemon, substrate libraries, website, ops, SDK, web apps",
+      "claude_config": "/home/ubuntu/projects/icn/.claude",
+      "monorepo": true,
+      "subdirectories": {
+        "rust": "icn/",
+        "website": "website/",
+        "ops": "ops/",
+        "sdk": "sdk/",
+        "web": "web/",
+        "docs": "docs/",
+        "deploy": "deploy/"
+      }
     },
     "homelab-inventory": {
-      "local": null,
+      "local": "/home/ubuntu/projects/homelab-inventory",
       "remote": "git@github.com:fahertym/homelab-inventory.git",
       "primary_branch": "main",
       "purpose": "Infrastructure inventory and automation for the homelab (Python 3.12+)",
@@ -38,21 +33,20 @@
     "base_branch": "origin/main",
     "active": [
       "main",
-      "1051-timestamp-response-c",
       "1084-names-gateway-a",
       "1120-auth-semantics-b"
     ]
   },
   "relationships": [
     {
-      "from": "icn/docs/",
-      "to": "icn-website/src/content/docs/",
-      "type": "content-sync",
-      "direction": "one-way",
-      "mechanism": "icn-website/scripts/sync-from-icn.sh (prebuild hook)"
+      "from": "docs/",
+      "to": "website/src/pages/docs/",
+      "type": "content-read",
+      "direction": "direct",
+      "mechanism": "website reads ../docs via path.resolve at build time (no sync script)"
     },
     {
-      "from": "icn/deploy/k8s/",
+      "from": "deploy/k8s/",
       "to": "k3s-cluster",
       "type": "deployment",
       "direction": "push",
@@ -61,7 +55,7 @@
     },
     {
       "from": "homelab-inventory",
-      "to": "icn-ops",
+      "to": "ops/",
       "type": "infra-observation",
       "direction": "read-only",
       "notes": "homelab-inventory data/llm-context/ bundles are authoritative infra state"

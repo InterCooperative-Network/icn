@@ -2,9 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
 
-## What This Repo Is
+## What This Directory Is
 
-`icn-ops` is the orchestration plane for ICN development. It coordinates work across `icn/`, `icn-website/`, and `icn-wt/`. It is **not** substrate code — it's the operational layer that observes, coordinates, and automates across the ecosystem.
+`ops/` is the orchestration plane for ICN development. It lives inside the ICN monorepo and
+coordinates work across all subdirectories and worktrees. It is **not** substrate code — it's
+the operational layer that observes, coordinates, and automates.
 
 ## Directory Map
 
@@ -53,17 +55,18 @@ Use the `log_decision` MCP tool if available — it writes the file and updates 
 
 Format: `NNNN-kebab-case-title.md`
 
-## What Stays Out of This Repo
+## What Stays Out of ops/
 
-- Rust/Cargo code → `icn/`
-- Website content or Astro components → `icn-website/`
-- K8s deployment manifests specific to the ICN daemon → `icn/deploy/k8s/`
-- Homelab infrastructure mutations → `homelab-inventory`
+- Rust/Cargo code → `icn/` (Cargo workspace root)
+- Website content or Astro components → `website/`
+- K8s deployment manifests → `deploy/k8s/`
+- Homelab infrastructure mutations → external `homelab-inventory` repo
 
-## Cross-Repo Relationships
+## Monorepo Layout
 
 See `state/config/repo-map.json` for the authoritative map. Key relationships:
-- `icn/docs/` syncs one-way to `icn-website/src/content/docs/` via `sync-from-icn.sh`
-- `icn/icn/` is the Cargo workspace root (not `icn/`)
+- `docs/` at repo root is the canonical documentation source
+- `website/` reads docs directly via path.resolve (no sync script)
+- `icn/` is the Cargo workspace root (not repo root)
 - Worktrees live in `../icn-wt/` on the dev VM
 - K3s cluster: control at `10.8.10.40`, workers at `.41`/`.42`
