@@ -162,16 +162,25 @@ pub async fn submit_task(
                 hash.copy_from_slice(&hash_bytes);
 
                 // Registry existence check: return 404 before queueing to the compute actor.
-                if let Some(registry) = compute_mgr.wasm_registry() {
-                    let exists = registry
-                        .get_metadata(&hash)
-                        .await
-                        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
-                        .is_some();
-                    if !exists {
-                        return Err(crate::error::GatewayError::NotFound(format!(
-                            "WASM module not found: {hash_hex}"
-                        )));
+                // Require the registry to be configured; silently skipping the check when it is
+                // absent would allow references to non-existent modules to reach the compute actor.
+                match compute_mgr.wasm_registry() {
+                    Some(registry) => {
+                        let exists = registry
+                            .get_metadata(&hash)
+                            .await
+                            .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+                            .is_some();
+                        if !exists {
+                            return Err(crate::error::GatewayError::NotFound(format!(
+                                "WASM module not found: {hash_hex}"
+                            )));
+                        }
+                    }
+                    None => {
+                        return Err(crate::error::GatewayError::InternalError(
+                            "WASM registry is not configured for wasm_hash submissions".to_string(),
+                        ));
                     }
                 }
 
