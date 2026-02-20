@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Non-Negotiables
+
+1. **Concise.** No long narratives. No excessive status updates. No unrequested infrastructure.
+2. **Merge = merge.** No polling loops. Use `gh --json` not tabular parsing. Prefer `--auto`, use `--admin` when told.
+3. **Toolchain pinned.** Do not upgrade `rust-toolchain.toml`. `cargo clean` for SIGSEGV. No unrelated clippy fixes.
+4. **Port 8080.** Gateway binds 8080 (see `icn-core/src/config/gateway.rs`). Never assume 8000.
+5. **Preflight first.** Run `/icn-preflight` at session start. Check stale state before rewriting code.
+6. **Scope is law.** The user's request defines scope. Do not expand. Note adjacent concerns but do not act on them.
+
 ## Project Overview
 
 > **ICN is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning.**
@@ -433,11 +442,6 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete de
 - Shutdown via `tokio::sync::broadcast`
 - Integration tests need unique ports per node
 - Vector clocks prevent duplicate gossip processing
-
-## Demo Environment
-- ICN gateway binds port **8080** by default (see `icn-core/src/config/gateway.rs`). Do not assume port 8000.
-- Always verify with `curl -s http://localhost:8080/health` before running demo scripts.
-- When running demo scripts, ensure coop IDs and localStorage state are fresh — stale state causes silent failures.
 
 ## Kernel/App Separation Architecture
 
