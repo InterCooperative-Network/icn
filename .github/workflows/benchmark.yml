@@ -91,12 +91,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "baseline/icn -> baseline/icn/target"
-          prefix-key: "bench-baseline-${{ github.run_id }}-${{ github.event.pull_request.base.sha }}"
-          cache-on-failure: true
-
       - name: Run baseline benchmarks
         run: cargo bench $BENCH_TARGETS -- --noplot --save-baseline base --sample-size 20
         working-directory: ./baseline/icn
@@ -122,12 +116,6 @@ jobs:
             echo "::error::Baseline benchmarks missing or empty - cannot perform valid comparison"
             exit 1
           fi
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "pr/icn -> pr/icn/target"
-          prefix-key: "bench-pr-${{ github.run_id }}-${{ github.event.pull_request.head.sha }}"
-          cache-on-failure: true
 
       - name: Run PR benchmarks and compare
         id: bench_compare
