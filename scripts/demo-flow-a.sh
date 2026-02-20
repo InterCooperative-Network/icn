@@ -41,7 +41,7 @@ LIST_RESP=$(curl -sf "$GATEWAY/v1/compute/wasm?limit=10" \
   ${AUTH_HEADER:+-H "$AUTH_HEADER"} 2>&1) \
   || fail "List failed: $LIST_RESP"
 
-MODULE_COUNT=$(echo "$LIST_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['total'])" 2>/dev/null) \
+MODULE_COUNT=$(echo "$LIST_RESP" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null) \
   || fail "Failed to parse list response: $LIST_RESP"
 ok "Found $MODULE_COUNT module(s)"
 
@@ -51,7 +51,7 @@ META_RESP=$(curl -sf "$GATEWAY/v1/compute/wasm/$WASM_HASH" \
   ${AUTH_HEADER:+-H "$AUTH_HEADER"} 2>&1) \
   || fail "Get metadata failed: $META_RESP"
 
-MODULE_NAME=$(echo "$META_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])" 2>/dev/null) \
+MODULE_NAME=$(echo "$META_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('name', '(unnamed)'))" 2>/dev/null) \
   || fail "Failed to parse metadata: $META_RESP"
 ok "Module: $MODULE_NAME (hash: $WASM_HASH)"
 
