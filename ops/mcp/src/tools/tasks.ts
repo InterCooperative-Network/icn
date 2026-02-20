@@ -3,9 +3,9 @@ import { z } from "zod";
 import type Database from "better-sqlite3";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
+import { resolveOpsStatePath } from "../paths.js";
 
-const ICN_ROOT = process.env["ICN_ROOT"] ?? "/home/ubuntu/projects";
-const SPRINT_FILE = join(ICN_ROOT, "icn-ops/state/sprint/current.json");
+const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
 
 interface Task {
   id: string;

@@ -3,9 +3,9 @@ import { z } from "zod";
 import type Database from "better-sqlite3";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { resolveOpsStatePath } from "../paths.js";
 
-const ICN_ROOT = process.env["ICN_ROOT"] ?? "/home/ubuntu/projects";
-const DECISIONS_DIR = join(ICN_ROOT, "icn-ops/state/decisions");
+const DECISIONS_DIR = resolveOpsStatePath("decisions");
 
 // Sync-on-boot: index any ADR files that exist on disk but aren't in SQLite.
 // Handles ADRs written manually or before the MCP server existed.

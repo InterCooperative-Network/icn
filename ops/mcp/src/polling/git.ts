@@ -21,11 +21,13 @@ function writeCache(db: Database.Database, key: string, value: unknown): void {
 }
 
 function pollOnce(db: Database.Database, icnRoot: string): void {
-  const repos = ["icn", "icn-website", "icn-ops"];
+  // Monorepo: icnRoot IS the repo root. No separate website/ops repos to poll.
+  const repos = ["icn"];
 
   const statuses: Record<string, unknown> = {};
   for (const repo of repos) {
-    const dir = `${icnRoot}/${repo}`;
+    // For "icn", poll the root itself (icnRoot). For others, sibling directory.
+    const dir = repo === "icn" ? icnRoot : `${icnRoot}/../${repo}`;
     const branch = runCmd(`git -C ${dir} rev-parse --abbrev-ref HEAD 2>/dev/null`);
     if (!branch) {
       statuses[repo] = { error: "not a git repo or not found" };
@@ -44,7 +46,7 @@ function pollOnce(db: Database.Database, icnRoot: string): void {
   writeCache(db, "git:repo_statuses", statuses);
 
   // Worktree lag vs origin/main for icn repo
-  const wtRoot = `${icnRoot}/icn-wt`;
+  const wtRoot = `${icnRoot}/../icn-wt`;
   const wtList = runCmd(`ls ${wtRoot} 2>/dev/null`);
   if (wtList) {
     const worktrees: Record<string, unknown> = {};

@@ -4,8 +4,9 @@ import type Database from "better-sqlite3";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { resolveMonorepoRoot } from "../paths.js";
 
-const ICN_ROOT = process.env["ICN_ROOT"] ?? "/home/ubuntu/projects";
+const ICN_ROOT = resolveMonorepoRoot();
 
 function runGit(cwd: string, args: string): string {
   try {
@@ -41,11 +42,11 @@ export function registerRepoTools(
     "Get current branch, dirty files, and sync status for all ICN repos.",
     {},
     async () => {
+      // Monorepo: ICN_ROOT is the repo root. website/ and ops/ are subdirectories.
+      // homelab-inventory is a separate repo at ../homelab-inventory.
       const repos = [
-        { name: "icn", path: join(ICN_ROOT, "icn") },
-        { name: "icn-website", path: join(ICN_ROOT, "icn-website") },
-        { name: "icn-ops", path: join(ICN_ROOT, "icn-ops") },
-        { name: "homelab-inventory", path: join(ICN_ROOT, "homelab-inventory") },
+        { name: "icn", path: ICN_ROOT },
+        { name: "homelab-inventory", path: join(ICN_ROOT, "..", "homelab-inventory") },
       ];
       const results = repos.map((r) => repoStatus(r.path, r.name));
       return {
@@ -59,7 +60,7 @@ export function registerRepoTools(
     "List all git worktrees with branch, last commit, staleness vs main.",
     {},
     async () => {
-      const wtRoot = join(ICN_ROOT, "icn-wt");
+      const wtRoot = join(ICN_ROOT, "..", "icn-wt");
       const icnPath = join(ICN_ROOT, "icn");
       const mainHash = runGit(icnPath, "rev-parse origin/main");
 
@@ -131,7 +132,7 @@ export function registerRepoTools(
         .string()
         .optional()
         .default("icn")
-        .describe("Repo name: icn, icn-website, icn-ops"),
+        .describe("Repo name: icn, homelab-inventory"),
       branch: z.string().optional().describe("Branch name, defaults to current"),
     },
     async ({ repo, branch }) => {

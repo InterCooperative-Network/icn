@@ -10,11 +10,11 @@ import { startGitPolling } from "./polling/git.js";
 import { startClusterPolling } from "./polling/cluster.js";
 import { startBuildsPolling } from "./polling/builds.js";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { resolveMonorepoRoot, resolveOpsStatePath } from "./paths.js";
 
-const ICN_ROOT = process.env["ICN_ROOT"] ?? "/home/ubuntu/projects";
-const SPRINT_FILE = join(ICN_ROOT, "icn-ops/state/sprint/current.json");
-const REPO_MAP_FILE = join(ICN_ROOT, "icn-ops/state/config/repo-map.json");
+const ICN_ROOT = resolveMonorepoRoot();
+const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
+const REPO_MAP_FILE = resolveOpsStatePath("config", "repo-map.json");
 
 async function main() {
   const db = initDb();

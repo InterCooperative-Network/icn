@@ -3,10 +3,9 @@ import { z } from "zod";
 import type Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { appendFileSync, readFileSync } from "fs";
-import { join } from "path";
+import { resolveOpsStatePath } from "../paths.js";
 
-const ICN_ROOT = process.env["ICN_ROOT"] ?? "/home/ubuntu/projects";
-const SESSION_LOG = join(ICN_ROOT, "icn-ops/state/session-log.jsonl");
+const SESSION_LOG = resolveOpsStatePath("session-log.jsonl");
 
 export function registerSessionTools(
   server: McpServer,
@@ -19,7 +18,7 @@ export function registerSessionTools(
       repo: z
         .string()
         .describe(
-          "Repo name: icn, icn-website, icn-ops, homelab-inventory"
+          "Repo name: icn, homelab-inventory"
         ),
       worktree: z
         .string()
