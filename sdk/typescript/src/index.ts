@@ -180,6 +180,8 @@ import {
 } from './types';
 
 export * from './types';
+export { WasmClient } from './wasm';
+export type { WasmModuleInfo, WasmDeployResult, WasmClientOptions } from './wasm';
 
 /** Default retry options */
 const DEFAULT_RETRY: Required<RetryOptions> = {
