@@ -129,6 +129,7 @@ Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
 All commands run from `icn/` directory:
 
 ```bash
+cargo check                              # Fast type-check (use before full build)
 cargo build                              # Build everything
 cargo build --release                    # Build release binaries
 cargo test                               # Run all tests
@@ -137,6 +138,12 @@ cargo test test_two_node_convergence     # Test by name
 cargo build && ./target/debug/icnd       # Run daemon
 cargo build && ./target/debug/icnctl status
 ```
+
+### Rust Build Notes
+- This is a large workspace (~414K lines). Use `cargo check` before `cargo build` for faster feedback.
+- Toolchain is pinned in `icn/rust-toolchain.toml` — do NOT upgrade unless explicitly asked.
+- If builds SIGSEGV or fail mysteriously, run `cargo clean` first — incremental compilation cache corruption is a known issue on this machine.
+- Do not fix pre-existing clippy lints unrelated to the current task.
 
 ## Architecture: Actor-Based Runtime
 
@@ -427,6 +434,11 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete de
 - Integration tests need unique ports per node
 - Vector clocks prevent duplicate gossip processing
 
+## Demo Environment
+- ICN gateway binds port **8080** by default (see `icn-core/src/config/gateway.rs`). Do not assume port 8000.
+- Always verify with `curl -s http://localhost:8080/health` before running demo scripts.
+- When running demo scripts, ensure coop IDs and localStorage state are fresh — stale state causes silent failures.
+
 ## Kernel/App Separation Architecture
 
 > **Detailed Documentation**: See [docs/architecture/KERNEL_APP_SEPARATION.md](docs/architecture/KERNEL_APP_SEPARATION.md) for comprehensive documentation including migration guides, implementation patterns, and request flow diagrams.
@@ -569,6 +581,9 @@ CCL documents are stored as state, interpreted by apps, and converted to `Constr
 
 ### Default Mode
 You are operating as an execution engine. Be concise. Do not narrate routine steps.
+- Do not over-verify or provide excessive status updates.
+- Do not build elaborate infrastructure (justfiles, bootstrap scripts, custom actions) beyond what is explicitly requested.
+- When merging PRs, use `gh pr merge --admin` if CI is queue-stalled — do not write polling loops to wait for CI.
 
 ### Scope is Law
 - The user's request defines the complete scope.
@@ -659,3 +674,5 @@ Do not jump to hardware/compiler blame without strong evidence.
 - `gh pr checks` output is tab-separated; multi-word check names (e.g. "Test Coverage") need `awk -F'\t' '{print $2}'`, not `awk '{print $2}'`.
 - `claude-review` failure = 15-min job timeout (infra flake). Never blocks merge.
 - "Test Coverage" at `pending / 0s` = queue-stalled, not running. Safe to `--admin` merge when all other required gates are green.
+- When merging multiple PRs in dependency order, expect compilation errors from struct field changes across crates — fix forward, don't over-investigate.
+- Prefer merge strategy over rebase for subtree commits (subtree squash commits do not rebase cleanly).
