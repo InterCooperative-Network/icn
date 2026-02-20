@@ -1,12 +1,12 @@
 {
   "repos": {
     "icn": {
-      "local": "/home/ubuntu/projects/icn",
+      "local": ".",
       "remote": "git@github.com:InterCooperative-Network/icn.git",
-      "cargo_workspace": "/home/ubuntu/projects/icn/icn",
+      "cargo_workspace": "icn",
       "primary_branch": "main",
       "purpose": "ICN monorepo: daemon, substrate libraries, website, ops, SDK, web apps",
-      "claude_config": "/home/ubuntu/projects/icn/.claude",
+      "claude_config": ".claude",
       "monorepo": true,
       "subdirectories": {
         "rust": "icn/",
@@ -19,7 +19,7 @@
       }
     },
     "homelab-inventory": {
-      "local": "/home/ubuntu/projects/homelab-inventory",
+      "local": "../homelab-inventory",
       "remote": "git@github.com:fahertym/homelab-inventory.git",
       "primary_branch": "main",
       "purpose": "Infrastructure inventory and automation for the homelab (Python 3.12+)",
@@ -28,8 +28,8 @@
     }
   },
   "worktrees": {
-    "root": "/home/ubuntu/projects/icn-wt",
-    "managed_by": "/home/ubuntu/projects/icn/scripts/worktrees.sh",
+    "root": "../icn-wt",
+    "managed_by": "scripts/worktrees.sh",
     "base_branch": "origin/main",
     "active": [
       "main",

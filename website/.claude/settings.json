@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'case \"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\" in *.astro|*.ts|*.tsx|*.js|*.mjs|*.cjs|*.css|*.json|*.md) cd /home/ubuntu/projects/icn/website && npx prettier --write \"${CLAUDE_TOOL_INPUT_FILE_PATH}\" 2>/dev/null || true;; esac'",
+            "command": "bash -c 'case \"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\" in *.astro|*.ts|*.tsx|*.js|*.mjs|*.cjs|*.css|*.json|*.md) cd \"$(git rev-parse --show-toplevel)/website\" && npx prettier --write \"${CLAUDE_TOOL_INPUT_FILE_PATH}\" 2>/dev/null || true;; esac'",
             "timeout": 10000
           }
         ]
