@@ -1,0 +1,128 @@
+---
+// src/pages/docs/[...slug].astro — Dynamic doc page renderer
+import Layout from '../../layouts/Layout.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+
+export async function getStaticPaths() {
+  const docsRoot = path.join(process.cwd(), 'src/content/docs');
+  const paths: { params: { slug: string }; props: { filePath: string } }[] = [];
+
+  function scanDir(dir: string, prefix: string = '') {
+    const entries = fs.readdirSync(dir);
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry);
+      if (fs.statSync(fullPath).isDirectory()) {
+        scanDir(fullPath, `${prefix}${entry}/`);
+      } else if (entry.endsWith('.md')) {
+        const slug = `${prefix}${entry.replace('.md', '')}`;
+        paths.push({
+          params: { slug },
+          props: { filePath: fullPath }
+        });
+      }
+    }
+  }
+
+  scanDir(docsRoot);
+  return paths;
+}
+
+const { slug } = Astro.params;
+const { filePath } = Astro.props;
+
+const rawContent = fs.readFileSync(filePath, 'utf-8');
+
+// Extract title from first heading or filename
+const titleMatch = rawContent.match(/^#\s+(.+)$/m);
+const title = titleMatch ? titleMatch[1] : slug!.split('/').pop()!.replace(/[-_]/g, ' ');
+
+// Render markdown with link rewriting
+import { renderMarkdown } from '../../lib/markdown';
+const htmlContent = renderMarkdown(rawContent);
+
+// Build breadcrumb
+const segments = slug!.split('/');
+---
+
+<Layout title={title} activeNav="docs">
+  <section class="section" style="padding-top: calc(64px + var(--space-2xl));">
+    <div class="container-narrow">
+      <!-- Breadcrumb -->
+      <nav class="breadcrumb">
+        <a href="/docs">Docs</a>
+        {segments.length > 1 && segments.slice(0, -1).map((seg, i) => (
+          <span class="breadcrumb-sep">/</span>
+          <span class="breadcrumb-dir">{seg.replace(/[-_]/g, ' ')}</span>
+        ))}
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">{segments[segments.length - 1].replace(/[-_]/g, ' ')}</span>
+      </nav>
+
+      <!-- Source link -->
+      <div class="doc-meta">
+        <a href={`https://github.com/InterCooperative-Network/icn/blob/main/${filePath.includes('/docs/') ? filePath.split('/content/docs/')[1] : ''}`} target="_blank" class="source-link">
+          View source on GitHub →
+        </a>
+      </div>
+
+      <!-- Rendered markdown -->
+      <article class="prose" set:html={htmlContent} />
+
+      <!-- Footer nav -->
+      <div class="doc-footer">
+        <a href="/docs" class="btn btn-ghost">← Back to Docs</a>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.8125rem;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb a {
+    color: var(--accent-teal);
+  }
+
+  .breadcrumb-sep {
+    color: var(--text-muted);
+  }
+
+  .breadcrumb-dir {
+    color: var(--text-secondary);
+    text-transform: capitalize;
+  }
+
+  .breadcrumb-current {
+    color: var(--text-primary);
+    text-transform: capitalize;
+  }
+
+  .doc-meta {
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .source-link {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .source-link:hover {
+    color: var(--accent-teal);
+  }
+
+  .doc-footer {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border-subtle);
+  }
+</style>

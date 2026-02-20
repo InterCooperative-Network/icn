@@ -1,0 +1,207 @@
+---
+// Layout.astro — Main site shell with nav + footer
+import '../styles/global.css';
+import ThemeToggle from '../components/ThemeToggle.astro';
+
+export interface Props {
+  title: string;
+  description?: string;
+  activeNav?: string;
+}
+
+const { title, description = 'A substrate daemon for the cooperative internet. DIDs, trust graphs, mutual credit, CCL contracts, and democratic governance — all in one P2P coordination layer.', activeNav = '' } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://intercooperative.network/#organization",
+      "name": "InterCooperative Network",
+      "url": "https://intercooperative.network",
+      "logo": "https://intercooperative.network/favicon.svg",
+      "sameAs": [
+        "https://github.com/InterCooperative-Network"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://intercooperative.network/#website",
+      "url": "https://intercooperative.network",
+      "name": "InterCooperative Network",
+      "description": "A substrate daemon for the cooperative internet.",
+      "publisher": {
+        "@id": "https://intercooperative.network/#organization"
+      }
+    }
+  ]
+};
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <meta name="theme-color" content="#06090f" />
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <title>{title} | InterCooperative Network</title>
+  
+  <script is:inline>
+    // Prevent theme flash
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+        return localStorage.getItem('theme');
+      }
+      return 'dark';
+    })();
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  </script>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav" id="main-nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none">
+          <rect width="128" height="128" rx="28" fill="url(#nav-bg)"/>
+          <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+          <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+          <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+          <circle cx="64" cy="30" r="11" fill="url(#nav-teal)"/>
+          <circle cx="34" cy="82" r="11" fill="url(#nav-teal)"/>
+          <circle cx="94" cy="82" r="11" fill="url(#nav-teal)"/>
+          <circle cx="64" cy="64" r="4" fill="url(#nav-teal)" opacity="0.8"/>
+          <defs>
+            <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"/><stop offset="1" stop-color="#0a1628"/></linearGradient>
+            <linearGradient id="nav-teal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+          </defs>
+        </svg>
+        <span>ICN</span>
+      </a>
+
+      <ul class="nav-links" id="nav-links">
+        <li><a href="/about" class:list={[{ active: activeNav === 'about' || currentPath.startsWith('/about') }]}>About</a></li>
+        <li><a href="/docs" class:list={[{ active: activeNav === 'docs' || currentPath.startsWith('/docs') }]}>Docs</a></li>
+        <li><a href="/architecture" class:list={[{ active: activeNav === 'architecture' || currentPath.startsWith('/architecture') }]}>Architecture</a></li>
+        <li><a href="/roadmap" class:list={[{ active: activeNav === 'roadmap' || currentPath.startsWith('/roadmap') }]}>Roadmap</a></li>
+        <li><a href="/community" class:list={[{ active: activeNav === 'community' || currentPath.startsWith('/community') }]}>Community</a></li>
+        <li><a href="/blog" class:list={[{ active: activeNav === 'blog' || currentPath.startsWith('/blog') }]}>Blog</a></li>
+      </ul>
+
+      <div class="nav-cta">
+        <ThemeToggle />
+        <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="GitHub">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <a href="/docs/GETTING_STARTED" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main>
+    <slot />
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a href="/" class="nav-logo">
+            <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none">
+              <rect width="128" height="128" rx="28" fill="url(#ft-bg)"/>
+              <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+              <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+              <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+              <circle cx="64" cy="30" r="11" fill="url(#ft-teal)"/>
+              <circle cx="34" cy="82" r="11" fill="url(#ft-teal)"/>
+              <circle cx="94" cy="82" r="11" fill="url(#ft-teal)"/>
+              <circle cx="64" cy="64" r="4" fill="url(#ft-teal)" opacity="0.8"/>
+              <defs>
+                <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"/><stop offset="1" stop-color="#0a1628"/></linearGradient>
+                <linearGradient id="ft-teal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+              </defs>
+            </svg>
+            <span>InterCooperative Network</span>
+          </a>
+          <p>A substrate daemon for the cooperative internet. Infrastructure for cooperatives, communities, and federations.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href="/about">About</a></li>
+            <li><a href="/docs">Documentation</a></li>
+            <li><a href="/architecture">Architecture</a></li>
+            <li><a href="/roadmap">Roadmap</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="/docs/GETTING_STARTED">Getting Started</a></li>
+            <li><a href="/docs/glossary">Glossary</a></li>
+            <li><a href="/docs/CONTRIBUTING">Contributing</a></li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank">Discussions</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Community</h4>
+          <ul>
+            <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li>
+            <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li>
+            <li><a href="/community">Community</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>AGPL-3.0 License · InterCooperative Network</span>
+        <span>Built with cooperation, not extraction</span>
+      </div>
+    </div>
+  </footer>
+
+  <script is:inline>
+    // Mobile nav toggle
+    document.getElementById('nav-toggle')?.addEventListener('click', () => {
+      document.getElementById('nav-links')?.classList.toggle('open');
+    });
+
+    // Scroll-reveal animations
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive').forEach(el => {
+      el.classList.add('reveal');
+      revealObserver.observe(el);
+    });
+  </script>
+</body>
+</html>

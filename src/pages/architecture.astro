@@ -1,0 +1,60 @@
+---
+// src/pages/architecture.astro — Architecture deep-dive
+import Layout from '../layouts/Layout.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+import { renderMarkdown } from '../lib/markdown';
+
+const archPath = path.join(process.cwd(), 'src/content/docs/ARCHITECTURE.md');
+let archHtml = '';
+if (fs.existsSync(archPath)) {
+  archHtml = renderMarkdown(fs.readFileSync(archPath, 'utf-8'));
+}
+---
+
+<Layout title="Architecture" activeNav="architecture">
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container">
+      <div class="section-header" style="text-align: left; max-width: none;">
+        <span class="badge badge-blue">System Design</span>
+        <h1>Architecture</h1>
+        <p>
+          A deep dive into the Constraint Engine Model, kernel/app separation, 
+          and the subsystems that make ICN work. This document is synced from 
+          <code>docs/ARCHITECTURE.md</code> in the main repository.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture overview cards -->
+  <section class="section-alt">
+    <div class="container">
+      <div class="grid grid-3">
+        <div class="card card-accent-teal">
+          <h3>Constraint Engine</h3>
+          <p>Apps are "policy oracles" that translate governance into generic constraint sets. The kernel enforces constraints mechanically — no domain semantics leak through the Meaning Firewall.</p>
+        </div>
+        <div class="card card-accent-blue">
+          <h3>Kernel / App Separation</h3>
+          <p>The kernel (icn-core, icn-net, icn-gossip) handles infrastructure. Apps (trust, governance, ledger) implement cooperative logic. They communicate via constraint sets only.</p>
+        </div>
+        <div class="card card-accent-purple">
+          <h3>P2P Everything</h3>
+          <p>QUIC/TLS transport with mDNS discovery, gossip-based state replication with causal ordering, and trust-gated topic subscription. No central servers needed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Full architecture doc -->
+  <section class="section">
+    <div class="container-narrow">
+      <article class="prose" set:html={archHtml} />
+      
+      <div class="doc-footer" style="margin-top: var(--space-3xl); padding-top: var(--space-xl); border-top: 1px solid var(--border-subtle);">
+        <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ARCHITECTURE.md" target="_blank" class="btn btn-ghost">View source on GitHub →</a>
+      </div>
+    </div>
+  </section>
+</Layout>

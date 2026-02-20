@@ -1,0 +1,40 @@
+---
+import { type CollectionEntry, getCollection } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+	const posts = await getCollection('blog');
+	return posts.map((post) => ({
+		params: { slug: post.slug },
+		props: post,
+	}));
+}
+type Props = CollectionEntry<'blog'>;
+
+const post = Astro.props;
+const { Content } = await post.render();
+---
+
+<Layout title={post.data.title} description={post.data.description} activeNav="blog">
+	<article class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container container-sm">
+      <div class="prose-header text-center mb-xl">
+        <div class="text-accent-teal text-sm font-bold uppercase tracking-wide mb-sm">
+          {post.data.pubDate.toLocaleDateString('en-us', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </div>
+        <h1>{post.data.title}</h1>
+        {post.data.heroImage && (
+          <img width={1020} height={510} src={post.data.heroImage} alt="" class="rounded-xl mt-lg border border-white/10" />
+        )}
+      </div>
+
+      <div class="prose">
+        <Content />
+      </div>
+    </div>
+	</article>
+</Layout>

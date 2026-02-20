@@ -1,0 +1,201 @@
+---
+// src/pages/docs/index.astro — Documentation index page
+import Layout from '../../layouts/Layout.astro';
+import Search from '../../components/Search.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Build sidebar structure from synced docs
+const docsRoot = path.join(process.cwd(), 'src/content/docs');
+
+interface DocFile {
+  slug: string;
+  title: string;
+  path: string;
+}
+
+interface DocSection {
+  name: string;
+  docs: DocFile[];
+}
+
+function titleFromFilename(filename: string): string {
+  return filename
+    .replace(/\.md$/, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\bApi\b/g, 'API')
+    .replace(/\bCcl\b/g, 'CCL')
+    .replace(/\bIcn\b/g, 'ICN')
+    .replace(/\bDid\b/g, 'DID');
+}
+
+function scanDocs(): DocSection[] {
+  const sections: DocSection[] = [];
+
+  // Core docs (top-level .md files)
+  const topLevelFiles = fs.readdirSync(docsRoot)
+    .filter(f => f.endsWith('.md') && !fs.statSync(path.join(docsRoot, f)).isDirectory())
+    .sort();
+  
+  if (topLevelFiles.length > 0) {
+    sections.push({
+      name: 'Core',
+      docs: topLevelFiles.map(f => ({
+        slug: f.replace('.md', ''),
+        title: titleFromFilename(f),
+        path: `/docs/${f.replace('.md', '')}`
+      }))
+    });
+  }
+
+  // Subdirectories
+  const dirs = fs.readdirSync(docsRoot)
+    .filter(f => fs.statSync(path.join(docsRoot, f)).isDirectory())
+    .sort();
+
+  for (const dir of dirs) {
+    const dirPath = path.join(docsRoot, dir);
+    const scanDir = (basePath: string, prefix: string): DocFile[] => {
+      const files: DocFile[] = [];
+      const entries = fs.readdirSync(basePath).sort();
+      for (const entry of entries) {
+        const entryPath = path.join(basePath, entry);
+        if (fs.statSync(entryPath).isDirectory()) {
+          files.push(...scanDir(entryPath, `${prefix}/${entry}`));
+        } else if (entry.endsWith('.md')) {
+          files.push({
+            slug: `${prefix}/${entry.replace('.md', '')}`,
+            title: titleFromFilename(entry),
+            path: `/docs${prefix}/${entry.replace('.md', '')}`
+          });
+        }
+      }
+      return files;
+    };
+    
+    const docs = scanDir(dirPath, `/${dir}`);
+    if (docs.length > 0) {
+      sections.push({
+        name: titleFromFilename(dir),
+        docs
+      });
+    }
+  }
+
+  return sections;
+}
+
+const sections = scanDocs();
+const totalDocs = sections.reduce((sum, s) => sum + s.docs.length, 0);
+const allDocs = sections.flatMap(s => s.docs);
+---
+
+<Layout title="Documentation" activeNav="docs">
+  <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+    <div class="container">
+      <div class="section-header" style="text-align: left; max-width: none;">
+        <span class="badge badge-teal">{totalDocs} Documents Synced</span>
+        <h1>Documentation</h1>
+        <p>Everything you need to understand, deploy, and contribute to the InterCooperative Network. These docs are synced directly from the main repository.</p>
+      </div>
+
+      <!-- Search -->
+      <Search searchList={allDocs} />
+
+      <div class="docs-index-grid" id="docs-grid">
+        {sections.map(section => (
+          <div class="docs-section-card" data-section>
+            <h3>{section.name}</h3>
+            <ul>
+              {section.docs.map(doc => (
+                <li data-slug={doc.slug}><a href={doc.path}>{doc.title}</a></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    const sections = document.querySelectorAll('[data-section]');
+
+    document.addEventListener('search-filter', (e) => {
+      const matches = new Set(e.detail.matches); // slugs
+
+      sections.forEach(section => {
+        const items = section.querySelectorAll('li[data-slug]');
+        let sectionVisible = 0;
+
+        items.forEach(item => {
+          const slug = item.getAttribute('data-slug');
+          if (matches.has(slug)) {
+            item.style.display = '';
+            sectionVisible++;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+
+        section.style.display = sectionVisible === 0 ? 'none' : '';
+      });
+    });
+
+    document.addEventListener('search-clear', () => {
+      sections.forEach(section => {
+        section.style.display = '';
+        section.querySelectorAll('li').forEach(item => item.style.display = '');
+      });
+    });
+  </script>
+</Layout>
+
+<style>
+  .docs-index-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-xl);
+  }
+
+  .docs-section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    transition: all var(--duration-normal) var(--ease-out);
+  }
+
+  .docs-section-card:hover {
+    border-color: var(--border-accent);
+    box-shadow: var(--shadow-glow-teal);
+  }
+
+  .docs-section-card h3 {
+    font-size: 1.125rem;
+    margin-bottom: var(--space-md);
+    color: var(--accent-teal);
+  }
+
+  .docs-section-card ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .docs-section-card li a {
+    display: block;
+    padding: 0.35rem var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    transition: all var(--duration-fast);
+  }
+
+  .docs-section-card li a:hover {
+    background: var(--accent-teal-glow);
+    color: var(--accent-teal);
+  }
+</style>

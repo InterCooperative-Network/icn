@@ -1,0 +1,110 @@
+<svg width="500" height="400" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nodeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00D4AA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#32FFD2;stop-opacity:0.6" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:0.4" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:0.6" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background connections -->
+  <g opacity="0.7">
+    <!-- Central hub connections -->
+    <line x1="250" y1="200" x2="150" y2="100" stroke="url(#connectionGradient)" stroke-width="2"/>
+    <line x1="250" y1="200" x2="350" y2="100" stroke="url(#connectionGradient)" stroke-width="2"/>
+    <line x1="250" y1="200" x2="100" y2="250" stroke="url(#connectionGradient)" stroke-width="2"/>
+    <line x1="250" y1="200" x2="400" y2="250" stroke="url(#connectionGradient)" stroke-width="2"/>
+    <line x1="250" y1="200" x2="150" y2="320" stroke="url(#connectionGradient)" stroke-width="2"/>
+    <line x1="250" y1="200" x2="350" y2="320" stroke="url(#connectionGradient)" stroke-width="2"/>
+    
+    <!-- Peripheral connections -->
+    <line x1="150" y1="100" x2="100" y2="250" stroke="url(#connectionGradient)" stroke-width="1.5" opacity="0.6"/>
+    <line x1="350" y1="100" x2="400" y2="250" stroke="url(#connectionGradient)" stroke-width="1.5" opacity="0.6"/>
+    <line x1="150" y1="320" x2="100" y2="250" stroke="url(#connectionGradient)" stroke-width="1.5" opacity="0.6"/>
+    <line x1="350" y1="320" x2="400" y2="250" stroke="url(#connectionGradient)" stroke-width="1.5" opacity="0.6"/>
+    
+    <!-- Cross connections -->
+    <line x1="150" y1="100" x2="350" y2="320" stroke="url(#connectionGradient)" stroke-width="1" opacity="0.4"/>
+    <line x1="350" y1="100" x2="150" y2="320" stroke="url(#connectionGradient)" stroke-width="1" opacity="0.4"/>
+  </g>
+  
+  <!-- Nodes -->
+  <g filter="url(#glow)">
+    <!-- Central hub (larger) -->
+    <circle cx="250" cy="200" r="20" fill="url(#nodeGradient)" opacity="0.9">
+      <animate attributeName="r" values="20;22;20" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- Primary nodes -->
+    <circle cx="150" cy="100" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    <circle cx="350" cy="100" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+    <circle cx="100" cy="250" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="1.5s"/>
+    </circle>
+    <circle cx="400" cy="250" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="2s"/>
+    </circle>
+    <circle cx="150" cy="320" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="0.3s"/>
+    </circle>
+    <circle cx="350" cy="320" r="12" fill="url(#nodeGradient)" opacity="0.8">
+      <animate attributeName="r" values="12;14;12" dur="2.5s" repeatCount="indefinite" begin="0.8s"/>
+    </circle>
+    
+    <!-- Secondary nodes -->
+    <circle cx="80" cy="150" r="8" fill="#32FFD2" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="420" cy="150" r="8" fill="#32FFD2" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="4s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+    <circle cx="80" cy="350" r="8" fill="#32FFD2" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="4s" repeatCount="indefinite" begin="2s"/>
+    </circle>
+    <circle cx="420" cy="350" r="8" fill="#32FFD2" opacity="0.7">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="4s" repeatCount="indefinite" begin="3s"/>
+    </circle>
+    
+    <!-- Micro nodes -->
+    <circle cx="200" cy="50" r="4" fill="#8B5CF6" opacity="0.6"/>
+    <circle cx="300" cy="50" r="4" fill="#8B5CF6" opacity="0.6"/>
+    <circle cx="50" cy="200" r="4" fill="#8B5CF6" opacity="0.6"/>
+    <circle cx="450" cy="200" r="4" fill="#8B5CF6" opacity="0.6"/>
+    <circle cx="200" cy="370" r="4" fill="#8B5CF6" opacity="0.6"/>
+    <circle cx="300" cy="370" r="4" fill="#8B5CF6" opacity="0.6"/>
+  </g>
+  
+  <!-- Data flow animation -->
+  <g opacity="0.8">
+    <circle r="3" fill="#32FFD2">
+      <animateMotion dur="6s" repeatCount="indefinite">
+        <path d="M250,200 L150,100 L100,250 L250,200"/>
+      </animateMotion>
+    </circle>
+    <circle r="3" fill="#3B82F6">
+      <animateMotion dur="5s" repeatCount="indefinite" begin="1s">
+        <path d="M250,200 L350,100 L400,250 L250,200"/>
+      </animateMotion>
+    </circle>
+    <circle r="3" fill="#8B5CF6">
+      <animateMotion dur="7s" repeatCount="indefinite" begin="2s">
+        <path d="M250,200 L150,320 L350,320 L250,200"/>
+      </animateMotion>
+    </circle>
+  </g>
+</svg> 

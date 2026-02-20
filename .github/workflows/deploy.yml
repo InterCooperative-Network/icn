@@ -1,0 +1,52 @@
+name: Deploy Astro site to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout website
+        uses: actions/checkout@v4
+
+      - name: 📥 Checkout ICN repo (for content sync)
+        uses: actions/checkout@v4
+        with:
+          repository: InterCooperative-Network/icn
+          path: icn-repo
+
+      - name: 🧰 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔄 Sync content from ICN repo
+        run: bash scripts/sync-from-icn.sh
+        env:
+          ICN_REPO: ${{ github.workspace }}/icn-repo
+
+      - name: 🛠️ Build Astro site
+        run: npx astro build
+
+      - name: 🌐 Set custom domain and disable Jekyll
+        run: |
+          echo "intercooperative.network" > dist/CNAME
+          touch dist/.nojekyll
+
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
