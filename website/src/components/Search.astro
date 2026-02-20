@@ -1,0 +1,288 @@
+---
+interface Props {
+  searchList: any[];
+}
+
+const { searchList } = Astro.props;
+---
+
+<search-component data-list={JSON.stringify(searchList)}>
+  <div class="search-container">
+    <div class="input-wrapper">
+      <input 
+        type="text" 
+        id="search-input" 
+        placeholder="Search documentation... (Press '/')"
+      />
+      <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <div class="shortcut-hint">
+        <kbd>/</kbd>
+      </div>
+    </div>
+
+    <div id="recent-searches" class="recent-searches hidden">
+      <div class="recent-header">Recent</div>
+      <ul id="recent-list"></ul>
+    </div>
+
+    <div id="search-results-count" class="results-count hidden">
+      Found <span id="match-count">0</span> results
+    </div>
+  </div>
+</search-component>
+
+<script>
+  import Fuse from 'fuse.js';
+
+  class SearchComponent extends HTMLElement {
+    constructor() {
+      super();
+      const listData = JSON.parse(this.dataset.list || '[]');
+      const input = this.querySelector('input');
+      const countEl = this.querySelector('#match-count');
+      const countContainer = this.querySelector('#search-results-count');
+      const recentContainer = this.querySelector('#recent-searches');
+      const recentList = this.querySelector('#recent-list');
+      
+      if (!input) return;
+
+      const fuse = new Fuse(listData, {
+        keys: ['title', 'slug', 'description'],
+        threshold: 0.4,
+        ignoreLocation: true,
+      });
+
+      // Local Storage Helpers
+      const getRecent = () => {
+        try {
+          return JSON.parse(localStorage.getItem('icn-recent-searches') || '[]');
+        } catch {
+          return [];
+        }
+      };
+
+      const addRecent = (term) => {
+        if (!term) return;
+        let recent = getRecent();
+        recent = [term, ...recent.filter(t => t !== term)].slice(0, 5);
+        localStorage.setItem('icn-recent-searches', JSON.stringify(recent));
+      };
+
+      const renderRecent = () => {
+        if (!recentList || !recentContainer) return;
+        const recent = getRecent();
+        if (recent.length === 0) {
+          recentContainer.classList.add('hidden');
+          return;
+        }
+        recentList.innerHTML = recent.map(term => `
+          <li>
+            <button type="button" class="recent-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>${term}</span>
+            </button>
+          </li>
+        `).join('');
+      };
+
+      // Event Listeners
+      input.addEventListener('focus', () => {
+        if (!input.value) {
+          renderRecent();
+          if (getRecent().length > 0) recentContainer?.classList.remove('hidden');
+        }
+      });
+
+      // Blur with delay to allow clicking items
+      input.addEventListener('blur', () => {
+        setTimeout(() => recentContainer?.classList.add('hidden'), 200);
+      });
+
+      recentList?.addEventListener('click', (e) => {
+        const btn = (e.target as Element).closest('.recent-item');
+        if (btn) {
+          input.value = btn.querySelector('span')?.textContent || '';
+          input.dispatchEvent(new Event('input'));
+        }
+      });
+
+      // Keyboard
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '/' && document.activeElement !== input) {
+          e.preventDefault();
+          input.focus();
+        }
+        if (e.key === 'Escape') {
+          if (document.activeElement === input) {
+            input.blur();
+          }
+          recentContainer?.classList.add('hidden');
+        }
+      });
+
+      input.addEventListener('input', (e) => {
+        const query = (e.target as HTMLInputElement).value;
+        
+        if (!query) {
+          this.dispatchEvent(new CustomEvent('search-clear', { bubbles: true }));
+          if (countContainer) countContainer.classList.add('hidden');
+          recentContainer?.classList.remove('hidden');
+          renderRecent();
+          return;
+        }
+
+        recentContainer?.classList.add('hidden');
+
+        const results = fuse.search(query);
+        const matches = results.map(r => r.item.slug);
+
+        if (countContainer && countEl) {
+          countEl.textContent = matches.length.toString();
+          countContainer.classList.remove('hidden');
+        }
+
+        this.dispatchEvent(new CustomEvent('search-filter', { 
+          bubbles: true, 
+          detail: { matches } 
+        }));
+      });
+
+      // Save on Enter
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && input.value) {
+          addRecent(input.value);
+        }
+      });
+    }
+  }
+
+  customElements.define('search-component', SearchComponent);
+</script>
+
+<style>
+  .search-container {
+    position: relative;
+    margin-bottom: var(--space-xl);
+  }
+
+  .input-wrapper {
+    position: relative;
+  }
+
+  input {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
+    padding: 0.875rem var(--space-lg) 0.875rem 3rem;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: all 0.2s ease-out;
+  }
+
+  input::placeholder {
+    color: var(--text-muted);
+  }
+
+  input:focus {
+    border-color: var(--accent-teal);
+    box-shadow: 0 0 0 3px var(--accent-teal-glow);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: var(--space-md);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .shortcut-hint {
+    position: absolute;
+    right: var(--space-md);
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+  }
+
+  .results-count {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: var(--space-sm);
+    text-align: right;
+  }
+
+  /* Recent Searches */
+  .recent-searches {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    margin-top: var(--space-xs);
+    padding: var(--space-sm);
+    z-index: 20;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .recent-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  #recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .recent-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: var(--space-sm);
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--duration-fast);
+  }
+
+  .recent-item:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+  }
+
+  .recent-item svg {
+    color: var(--text-muted);
+  }
+
+  .hidden {
+    display: none;
+  }
+</style>

@@ -1,0 +1,111 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+---
+
+<Layout title="Blog" activeNav="blog">
+	<section class="section" style="padding-top: calc(64px + var(--space-3xl));">
+		<div class="container">
+			<div class="section-header">
+				<span class="badge badge-teal">Latest Updates</span>
+				<h1>ICN Blog</h1>
+				<p>News, announcements, and deep dives from the InterCooperative Network team.</p>
+			</div>
+			
+			<div class="blog-grid">
+				{posts.map((post) => (
+					<a href={`/blog/${post.slug}/`} class="blog-card group">
+						{post.data.heroImage && (
+							<img width={720} height={360} src={post.data.heroImage} alt="" class="blog-img" />
+						)}
+						<div class="blog-content">
+							<div class="blog-meta">
+								<time datetime={post.data.pubDate.toISOString()}>
+									{post.data.pubDate.toLocaleDateString('en-us', {
+										year: 'numeric',
+										month: 'short',
+										day: 'numeric',
+									})}
+								</time>
+								{post.data.tags.length > 0 && (
+									<span class="blog-tags">
+										{post.data.tags.map(tag => `#${tag}`).join(' ')}
+									</span>
+								)}
+							</div>
+							<h3 class="blog-title group-hover:text-accent-teal transition-colors">
+								{post.data.title}
+							</h3>
+							<p class="blog-desc">{post.data.description}</p>
+						</div>
+					</a>
+				))}
+			</div>
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.blog-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: var(--space-xl);
+		margin-top: var(--space-2xl);
+	}
+
+	.blog-card {
+		display: flex;
+		flex-direction: column;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-xl);
+		overflow: hidden;
+		transition: all 0.3s ease;
+		text-decoration: none;
+	}
+
+	.blog-card:hover {
+		transform: translateY(-4px);
+		box-shadow: var(--shadow-glow-teal);
+		border-color: var(--border-accent);
+	}
+
+	.blog-img {
+		width: 100%;
+		height: 200px;
+		object-fit: cover;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.blog-content {
+		padding: var(--space-lg);
+		flex-grow: 1;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.blog-meta {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.875rem;
+		color: var(--text-muted);
+		margin-bottom: var(--space-sm);
+	}
+
+	.blog-title {
+		font-size: 1.25rem;
+		margin-bottom: var(--space-xs);
+		color: var(--text-heading);
+		font-weight: 600;
+	}
+
+	.blog-desc {
+		color: var(--text-secondary);
+		font-size: 0.9375rem;
+		line-height: 1.6;
+	}
+</style>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://intercooperative.network/sitemap-index.xml

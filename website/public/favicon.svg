@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f2027"/>
+      <stop offset="50%" stop-color="#0c1a25"/>
+      <stop offset="100%" stop-color="#0a1628"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <!-- Glow halo -->
+  <circle cx="64" cy="64" r="42" fill="url(#glow)" opacity="0.5"/>
+  <!-- Network edges (connections between nodes) -->
+  <line x1="64" y1="30" x2="34" y2="82" stroke="url(#teal)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="64" y1="30" x2="94" y2="82" stroke="url(#teal)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <line x1="34" y1="82" x2="94" y2="82" stroke="url(#teal)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <!-- Inner triangle (cooperation core) -->
+  <polygon points="64,46 48,74 80,74" fill="none" stroke="url(#teal)" stroke-width="2.5" stroke-linejoin="round" opacity="0.35"/>
+  <!-- Outer nodes -->
+  <circle cx="64" cy="30" r="9" fill="url(#teal)"/>
+  <circle cx="34" cy="82" r="9" fill="url(#teal)"/>
+  <circle cx="94" cy="82" r="9" fill="url(#teal)"/>
+  <!-- Inner nodes (cooperation) -->
+  <circle cx="64" cy="46" r="5" fill="#0c1a25" stroke="url(#teal)" stroke-width="2"/>
+  <circle cx="48" cy="74" r="5" fill="#0c1a25" stroke="url(#teal)" stroke-width="2"/>
+  <circle cx="80" cy="74" r="5" fill="#0c1a25" stroke="url(#teal)" stroke-width="2"/>
+  <!-- Center dot -->
+  <circle cx="64" cy="64" r="3.5" fill="url(#teal)" opacity="0.9"/>
+</svg>

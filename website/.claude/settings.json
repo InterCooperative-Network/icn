@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'case \"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\" in */src/content/docs/*) printf \"{\\\"decision\\\":\\\"block\\\",\\\"reason\\\":\\\"src/content/docs/ is synced from icn/docs/ and gitignored. Edit the source at /home/ubuntu/projects/icn/docs/ instead, then run /sync-and-build to propagate changes.\\\"}\" && exit 2;; esac; exit 0'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'case \"${CLAUDE_TOOL_INPUT_FILE_PATH:-}\" in *.astro|*.ts|*.tsx|*.js|*.mjs|*.cjs|*.css|*.json|*.md) cd /home/ubuntu/projects/icn-website && npx prettier --write \"${CLAUDE_TOOL_INPUT_FILE_PATH}\" 2>/dev/null || true;; esac'",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}
