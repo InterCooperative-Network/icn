@@ -109,20 +109,22 @@ impl ComputeManager {
             coop_id: coop_id.clone(),
         };
 
-        // Convert TaskCode to API params
-        let (code_str, wasm_bytes, code_type) = match code {
-            TaskCode::Ccl(c) => (Some(c), None, icn_api::compute::CodeTypeParam::Ccl),
+        // Convert TaskCode to API params.
+        // WasmRef uses the distinct `wasm_hash` field so ComputeService can reconstruct
+        // TaskCode::WasmRef rather than trying to base64-decode a hex string as bytes.
+        let (code_str, wasm_bytes, wasm_hash, code_type) = match code {
+            TaskCode::Ccl(c) => (Some(c), None, None, icn_api::compute::CodeTypeParam::Ccl),
             TaskCode::WasmInline(b) => {
                 let encoded =
                     base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &b);
-                (None, Some(encoded), icn_api::compute::CodeTypeParam::Wasm)
+                (None, Some(encoded), None, icn_api::compute::CodeTypeParam::Wasm)
             }
             TaskCode::CclRef { .. } => {
                 anyhow::bail!("CclRef not supported via gateway API");
             }
             TaskCode::WasmRef(hash) => {
                 let hash_hex = hex::encode(hash);
-                (None, Some(hash_hex), icn_api::compute::CodeTypeParam::Wasm)
+                (None, None, Some(hash_hex), icn_api::compute::CodeTypeParam::Wasm)
             }
         };
 
@@ -137,6 +139,7 @@ impl ComputeManager {
             task_id,
             code: code_str,
             wasm_bytes,
+            wasm_hash,
             code_type,
             inputs: inputs_json,
             fuel_limit,

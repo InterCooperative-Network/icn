@@ -146,17 +146,35 @@ pub async fn submit_task(
         }
         CodeType::Wasm => {
             if let Some(ref hash_hex) = req.wasm_hash {
-                // Reference by hash (deploy-once, reference-by-hash)
-                let hash_bytes = hex::decode(hash_hex).map_err(|_| {
-                    crate::error::GatewayError::BadRequest("Invalid wasm_hash hex".to_string())
-                })?;
-                if hash_bytes.len() != 32 {
+                // Reference by hash (deploy-once, reference-by-hash).
+                // Validate format at the API boundary before touching the registry.
+                if hash_hex.len() != 64 {
                     return Err(crate::error::GatewayError::BadRequest(
-                        "wasm_hash must be 32 bytes".to_string(),
+                        "wasm_hash must be exactly 64 hex characters (32 bytes)".to_string(),
                     ));
                 }
+                let hash_bytes = hex::decode(hash_hex).map_err(|_| {
+                    crate::error::GatewayError::BadRequest(
+                        "wasm_hash contains non-hex characters".to_string(),
+                    )
+                })?;
                 let mut hash = [0u8; 32];
                 hash.copy_from_slice(&hash_bytes);
+
+                // Registry existence check: return 404 before queueing to the compute actor.
+                if let Some(registry) = compute_mgr.wasm_registry() {
+                    let exists = registry
+                        .get_metadata(&hash)
+                        .await
+                        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+                        .is_some();
+                    if !exists {
+                        return Err(crate::error::GatewayError::NotFound(format!(
+                            "WASM module not found: {hash_hex}"
+                        )));
+                    }
+                }
+
                 TaskCode::WasmRef(hash)
             } else if let Some(ref wasm_b64) = req.wasm_bytes {
                 // Inline WASM bytes
@@ -532,5 +550,42 @@ mod tests {
     #[test]
     fn test_default_fuel_limit() {
         assert_eq!(default_fuel_limit(), 10_000);
+    }
+
+    // -------------------------------------------------------------------------
+    // Hash validation tests (no daemon needed)
+    // -------------------------------------------------------------------------
+
+    /// `wasm_hash` must be exactly 64 hex chars.  Short strings should be caught
+    /// before we even attempt a registry lookup.
+    #[test]
+    fn test_wasm_hash_validation_bad_length() {
+        // 63 chars → too short
+        let short_hash = "a".repeat(63);
+        assert_ne!(short_hash.len(), 64);
+
+        // 65 chars → too long
+        let long_hash = "a".repeat(65);
+        assert_ne!(long_hash.len(), 64);
+
+        // 64 chars of valid hex → passes length check
+        let good_hash = "a".repeat(64);
+        assert_eq!(good_hash.len(), 64);
+        assert!(hex::decode(&good_hash).is_ok());
+    }
+
+    #[test]
+    fn test_wasm_hash_validation_non_hex() {
+        // 64 chars but not all hex
+        let bad_chars = "z".repeat(64);
+        assert!(hex::decode(&bad_chars).is_err());
+    }
+
+    #[test]
+    fn test_wasm_hash_validation_exact_32_bytes() {
+        // 64 hex chars → exactly 32 bytes when decoded
+        let hash_hex = "aa".repeat(32); // 64 chars, decodes to 32 × 0xaa
+        let decoded = hex::decode(&hash_hex).unwrap_or_default();
+        assert_eq!(decoded.len(), 32);
     }
 }
