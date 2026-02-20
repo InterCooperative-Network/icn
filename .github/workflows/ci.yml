@@ -306,6 +306,33 @@ jobs:
         with:
           verbose: 'true'
 
+      - name: Clean stale Cargo test binaries
+        if: needs.changes.outputs.docs_only != 'true'
+        run: |
+          # Test executables accumulate in target/debug/ across CI runs on self-hosted
+          # runners. Remove them before building so the linker can't run out of disk.
+          # lib*.rlib / lib*.rmeta / lib*.d are preserved — sccache can repopulate
+          # them if missing, but keeping them avoids an extra sccache round-trip.
+          # NOTE: We must also delete .d files for test executables (non-lib*.d).
+          # Keeping a .d file for a deleted binary causes Cargo to skip relinking
+          # (fingerprint says "up-to-date") but then fail with ENOENT at runtime.
+          if [ -d icn/target/debug ]; then
+            echo "=== Disk before Cargo cleanup ==="
+            df -h / | tail -1
+            # Remove top-level test executables (cargo places copies here)
+            find icn/target/debug -maxdepth 1 -type f -delete 2>/dev/null || true
+            # Remove test executables + their .d dep-files from deps/.
+            # Keep only lib-prefixed files: lib*.rlib, lib*.rmeta, lib*.d, *.so
+            find icn/target/debug/deps -maxdepth 1 -type f \
+              ! -name "lib*.rlib" \
+              ! -name "lib*.rmeta" \
+              ! -name "lib*.d" \
+              ! -name "*.so" \
+              -delete 2>/dev/null || true
+            echo "=== Disk after Cargo cleanup ==="
+            df -h / | tail -1
+          fi
+
       - name: Install build tools
         if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/install-build-tools
