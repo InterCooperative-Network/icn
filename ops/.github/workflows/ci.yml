@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  mcp-server:
+    name: MCP Server (TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: Install dependencies
+        run: cd mcp && npm ci
+
+      - name: Type check
+        run: cd mcp && npx tsc --noEmit
+
+      - name: Run tests
+        run: cd mcp && npm test
+
+      - name: Build
+        run: cd mcp && npm run build
+
+  validate-state:
+    name: Validate State Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate JSON state files
+        run: |
+          for f in state/config/*.json state/sprint/current.json; do
+            echo "Validating $f..."
+            node -e "JSON.parse(require('fs').readFileSync('$f','utf8')); console.log('  OK')"
+          done
