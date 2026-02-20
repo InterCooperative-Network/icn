@@ -1,0 +1,11 @@
+node_modules/
+mcp/dist/
+mcp/data/*.db
+mcp/data/*.db-shm
+mcp/data/*.db-wal
+.env
+.env.local
+*.log
+.DS_Store
+state/session-log.jsonl
+state/sprint/history/

@@ -1,0 +1,65 @@
+{
+  "sprint": 8,
+  "name": "Sprint 8 — Flow Demos as Product Truth",
+  "started": "2026-02-20",
+  "goals": [
+    "Ship Flow B end-to-end demo script (service discovery)",
+    "Implement Flow A WASM compute path in gateway + SDK (#1076, #1077)",
+    "Ship Flow A demo script (WASM distribution)",
+    "Merge CI disk cleanup fix (#1251) and prevent future runner exhaustion"
+  ],
+  "tasks": [
+    {
+      "id": "1250",
+      "title": "feat(gateway): names API wiring + SDK surface",
+      "status": "in-review",
+      "pr": 1250,
+      "assignee": null,
+      "epic": "1099"
+    },
+    {
+      "id": "1251",
+      "title": "fix(ci): clean stale Cargo test binaries on self-hosted runners",
+      "status": "in-review",
+      "pr": 1251,
+      "assignee": null,
+      "epic": null
+    },
+    {
+      "id": "1076",
+      "title": "feat(gateway): compute submit accepts wasm_hash",
+      "status": "in-review",
+      "pr": 1253,
+      "assignee": null,
+      "epic": "1099"
+    },
+    {
+      "id": "1077",
+      "title": "feat(sdk): TypeScript WASM client + typed errors",
+      "status": "in-review",
+      "pr": 1254,
+      "assignee": null,
+      "epic": "1099"
+    },
+    {
+      "id": "1085",
+      "title": "demo(flow-b): service discovery end-to-end script",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "main-session",
+      "epic": "1099"
+    },
+    {
+      "id": "1078",
+      "title": "demo(flow-a): WASM distribution end-to-end script",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "main-session",
+      "epic": "1099"
+    }
+  ],
+  "epics": {
+    "1099": "[EPIC] Pilot Completion (P0) — Flows A/B/C",
+    "1147": "[EPIC] Vertical Slice (P0) — Identity→Governance→Compute→Receipts→Audit"
+  }
+}
