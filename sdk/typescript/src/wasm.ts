@@ -18,6 +18,7 @@
 
 import {
   ErrorCode,
+  ICNError,
   AuthenticationError,
   NetworkError,
   TimeoutError,
@@ -83,7 +84,7 @@ export class WasmClient {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.token = options.token;
     this.timeout = options.timeout ?? 30_000;
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   /** Set or replace the bearer token */
@@ -200,13 +201,13 @@ export class WasmClient {
       return (await response.json()) as T;
     } catch (err) {
       clearTimeout(timeoutId);
-      if ((err as { name?: string }).name === 'AbortError') {
+      if (err instanceof ICNError) {
+        throw err;
+      }
+      if ((err as Error).name === 'AbortError') {
         throw new TimeoutError('Request timeout', this.timeout);
       }
-      if (err instanceof Error && !(err as { statusCode?: number }).statusCode) {
-        throw new NetworkError(err.message);
-      }
-      throw err;
+      throw new NetworkError((err as Error).message);
     }
   }
 }
