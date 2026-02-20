@@ -14,9 +14,9 @@
 
 [metadata]
 version = "0.2.0"
-last_updated = "2026-02-10"
-total_crates = 28
-clean_crates = 8
+last_updated = "2026-02-20"
+total_crates = 29
+clean_crates = 9
 infected_crates = 11
 needs_review_crates = 9
 
@@ -271,6 +271,28 @@ notes = "Transaction support - kernel primitive"
 name = "StorageQuota"
 kind = "struct"
 notes = "Resource limits - kernel primitive"
+
+# -----------------------------------------------------------------------------
+
+[crates.icn-naming]
+description = "KV-backed hierarchical naming service"
+status = "clean"
+infection_notes = """
+Implements NamingService trait from icn-kernel-api. Provides generic
+hierarchical name resolution backed by icn-store (SledStore).
+
+No imports of icn-trust, icn-governance, icn-ledger, icn-ccl, icn-entity,
+icn-community, icn-federation, or icn-steward. Signature verification uses
+icn-identity primitives only.
+
+Added to icn-gateway in PR #1250 (Sprint 7 names API wiring).
+"""
+
+[[crates.icn-naming.exports]]
+name = "SledNamingService"
+kind = "struct"
+public_methods = ["new", "register", "resolve", "resolve_with_options", "update", "delete"]
+notes = "Concrete NamingService implementation - wraps SledStore"
 
 # -----------------------------------------------------------------------------
 

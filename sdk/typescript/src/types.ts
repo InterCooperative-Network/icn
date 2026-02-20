@@ -1898,6 +1898,11 @@ export interface GovernanceClient {
   getProof(proposalId: string): Promise<GovernanceReceiptResponse>;
 }
 
+/** Flow B names sub-client surface */
+export interface NamesClient {
+  resolve(path: string, options?: ResolveNameOptions): Promise<ResolveNameResponse>;
+}
+
 // ============================================================================
 // Service Discovery / Naming
 // ============================================================================
@@ -1983,4 +1988,46 @@ export interface DiscoverServicesResponse {
   services: ServiceEndpointInfo[];
   /** Total results */
   total: number;
+}
+
+/** Optional name resolution controls */
+export interface ResolveNameOptions {
+  /** Whether to verify signatures during resolution (default: true) */
+  verify_signatures?: boolean;
+  /** Maximum alias recursion depth */
+  max_depth?: number;
+}
+
+export interface ResolveNameEndpoint {
+  protocol: string;
+  host: string;
+  port: number;
+  path?: string;
+}
+
+export type ResolveNameTarget =
+  | { kind: 'service'; endpoint: ResolveNameEndpoint }
+  | { kind: 'blob'; hash: string }
+  | { kind: 'namespace'; org: string; app: string; sub?: string }
+  | { kind: 'alias'; name: string }
+  | { kind: 'multiService'; endpoints: ResolveNameEndpoint[] };
+
+/** Response from GET /v1/names/{path} */
+export interface ResolveNameResponse {
+  /** Requested name */
+  name: string;
+  /** Final resolved record name (after alias following) */
+  resolved_name: string;
+  /** Resolved target */
+  target: ResolveNameTarget;
+  /** Authority DID controlling the record */
+  authority: string;
+  /** Cache TTL in seconds */
+  ttl_secs: number;
+  /** Record creation timestamp */
+  created_at: number;
+  /** Record update timestamp */
+  updated_at: number;
+  /** Record metadata map */
+  metadata: Record<string, string>;
 }

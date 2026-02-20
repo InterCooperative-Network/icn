@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use icn_identity::IdentityBundle;
 use icn_kernel_api::services::ServiceRegistry;
@@ -121,6 +121,7 @@ pub async fn run_supervisor(
             steward: gateway_handles.steward,
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
+            naming_service: gateway_handles.naming_service,
         },
     );
 
@@ -395,6 +396,17 @@ async fn spawn_actors_with_identity(
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
     gateway_handles.service_discovery_manager = service_discovery_mgr.clone();
+    gateway_handles.naming_service = match super::init_naming::init_naming_service(config) {
+        Ok(service) => Some(service),
+        Err(error) => {
+            // NOTE: When the supervisor-provided naming service fails to initialize,
+            // the gateway falls back to opening its own local store at the same path.
+            // This means the /names endpoint will serve from a potentially empty store
+            // rather than returning 503. Operators should monitor for this log.
+            error!("Failed to initialize naming service: {}", error);
+            None
+        }
+    };
 
     // Spawn Identity actor (provides signing and trust service access)
     let identity_handle = crate::identity::IdentityActor::spawn(

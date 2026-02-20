@@ -69,6 +69,7 @@ sha2 = "0.10"
 icn-identity = { path = "../icn-identity", features = ["utoipa"] }
 icn-net = { path = "../icn-net" }
 icn-kernel-api = { path = "../icn-kernel-api" }
+icn-naming = { path = "../icn-naming" }
 icn-entity = { path = "../icn-entity" }
 icn-time = { path = "../icn-time" }
 icn-ledger = { path = "../icn-ledger" }
