@@ -144,10 +144,16 @@ pub async fn resolve_name(
     let name = normalize_name_path(&path.into_inner())?;
     let mut options = ResolveOptions::new();
     if let Some(max_depth) = query.max_depth {
-        options = options.with_max_depth(max_depth);
+        // Cap to prevent unreasonably deep traversal via the REST API.
+        options = options.with_max_depth(max_depth.min(32));
     }
-    if matches!(query.verify_signatures, Some(false)) {
-        options = options.without_signature_verification();
+    match query.verify_signatures {
+        Some(false) => {
+            options = options.without_signature_verification();
+        }
+        Some(true) | None => {
+            // verify_signatures defaults to true; explicit true is a no-op.
+        }
     }
 
     let (_, record) = naming
@@ -163,16 +169,173 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_web::{test, App};
+    use icn_kernel_api::naming::{NameRecord, ResolveOptions, Target};
+    use icn_kernel_api::types::{Endpoint, Name, Signature};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use std::time::Duration;
 
-    #[test]
-    fn normalize_path_adds_leading_slash() {
+    /// Minimal NamingService mock backed by a closure for full flexibility.
+    struct MockNaming<F>
+    where
+        F: Fn(&Name, ResolveOptions) -> Result<(Target, NameRecord), NamingError> + Send + Sync,
+    {
+        handler: F,
+    }
+
+    impl<F> NamingService for MockNaming<F>
+    where
+        F: Fn(&Name, ResolveOptions) -> Result<(Target, NameRecord), NamingError> + Send + Sync,
+    {
+        fn register(
+            &self,
+            _: &Name,
+            _: Target,
+            _: &icn_kernel_api::types::Did,
+            _: &Signature,
+            _: Duration,
+        ) -> Result<NameRecord, NamingError> {
+            unimplemented!()
+        }
+
+        fn resolve(&self, _: &Name) -> Result<Target, NamingError> {
+            unimplemented!()
+        }
+
+        fn resolve_with_options(
+            &self,
+            name: &Name,
+            options: ResolveOptions,
+        ) -> Result<(Target, NameRecord), NamingError> {
+            (self.handler)(name, options)
+        }
+
+        fn update(&self, _: &Name, _: Target, _: &Signature) -> Result<NameRecord, NamingError> {
+            unimplemented!()
+        }
+
+        fn delete(&self, _: &Name, _: &Signature) -> Result<(), NamingError> {
+            unimplemented!()
+        }
+
+        fn get_record(&self, _: &Name) -> Result<NameRecord, NamingError> {
+            unimplemented!()
+        }
+
+        fn list(&self, _: &Name) -> Result<Vec<Name>, NamingError> {
+            unimplemented!()
+        }
+
+        fn watch(&self, _: &Name) -> Result<icn_kernel_api::types::Subscription, NamingError> {
+            unimplemented!()
+        }
+
+        fn verify(&self, _: &NameRecord) -> Result<bool, NamingError> {
+            unimplemented!()
+        }
+    }
+
+    fn stub_record(name: &str) -> NameRecord {
+        NameRecord {
+            name: Name::new(name.to_string()),
+            target: Target::Service {
+                endpoint: Endpoint {
+                    protocol: "https".to_string(),
+                    host: "localhost".to_string(),
+                    port: 8080,
+                    path: None,
+                },
+            },
+            authority: "did:icn:testauthority".to_string(),
+            signature: Signature(vec![]),
+            ttl: Duration::from_secs(300),
+            created_at: 1000,
+            updated_at: 1000,
+            metadata: HashMap::new(),
+        }
+    }
+
+    #[actix_web::test]
+    async fn normalize_path_adds_leading_slash() {
         let normalized = normalize_name_path("org/demo/service").unwrap();
         assert_eq!(normalized.as_str(), "/org/demo/service");
     }
 
-    #[test]
-    fn normalize_path_rejects_empty() {
+    #[actix_web::test]
+    async fn normalize_path_rejects_empty() {
         let err = normalize_name_path("").unwrap_err();
         assert!(matches!(err, GatewayError::BadRequest(_)));
+    }
+
+    #[actix_web::test]
+    async fn test_resolve_name_success_returns_200() {
+        let svc: Arc<dyn NamingService> = Arc::new(MockNaming {
+            handler: |name, _opts| {
+                let rec = stub_record(name.as_str());
+                let target = rec.target.clone();
+                Ok((target, rec))
+            },
+        });
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(svc))
+                .service(web::scope("/names").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/names/org/demo/service")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 200);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["target"]["kind"], "service");
+        assert_eq!(body["target"]["endpoint"]["host"], "localhost");
+        assert_eq!(body["authority"], "did:icn:testauthority");
+    }
+
+    #[actix_web::test]
+    async fn test_resolve_name_not_found_returns_404() {
+        let svc: Arc<dyn NamingService> = Arc::new(MockNaming {
+            handler: |_, _| Err(NamingError::NotFound("no such name".into())),
+        });
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(svc))
+                .service(web::scope("/names").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/names/missing/path")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 404);
+    }
+
+    #[actix_web::test]
+    async fn test_resolve_name_unauthorized_returns_403() {
+        let svc: Arc<dyn NamingService> = Arc::new(MockNaming {
+            handler: |_, _| Err(NamingError::Unauthorized("not your name".into())),
+        });
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(svc))
+                .service(web::scope("/names").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/names/protected/path")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+
+        assert_eq!(resp.status(), 403);
     }
 }

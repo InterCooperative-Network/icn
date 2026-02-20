@@ -596,10 +596,11 @@ impl GatewayServer {
             } else {
                 let store = if let Some(ref data_dir) = self.data_dir {
                     let store_path = data_dir.join("store").join("naming");
-                    info!("Naming service initialized at {:?}", store_path);
-                    Arc::new(SledStore::open(&store_path).map_err(|e| {
+                    let opened = SledStore::open(&store_path).map_err(|e| {
                         GatewayError::InternalError(format!("Failed to open naming store: {e}"))
-                    })?)
+                    })?;
+                    info!("Naming service initialized at {:?}", store_path);
+                    Arc::new(opened)
                 } else {
                     info!("Naming service initialized with temporary storage");
                     Arc::new(SledStore::temporary().map_err(|e| {

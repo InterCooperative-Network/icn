@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use icn_identity::IdentityBundle;
 use icn_kernel_api::services::ServiceRegistry;
@@ -399,7 +399,11 @@ async fn spawn_actors_with_identity(
     gateway_handles.naming_service = match super::init_naming::init_naming_service(config) {
         Ok(service) => Some(service),
         Err(error) => {
-            warn!("Failed to initialize naming service: {}", error);
+            // NOTE: When the supervisor-provided naming service fails to initialize,
+            // the gateway falls back to opening its own local store at the same path.
+            // This means the /names endpoint will serve from a potentially empty store
+            // rather than returning 503. Operators should monitor for this log.
+            error!("Failed to initialize naming service: {}", error);
             None
         }
     };
