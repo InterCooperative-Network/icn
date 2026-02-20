@@ -94,3 +94,5 @@ copilot-session-*.md
 
 # Local artifacts (agent work products, not for repo)
 .local_artifacts/
+
+.codex/
