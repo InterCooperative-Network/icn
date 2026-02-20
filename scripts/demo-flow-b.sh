@@ -3,7 +3,7 @@
 # Tests: register name → resolve name → assert round-trip → list by DID → assert membership
 set -euo pipefail
 
-GATEWAY="${ICN_GATEWAY:-http://localhost:8080}"
+GATEWAY="${ICN_GATEWAY:-http://localhost:8000}"
 TOKEN="${ICN_TOKEN:-}"
 
 RED='\033[0;31m'
@@ -20,19 +20,22 @@ if [ -n "$TOKEN" ]; then
   AUTH_HEADER="Authorization: Bearer $TOKEN"
 fi
 
-TEST_NAME="demo-service"
-TEST_DID="did:icn:demo-service-001"
+TIMESTAMP=$(date +%s)
+TEST_NAME="demo-service-${TIMESTAMP}"
+TEST_DID="did:icn:demo-service-${TIMESTAMP}"
 
 # Step 1: Register a name to a DID
 step "Registering name '$TEST_NAME' to DID '$TEST_DID'..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$GATEWAY/v1/names/register" \
+REG_RESP=$(curl -s -w "\n%{http_code}" -X POST "$GATEWAY/v1/names/register" \
   -H "Content-Type: application/json" \
   ${AUTH_HEADER:+-H "$AUTH_HEADER"} \
   -d "{\"name\": \"$TEST_NAME\", \"did\": \"$TEST_DID\"}" 2>&1)
+HTTP_CODE=$(echo "$REG_RESP" | tail -1)
+REG_BODY=$(echo "$REG_RESP" | head -n -1)
 if [ "$HTTP_CODE" = "200" ]; then
   ok "Registered name: $TEST_NAME → $TEST_DID"
 else
-  fail "Register returned unexpected HTTP $HTTP_CODE (expected 200)"
+  fail "Register returned HTTP $HTTP_CODE (expected 200): $REG_BODY"
 fi
 
 # Step 2: Resolve name back to DID
