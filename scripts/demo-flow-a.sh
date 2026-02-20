@@ -3,7 +3,8 @@
 # Tests: upload WASM → list modules → submit by hash → poll status
 set -euo pipefail
 
-GATEWAY="${ICN_GATEWAY:-http://localhost:8000}"
+# Gateway binds 8080 by default (see icn-core/src/config/gateway.rs).
+GATEWAY="${ICN_GATEWAY:-http://localhost:8080}"
 TOKEN="${ICN_TOKEN:-}"
 
 RED='\033[0;31m'

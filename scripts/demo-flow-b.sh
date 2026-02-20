@@ -4,7 +4,6 @@
 set -euo pipefail
 
 # Gateway binds 8080 by default (see icn-core/src/config/gateway.rs).
-# NOTE: Other demo scripts (flow-a, flow-c, flow-d, runner) still use 8000 and should be migrated.
 GATEWAY="${ICN_GATEWAY:-http://localhost:8080}"
 TOKEN="${ICN_TOKEN:-}"
 

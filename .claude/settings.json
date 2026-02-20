@@ -57,6 +57,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "echo \"branch: $(git branch --show-current 2>/dev/null || echo detached)\"",
+            "timeout": 5,
+            "statusMessage": "Current branch"
+          },
+          {
+            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/firewall-guard.sh",
             "timeout": 10,
             "statusMessage": "Checking meaning firewall..."

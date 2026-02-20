@@ -3,7 +3,8 @@
 # Tests: create treasury → get balance → propose spend → vote → verify outcome
 set -euo pipefail
 
-GATEWAY="${ICN_GATEWAY:-http://localhost:8000}"
+# Gateway binds 8080 by default (see icn-core/src/config/gateway.rs).
+GATEWAY="${ICN_GATEWAY:-http://localhost:8080}"
 TOKEN="${ICN_TOKEN:-}"
 COOP_ID="${ICN_COOP_ID:-demo-coop}"
 
