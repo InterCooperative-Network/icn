@@ -1,0 +1,17 @@
+{
+  "sprint": 99,
+  "name": "Test Sprint",
+  "started": "2026-02-19",
+  "goals": ["test goal"],
+  "tasks": [
+    {
+      "id": "test-task-1",
+      "title": "A test task",
+      "status": "pending",
+      "pr": null,
+      "assignee": null,
+      "epic": null
+    }
+  ],
+  "epics": {}
+}
