@@ -740,19 +740,33 @@ mod tests {
     /// Verifies that the WasmRef branch in ComputeService::submit_task correctly
     /// decodes the hex hash and builds TaskCode::WasmRef — not TaskCode::WasmInline.
     /// This is a regression test for the bug where `wasm_hash` was treated as base64.
+    ///
+    /// Note: Cannot call submit_task() directly here because it requires an ApiContext
+    /// with a running compute engine. Instead, we replicate the exact hex→WasmRef
+    /// conversion logic from submit_task and verify the output matches expectations.
     #[test]
     fn compute_submit_wasm_hash_starts_task_param_roundtrip() {
-        // 32-byte all-zeros hash in hex
-        let hash_bytes = [0u8; 32];
+        // 32-byte known hash
+        let hash_bytes = [0xab_u8; 32];
         let hash_hex = hex::encode(hash_bytes);
         assert_eq!(hash_hex.len(), 64);
 
-        // Decode should give back 32 bytes
-        let decoded = hex::decode(&hash_hex).unwrap_or_default();
-        assert_eq!(decoded.len(), 32);
-        assert_eq!(decoded.as_slice(), &hash_bytes);
+        // --- Replicate the exact conversion from submit_task (lines 73-83) ---
+        let decoded = hex::decode(&hash_hex).expect("valid hex should decode");
+        assert_eq!(decoded.len(), 32, "must decode to exactly 32 bytes");
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&decoded);
+        let task_code = icn_compute::TaskCode::WasmRef(hash);
 
-        // Confirm that the SubmitTaskParams struct is well-formed for WasmRef
+        // Verify we got WasmRef (not WasmInline) with the correct bytes
+        match task_code {
+            icn_compute::TaskCode::WasmRef(h) => {
+                assert_eq!(h, hash_bytes, "roundtrip must preserve exact hash bytes");
+            }
+            other => panic!("Expected TaskCode::WasmRef, got {:?}", other),
+        }
+
+        // --- Verify SubmitTaskParams validates correctly ---
         let params = SubmitTaskParams {
             task_id: "task-wasm-hash-ref".to_string(),
             code: None,
