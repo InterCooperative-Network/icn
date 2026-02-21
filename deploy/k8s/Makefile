@@ -225,12 +225,23 @@ image-count: ## Show container image count on all nodes
 
 REGISTRY ?= 10.8.10.40:30500
 
-push-registry: ## Push image to local in-cluster registry (fast path, no scp)
-	@echo "Pushing $(IMAGE_NAME):$(IMAGE_TAG) to local registry $(REGISTRY)..."
+push-registry: ## Push image to local in-cluster registry
+	@echo "Pushing $(IMAGE_NAME):$(IMAGE_TAG) to registry $(REGISTRY)..."
 	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 	docker push $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
 
-fast-deploy: build push-registry ## Build + registry push + rolling deploy (fast iteration)
-	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG) from local registry..."
-	# Use localhost on k3s-control because this command runs remotely over SSH.
-	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) set image deployment/icn-daemon icnd=localhost:30500/$(IMAGE_NAME):$(IMAGE_TAG) && sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s"
+push-ui-registry: ## Push Pilot UI image to local in-cluster registry
+	@echo "Pushing $(UI_IMAGE_NAME):$(IMAGE_TAG) to registry $(REGISTRY)..."
+	docker tag $(UI_IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/$(UI_IMAGE_NAME):$(IMAGE_TAG)
+	docker push $(REGISTRY)/$(UI_IMAGE_NAME):$(IMAGE_TAG)
+
+fast-deploy: build push-registry ## Build + registry push + rolling restart (DEFAULT deploy path)
+	@echo "Deploying $(IMAGE_NAME):$(IMAGE_TAG) via registry..."
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout restart deployment/icn-daemon && sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s"
+
+fast-deploy-ui: build-ui-image push-ui-registry ## Build + push + restart Pilot UI via registry
+	@echo "Deploying $(UI_IMAGE_NAME):$(IMAGE_TAG) via registry..."
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout restart deployment/pilot-ui && sudo kubectl -n $(NAMESPACE) rollout status deployment/pilot-ui --timeout=60s"
+
+fast-deploy-all: fast-deploy fast-deploy-ui ## Build + push + deploy both via registry
+	@echo "✓ All deployments updated via registry"
