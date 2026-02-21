@@ -40,11 +40,20 @@ echo ""
 
 cd "$REPO_ROOT"
 
+# Build-time provenance
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+echo "  Git SHA: $GIT_SHA"
+echo "  Build time: $BUILD_TIME"
+
 # Build the image
 # Use Dockerfile.icnd which expects context to be icn/ directory
 # This matches the docker-compose setup
 docker build \
   $NO_CACHE \
+  --build-arg GIT_SHA="$GIT_SHA" \
+  --build-arg BUILD_TIME="$BUILD_TIME" \
   -f deploy/Dockerfile.icnd \
   -t "$FULL_IMAGE" \
   -t "${IMAGE_NAME}:latest" \

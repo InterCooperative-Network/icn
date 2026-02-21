@@ -14,6 +14,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /build
 
+# Build-time provenance args
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
 # Copy workspace (context is already ../icn)
 COPY . .
 
@@ -21,6 +25,8 @@ COPY . .
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
 # -j 2: Limit parallelism to reduce peak memory usage
 ENV RUST_MIN_STACK=33554432
+ENV GIT_SHA=${GIT_SHA}
+ENV BUILD_TIME=${BUILD_TIME}
 RUN cargo build --release --bin icnd --bin icnctl --features wasm -j 2
 
 # Runtime image

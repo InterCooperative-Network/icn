@@ -80,6 +80,8 @@ pub async fn readiness(coop_manager: web::Data<Arc<CoopManager>>) -> HttpRespons
             "not_ready".to_string()
         },
         version: env!("CARGO_PKG_VERSION").to_string(),
+        git_sha: option_env!("GIT_SHA").map(|s| s.to_string()),
+        build_time: option_env!("BUILD_TIME").map(|s| s.to_string()),
         checks: Some(checks),
     };
 
@@ -168,6 +170,8 @@ pub async fn health() -> HttpResponse {
     let response = HealthResponse {
         status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+        git_sha: option_env!("GIT_SHA").map(|s| s.to_string()),
+        build_time: option_env!("BUILD_TIME").map(|s| s.to_string()),
         checks: None,
     };
     HttpResponse::Ok().json(response)
