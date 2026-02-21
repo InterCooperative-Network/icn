@@ -251,8 +251,8 @@ spec:
     spec:
       containers:
       - name: icnd
-        image: icn:latest
-        imagePullPolicy: Never
+        image: 10.8.10.40:30500/icn:latest
+        imagePullPolicy: Always
         args:
           - --config
           - /etc/icn/icn.toml
