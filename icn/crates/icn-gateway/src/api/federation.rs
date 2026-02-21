@@ -692,3 +692,64 @@ pub async fn federation_connect(
         "own_coop_id": own_info.coop_id
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, App};
+
+    #[actix_web::test]
+    async fn test_federation_status_route_matches() {
+        let fed_mgr = Arc::new(FederationManager::new());
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .service(web::scope("/federation").service(get_status)),
+        )
+        .await;
+
+        // Request without auth claims - should reach handler and fail on require_scope,
+        // NOT return 404
+        let req = test::TestRequest::get()
+            .uri("/federation/status")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        // If route matches, we get 401/403 (auth/scope error), NOT 404
+        assert_ne!(
+            resp.status().as_u16(),
+            404,
+            "Federation status route should match (got 404 = route not found)"
+        );
+    }
+
+    /// Verify that empty scopes placed AFTER named scopes don't steal routes.
+    /// This is a regression test for the bug where web::scope("") before
+    /// web::scope("/federation") caused federation routes to 404.
+    #[actix_web::test]
+    async fn test_empty_scope_ordering_does_not_steal_routes() {
+        let fed_mgr = Arc::new(FederationManager::new());
+
+        // Empty scopes AFTER federation (correct ordering)
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .service(
+                    web::scope("/v1")
+                        .service(web::scope("/federation").service(get_status))
+                        .service(web::scope("")), // empty scope AFTER — should not steal
+                ),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/status")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status().as_u16();
+        assert_ne!(
+            status, 404,
+            "Federation status should not return 404 when empty scopes are last (got {status})"
+        );
+    }
+}
