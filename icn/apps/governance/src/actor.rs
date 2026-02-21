@@ -22,8 +22,8 @@ use icn_governance::{
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
     GovernanceProfileId, MembershipAction, MembershipConfig, MembershipResolver, MembershipSource,
     PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
-    ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot, Timestamp, Vote,
-    VoteChoice, VoteTally,
+    ProposalScope, ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot,
+    Timestamp, Vote, VoteChoice, VoteTally,
 };
 
 use icn_kernel_api::events::{EventEmitter, SystemEvent};
@@ -129,6 +129,8 @@ pub enum GovernanceCommand {
         description: String,
         /// Proposal action payload
         payload: ProposalPayload,
+        /// Scope — local or federation-wide
+        scope: ProposalScope,
     },
     /// Start deliberation period for a proposal
     ///
@@ -700,6 +702,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         title: String,
         description: String,
         payload: icn_governance::ProposalPayload,
+        scope: ProposalScope,
     ) -> Result<ProposalId> {
         // Pre-validate ProtocolChange proposals to catch invalid parameters early
         // This prevents wasted governance cycles on proposals that would fail at execution
@@ -854,6 +857,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             title,
             description,
             payload,
+            scope,
         })
         .await?;
 
@@ -1283,8 +1287,9 @@ impl GovernanceActor {
                 title,
                 description,
                 payload,
+                scope,
             } => {
-                info!("Creating proposal: {}", title);
+                info!("Creating proposal: {} (scope: {:?})", title, scope);
 
                 let mut proposal = Proposal::new(
                     domain_id,
@@ -1292,7 +1297,8 @@ impl GovernanceActor {
                     title.clone(),
                     description,
                     payload,
-                );
+                )
+                .with_scope(scope);
 
                 // Use the provided proposal ID instead of the generated one
                 proposal.id = proposal_id.clone();

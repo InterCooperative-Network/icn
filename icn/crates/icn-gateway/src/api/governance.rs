@@ -15,8 +15,8 @@ use crate::models::{
     CreateProposalRequest, DelegationListResponse, DelegationResponse,
     EstablishClearingProposalRequest, JoinFederationProposalRequest,
     LeaveFederationProposalRequest, OpenProposalRequest, ProposalPayloadRequest,
-    RevokeVouchProposalRequest, TerminateClearingProposalRequest, UpdateActionItemRequest,
-    UpdateFederationPolicyProposalRequest, VouchProposalRequest,
+    ProposalScopeRequest, RevokeVouchProposalRequest, TerminateClearingProposalRequest,
+    UpdateActionItemRequest, UpdateFederationPolicyProposalRequest, VouchProposalRequest,
 };
 use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
@@ -25,7 +25,7 @@ use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, DataSharingLevel,
     Delegation, DelegationScope, DisputeResolutionMethod, FederationProposal, FederationTerms,
     GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
-    VoteChoice,
+    ProposalScope, VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::{action_items, gateway};
@@ -470,6 +470,14 @@ pub async fn create_proposal(
         }
     };
 
+    // Map scope request to governance ProposalScope
+    let scope = match req.scope {
+        Some(ProposalScopeRequest::Federation { ref federation_id }) => {
+            ProposalScope::Federation(federation_id.clone())
+        }
+        Some(ProposalScopeRequest::Local) | None => ProposalScope::Local,
+    };
+
     // Create proposal via governance manager
     // In actor-backed mode, the actor generates the proposal ID
     // In standalone mode, we provide one (but it may be overridden)
@@ -484,6 +492,7 @@ pub async fn create_proposal(
             req.title.clone(),
             req.description.clone(),
             payload,
+            scope,
         )
         .await?;
 
@@ -1113,6 +1122,7 @@ async fn create_federation_proposal_impl(
             common.title.clone(),
             common.description.clone(),
             payload,
+            ProposalScope::Local, // Federation join/leave is a local governance decision
         )
         .await?;
 
@@ -2863,7 +2873,7 @@ mod tests {
     use actix_web::{test, App, HttpMessage};
     use icn_governance::{
         GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource,
-        Proposal, ProposalState,
+        Proposal, ProposalScope, ProposalState,
     };
     use icn_identity::IdentityBundle;
 
@@ -3011,6 +3021,7 @@ mod tests {
             payload: ProposalPayloadRequest::Text {
                 body: "Detailed proposal text...".to_string(),
             },
+            scope: None,
         };
 
         let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
@@ -3074,6 +3085,7 @@ mod tests {
             payload: ProposalPayloadRequest::Text {
                 body: "Test".to_string(),
             },
+            scope: None,
         };
 
         let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
@@ -3188,6 +3200,7 @@ mod tests {
                 payload: ProposalPayloadRequest::Text {
                     body: "Test".to_string(),
                 },
+                scope: None,
             };
 
             let claims = create_test_claims(&alice.did().to_string(), vec!["governance:write"]);
@@ -3470,6 +3483,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Should fail due to insufficient quorum".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3556,6 +3570,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3618,6 +3633,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3663,6 +3679,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3715,6 +3732,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3749,6 +3767,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await;
 
@@ -3796,6 +3815,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3923,6 +3943,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Original body".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();
@@ -3938,6 +3959,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Malicious content".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await;
 
@@ -4062,6 +4084,7 @@ mod tests {
                 ProposalPayload::Text {
                     body: "Test".to_string(),
                 },
+                ProposalScope::Local,
             )
             .await
             .unwrap();

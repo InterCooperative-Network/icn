@@ -7,7 +7,7 @@ use icn_identity::Did;
 use crate::{
     Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
     MembershipAction, MembershipConfig, PaginatedResult, ParameterChange, Proposal, ProposalId,
-    ProposalPayload, ProtocolParameter, Timestamp, VoteChoice, VoteTally,
+    ProposalPayload, ProposalScope, ProtocolParameter, Timestamp, VoteChoice, VoteTally,
 };
 
 /// Trait for governance operations exposed to RPC layer
@@ -63,6 +63,7 @@ pub trait GovernanceOps: Send + Sync {
         title: String,
         description: String,
         payload: ProposalPayload,
+        scope: ProposalScope,
     ) -> Result<ProposalId>;
 
     /// Start deliberation period for a proposal

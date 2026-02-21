@@ -508,7 +508,13 @@ pub async fn handle_governance_proposal_create(
     };
 
     match governance_handle
-        .create_proposal(domain_id, request.title, request.description, payload)
+        .create_proposal(
+            domain_id,
+            request.title,
+            request.description,
+            payload,
+            icn_governance::ProposalScope::Local,
+        )
         .await
     {
         Ok(proposal_id) => {

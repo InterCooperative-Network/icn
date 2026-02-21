@@ -669,6 +669,7 @@ pub async fn create_budget(
             title,
             description,
             payload,
+            icn_governance::ProposalScope::Local,
         )
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to create proposal: {e}")))?;
@@ -1060,6 +1061,7 @@ pub(crate) async fn do_propose_spend(
             title,
             description,
             payload,
+            icn_governance::ProposalScope::Local,
         )
         .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to create proposal: {e}")))?;
