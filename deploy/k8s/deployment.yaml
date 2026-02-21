@@ -82,6 +82,9 @@ spec:
           value: "/data"
         - name: HOME
           value: "/data"
+        # CORS: allow Pilot UI origin for cross-origin API access
+        - name: ICN_CORS_ORIGINS
+          value: "http://10.8.10.40:30030"
         # Gateway base URL for QR login - set this to the external URL where the gateway is accessible
         # This is used in QR codes for mobile wallet login
         - name: GATEWAY_BASE_URL
