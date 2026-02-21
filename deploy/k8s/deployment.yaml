@@ -31,7 +31,7 @@ spec:
               echo "Identity keystore already exists, skipping init"
             else
               echo "Initializing identity keystore..."
-              icnctl id init
+              icnctl --data-dir /data id init
               echo "Identity keystore created at /data/identity.age"
             fi
         env:
@@ -41,6 +41,8 @@ spec:
               name: icn-secrets
               key: passphrase
         - name: ICN_DATA_DIR
+          value: "/data"
+        - name: HOME
           value: "/data"
         volumeMounts:
         - name: data
