@@ -69,11 +69,13 @@ RPC_PORT=$((5601 + (BASE_PORT - 7777)))
 METRICS_PORT=$((9100 + (BASE_PORT - 7777)))
 NODEPORT_QUIC=$((30777 + (BASE_PORT - 7777)))
 NODEPORT_RPC=$((30601 + (BASE_PORT - 7777)))
+NODEPORT_GATEWAY=$((30081 + (BASE_PORT - 7777)))
 
 echo "Port Allocation:"
 echo "  QUIC:    $QUIC_PORT (NodePort: $NODEPORT_QUIC)"
 echo "  RPC:     $RPC_PORT (NodePort: $NODEPORT_RPC)"
 echo "  Metrics: $METRICS_PORT"
+echo "  Gateway: 8080 (NodePort: $NODEPORT_GATEWAY)"
 echo ""
 
 # Step 1: Create namespace
@@ -126,6 +128,12 @@ data:
     metrics_port = ${METRICS_PORT}
     health_port = 8080
     log_level = "info"
+
+    [gateway]
+    enabled = true
+    bind_addr = "0.0.0.0:8080"
+    token_expiry_hours = 24
+    challenge_ttl_minutes = 5
 
     [rate_limiting]
     enabled = true
@@ -188,6 +196,7 @@ metadata:
 type: Opaque
 stringData:
   passphrase: "$PASSPHRASE"
+  jwt-secret: "$(openssl rand -hex 32)"
 EOF
 
 ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/secret.yaml"
@@ -249,6 +258,49 @@ spec:
         coop: $COOP_NAME
         component: daemon
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: init-identity
+        image: 10.8.10.40:30500/icn:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            if [ -f /data/identity.age ]; then
+              echo "Identity keystore already exists, skipping init"
+            else
+              echo "Initializing identity keystore..."
+              icnctl --data-dir /data id init
+              echo "Identity keystore created at /data/identity.age"
+            fi
+        env:
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-${COOP_NAME}-secrets
+              key: passphrase
+        - name: ICN_DATA_DIR
+          value: "/data"
+        - name: HOME
+          value: "/data"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
       containers:
       - name: icnd
         image: 10.8.10.40:30500/icn:latest
@@ -266,6 +318,22 @@ spec:
           value: "/data"
         - name: HOME
           value: "/data"
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-${COOP_NAME}-secrets
+              key: passphrase
+        - name: ICN_GATEWAY_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: icn-${COOP_NAME}-secrets
+              key: jwt-secret
+        - name: ICN_CORS_ORIGINS
+          value: "http://10.8.10.40:30030"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://tempo.icn:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "icnd-${COOP_NAME}"
         ports:
         - name: quic
           containerPort: ${QUIC_PORT}
@@ -276,24 +344,24 @@ spec:
         - name: metrics
           containerPort: ${METRICS_PORT}
           protocol: TCP
-        - name: health
+        - name: gateway
           containerPort: 8080
           protocol: TCP
         livenessProbe:
           httpGet:
-            path: /metrics
-            port: ${METRICS_PORT}
+            path: /v1/health
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 1
+          timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /metrics
-            port: ${METRICS_PORT}
+            path: /v1/health
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 1
+          timeoutSeconds: 5
           failureThreshold: 3
         resources:
           requests:
@@ -308,9 +376,14 @@ spec:
           readOnly: true
         - name: data
           mountPath: /data
-      securityContext:
-        runAsUser: 0
-        runAsGroup: 0
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
       volumes:
       - name: config
         configMap:
@@ -318,6 +391,8 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: icn-${COOP_NAME}-data
+      - name: tmp
+        emptyDir: {}
 EOF
 
 ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/deployment.yaml"
@@ -384,6 +459,26 @@ spec:
     protocol: TCP
     targetPort: rpc
     nodePort: ${NODEPORT_RPC}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-${COOP_NAME}-gateway
+  namespace: $NAMESPACE
+  labels:
+    app: icn
+    coop: $COOP_NAME
+spec:
+  type: NodePort
+  selector:
+    app: icn
+    coop: $COOP_NAME
+  ports:
+  - name: gateway
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+    nodePort: ${NODEPORT_GATEWAY}
 EOF
 
 ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/services.yaml"
@@ -407,33 +502,6 @@ for i in {1..60}; do
 done
 echo ""
 
-# Step 8: Initialize identity
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "Step 8: Initializing identity..."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# Wait a bit more for pod to be fully ready
-sleep 5
-
-# Check if identity already exists
-IDENTITY_CHECK=$(ssh "$K3S_HOST" "sudo kubectl -n $NAMESPACE exec deployment/icn-${COOP_NAME} -- icnctl id show 2>&1" || echo "not-found")
-
-if echo "$IDENTITY_CHECK" | grep -q "did:icn:"; then
-    DID=$(echo "$IDENTITY_CHECK" | grep -o "did:icn:[a-zA-Z0-9]*" | head -1)
-    echo "✓ Identity already exists: $DID"
-else
-    echo "Initializing new identity..."
-    ssh "$K3S_HOST" "sudo kubectl -n $NAMESPACE exec deployment/icn-${COOP_NAME} -- bash -c 'echo \"$PASSPHRASE\" | icnctl id init'" || {
-        echo "⚠️  Identity initialization may have failed, check logs"
-    }
-    
-    # Get the DID
-    sleep 2
-    DID=$(ssh "$K3S_HOST" "sudo kubectl -n $NAMESPACE exec deployment/icn-${COOP_NAME} -- icnctl id show 2>&1" | grep -o "did:icn:[a-zA-Z0-9]*" | head -1 || echo "unknown")
-    echo "✓ Identity initialized: $DID"
-fi
-echo ""
-
 # Cleanup
 rm -rf "$TEMP_DIR"
 
@@ -444,7 +512,6 @@ echo "╚═══════════════════════�
 echo ""
 echo "Coop: $COOP_NAME ($COOP_DISPLAY_NAME)"
 echo "Namespace: $NAMESPACE"
-echo "DID: $DID"
 echo ""
 echo "Access:"
 echo "  Check status: kubectl -n $NAMESPACE get pods"
