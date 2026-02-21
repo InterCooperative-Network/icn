@@ -19,6 +19,40 @@ spec:
         app: icn
         component: daemon
     spec:
+      initContainers:
+      - name: init-identity
+        image: 10.8.10.40:30500/icn:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            if [ -f /data/identity.age ]; then
+              echo "Identity keystore already exists, skipping init"
+            else
+              echo "Initializing identity keystore..."
+              icnctl id init
+              echo "Identity keystore created at /data/identity.age"
+            fi
+        env:
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
+        - name: ICN_DATA_DIR
+          value: "/data"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
       containers:
       - name: icnd
         image: 10.8.10.40:30500/icn:latest
@@ -27,6 +61,11 @@ spec:
           - --config
           - /etc/icn/icn.toml
         env:
+        - name: ICN_KEYSTORE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: passphrase
         - name: ICN_PASSPHRASE
           valueFrom:
             secretKeyRef:
