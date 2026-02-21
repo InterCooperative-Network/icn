@@ -1,6 +1,6 @@
 # ICN Daemon Docker Image
 #
-# Build from project root:
+# Build from repo root (context = repo root):
 #   docker build -f deploy/Dockerfile.icnd -t icn/icnd .
 
 FROM rust:1.88-slim as builder
@@ -18,8 +18,14 @@ WORKDIR /build
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=unknown
 
-# Copy workspace (context is already ../icn)
-COPY . .
+# Copy workspace and external app crates (context is repo root)
+COPY icn/Cargo.toml icn/Cargo.lock icn/rust-toolchain.toml ./icn/
+COPY icn/crates ./icn/crates
+COPY icn/bins ./icn/bins
+COPY icn/apps ./icn/apps
+COPY apps ./apps
+
+WORKDIR /build/icn
 
 # Build release binaries
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
@@ -38,8 +44,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binaries
-COPY --from=builder /build/target/release/icnd /usr/local/bin/
-COPY --from=builder /build/target/release/icnctl /usr/local/bin/
+COPY --from=builder /build/icn/target/release/icnd /usr/local/bin/
+COPY --from=builder /build/icn/target/release/icnctl /usr/local/bin/
 
 # Copy devnet entrypoint script
 COPY deploy/devnet/entrypoint.sh /usr/local/bin/entrypoint.sh

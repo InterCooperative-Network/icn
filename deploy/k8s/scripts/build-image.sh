@@ -34,7 +34,7 @@ FULL_IMAGE="${IMAGE_NAME}:${TAG}"
 
 echo "Building ICN Docker image..."
 echo "  Image: $FULL_IMAGE"
-echo "  Context: $REPO_ROOT/icn"
+echo "  Context: $REPO_ROOT"
 echo "  No-cache: ${NO_CACHE:-disabled}"
 echo ""
 
@@ -48,8 +48,7 @@ echo "  Git SHA: $GIT_SHA"
 echo "  Build time: $BUILD_TIME"
 
 # Build the image
-# Use Dockerfile.icnd which expects context to be icn/ directory
-# This matches the docker-compose setup
+# Use Dockerfile.icnd with repo root as context (apps/ lives outside icn/ workspace)
 docker build \
   $NO_CACHE \
   --build-arg GIT_SHA="$GIT_SHA" \
@@ -57,7 +56,7 @@ docker build \
   -f deploy/Dockerfile.icnd \
   -t "$FULL_IMAGE" \
   -t "${IMAGE_NAME}:latest" \
-  "$REPO_ROOT/icn"
+  "$REPO_ROOT"
 
 echo ""
 echo "✓ Image built successfully: $FULL_IMAGE"
