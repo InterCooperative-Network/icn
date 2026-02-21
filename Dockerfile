@@ -24,10 +24,16 @@ COPY apps ./apps
 
 WORKDIR /app/icn
 
+# Build-time provenance args
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
 # Build release binaries
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
 # -j 2: Limit parallelism to reduce peak memory usage
 ENV RUST_MIN_STACK=33554432
+ENV GIT_SHA=${GIT_SHA}
+ENV BUILD_TIME=${BUILD_TIME}
 RUN cargo build --release --bins -j 2
 
 # Stage 2: Runtime (must match builder's glibc version)
