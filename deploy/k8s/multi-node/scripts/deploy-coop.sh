@@ -180,11 +180,14 @@ ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/configmap.yaml"
 echo "✓ ConfigMap created"
 echo ""
 
-# Step 3: Create Secret
+# Step 3: Create Secret (skip if exists to avoid rotating JWT key)
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Step 3: Creating Secret..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cat > "$TEMP_DIR/secret.yaml" <<EOF
+if ssh "$K3S_HOST" "sudo kubectl -n $NAMESPACE get secret icn-${COOP_NAME}-secrets" &>/dev/null; then
+  echo "✓ Secret already exists (keeping existing JWT key)"
+else
+  cat > "$TEMP_DIR/secret.yaml" <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -199,8 +202,9 @@ stringData:
   jwt-secret: "$(openssl rand -hex 32)"
 EOF
 
-ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/secret.yaml"
-echo "✓ Secret created"
+  ssh "$K3S_HOST" "sudo kubectl apply -f -" < "$TEMP_DIR/secret.yaml"
+  echo "✓ Secret created"
+fi
 echo ""
 
 # Step 4: Create PVC
@@ -430,10 +434,10 @@ spec:
     port: ${METRICS_PORT}
     protocol: TCP
     targetPort: metrics
-  - name: health
+  - name: gateway
     port: 8080
     protocol: TCP
-    targetPort: health
+    targetPort: gateway
 ---
 apiVersion: v1
 kind: Service
