@@ -550,6 +550,11 @@ components:
           type: string
         payload:
           $ref: '#/components/schemas/ProposalPayloadRequest'
+        scope:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProposalScopeRequest'
+            description: Proposal scope — defaults to Local if omitted
         title:
           type: string
     CreateSessionRequest:
@@ -770,6 +775,10 @@ components:
       - status
       - version
       properties:
+        build_time:
+          type:
+          - string
+          - 'null'
         checks:
           type:
           - object
@@ -778,6 +787,10 @@ components:
             $ref: '#/components/schemas/ComponentHealth'
           propertyNames:
             type: string
+        git_sha:
+          type:
+          - string
+          - 'null'
         status:
           type: string
         version:
@@ -1152,6 +1165,31 @@ components:
           value:
             type: string
       description: Proposal payload types (matches icn_governance::ProposalPayload)
+    ProposalScopeRequest:
+      oneOf:
+      - type: object
+        description: Local to this node's governance domain (default)
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - local
+      - type: object
+        description: Visible across a federation — propagates via gossip
+        required:
+        - federation_id
+        - type
+        properties:
+          federation_id:
+            type: string
+            description: Federation identifier
+          type:
+            type: string
+            enum:
+            - federation
+      description: Scope for a proposal (local or federation-wide)
     RegisterDeviceRequest:
       type: object
       description: Register device request

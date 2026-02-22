@@ -24,7 +24,7 @@ use icn_governance::{
     GovernanceDomain, GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams,
     GovernanceProfileId, InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig,
     MembershipSource, PaginatedResult, ProofOutcome, Proposal, ProposalDomainLookup, ProposalId,
-    ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
+    ProposalPayload, ProposalScope, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
     DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
@@ -530,12 +530,13 @@ impl GovernanceManager {
         title: String,
         description: String,
         payload: ProposalPayload,
+        scope: ProposalScope,
     ) -> Result<ProposalId> {
         if let Some(ref handle) = self.governance_handle {
             // Actor-backed mode: delegate to GovernanceActor
             // Note: proposal_id and proposer are ignored - actor generates ID and uses own DID
             let generated_id = handle
-                .create_proposal(domain_id, title, description, payload)
+                .create_proposal(domain_id, title, description, payload, scope)
                 .await?;
             return Ok(generated_id);
         }
@@ -553,7 +554,8 @@ impl GovernanceManager {
         }
         drop(domains); // Release read lock before acquiring write lock
 
-        let mut proposal = Proposal::new(domain_id, proposer, title, description, payload);
+        let mut proposal =
+            Proposal::new(domain_id, proposer, title, description, payload).with_scope(scope);
         // Override the generated ID with the one provided
         proposal.id = proposal_id.clone();
 
@@ -1900,6 +1902,7 @@ mod tests {
             ProposalPayload::Text {
                 body: "test".to_string(),
             },
+            ProposalScope::Local,
         )
         .await
         .unwrap();
@@ -1959,6 +1962,7 @@ mod tests {
             ProposalPayload::Text {
                 body: "test".to_string(),
             },
+            ProposalScope::Local,
         )
         .await
         .unwrap();

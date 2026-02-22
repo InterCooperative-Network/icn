@@ -291,6 +291,19 @@ pub struct FederationConnectRequest {
     pub name: Option<String>,
 }
 
+/// Scope for a proposal (local or federation-wide)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProposalScopeRequest {
+    /// Local to this node's governance domain (default)
+    Local,
+    /// Visible across a federation — propagates via gossip
+    Federation {
+        /// Federation identifier
+        federation_id: String,
+    },
+}
+
 /// Create a new proposal
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateProposalRequest {
@@ -298,6 +311,9 @@ pub struct CreateProposalRequest {
     pub title: String,       // Short title
     pub description: String, // Full description/rationale
     pub payload: ProposalPayloadRequest,
+    /// Proposal scope — defaults to Local if omitted
+    #[serde(default)]
+    pub scope: Option<ProposalScopeRequest>,
 }
 
 /// Proposal payload types (matches icn_governance::ProposalPayload)
