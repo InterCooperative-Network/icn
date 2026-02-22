@@ -32,9 +32,9 @@ pub mod registry;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
-pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
+pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 
 // Re-export registry types for decision/meeting management
 pub use registry::{DecisionFilter, DecisionIndexEntry, DecisionRegistry, DecisionStatus, Meeting};
