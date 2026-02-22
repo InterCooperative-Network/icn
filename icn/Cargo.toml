@@ -36,6 +36,7 @@ members = [
     "crates/icn-naming",
     "apps/governance",
     "apps/membership",
+    "apps/ledger",
 ]
 
 [workspace.package]

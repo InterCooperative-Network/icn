@@ -51,6 +51,7 @@ icn-steward.workspace = true
 # App crates for initialization
 icn-trust-app = { path = "../../../apps/trust" }
 icn-governance-actor = { path = "../../apps/governance" }
+icn-ledger-actor = { path = "../../apps/ledger" }
 icn-coop = { path = "../icn-coop" }
 icn-community = { path = "../icn-community" }
 icn-naming.workspace = true

@@ -70,6 +70,7 @@ impl<S: icn_store::Store> EscrowStore for SledEscrowStore<S> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use icn_kernel_api::escrow::EscrowStatus;

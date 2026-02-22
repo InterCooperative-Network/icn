@@ -2956,6 +2956,7 @@ dependencies = [
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
+ "icn-ledger-actor",
  "icn-membership-app",
  "icn-naming",
  "icn-net",
@@ -3333,6 +3334,17 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "icn-ledger-actor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "icn-kernel-api",
+ "icn-store",
+ "serde_json",
+ "sled",
 ]
 
 [[package]]
