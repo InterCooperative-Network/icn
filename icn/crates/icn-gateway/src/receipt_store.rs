@@ -9,6 +9,7 @@
 
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+use icn_governance_actor::receipt_backend::GovernanceReceiptBackend;
 use icn_kernel_api::economics::SettlementIntent;
 use icn_kernel_api::receipts::{AllocationReceipt, CanonicalReceipt, Hash};
 use sled::Db;
@@ -333,6 +334,19 @@ impl ReceiptStore {
         let allocations = self.list_allocations_by_decision(decision_hash)?;
         let intents = self.list_intents_by_decision(decision_hash)?;
         Ok((allocations, intents))
+    }
+}
+
+impl GovernanceReceiptBackend for ReceiptStore {
+    fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
+        self.put_governance(receipt).map(|_| ())
+    }
+
+    fn get_governance_by_proposal(
+        &self,
+        proposal_id: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        self.get_governance_by_proposal(proposal_id)
     }
 }
 

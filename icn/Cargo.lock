@@ -2928,7 +2928,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "utoipa",
+ "utoipa 5.4.0",
  "uuid",
 ]
 
@@ -3077,7 +3077,7 @@ dependencies = [
  "tokio",
  "tracing",
  "urlencoding",
- "utoipa",
+ "utoipa 5.4.0",
  "uuid",
  "wiremock",
 ]
@@ -3115,6 +3115,8 @@ dependencies = [
  "icn-federation",
  "icn-gossip",
  "icn-governance",
+ "icn-governance-actor",
+ "icn-http-kit",
  "icn-identity",
  "icn-kernel-api",
  "icn-ledger",
@@ -3148,7 +3150,7 @@ dependencies = [
  "tracing-actix-web",
  "tracing-subscriber",
  "url",
- "utoipa",
+ "utoipa 5.4.0",
  "utoipa-swagger-ui",
  "uuid",
 ]
@@ -3217,15 +3219,18 @@ dependencies = [
 name = "icn-governance-actor"
 version = "0.1.0"
 dependencies = [
+ "actix-web",
  "anyhow",
  "async-trait",
  "blake3",
  "ed25519-dalek",
  "hex",
+ "icn-encoding",
  "icn-entity",
  "icn-federation",
  "icn-gossip",
  "icn-governance",
+ "icn-http-kit",
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
@@ -3233,8 +3238,11 @@ dependencies = [
  "icn-time",
  "serde",
  "serde_json",
+ "sled",
  "tokio",
  "tracing",
+ "utoipa 4.2.3",
+ "uuid",
 ]
 
 [[package]]
@@ -3247,6 +3255,20 @@ dependencies = [
  "icn-kernel-api",
  "icn-store",
  "parking_lot 0.12.5",
+ "tracing",
+]
+
+[[package]]
+name = "icn-http-kit"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -3280,7 +3302,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tss-esapi",
- "utoipa",
+ "utoipa 5.4.0",
  "x25519-dalek",
  "zeroize",
 ]
@@ -3367,7 +3389,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "utoipa",
+ "utoipa 5.4.0",
  "uuid",
 ]
 
@@ -3399,7 +3421,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "utoipa",
+ "utoipa 5.4.0",
  "uuid",
 ]
 
@@ -3743,7 +3765,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "utoipa",
+ "utoipa 5.4.0",
  "winter-air",
  "winter-math",
  "winter-utils",
@@ -3791,7 +3813,7 @@ dependencies = [
  "tokio",
  "toml 0.9.11+spec-1.1.0",
  "tracing",
- "utoipa",
+ "utoipa 5.4.0",
  "uuid",
  "walkdir",
  "x25519-dalek",
@@ -5383,6 +5405,30 @@ name = "pqcrypto-traits"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94e851c7654eed9e68d7d27164c454961a616cf8c203d500607ef22c737b51bb"
+
+[[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
+]
 
 [[package]]
 name = "proc-macro-error-attr2"
@@ -7647,6 +7693,18 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utoipa"
+version = "4.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5afb1a60e207dca502682537fefcfd9921e71d0b83e9576060f09abc6efab23"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_json",
+ "utoipa-gen 4.3.1",
+]
+
+[[package]]
+name = "utoipa"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fcc29c80c21c31608227e0912b2d7fddba57ad76b606890627ba8ee7964e993"
@@ -7655,7 +7713,20 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
- "utoipa-gen",
+ "utoipa-gen 5.4.0",
+]
+
+[[package]]
+name = "utoipa-gen"
+version = "4.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20c24e8ab68ff9ee746aad22d39b5535601e6416d1b0feeabf78be986a5c4392"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.111",
 ]
 
 [[package]]
@@ -7684,7 +7755,7 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
- "utoipa",
+ "utoipa 5.4.0",
  "zip",
 ]
 

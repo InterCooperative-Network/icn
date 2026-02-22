@@ -246,18 +246,18 @@ mod tests {
     /// Mirrors `strict_trust_import_violations` for governance imports.
     /// Governance extraction is Phase 4 — these counts will ratchet to 0.
     ///
-    /// Current state (2026-01-30):
+    /// Current state (2026-02-22, Phase 4 complete):
     /// - icn-net: CLEAN ✅
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
-    /// - icn-gateway: 17 (governance admin endpoints — Phase 4 work)
+    /// - icn-gateway: 17 (commons, treasury, entity, steward — pre-Phase-4 residue)
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 20), // Phase 4 governance extraction pending (P0: +3 for receipt types)
+            ("icn-gateway", 17), // governance HTTP handlers extracted (Phase 4)
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -289,15 +289,15 @@ mod tests {
     ///
     /// Target state: 0 after gateway governance extraction (Phase 4).
     ///
-    /// Current state (2026-02-10):
-    /// - api/governance.rs: 54 (proposal handlers, membership, voting)
-    /// - governance_mgr.rs: 5 (manager implementation)
-    /// - commons_store.rs: 5 (commons governance)
-    /// - commons_mgr.rs: 3 (commons manager)
-    /// - Other scattered: 10 (entity, treasury, steward, constitutional)
+    /// Current state (2026-02-22, Phase 4 complete):
+    /// - api/governance.rs: DELETED ✅ (was 54 refs)
+    /// - governance_mgr.rs: REPLACED with re-export ✅ (was 5 refs)
+    /// - commons_store.rs: 5 (commons governance — pre-Phase-4 residue)
+    /// - commons_mgr.rs: 3 (commons manager — pre-Phase-4 residue)
+    /// - Other scattered: 16 (entity, treasury, steward, flow_c, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 83; // P0: +4 for GovernanceDecisionReceipt, ProofOutcome, VoteTally, GovernanceProofV2; +2 from #1268 federation tab
+        let expected: usize = 24; // Phase 4 complete: governance HTTP handlers fully extracted
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(

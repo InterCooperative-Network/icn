@@ -23,6 +23,7 @@ use crate::entity_mgr::{EntityHandle, EntityManager};
 use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
+use crate::governance_adapter::GatewayEventAdapter;
 use crate::governance_mgr::GovernanceHandle;
 use crate::governance_mgr::GovernanceManager;
 use crate::identity_mgr::IdentityManager;
@@ -39,6 +40,8 @@ use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::TrustManager;
 use icn_compute::ComputeHandle;
+use icn_governance_actor::http::configure as configure_governance;
+use icn_governance_actor::http::configure::GovernanceContext;
 use icn_kernel_api::naming::NamingService;
 use icn_store::SledStore;
 use tokio::sync::RwLock;
@@ -513,7 +516,6 @@ impl GatewayServer {
                 })?)
             };
 
-        let governance_handle_for_service = self.governance_handle.clone();
         let ledger_handle_for_service = self.ledger_handle.clone();
 
         // Create governance manager with Sled-backed action items
@@ -532,9 +534,6 @@ impl GatewayServer {
                         .with_receipt_store(receipt_store.clone()),
                 )
             };
-        let governance_service: Option<Arc<icn_api::GovernanceService>> =
-            governance_handle_for_service
-                .map(|handle| Arc::new(icn_api::GovernanceService::new(handle)));
         let ledger_service: Option<Arc<icn_api::LedgerService>> =
             ledger_handle_for_service.map(|handle| Arc::new(icn_api::LedgerService::new(handle)));
 
@@ -739,6 +738,13 @@ impl GatewayServer {
             info!("Creating new EventBroadcaster (not shared with compute actor)");
             Arc::new(EventBroadcaster::new())
         });
+
+        // Create governance context for apps/governance HTTP handlers.
+        // GatewayEventAdapter wires the domain emitter to the WebSocket broadcaster.
+        let gov_ctx = GovernanceContext {
+            manager: governance_manager.clone(),
+            emitter: GatewayEventAdapter::new(event_broadcaster.clone()),
+        };
 
         // Create rate limiter with configured or default config
         let rate_limit_config = self.rate_limit_config.unwrap_or_default();
@@ -989,7 +995,6 @@ impl GatewayServer {
                 .app_data(web::Data::new(community_manager.clone()))
                 .app_data(web::Data::new(steward_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
-                .app_data(web::Data::new(governance_service.clone()))
                 .app_data(web::Data::new(ledger_service.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(session_manager.clone()))
@@ -1171,48 +1176,15 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Protected governance endpoints (auth + rate limiting)
-                        // NOTE: Must be BEFORE empty scopes for routing to work
+                        // Governance endpoints — served by apps/governance HTTP layer.
+                        // Routes are registered by configure_governance(); auth + rate
+                        // limiting applied via the wrapping empty scope.
                         .service(
-                            web::scope("/gov")
-                                .service(api::governance::create_domain)
-                                .service(api::governance::list_domains)
-                                .service(api::governance::get_domain)
-                                .service(api::governance::add_domain_member)
-                                .service(api::governance::create_proposal)
-                                .service(api::governance::list_proposals)
-                                .service(api::governance::get_proposal)
-                                .service(api::governance::get_votes)
-                                .service(api::governance::get_proposal_proof)
-                                .service(api::governance::open_proposal)
-                                .service(api::governance::close_proposal)
-                                // Federation proposal endpoints
-                                .service(api::governance::create_join_federation_proposal)
-                                .service(api::governance::create_leave_federation_proposal)
-                                .service(api::governance::create_establish_clearing_proposal)
-                                .service(api::governance::create_terminate_clearing_proposal)
-                                .service(api::governance::create_vouch_proposal)
-                                .service(api::governance::create_revoke_vouch_proposal)
-                                .service(api::governance::create_update_federation_policy_proposal)
-                                // Vote endpoints
-                                .service(api::governance::cast_vote)
-                                // Delegation endpoints
-                                .service(api::governance::create_delegation)
-                                .service(api::governance::list_delegations)
-                                .service(api::governance::get_delegation)
-                                .service(api::governance::revoke_delegation)
-                                // Deliberation endpoints
-                                .service(api::governance::start_deliberation)
-                                .service(api::governance::end_deliberation)
-                                // Discussion endpoints
-                                .service(api::governance::add_comment)
-                                .service(api::governance::list_comments)
-                                .service(api::governance::get_discussion)
-                                .service(api::governance::edit_comment)
-                                .service(api::governance::delete_comment)
-                                .service(api::governance::add_reaction)
-                                .service(api::governance::remove_reaction)
-                                // Apply auth first, then rate limiting
+                            web::scope("")
+                                .configure({
+                                    let ctx = gov_ctx.clone();
+                                    move |cfg| configure_governance(cfg, ctx.clone())
+                                })
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

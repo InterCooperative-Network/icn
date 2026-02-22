@@ -16,7 +16,6 @@ pub mod escrow;
 pub mod execution;
 pub mod federation;
 pub mod flow_c;
-pub mod governance;
 pub mod governance_dashboard;
 pub mod health;
 pub mod identity;

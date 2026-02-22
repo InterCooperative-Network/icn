@@ -37,6 +37,7 @@ pub mod error;
 pub mod events;
 pub mod fcm_client;
 pub mod federation_mgr;
+pub mod governance_adapter;
 pub mod governance_mgr;
 pub mod identity_mgr;
 pub mod invite;
