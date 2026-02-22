@@ -1227,33 +1227,6 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Recurring payments endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::recurring_payments::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
-                        // Escrow endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::escrow::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
-                        // Budget endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::budgets::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
                         // Protected invite endpoints (auth + rate limiting)
                         .service(
                             web::scope("/invites")
@@ -1440,24 +1413,6 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Governance dashboard (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::governance_dashboard::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
-                        // Community (Civic Engine) endpoints (auth + rate limiting)
-                        .service(
-                            web::scope("")
-                                .configure(api::communities::configure)
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
                         // Decision Registry endpoints (auth + rate limiting)
                         // Governance meetings and decisions indexing
                         .service(
@@ -1473,6 +1428,52 @@ impl GatewayServer {
                         .service(
                             web::scope("/receipts")
                                 .configure(api::receipts::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // === Empty-scope services (MUST be last — empty scopes match all paths) ===
+                        // Recurring payments endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::recurring_payments::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Escrow endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::escrow::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Budget endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::budgets::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Governance dashboard (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::governance_dashboard::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Community (Civic Engine) endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::communities::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))
