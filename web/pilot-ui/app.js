@@ -3162,10 +3162,10 @@ setInterval(() => {
 
 // Auto-detect gateway URL based on where the app is being served from
 function detectGatewayUrl() {
-    // If served from the gateway itself (not localhost), use window.location.origin
-    // This allows LAN access without manual URL configuration
+    // If served from the gateway itself (not localhost), derive the gateway URL.
+    // Pilot UI runs on port 30030; the gateway API runs on port 30080 on the same host.
     if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-        return window.location.origin;
+        return `${window.location.protocol}//${window.location.hostname}:30080`;
     }
     // Default to localhost for local development
     return 'http://localhost:8080';
