@@ -297,7 +297,7 @@ mod tests {
     /// - Other scattered: 10 (entity, treasury, steward, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 81; // P0: +4 for GovernanceDecisionReceipt, ProofOutcome, VoteTally, GovernanceProofV2
+        let expected: usize = 83; // P0: +4 for GovernanceDecisionReceipt, ProofOutcome, VoteTally, GovernanceProofV2; +2 from #1268 federation tab
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(
