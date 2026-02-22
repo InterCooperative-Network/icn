@@ -5721,3 +5721,164 @@ footer .sync-status.error {
     color: var(--text-tertiary);
     font-style: italic;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Federation View (T6 — Sprint 11)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.federation-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    padding: 0.5rem 0;
+}
+
+.federation-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.federation-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.federation-stat-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.federation-stat-value .status-dot.active {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.federation-banner.warning {
+    background: color-mix(in srgb, var(--warning) 15%, transparent);
+    border: 1px solid var(--warning);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.federation-not-initialized .help-text {
+    margin-top: 0.75rem;
+}
+
+.federation-command {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin-top: 0.5rem;
+}
+
+.federation-error {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.federation-error .btn {
+    margin-top: 0.75rem;
+}
+
+/* Federation table */
+.federation-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.federation-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.federation-table th {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-tertiary);
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.federation-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+}
+
+.federation-table tbody tr:hover {
+    background: var(--bg-secondary);
+}
+
+.federation-did code {
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
+.federation-endpoints {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.federation-cap-badge {
+    display: inline-block;
+    background: color-mix(in srgb, var(--primary) 15%, transparent);
+    color: var(--primary);
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.btn-copy-inline {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+
+.btn-copy-inline:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-hover);
+}
+
+@media (max-width: 768px) {
+    .federation-status-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .federation-table {
+        font-size: 0.8rem;
+    }
+
+    .federation-table th,
+    .federation-table td {
+        padding: 0.5rem;
+    }
+}

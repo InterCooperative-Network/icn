@@ -7852,13 +7852,186 @@ elements.createActionItemSubmitBtn?.addEventListener('click', async () => {
 // Make functions available globally
 window.viewListing = viewListing;
 
-// Load data when exchange tab is first viewed
+// Load data when exchange or federation tab is first viewed
 const originalSwitchTab = switchTab;
 window.switchTab = function(tabId) {
     originalSwitchTab(tabId);
     if (tabId === 'exchange') {
         loadListings();
+    } else if (tabId === 'federation') {
+        loadFederation();
     }
 };
 
 console.log('Action items and listings functionality initialized');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Federation View (T6 — Sprint 11)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let federationLoaded = false;
+
+async function loadFederation() {
+    const statusEl = document.getElementById('federation-status-content');
+    const coopsEl = document.getElementById('federation-coops-list');
+    const peerCountEl = document.getElementById('federation-peer-count');
+
+    if (!state.token) {
+        statusEl.innerHTML = '<p class="empty-state">Sign in with a token that includes <code>federation:read</code> scope to view federation status.</p>';
+        coopsEl.innerHTML = '';
+        peerCountEl.textContent = '';
+        return;
+    }
+
+    // Show loading on first load only
+    if (!federationLoaded) {
+        statusEl.innerHTML = '<p class="loading">Loading federation status...</p>';
+        coopsEl.innerHTML = '<p class="loading">Loading...</p>';
+    }
+
+    try {
+        // Fetch status and coops in parallel
+        const [statusData, coopsData] = await Promise.all([
+            fetchFederationStatus(),
+            fetchFederationCoops()
+        ]);
+
+        renderFederationStatus(statusData, statusEl);
+        renderFederationCoops(coopsData, coopsEl, peerCountEl);
+        federationLoaded = true;
+    } catch (err) {
+        const msg = err.message || 'Failed to load federation data';
+        if (msg.includes('401') || msg.includes('403') || msg.includes('Session expired')) {
+            statusEl.innerHTML = '<p class="empty-state">Token missing <code>federation:read</code> scope. Mint a token with federation scopes to view this page.</p>';
+        } else {
+            statusEl.innerHTML = `<div class="federation-error"><p>Failed to load federation status.</p><p class="help-text">${escapeHtml(msg)}</p><button class="btn btn-small btn-secondary" onclick="loadFederation()">Retry</button></div>`;
+        }
+        coopsEl.innerHTML = '';
+        peerCountEl.textContent = '';
+    }
+}
+
+async function fetchFederationStatus() {
+    return apiRequest('GET', '/federation/status');
+}
+
+async function fetchFederationCoops() {
+    return apiRequest('GET', '/federation/coops');
+}
+
+function renderFederationStatus(data, container) {
+    if (!data || !data.initialized) {
+        container.innerHTML = `
+            <div class="federation-not-initialized">
+                <div class="federation-banner warning">
+                    <strong>Federation not initialized on this coop.</strong>
+                </div>
+                <p class="help-text">Run the initialization script:</p>
+                <pre class="federation-command">deploy/k8s/multi-node/scripts/init-federation.sh</pre>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="federation-status-grid">
+            <div class="federation-stat">
+                <span class="federation-stat-label">Status</span>
+                <span class="federation-stat-value">
+                    <span class="status-dot active"></span> Federated
+                </span>
+            </div>
+            <div class="federation-stat">
+                <span class="federation-stat-label">Coop ID</span>
+                <span class="federation-stat-value">${escapeHtml(data.own_coop_id || '--')}</span>
+            </div>
+            <div class="federation-stat">
+                <span class="federation-stat-label">Coop Name</span>
+                <span class="federation-stat-value">${escapeHtml(data.own_coop_name || '--')}</span>
+            </div>
+            <div class="federation-stat">
+                <span class="federation-stat-label">Peer Coops</span>
+                <span class="federation-stat-value">${data.federated_coops ?? '--'}</span>
+            </div>
+            <div class="federation-stat">
+                <span class="federation-stat-label">Clearing Agreements</span>
+                <span class="federation-stat-value">${data.clearing_agreements ?? 0}</span>
+            </div>
+        </div>`;
+}
+
+function renderFederationCoops(data, container, peerCountEl) {
+    // API may return array directly or wrapped in { data: [...] }
+    const coops = Array.isArray(data) ? data : (data?.data || data?.items || []);
+
+    peerCountEl.textContent = coops.length > 0 ? `${coops.length} peer${coops.length !== 1 ? 's' : ''}` : '';
+
+    if (coops.length === 0) {
+        container.innerHTML = '<p class="empty-state">No federated coops discovered yet.</p>';
+        return;
+    }
+
+    const rows = coops.map(coop => {
+        const did = coop.public_did || '--';
+        const shortDid = did.length > 30 ? did.substring(0, 28) + '...' : did;
+        const endpoints = (coop.gateway_endpoints || []).join(', ') || '--';
+        const caps = (coop.capabilities || []).join(', ') || '--';
+        const lastSeen = coop.last_seen
+            ? new Date(coop.last_seen * 1000).toLocaleString()
+            : '--';
+
+        return `
+            <tr>
+                <td><strong>${escapeHtml(coop.name || coop.coop_id)}</strong></td>
+                <td><code>${escapeHtml(coop.coop_id)}</code></td>
+                <td class="federation-did" title="${escapeHtml(did)}">
+                    <code>${escapeHtml(shortDid)}</code>
+                    ${did !== '--' ? `<button class="btn-copy-inline" onclick="copyToClipboard('${escapeHtml(did)}')" title="Copy DID">Copy</button>` : ''}
+                </td>
+                <td><span class="federation-endpoints">${escapeHtml(endpoints)}</span></td>
+                <td>${(coop.capabilities || []).map(c => `<span class="federation-cap-badge">${escapeHtml(c)}</span>`).join(' ') || '--'}</td>
+                <td class="help-text">${escapeHtml(lastSeen)}</td>
+            </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="federation-table-wrap">
+            <table class="federation-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Coop ID</th>
+                        <th>Public DID</th>
+                        <th>Endpoints</th>
+                        <th>Capabilities</th>
+                        <th>Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard', 'success');
+    }).catch(() => {
+        // Fallback for non-secure contexts
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Copied to clipboard', 'success');
+    });
+}
+
+// Refresh button
+document.getElementById('federation-refresh-btn')?.addEventListener('click', () => {
+    federationLoaded = false;
+    loadFederation();
+});
+
+console.log('Federation view initialized');
