@@ -4,6 +4,10 @@ FROM nginx:alpine
 # Copy static files
 COPY index.html /usr/share/nginx/html/
 COPY app.js /usr/share/nginx/html/
+COPY crypto.js /usr/share/nginx/html/
+COPY offline-storage.js /usr/share/nginx/html/
+COPY receipts.js /usr/share/nginx/html/
+COPY i18n.js /usr/share/nginx/html/
 COPY style.css /usr/share/nginx/html/
 COPY sw.js /usr/share/nginx/html/
 COPY manifest.json /usr/share/nginx/html/

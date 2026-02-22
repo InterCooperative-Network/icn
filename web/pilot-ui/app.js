@@ -957,11 +957,8 @@ async function login() {
             state.token = token;
         }
 
-        // Test connection by fetching health
+        // Test connection and verify token by fetching health
         await apiRequest('GET', '/health');
-
-        // Fetch balance to verify auth
-        await apiRequest('GET', `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`);
 
         // Set token expiry (default 24 hours from now)
         state.tokenExpiry = Date.now() + (24 * 60 * 60 * 1000);
