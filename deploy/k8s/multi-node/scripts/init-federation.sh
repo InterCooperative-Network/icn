@@ -96,6 +96,9 @@ call_api() {
   if [[ "$http_code" =~ ^2 ]]; then
     echo "  ✓ $method $path → $http_code"
     return 0
+  elif [[ "$http_code" == "400" ]] && echo "$resp_body" | grep -q "already"; then
+    echo "  ↩ $method $path → already exists (idempotent)"
+    return 0
   else
     echo "  ✗ $method $path → $http_code: $resp_body"
     return 1
@@ -108,8 +111,7 @@ for coop in "${COOPS[@]}"; do
   port="${COOP_PORTS[$coop]}"
   echo "  Initializing $coop..."
   call_api "$coop" POST "/v1/federation/init" \
-    "{\"coop_id\":\"${coop}\",\"name\":\"${coop^} Cooperative\",\"gateway_endpoint\":\"http://${GATEWAY_HOST}:${port}\"}" \
-    || true  # May already be initialized
+    "{\"coop_id\":\"${coop}\",\"name\":\"${coop^} Cooperative\",\"gateway_endpoint\":\"http://${GATEWAY_HOST}:${port}\"}"
 done
 echo ""
 
@@ -121,8 +123,7 @@ for src in "${COOPS[@]}"; do
     dst_port="${COOP_PORTS[$dst]}"
     echo "  $src → $dst..."
     call_api "$src" POST "/v1/federation/coops" \
-      "{\"coop_id\":\"${dst}\",\"name\":\"${dst^} Cooperative\",\"public_did\":\"${DIDS[$dst]}\",\"gateway_endpoints\":[\"http://${GATEWAY_HOST}:${dst_port}\"],\"capabilities\":[\"governance\"]}" \
-      || true  # May already be registered
+      "{\"coop_id\":\"${dst}\",\"name\":\"${dst^} Cooperative\",\"public_did\":\"${DIDS[$dst]}\",\"gateway_endpoints\":[\"http://${GATEWAY_HOST}:${dst_port}\"],\"capabilities\":[\"governance\"]}"
   done
 done
 echo ""
@@ -132,8 +133,7 @@ echo "━━━ Step 4: Creating governance domains ━━━"
 for coop in "${COOPS[@]}"; do
   echo "  Creating domain on $coop..."
   call_api "$coop" POST "/v1/gov/domains" \
-    "{\"id\":\"${coop}-governance\",\"name\":\"${coop^} Governance\",\"profile\":\"cooperative\",\"quorum_percent\":50,\"approval_percent\":66,\"voting_period_days\":7,\"members\":[\"${DIDS[$coop]}\"]}" \
-    || true  # May already exist
+    "{\"id\":\"${coop}-governance\",\"name\":\"${coop^} Governance\",\"profile\":\"cooperative\",\"quorum_percent\":50,\"approval_percent\":66,\"voting_period_days\":7,\"members\":[\"${DIDS[$coop]}\"]}"
 done
 echo ""
 
