@@ -1341,6 +1341,47 @@ impl GovernanceManager {
 
         Ok(item)
     }
+
+    // ========================================================================
+    // Gateway-level string wrappers
+    //
+    // These thin helpers let the gateway avoid importing icn_governance types
+    // (ProposalId, VoteChoice) directly. They are the meaning-firewall boundary
+    // for the proposal vote flow.
+    // ========================================================================
+
+    /// Cast a vote using string IDs and choices (gateway boundary helper).
+    ///
+    /// `choice_str` must be "for", "against", or "abstain".
+    pub async fn cast_vote_str(
+        &self,
+        proposal_id_str: String,
+        voter: Did,
+        choice_str: &str,
+        comment: Option<String>,
+    ) -> Result<()> {
+        let choice = match choice_str.to_lowercase().as_str() {
+            "for" => VoteChoice::For,
+            "against" => VoteChoice::Against,
+            "abstain" => VoteChoice::Abstain,
+            other => anyhow::bail!("Invalid vote choice: {other}"),
+        };
+        self.cast_vote(ProposalId(proposal_id_str), voter, choice, comment)
+            .await
+    }
+
+    /// Get a proposal by its string ID (gateway boundary helper).
+    pub async fn get_proposal_str(&self, id: &str) -> Result<Option<Proposal>> {
+        self.get_proposal(&ProposalId(id.to_string())).await
+    }
+
+    /// Get the proof for a proposal by its string ID (gateway boundary helper).
+    pub async fn get_proof_str(
+        &self,
+        id: &str,
+    ) -> Result<Option<icn_governance::GovernanceProofV2>> {
+        self.get_proof(&ProposalId(id.to_string())).await
+    }
 }
 
 impl Default for GovernanceManager {

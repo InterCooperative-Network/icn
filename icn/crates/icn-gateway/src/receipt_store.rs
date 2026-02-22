@@ -353,7 +353,6 @@ impl GovernanceReceiptBackend for ReceiptStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_governance::{ProofOutcome, VoteTally};
     use icn_kernel_api::ScopeLevel;
 
     fn temp_db() -> Db {

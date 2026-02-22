@@ -316,7 +316,7 @@ pub struct CreateProposalRequest {
     pub scope: Option<ProposalScopeRequest>,
 }
 
-/// Proposal payload types (matches icn_governance::ProposalPayload)
+/// Proposal payload types (gateway-local variant of the governance proposal payload)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProposalPayloadRequest {
@@ -1089,6 +1089,102 @@ pub struct ListingFilterParams {
     /// Number of results to skip for pagination (default: 0)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<usize>,
+}
+
+// ============================================================================
+// Governance Dashboard DTOs
+// ============================================================================
+
+/// Governance dashboard data
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GovernanceDashboard {
+    /// Charter ID (hex)
+    pub charter_id: Option<String>,
+    /// Pending amendments count
+    pub pending_amendments: usize,
+    /// Open appeals count
+    pub open_appeals: usize,
+    /// Recent activity events
+    pub recent_activity: Vec<GovernanceActivityEvent>,
+    /// Amendments breakdown
+    pub amendments_breakdown: AmendmentsBreakdown,
+    /// Appeals breakdown
+    pub appeals_breakdown: AppealsBreakdown,
+}
+
+/// Amendments breakdown by status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AmendmentsBreakdown {
+    pub draft: usize,
+    pub submitted: usize,
+    pub voting: usize,
+    pub ratified: usize,
+    pub rejected: usize,
+    pub withdrawn: usize,
+}
+
+/// Appeals breakdown by status
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AppealsBreakdown {
+    pub filed: usize,
+    pub under_review: usize,
+    pub hearing: usize,
+    pub resolved: usize,
+    pub dismissed: usize,
+    pub withdrawn: usize,
+}
+
+/// Recent governance activity event
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GovernanceActivityEvent {
+    /// Event type
+    pub event_type: String,
+    /// Event description
+    pub description: String,
+    /// Timestamp
+    pub timestamp: u64,
+    /// Resource ID (proposal/amendment/appeal)
+    pub resource_id: String,
+    /// Resource type
+    pub resource_type: String,
+}
+
+/// Steward summary response (for list endpoints)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StewardSummaryResponse {
+    pub steward_id: String,
+    pub steward_did: String,
+    pub holder_did: String,
+    pub status: String,
+    pub jurisdiction: Option<String>,
+    pub reputation_score: f64,
+    pub attestations_issued: u64,
+    pub can_attest: bool,
+    pub term_end: u64,
+}
+
+/// Steward detail response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StewardDetailResponse {
+    pub steward_id: String,
+    pub steward_did: String,
+    pub holder_did: String,
+    pub status: String,
+    pub jurisdiction: Option<String>,
+    pub term_start: u64,
+    pub term_end: u64,
+    pub bond_amount: u64,
+    pub reputation_score: f64,
+    pub effectiveness_score: f64,
+    pub attestations_issued: u64,
+    pub attestations_disputed: u64,
+    pub disputes_against: u64,
+    pub disputes_won: u64,
+    pub specializations: Vec<String>,
+    pub can_attest: bool,
+    pub is_term_expired: bool,
+    pub created_at: u64,
+    pub updated_at: u64,
 }
 
 #[cfg(test)]

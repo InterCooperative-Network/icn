@@ -1250,6 +1250,7 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
     use icn_identity::KeyPair;
 
     fn create_test_store() -> CommonsStore<InMemoryCommonsStore> {
@@ -1331,8 +1332,6 @@ mod tests {
 
     #[test]
     fn test_charter_operations() {
-        use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
-
         let store = create_test_store();
 
         let charter = Charter::new(
@@ -1365,8 +1364,6 @@ mod tests {
 
     #[test]
     fn test_cache_behavior() {
-        use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
-
         let backend = Arc::new(InMemoryCommonsStore::new());
         let store = CommonsStore::new(backend.clone());
 
@@ -1409,6 +1406,7 @@ mod tests {
     mod sled_tests {
         use super::*;
         use crate::commons_store::SledCommonsStore;
+        use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
 
         fn create_sled_store() -> CommonsStore<SledCommonsStore> {
             let backend = Arc::new(SledCommonsStore::temporary().unwrap());
@@ -1489,8 +1487,6 @@ mod tests {
 
         #[test]
         fn test_sled_charter_operations() {
-            use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
-
             let store = create_sled_store();
 
             let charter = Charter::new(
@@ -1523,7 +1519,6 @@ mod tests {
 
         #[test]
         fn test_sled_persistence() {
-            use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
             use std::path::PathBuf;
             use tempfile::tempdir;
 
