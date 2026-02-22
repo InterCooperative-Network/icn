@@ -18,7 +18,8 @@ use icn_core::{EventBus, SystemEvent};
 use icn_gossip::GossipActor;
 use icn_governance::{
     GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams, MembershipConfig,
-    ProofOutcome, ProposalId, ProposalPayload, StaticMembershipResolver, VoteChoice, VoteTally,
+    ProofOutcome, ProposalId, ProposalPayload, ProposalScope, StaticMembershipResolver, VoteChoice,
+    VoteTally,
 };
 use icn_governance_actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite};
 use icn_identity::KeyPair;
@@ -334,6 +335,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                 action: icn_governance::MembershipAction::Add,
                 member: dave.did(),
             },
+            scope: ProposalScope::Local,
         })
         .await?;
 
@@ -411,6 +413,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                 recipient: supplier.did(),
                 purpose: "Purchase drill press for tool library".to_string(),
             },
+            scope: ProposalScope::Local,
         })
         .await?;
 
