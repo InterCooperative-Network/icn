@@ -246,18 +246,18 @@ mod tests {
     /// Mirrors `strict_trust_import_violations` for governance imports.
     /// Governance extraction is Phase 4 — these counts will ratchet to 0.
     ///
-    /// Current state (2026-02-22, Phase 4 complete):
+    /// Current state (2026-02-22, Sprint 14 easy sweep):
     /// - icn-net: CLEAN ✅
     /// - icn-gossip: CLEAN ✅
     /// - icn-ledger: CLEAN ✅
-    /// - icn-gateway: 17 (commons, treasury, entity, steward — pre-Phase-4 residue)
+    /// - icn-gateway: 11 (governance_dashboard, flow_c, steward extracted; commons/treasury/entity residue)
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
             ("icn-net", 0),      // CLEAN ✅
             ("icn-gossip", 0),   // CLEAN ✅
             ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 17), // governance HTTP handlers extracted (Phase 4)
+            ("icn-gateway", 11), // Sprint 14 easy sweep: governance_dashboard, flow_c, steward extracted
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -289,15 +289,19 @@ mod tests {
     ///
     /// Target state: 0 after gateway governance extraction (Phase 4).
     ///
-    /// Current state (2026-02-22, Phase 4 complete):
+    /// Current state (2026-02-22, Sprint 14 easy sweep):
     /// - api/governance.rs: DELETED ✅ (was 54 refs)
     /// - governance_mgr.rs: REPLACED with re-export ✅ (was 5 refs)
-    /// - commons_store.rs: 5 (commons governance — pre-Phase-4 residue)
-    /// - commons_mgr.rs: 3 (commons manager — pre-Phase-4 residue)
-    /// - Other scattered: 16 (entity, treasury, steward, flow_c, constitutional)
+    /// - governance_dashboard.rs: CLEANED ✅ (was 1 ref)
+    /// - flow_c.rs: CLEANED ✅ (was 1 ref)
+    /// - steward/mod.rs: CLEANED ✅ (was 1 ref)
+    /// - models.rs comment: CLEANED ✅ (was 1 ref)
+    /// - receipt_store.rs test: CLEANED ✅ (was 1 ref)
+    /// - commons_store.rs tests: consolidated ✅ (-2 refs)
+    /// - Hard residue: 17 (commons_mgr, commons_store, treasury, entity, receipts, constitutional)
     #[test]
     fn strict_gateway_governance_total_refs() {
-        let expected: usize = 24; // Phase 4 complete: governance HTTP handlers fully extracted
+        let expected: usize = 17; // Sprint 14 easy sweep: -7 refs from 24
         let actual = count_imports_in_crate("icn-gateway", "icn_governance::");
 
         assert!(

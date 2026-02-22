@@ -11,53 +11,16 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 
-use crate::commons_mgr::CommonsManager;
+use crate::commons_mgr::{steward_to_detail, steward_to_summary, CommonsManager};
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_governance::{StewardRecord, StewardStatus};
 use icn_identity::Did;
 
 // ============================================================================
 // Response/Request DTOs
 // ============================================================================
 
-/// Steward summary response (for list endpoints)
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct StewardSummaryResponse {
-    pub steward_id: String,
-    pub steward_did: String,
-    pub holder_did: String,
-    pub status: String,
-    pub jurisdiction: Option<String>,
-    pub reputation_score: f64,
-    pub attestations_issued: u64,
-    pub can_attest: bool,
-    pub term_end: u64,
-}
-
-/// Steward detail response
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct StewardDetailResponse {
-    pub steward_id: String,
-    pub steward_did: String,
-    pub holder_did: String,
-    pub status: String,
-    pub jurisdiction: Option<String>,
-    pub term_start: u64,
-    pub term_end: u64,
-    pub bond_amount: u64,
-    pub reputation_score: f64,
-    pub effectiveness_score: f64,
-    pub attestations_issued: u64,
-    pub attestations_disputed: u64,
-    pub disputes_against: u64,
-    pub disputes_won: u64,
-    pub specializations: Vec<String>,
-    pub can_attest: bool,
-    pub is_term_expired: bool,
-    pub created_at: u64,
-    pub updated_at: u64,
-}
+pub use crate::models::{StewardDetailResponse, StewardSummaryResponse};
 
 /// Register steward request
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -97,53 +60,6 @@ pub struct ExtendTermRequest {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BondOperationRequest {
     pub amount: u64,
-}
-
-fn steward_to_summary(s: &StewardRecord) -> StewardSummaryResponse {
-    StewardSummaryResponse {
-        steward_id: s.steward_id.to_hex(),
-        steward_did: s.steward_did.to_string(),
-        holder_did: s.holder_did.to_string(),
-        status: format_status(&s.status),
-        jurisdiction: s.jurisdiction.clone(),
-        reputation_score: s.reputation_score,
-        attestations_issued: s.attestations_issued,
-        can_attest: s.can_attest(),
-        term_end: s.term_end,
-    }
-}
-
-fn steward_to_detail(s: &StewardRecord) -> StewardDetailResponse {
-    StewardDetailResponse {
-        steward_id: s.steward_id.to_hex(),
-        steward_did: s.steward_did.to_string(),
-        holder_did: s.holder_did.to_string(),
-        status: format_status(&s.status),
-        jurisdiction: s.jurisdiction.clone(),
-        term_start: s.term_start,
-        term_end: s.term_end,
-        bond_amount: s.bond_amount,
-        reputation_score: s.reputation_score,
-        effectiveness_score: s.effectiveness_score(),
-        attestations_issued: s.attestations_issued,
-        attestations_disputed: s.attestations_disputed,
-        disputes_against: s.disputes_against,
-        disputes_won: s.disputes_won,
-        specializations: s.specializations.clone(),
-        can_attest: s.can_attest(),
-        is_term_expired: s.is_term_expired(),
-        created_at: s.created_at,
-        updated_at: s.updated_at,
-    }
-}
-
-fn format_status(s: &StewardStatus) -> String {
-    match s {
-        StewardStatus::Active => "active".to_string(),
-        StewardStatus::Suspended { .. } => "suspended".to_string(),
-        StewardStatus::Retired => "retired".to_string(),
-        StewardStatus::Revoked { .. } => "revoked".to_string(),
-    }
 }
 
 // ============================================================================

@@ -9,7 +9,8 @@
 use anyhow::{bail, Result};
 use icn_governance::{
     Amendment, AmendmentChange, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId,
-    AppealOutcome, AppealResponse, Charter, CharterStatus, OrgType, Ratification, StewardRecord,
+    AppealOutcome, AppealResponse, AppealStatus, Charter, CharterStatus, OrgType, Ratification,
+    StewardRecord, StewardStatus,
 };
 use icn_identity::{
     Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did,
@@ -22,6 +23,10 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
+use crate::models::{
+    AmendmentsBreakdown, AppealsBreakdown, GovernanceActivityEvent, GovernanceDashboard,
+    StewardDetailResponse, StewardSummaryResponse,
+};
 
 /// Commons Manager for gateway API
 ///
@@ -2100,11 +2105,172 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     > {
         self.store.list_enrollment_sessions()
     }
+
+    /// Build a governance dashboard from stored amendments and appeals.
+    ///
+    /// Returns a gateway-level DTO so callers don't need icn_governance types.
+    pub async fn build_governance_dashboard(
+        &self,
+        charter_id: &str,
+    ) -> Result<GovernanceDashboard> {
+        let amendments = self.list_amendments(None, None, None).await?;
+        let appeals = self.list_appeals(None, None, None).await?;
+
+        let mut ab = AmendmentsBreakdown {
+            draft: 0,
+            submitted: 0,
+            voting: 0,
+            ratified: 0,
+            rejected: 0,
+            withdrawn: 0,
+        };
+        let mut pending_amendments = 0usize;
+        for amendment in &amendments {
+            match &amendment.status {
+                AmendmentStatus::Draft => {
+                    ab.draft += 1;
+                    pending_amendments += 1;
+                }
+                AmendmentStatus::Submitted { .. } | AmendmentStatus::UnderReview { .. } => {
+                    ab.submitted += 1;
+                    pending_amendments += 1;
+                }
+                AmendmentStatus::Voting { .. } | AmendmentStatus::Ratifying { .. } => {
+                    ab.voting += 1;
+                    pending_amendments += 1;
+                }
+                AmendmentStatus::Ratified { .. } => ab.ratified += 1,
+                AmendmentStatus::Rejected { .. } => ab.rejected += 1,
+                AmendmentStatus::Withdrawn { .. } => ab.withdrawn += 1,
+                _ => {}
+            }
+        }
+
+        let mut apb = AppealsBreakdown {
+            filed: 0,
+            under_review: 0,
+            hearing: 0,
+            resolved: 0,
+            dismissed: 0,
+            withdrawn: 0,
+        };
+        let mut open_appeals = 0usize;
+        for appeal in &appeals {
+            match &appeal.status {
+                AppealStatus::Filed { .. } => {
+                    apb.filed += 1;
+                    open_appeals += 1;
+                }
+                AppealStatus::UnderReview { .. } => {
+                    apb.under_review += 1;
+                    open_appeals += 1;
+                }
+                AppealStatus::Hearing { .. } => {
+                    apb.hearing += 1;
+                    open_appeals += 1;
+                }
+                AppealStatus::Resolved { .. } => apb.resolved += 1,
+                AppealStatus::Dismissed { .. } => apb.dismissed += 1,
+                AppealStatus::Withdrawn { .. } => apb.withdrawn += 1,
+            }
+        }
+
+        let mut activity = Vec::new();
+        for amendment in amendments.iter().take(5) {
+            let timestamp = match &amendment.status {
+                AmendmentStatus::Draft => amendment.created_at,
+                AmendmentStatus::Submitted { submitted_at, .. } => *submitted_at,
+                AmendmentStatus::Voting {
+                    voting_started_at, ..
+                } => *voting_started_at,
+                AmendmentStatus::Ratified { ratified_at, .. } => *ratified_at,
+                AmendmentStatus::Rejected { rejected_at, .. } => *rejected_at,
+                AmendmentStatus::Withdrawn { withdrawn_at, .. } => *withdrawn_at,
+                _ => amendment.created_at,
+            };
+            activity.push(GovernanceActivityEvent {
+                event_type: "amendment".to_string(),
+                description: format!("Amendment: {}", amendment.title),
+                timestamp,
+                resource_id: hex::encode(amendment.id.as_bytes()),
+                resource_type: "amendment".to_string(),
+            });
+        }
+        for appeal in appeals.iter().take(5) {
+            activity.push(GovernanceActivityEvent {
+                event_type: "appeal".to_string(),
+                description: format!("Appeal filed: {:?}", appeal.appeal_type),
+                timestamp: appeal.created_at,
+                resource_id: hex::encode(appeal.id.as_bytes()),
+                resource_type: "appeal".to_string(),
+            });
+        }
+        activity.sort_by_key(|e| std::cmp::Reverse(e.timestamp));
+        activity.truncate(10);
+
+        Ok(GovernanceDashboard {
+            charter_id: Some(charter_id.to_string()),
+            pending_amendments,
+            open_appeals,
+            recent_activity: activity,
+            amendments_breakdown: ab,
+            appeals_breakdown: apb,
+        })
+    }
 }
 
 impl Default for CommonsManager<InMemoryCommonsStore> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Convert a `StewardRecord` to a gateway-local summary DTO.
+pub fn steward_to_summary(s: &StewardRecord) -> StewardSummaryResponse {
+    StewardSummaryResponse {
+        steward_id: s.steward_id.to_hex(),
+        steward_did: s.steward_did.to_string(),
+        holder_did: s.holder_did.to_string(),
+        status: format_steward_status(&s.status),
+        jurisdiction: s.jurisdiction.clone(),
+        reputation_score: s.reputation_score,
+        attestations_issued: s.attestations_issued,
+        can_attest: s.can_attest(),
+        term_end: s.term_end,
+    }
+}
+
+/// Convert a `StewardRecord` to a gateway-local detail DTO.
+pub fn steward_to_detail(s: &StewardRecord) -> StewardDetailResponse {
+    StewardDetailResponse {
+        steward_id: s.steward_id.to_hex(),
+        steward_did: s.steward_did.to_string(),
+        holder_did: s.holder_did.to_string(),
+        status: format_steward_status(&s.status),
+        jurisdiction: s.jurisdiction.clone(),
+        term_start: s.term_start,
+        term_end: s.term_end,
+        bond_amount: s.bond_amount,
+        reputation_score: s.reputation_score,
+        effectiveness_score: s.effectiveness_score(),
+        attestations_issued: s.attestations_issued,
+        attestations_disputed: s.attestations_disputed,
+        disputes_against: s.disputes_against,
+        disputes_won: s.disputes_won,
+        specializations: s.specializations.clone(),
+        can_attest: s.can_attest(),
+        is_term_expired: s.is_term_expired(),
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+    }
+}
+
+fn format_steward_status(s: &StewardStatus) -> String {
+    match s {
+        StewardStatus::Active => "active".to_string(),
+        StewardStatus::Suspended { .. } => "suspended".to_string(),
+        StewardStatus::Retired => "retired".to_string(),
+        StewardStatus::Revoked { .. } => "revoked".to_string(),
     }
 }
 
