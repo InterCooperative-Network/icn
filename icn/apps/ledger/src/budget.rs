@@ -73,6 +73,7 @@ impl BudgetStore for SledBudgetStore {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use icn_kernel_api::budget::BudgetStatus;

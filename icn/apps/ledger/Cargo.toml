@@ -1,0 +1,26 @@
+[package]
+name = "icn-ledger-actor"
+version = "0.1.0"
+edition = "2021"
+description = "ICN Ledger App — escrow and budget stores for the cooperative ledger"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for EscrowStore and BudgetStore traits
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
+# Storage trait and Sled implementation
+icn-store = { path = "../../crates/icn-store" }
+
+# Direct sled access for budget tree
+sled.workspace = true
+
+# Serialization
+serde_json.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+[lints]
+workspace = true

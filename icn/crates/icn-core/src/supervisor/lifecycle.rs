@@ -646,22 +646,12 @@ async fn spawn_actors_with_identity(
         kernel_executor = kernel_executor.with_membership_service(membership_service);
         info!("✓ Membership service wired to governance executor");
 
-        // Create escrow store for domain-level idempotency
-        let escrow_store_path = config.store_path().join("escrow");
-        let escrow_sled_store: Arc<icn_store::SledStore> =
-            Arc::new(icn_store::SledStore::open(&escrow_store_path)?);
-        let escrow_store: Arc<dyn icn_kernel_api::escrow::EscrowStore> =
-            Arc::new(super::escrow_store::SledEscrowStore::new(escrow_sled_store));
+        // Create escrow and budget stores via the ledger app crate
+        let ledger_stores = icn_ledger_actor::init::create_stores(&config.store_path())?;
+        let escrow_store = ledger_stores.escrow_store;
         kernel_executor = kernel_executor.with_escrow_store(escrow_store.clone());
-        info!("✓ Escrow store wired to governance executor");
-
-        // Create budget store for budget enforcement
-        let budget_store_path = config.store_path().join("budget");
-        let budget_sled_db = sled::open(&budget_store_path)?;
-        let budget_store: Arc<dyn icn_kernel_api::budget::BudgetStore> =
-            Arc::new(super::budget_store::SledBudgetStore::new(&budget_sled_db)?);
-        kernel_executor = kernel_executor.with_budget_store(budget_store);
-        info!("✓ Budget store wired to governance executor");
+        kernel_executor = kernel_executor.with_budget_store(ledger_stores.budget_store);
+        info!("✓ Escrow and budget stores wired to governance executor");
 
         // Create effect dispatcher
         let effect_dispatcher = Arc::new(super::effect_dispatcher::EffectDispatcher::new(
