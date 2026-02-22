@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
 
+use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_gossip::GossipActor;
 use icn_identity::Did;
-use icn_store::Store;
 
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
@@ -304,8 +304,7 @@ impl GovernanceHandle {
         proposal_id: &ProposalId,
     ) -> Result<Option<icn_governance::GovernanceProofV2>> {
         let actor = self.inner.read().await;
-        let proof_key = format!("governance:proof:{}", proposal_id.0);
-        match actor.store.get(proof_key.as_bytes())? {
+        match actor.store.get_proof_bytes(proposal_id)? {
             Some(bytes) => {
                 // Only return securely verifiable V2 proofs. Legacy proofs are not
                 // returned because they cannot carry canonical V2 attestations.
@@ -991,7 +990,7 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 /// The governance actor
 pub struct GovernanceActor {
     did: Did,
-    store: Arc<dyn Store>,
+    store: Arc<dyn GovernanceStateStore>,
     gossip: Arc<RwLock<GossipActor>>,
     resolver: Arc<dyn MembershipResolver + Send + Sync>,
     profile: GovernanceProfile,
@@ -1010,13 +1009,15 @@ impl GovernanceActor {
     /// Spawn a new governance actor
     pub async fn spawn(
         did: Did,
-        store: Arc<dyn Store>,
+        store: Arc<dyn icn_store::Store>,
         gossip: Arc<RwLock<GossipActor>>,
         resolver: Arc<dyn MembershipResolver + Send + Sync>,
         event_bus: Option<Arc<dyn EventEmitter>>,
         signing_key: Option<Arc<ed25519_dalek::SigningKey>>,
     ) -> Result<GovernanceHandle> {
         info!("Spawning GovernanceActor for DID: {}", did);
+        // Wrap raw store in typed state store abstraction
+        let store: Arc<dyn GovernanceStateStore> = Arc::new(SledGovernanceStateStore::new(store));
 
         // Subscribe to governance topic
         {
@@ -1271,8 +1272,7 @@ impl GovernanceActor {
                 );
 
                 // Persist locally
-                self.store
-                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+                self.store.save_domain(&domain)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::domain_created(domain))
@@ -1304,8 +1304,7 @@ impl GovernanceActor {
                 proposal.id = proposal_id.clone();
 
                 // Persist locally
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_created(proposal.clone()))
@@ -1345,8 +1344,7 @@ impl GovernanceActor {
                 };
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Load domain to get default voting period for auto-transition
                 // Use graceful fallback if domain load fails to avoid blocking deliberation
@@ -1425,8 +1423,7 @@ impl GovernanceActor {
                 };
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Schedule auto-close for voting
                 let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
@@ -1492,8 +1489,7 @@ impl GovernanceActor {
                 };
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Schedule auto-close
                 let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
@@ -1533,10 +1529,7 @@ impl GovernanceActor {
                 }
 
                 // Persist locally
-                self.store.put(
-                    &vote_key(&proposal_id, &self.did),
-                    &serde_json::to_vec(&vote)?,
-                )?;
+                self.store.save_vote(&proposal_id, &vote)?;
 
                 // Broadcast to network
                 let vote_msg = GovernanceMessage::vote_cast(vote, None);
@@ -1639,8 +1632,7 @@ impl GovernanceActor {
                 proposal.close(new_state)?;
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Generate GovernanceProofV2 if signing key is available
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
@@ -1671,8 +1663,7 @@ impl GovernanceActor {
                     let serialized = serde_json::to_vec(&proof)?;
 
                     // Persist proof for later retrieval
-                    let proof_key = format!("governance:proof:{}", proposal_id.0);
-                    self.store.put(proof_key.as_bytes(), &serialized)?;
+                    self.store.save_proof_bytes(&proposal_id, &serialized)?;
 
                     info!(
                         "GovernanceProofV2 signed for proposal {} (decision_hash: {})",
@@ -1785,8 +1776,7 @@ impl GovernanceActor {
                 proposal.veto(reason.clone())?;
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Emit event for downstream processing
                 if let Some(ref event_bus) = self.event_bus {
@@ -1835,8 +1825,7 @@ impl GovernanceActor {
                 proposal.force_close(proposal_outcome.clone(), reason.clone())?;
 
                 // Persist updated state
-                self.store
-                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+                self.store.save_proposal(&proposal)?;
 
                 // Emit appropriate event
                 if let Some(ref event_bus) = self.event_bus {
@@ -1893,8 +1882,7 @@ impl GovernanceActor {
                 domain.update_config(new_config);
 
                 // Persist locally
-                self.store
-                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+                self.store.save_domain(&domain)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::domain_updated(domain))
@@ -1972,8 +1960,7 @@ impl GovernanceActor {
                 domain.updated_at = icn_time::current_timestamp_secs();
 
                 // Persist locally
-                self.store
-                    .put(&domain_key(&domain_id), &serde_json::to_vec(&domain)?)?;
+                self.store.save_domain(&domain)?;
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::domain_updated(domain))
@@ -2025,11 +2012,7 @@ impl GovernanceActor {
 
     /// List all domains
     fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
-        let prefix = domain_key_prefix();
-        let rows = self.store.scan(prefix)?;
-        rows.into_iter()
-            .map(|(_k, v)| Ok(serde_json::from_slice::<GovernanceDomain>(&v)?))
-            .collect()
+        self.store.list_domains()
     }
 
     /// List domains with pagination
@@ -2054,17 +2037,12 @@ impl GovernanceActor {
         };
 
         // Scan all domains (storage layer doesn't support native pagination)
-        let prefix = domain_key_prefix();
-        let all_rows = self.store.scan(prefix)?;
-        let total = all_rows.len();
+        let all_domains = self.store.list_domains()?;
+        let total = all_domains.len();
 
         // Skip to offset and take limit
-        let page: Vec<GovernanceDomain> = all_rows
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .map(|(_k, v)| serde_json::from_slice::<GovernanceDomain>(&v))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let page: Vec<GovernanceDomain> =
+            all_domains.into_iter().skip(offset).take(limit).collect();
 
         // Calculate next cursor
         let next_offset = offset + page.len();
@@ -2083,30 +2061,22 @@ impl GovernanceActor {
 
     /// List all proposals
     fn list_proposals(&self) -> Result<Vec<Proposal>> {
-        let prefix = proposal_key_prefix();
-        let rows = self.store.scan(prefix)?;
-        rows.into_iter()
-            .map(|(_k, v)| Ok(serde_json::from_slice::<Proposal>(&v)?))
-            .collect()
+        self.store.list_proposals()
     }
 
     /// Load a domain by ID
     fn load_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
-        load_json(self.store.as_ref(), &domain_key(id))
+        self.store.get_domain(id)
     }
 
     /// Load a proposal by ID
     fn load_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
-        load_json(self.store.as_ref(), &proposal_key(id))
+        self.store.get_proposal(id)
     }
 
     /// Load all votes for a proposal
     fn load_votes(&self, id: &ProposalId) -> Result<Vec<Vote>> {
-        let prefix = vote_key_prefix(id);
-        let rows = self.store.scan(&prefix)?;
-        rows.into_iter()
-            .map(|(_k, v)| Ok(serde_json::from_slice::<Vote>(&v)?))
-            .collect()
+        self.store.list_votes(id)
     }
 
     /// Get vote tally for a proposal
@@ -2174,10 +2144,7 @@ impl GovernanceActor {
         }
 
         // Store the delegation
-        self.store.put(
-            &delegation_key(&delegation.id),
-            &serde_json::to_vec(&delegation)?,
-        )?;
+        self.store.save_delegation(&delegation)?;
 
         info!(
             "✓ Delegation created: {} -> {} (scope: {:?})",
@@ -2372,15 +2339,14 @@ impl GovernanceActor {
 
     /// Load a delegation by ID
     fn load_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
-        load_json(self.store.as_ref(), &delegation_key(id))
+        self.store.get_delegation(id)
     }
 
     /// List all delegations from a delegator
     ///
     /// Returns error on deserialization failures to surface data corruption issues.
     fn list_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
-        let prefix = delegation_key_prefix();
-        let rows = self.store.scan(prefix)?;
+        let rows = self.store.list_all_delegations()?;
         let mut delegations = Vec::new();
 
         for (k, v) in rows {
@@ -2412,8 +2378,7 @@ impl GovernanceActor {
     ///
     /// Returns error on deserialization failures to surface data corruption issues.
     fn list_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
-        let prefix = delegation_key_prefix();
-        let rows = self.store.scan(prefix)?;
+        let rows = self.store.list_all_delegations()?;
         let mut delegations = Vec::new();
 
         for (k, v) in rows {
@@ -2449,10 +2414,8 @@ impl GovernanceActor {
 
         delegation.revoked_at = Some(revoked_at);
 
-        self.store.put(
-            &delegation_key(&delegation.id),
-            &serde_json::to_vec(&delegation)?,
-        )?;
+        self.store
+            .save_revoked_delegation(&delegation, revoked_at)?;
 
         info!("✓ Delegation revoked: {}", id.0);
 
@@ -2461,23 +2424,20 @@ impl GovernanceActor {
 }
 
 /// Handle incoming governance messages from gossip
-fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
+fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> Result<()> {
     match msg {
         GovernanceMessage::DomainCreated { domain } => {
-            // Use domain.id as the key
-            let id = GovernanceDomainId(domain.id.0.clone());
-            store.put(&domain_key(&id), &serde_json::to_vec(&domain)?)?;
+            store.save_domain(&domain)?;
         }
 
         GovernanceMessage::DomainUpdated { domain } => {
             // Update existing domain with new config
-            let id = GovernanceDomainId(domain.id.0.clone());
-            store.put(&domain_key(&id), &serde_json::to_vec(&domain)?)?;
-            info!("Domain config updated via gossip: {}", id.0);
+            store.save_domain(&domain)?;
+            info!("Domain config updated via gossip: {}", domain.id.0);
         }
 
         GovernanceMessage::ProposalCreated { proposal } => {
-            store.put(&proposal_key(&proposal.id), &serde_json::to_vec(&proposal)?)?;
+            store.save_proposal(&proposal)?;
         }
 
         GovernanceMessage::ProposalOpened {
@@ -2486,7 +2446,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
             closes_at,
         } => {
             // Load, update state, persist
-            if let Some(proposal) = load_json::<Proposal>(store, &proposal_key(&id))? {
+            if let Some(proposal) = store.get_proposal(&id)? {
                 // Force state to Open (idempotent for convergence)
                 let updated = Proposal {
                     state: ProposalState::Open {
@@ -2496,15 +2456,12 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
                     updated_at: now_seconds(),
                     ..proposal
                 };
-                store.put(&proposal_key(&id), &serde_json::to_vec(&updated)?)?;
+                store.save_proposal(&updated)?;
             }
         }
 
         GovernanceMessage::VoteCast { vote, .. } => {
-            store.put(
-                &vote_key(&vote.proposal_id, &vote.voter),
-                &serde_json::to_vec(&vote)?,
-            )?;
+            store.save_vote(&vote.proposal_id.clone(), &vote)?;
         }
 
         GovernanceMessage::ProposalClosed {
@@ -2514,19 +2471,17 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
             proof_bytes,
             ..
         } => {
-            if let Some(mut proposal) = load_json::<Proposal>(store, &proposal_key(&id))? {
+            if let Some(mut proposal) = store.get_proposal(&id)? {
                 let new_state = match outcome {
                     ProposalOutcome::Accepted => ProposalState::Accepted { closed_at },
                     ProposalOutcome::Rejected => ProposalState::Rejected { closed_at },
                     ProposalOutcome::NoQuorum => ProposalState::NoQuorum { closed_at },
                 };
                 proposal.close(new_state)?;
-                store.put(&proposal_key(&id), &serde_json::to_vec(&proposal)?)?;
+                store.save_proposal(&proposal)?;
             }
             // Persist proof from remote node (if included and valid)
             if let Some(bytes) = proof_bytes {
-                let proof_key = format!("governance:proof:{}", id.0);
-
                 // Validate remote proof before storing (untrusted gossip input)
                 let incoming_v2 = match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
                     &bytes,
@@ -2580,7 +2535,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
                 };
 
                 if let Some(proof) = incoming_v2 {
-                    let should_store = match store.get(proof_key.as_bytes())? {
+                    let should_store = match store.get_proof_bytes(&id)? {
                         Some(existing_bytes) => {
                             match serde_json::from_slice::<icn_governance::GovernanceProofV2>(
                                 &existing_bytes,
@@ -2603,7 +2558,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
 
                     if should_store {
                         let canonical_bytes = serde_json::to_vec(&proof)?;
-                        store.put(proof_key.as_bytes(), &canonical_bytes)?;
+                        store.save_proof_bytes(&id, &canonical_bytes)?;
                         info!(
                             "Stored validated governance proof from remote for proposal {}",
                             id.0
@@ -2621,51 +2576,7 @@ fn handle_incoming(store: &dyn Store, msg: GovernanceMessage) -> Result<()> {
     Ok(())
 }
 
-// ---- Storage key helpers (aligned with icnctl) ----
-
-fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
-    format!("gov:domain:{}", id.0).into_bytes()
-}
-
-fn domain_key_prefix() -> &'static [u8] {
-    b"gov:domain:"
-}
-
-fn proposal_key(id: &ProposalId) -> Vec<u8> {
-    format!("gov:proposal:{}", id.0).into_bytes()
-}
-
-fn proposal_key_prefix() -> &'static [u8] {
-    b"gov:proposal:"
-}
-
-fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
-    format!("gov:vote:{}:{}", proposal_id.0, voter).into_bytes()
-}
-
-fn vote_key_prefix(proposal_id: &ProposalId) -> Vec<u8> {
-    format!("gov:vote:{}:", proposal_id.0).into_bytes()
-}
-
-fn delegation_key(id: &DelegationId) -> Vec<u8> {
-    format!("gov:delegation:{}", id.0).into_bytes()
-}
-
-fn delegation_key_prefix() -> &'static [u8] {
-    b"gov:delegation:"
-}
-
 // ---- Utility functions ----
-
-fn load_json<T: for<'a> serde::Deserialize<'a>>(
-    store: &dyn Store,
-    key: &[u8],
-) -> Result<Option<T>> {
-    match store.get(key)? {
-        Some(v) => Ok(Some(serde_json::from_slice::<T>(&v)?)),
-        None => Ok(None),
-    }
-}
 
 fn now_seconds() -> u64 {
     icn_time::current_timestamp_secs()
