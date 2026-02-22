@@ -3036,15 +3036,15 @@ elements.authHelpModal.addEventListener('click', (e) => {
     }
 });
 
-// Create Identity Modal event listeners
-elements.showCreateIdentityBtn.addEventListener('click', showCreateIdentityModal);
-elements.closeCreateIdentity.addEventListener('click', closeCreateIdentityModal);
-elements.generateIdentityBtn.addEventListener('click', generateIdentity);
-elements.copyGeneratedDid.addEventListener('click', copyGeneratedDidToClipboard);
-elements.useNewIdentityBtn.addEventListener('click', useNewIdentity);
+// Create Identity Modal event listeners (null-guarded — element may not exist in all views)
+elements.showCreateIdentityBtn?.addEventListener('click', showCreateIdentityModal);
+elements.closeCreateIdentity?.addEventListener('click', closeCreateIdentityModal);
+elements.generateIdentityBtn?.addEventListener('click', generateIdentity);
+elements.copyGeneratedDid?.addEventListener('click', copyGeneratedDidToClipboard);
+elements.useNewIdentityBtn?.addEventListener('click', useNewIdentity);
 
 // Close modal when clicking outside
-elements.createIdentityModal.addEventListener('click', (e) => {
+elements.createIdentityModal?.addEventListener('click', (e) => {
     if (e.target === elements.createIdentityModal) {
         closeCreateIdentityModal();
     }

@@ -34,6 +34,9 @@
     --border-color: var(--gray-200);
     --border-hover: var(--gray-300);
 
+    /* Muted text (used by .help-text etc.) */
+    --text-muted: #6b7280;
+
     /* Focus */
     --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.3);
     --focus-ring-offset: 2px;
@@ -72,6 +75,8 @@
     --gray-500: #9ca3af;
     --gray-700: #d1d5db;
     --gray-900: #f9fafb;
+
+    --text-muted: #9ca3af;
 
     --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.4);
 
@@ -5741,7 +5746,7 @@ footer .sync-status.error {
 
 .federation-stat-label {
     font-size: 0.8rem;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
@@ -5775,6 +5780,7 @@ footer .sync-status.error {
 
 .federation-not-initialized .help-text {
     margin-top: 0.75rem;
+    color: var(--text-secondary);
 }
 
 .federation-command {
@@ -5815,7 +5821,7 @@ footer .sync-status.error {
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: var(--text-tertiary);
+    color: var(--text-secondary);
     border-bottom: 2px solid var(--border-color);
     white-space: nowrap;
 }
@@ -5824,6 +5830,7 @@ footer .sync-status.error {
     padding: 0.75rem;
     border-bottom: 1px solid var(--border-color);
     vertical-align: top;
+    color: var(--text-primary);
 }
 
 .federation-table tbody tr:hover {
