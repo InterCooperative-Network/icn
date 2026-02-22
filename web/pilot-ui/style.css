@@ -85,6 +85,24 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
+/* Toggle-based dark mode overrides (card/input backgrounds that the
+   legacy @media(prefers-color-scheme:dark) block handles separately) */
+[data-theme="dark"] .card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-content {
+    background: var(--bg-primary);
+}
+
 /* ============================================================================
    Base Styles
    ============================================================================ */
@@ -422,7 +440,7 @@ textarea:focus-visible,
 
 /* Cards */
 .card {
-    background: white;
+    background: var(--bg-primary);
     border-radius: 8px;
     padding: 1.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -871,7 +889,7 @@ main {
 }
 
 .stat-card {
-    background: white;
+    background: var(--bg-primary);
     padding: 1.5rem;
     border-radius: 8px;
     text-align: center;
