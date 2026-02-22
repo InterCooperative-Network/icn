@@ -139,15 +139,14 @@ echo ""
 DEMO_DOMAIN="demo-federation-$(date +%s)"
 info "Step 1a: Create demo governance domain on alpha"
 
-# Extract the token's DID (the identity we auth as)
-ALPHA_TOKEN_DID=$(echo "${TOKENS[alpha]}" | cut -d. -f2 | python3 -c "
+if ! $DRY_RUN; then
+  # Extract the token's DID (the identity we auth as)
+  ALPHA_TOKEN_DID=$(echo "${TOKENS[alpha]}" | cut -d. -f2 | python3 -c "
 import sys, base64, json
 payload = sys.stdin.read().strip()
 payload += '=' * (4 - len(payload) % 4)
 print(json.loads(base64.urlsafe_b64decode(payload))['sub'])
 ")
-
-if ! $DRY_RUN; then
   DOMAIN_JSON=$(python3 -c "
 import json; print(json.dumps({
   'id': '$DEMO_DOMAIN', 'name': 'Demo Federation Coop', 'profile': 'cooperative',
