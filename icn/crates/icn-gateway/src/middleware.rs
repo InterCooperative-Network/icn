@@ -44,7 +44,18 @@ pub async fn jwt_auth(
 
     match auth_manager.verify_token(token) {
         Ok(claims) => {
-            // Insert claims into request extensions for handlers to access
+            // Insert BasicClaims first so apps/governance handlers can extract them
+            // without depending on gateway-internal TokenClaims type.
+            let basic = icn_http_kit::auth::BasicClaims {
+                sub: claims.sub.clone(),
+                scope: if claims.scopes.is_empty() {
+                    None
+                } else {
+                    Some(claims.scopes.join(" "))
+                },
+            };
+            req.extensions_mut().insert(basic);
+            // Insert gateway-internal TokenClaims for existing gateway handlers.
             req.extensions_mut().insert(claims);
             Ok(req)
         }

@@ -25,15 +25,22 @@
 //! [`ProtocolExecutor`]: icn_kernel_api::governance::ProtocolExecutor
 
 pub mod actor;
+pub mod events;
 pub mod executor;
 pub mod handlers;
+pub mod http;
 pub mod init;
+pub mod manager;
+pub mod receipt_backend;
 pub mod registry;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
+pub use manager::{GovernanceManager, SledActionItemStore};
+pub use receipt_backend::GovernanceReceiptBackend;
 pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 
 // Re-export registry types for decision/meeting management
@@ -159,6 +166,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use icn_governance::{ProposalPayload, TreasuryProposalOperation};

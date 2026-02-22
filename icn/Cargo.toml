@@ -37,6 +37,7 @@ members = [
     "apps/governance",
     "apps/membership",
     "apps/ledger",
+    "crates/icn-http-kit",
 ]
 
 [workspace.package]

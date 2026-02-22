@@ -34,10 +34,26 @@ icn-obs = { path = "../../crates/icn-obs" }
 # Time utilities
 icn-time = { path = "../../crates/icn-time" }
 
+# Encoding utilities (for Sled store serialization)
+icn-encoding = { path = "../../crates/icn-encoding" }
+
+# Shared HTTP scaffolding (auth, error, pagination, validation)
+icn-http-kit = { path = "../../crates/icn-http-kit" }
+
+# HTTP framework (for governance HTTP handlers)
+actix-web = "4"
+utoipa = { version = "4", features = ["actix_extras"] }
+
+# Persistent storage for action items
+sled = "0.34"
+
 # Cryptography (for GovernanceProof signing)
 ed25519-dalek.workspace = true
 hex = "0.4"
 blake3 = "1.5"
+
+# UUID generation (for suggestion proposal IDs)
+uuid = { version = "1", features = ["v4"] }
 
 # Error handling
 anyhow = "1.0"
@@ -50,3 +66,6 @@ serde_json = "1.0"
 
 # Logging
 tracing = "0.1"
+
+[lints]
+workspace = true

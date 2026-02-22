@@ -7,14 +7,16 @@ use std::sync::Arc;
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 
-use crate::api::governance::{do_cast_vote, do_get_proposal_proof};
 use crate::api::treasury::{do_get_treasury_balance, do_propose_spend, SpendRequest};
-use crate::error::Result;
-use crate::events::EventBroadcaster;
+use crate::error::{GatewayError, Result};
+use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
+use crate::middleware::{get_claims, require_scope};
 use crate::models::CastVoteRequest;
 use crate::notifications::NotificationService;
 use crate::treasury_mgr::GatewayTreasuryManager;
+use icn_governance::{ProposalId, VoteChoice};
+use icn_identity::Did;
 
 /// POST /v1/coops/{coop_id}/proposals - Propose treasury spend.
 #[post("/{coop_id}/proposals")]
@@ -41,32 +43,109 @@ pub async fn get_treasury_balance_alias(
 /// POST /v1/proposals/{id}/vote - Cast vote alias.
 #[post("/{id}/vote")]
 pub async fn cast_vote_alias(
-    req: HttpRequest,
+    http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     notification_service: web::Data<Arc<NotificationService>>,
     id: web::Path<String>,
-    body: web::Json<CastVoteRequest>,
+    req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse> {
-    do_cast_vote(
-        req,
-        gov_mgr,
-        event_broadcaster,
-        notification_service,
-        id,
-        body,
-    )
-    .await
+    require_scope(&http_req, "governance:write")?;
+
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let voter_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    crate::validation::validate_vote_comment(&req.comment)?;
+
+    let choice = match req.choice.to_lowercase().as_str() {
+        "for" => VoteChoice::For,
+        "against" => VoteChoice::Against,
+        "abstain" => VoteChoice::Abstain,
+        _ => {
+            return Err(GatewayError::BadRequest(format!(
+                "Invalid vote choice: {}",
+                req.choice
+            )))
+        }
+    };
+
+    let proposal_id = ProposalId(id.into_inner());
+    gov_mgr
+        .cast_vote(
+            proposal_id.clone(),
+            voter_did.clone(),
+            choice,
+            req.comment.clone(),
+        )
+        .await?;
+
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        GatewayError::InternalError("Vote cast succeeded but proposal not found".to_string())
+    })?;
+
+    let vote_event = GatewayEvent::GovernanceVoteCast {
+        proposal_id: proposal_id.0.clone(),
+        domain_id: proposal.domain_id.0.clone(),
+        voter: voter_did.to_string(),
+        choice: req.choice.clone(),
+    };
+
+    event_broadcaster
+        .broadcast(&proposal.domain_id.0, vote_event.clone())
+        .await;
+
+    let notif_service = notification_service.into_inner();
+    tokio::spawn(async move {
+        use crate::notification_listener::handle_event_for_notifications;
+        handle_event_for_notifications(&vote_event, &notif_service).await;
+    });
+
+    Ok(HttpResponse::Ok().json(proposal))
 }
 
 /// GET /v1/proposals/{id}/proof - Proof read alias.
 #[get("/{id}/proof")]
 pub async fn get_proof_alias(
-    req: HttpRequest,
+    http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    do_get_proposal_proof(req, gov_mgr, id).await
+    require_scope(&http_req, "governance:read")?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    let proof = gov_mgr.get_proof(&proposal_id).await?.ok_or_else(|| {
+        GatewayError::NotFound(format!("No proof found for proposal: {}", proposal_id.0))
+    })?;
+
+    if !proof.verify_receipt() {
+        tracing::warn!(
+            "Invalid proof binding for proposal {} — not serving",
+            proposal_id.0
+        );
+        return Err(GatewayError::NotFound(format!(
+            "No valid proof found for proposal: {}",
+            proposal_id.0
+        )));
+    }
+
+    if proof.attestations.is_empty() {
+        tracing::warn!(
+            "Proof for proposal {} has no attestations — not serving",
+            proposal_id.0
+        );
+        return Err(GatewayError::NotFound(format!(
+            "No valid proof found for proposal: {}",
+            proposal_id.0
+        )));
+    }
+
+    Ok(HttpResponse::Ok().json(proof))
 }
 
 /// Configure /v1/coops Flow C alias routes.
