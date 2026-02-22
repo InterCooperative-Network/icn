@@ -29,8 +29,10 @@ pub mod executor;
 pub mod handlers;
 pub mod init;
 pub mod registry;
+pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
 pub use handlers::translate_payload_to_effects;
 
