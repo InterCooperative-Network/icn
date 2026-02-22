@@ -7974,7 +7974,6 @@ function renderFederationCoops(data, container, peerCountEl) {
         const did = coop.public_did || '--';
         const shortDid = did.length > 30 ? did.substring(0, 28) + '...' : did;
         const endpoints = (coop.gateway_endpoints || []).map(e => escapeHtml(e)).join(', ') || '--';
-        const caps = (coop.capabilities || []).join(', ') || '--';
         const lastSeen = coop.last_seen
             ? new Date(coop.last_seen * 1000).toLocaleString()
             : '--';

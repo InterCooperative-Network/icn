@@ -87,7 +87,7 @@ FED_STATUS="$(curl -fsS --max-time 5 -H "Authorization: Bearer ${TOKEN}" \
 
 if echo "$FED_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('initialized') else 1)" 2>/dev/null; then
   ok "Federation initialized"
-  PEER_COUNT="$(echo "$FED_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('peers', [])))" 2>/dev/null || echo '?')"
+  PEER_COUNT="$(echo "$FED_STATUS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('federated_coops', 0))" 2>/dev/null || echo '?')"
   info "Peers: ${PEER_COUNT}"
 else
   warn "Federation not initialized — tab will show 'not initialized' state"
