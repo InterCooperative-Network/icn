@@ -254,7 +254,7 @@ jobs:
     name: Clippy
     needs: [changes]
     timeout-minutes: 30
-    runs-on: [self-hosted, linux, x64, homelab, k3s]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -275,30 +275,23 @@ jobs:
         with:
           components: clippy
 
-      - name: Configure sccache
+      - uses: Swatinem/rust-cache@v2
         if: needs.changes.outputs.docs_only != 'true'
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
 
       - name: Run Clippy
         if: needs.changes.outputs.docs_only != 'true'
         run: cargo clippy --workspace --all-targets --features "hsm,post-quantum" -- -D warnings
         working-directory: ./icn
 
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats || true
-
   test:
     name: Test
     needs: [changes]
     timeout-minutes: 90
-    runs-on: [self-hosted, linux, x64, homelab, k3s]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -311,33 +304,7 @@ jobs:
         uses: ./.github/actions/free-disk-space
         with:
           verbose: 'true'
-
-      - name: Clean stale Cargo test binaries
-        if: needs.changes.outputs.docs_only != 'true'
-        run: |
-          # Test executables accumulate in target/debug/ across CI runs on self-hosted
-          # runners. Remove them before building so the linker can't run out of disk.
-          # lib*.rlib / lib*.rmeta / lib*.d are preserved — sccache can repopulate
-          # them if missing, but keeping them avoids an extra sccache round-trip.
-          # NOTE: We must also delete .d files for test executables (non-lib*.d).
-          # Keeping a .d file for a deleted binary causes Cargo to skip relinking
-          # (fingerprint says "up-to-date") but then fail with ENOENT at runtime.
-          if [ -d icn/target/debug ]; then
-            echo "=== Disk before Cargo cleanup ==="
-            df -h / | tail -1
-            # Remove top-level test executables (cargo places copies here)
-            find icn/target/debug -maxdepth 1 -type f -delete 2>/dev/null || true
-            # Remove test executables + their .d dep-files from deps/.
-            # Keep only lib-prefixed files: lib*.rlib, lib*.rmeta, lib*.d, *.so
-            find icn/target/debug/deps -maxdepth 1 -type f \
-              ! -name "lib*.rlib" \
-              ! -name "lib*.rmeta" \
-              ! -name "lib*.d" \
-              ! -name "*.so" \
-              -delete 2>/dev/null || true
-            echo "=== Disk after Cargo cleanup ==="
-            df -h / | tail -1
-          fi
+          aggressive: 'true'
 
       - name: Install build tools
         if: needs.changes.outputs.docs_only != 'true'
@@ -346,15 +313,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.changes.outputs.docs_only != 'true'
 
-      - name: Configure sccache
+      - uses: Swatinem/rust-cache@v2
         if: needs.changes.outputs.docs_only != 'true'
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
 
       - name: Run unit tests (parallel)
         if: needs.changes.outputs.docs_only != 'true'
@@ -371,15 +335,11 @@ jobs:
         run: cargo test -p icn-gateway --features sled-storage
         working-directory: ./icn
 
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats || true
-
   backup-validation:
     name: Backup Validation
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64, homelab, k3s]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -391,14 +351,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Configure sccache
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
 
       - name: Build icnctl
         run: cargo build -p icnctl --release
@@ -422,10 +379,6 @@ jobs:
           echo "Cleanup..."
           rm -rf "$DATA_DIR" "$BACKUP_FILE"
         working-directory: ./icn
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats
 
   coverage:
     name: Test Coverage
@@ -511,7 +464,7 @@ jobs:
     name: Build Release
     needs: [changes]
     timeout-minutes: 45
-    runs-on: [self-hosted, linux, x64, homelab, k3s]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -522,6 +475,8 @@ jobs:
       - name: Free disk space
         if: needs.changes.outputs.docs_only != 'true'
         uses: ./.github/actions/free-disk-space
+        with:
+          aggressive: 'true'
 
       - name: Install build tools
         if: needs.changes.outputs.docs_only != 'true'
@@ -530,24 +485,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: needs.changes.outputs.docs_only != 'true'
 
-      - name: Configure sccache
+      - uses: Swatinem/rust-cache@v2
         if: needs.changes.outputs.docs_only != 'true'
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
 
       - name: Build release binaries
         if: needs.changes.outputs.docs_only != 'true'
         run: cargo build --release
         working-directory: ./icn
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats || true
 
       - name: Upload binaries
         if: needs.changes.outputs.docs_only != 'true'
@@ -653,31 +601,27 @@ jobs:
   pilot-provenance:
     name: Pilot Provenance Invariant
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64, homelab, k3s]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [changes, test]
     steps:
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - name: Install build tools
         uses: ./.github/actions/install-build-tools
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Configure sccache
-        run: |
-          echo "RUSTC_WRAPPER=/usr/local/bin/sccache" >> $GITHUB_ENV
-          echo "SCCACHE_DIR=/mnt/icn-sccache" >> $GITHUB_ENV
-          echo "SCCACHE_CACHE_SIZE=30G" >> $GITHUB_ENV
-          echo "CARGO_BUILD_JOBS=4" >> $GITHUB_ENV
-          sccache --start-server || true
-          sccache --show-stats
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+          prefix-key: "v0-rust-ci"
 
       - name: Run pilot chain demo
         env:
           PILOT_DETERMINISTIC: "1"
         run: ./scripts/pilot_chain_demo.sh
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats
