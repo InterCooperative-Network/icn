@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
 
+use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_gossip::GossipActor;
 use icn_identity::Did;
-use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
@@ -2041,11 +2041,8 @@ impl GovernanceActor {
         let total = all_domains.len();
 
         // Skip to offset and take limit
-        let page: Vec<GovernanceDomain> = all_domains
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let page: Vec<GovernanceDomain> =
+            all_domains.into_iter().skip(offset).take(limit).collect();
 
         // Calculate next cursor
         let next_offset = offset + page.len();
@@ -2417,7 +2414,8 @@ impl GovernanceActor {
 
         delegation.revoked_at = Some(revoked_at);
 
-        self.store.save_revoked_delegation(&delegation, revoked_at)?;
+        self.store
+            .save_revoked_delegation(&delegation, revoked_at)?;
 
         info!("✓ Delegation revoked: {}", id.0);
 

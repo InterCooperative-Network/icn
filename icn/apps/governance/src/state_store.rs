@@ -66,11 +66,8 @@ pub trait GovernanceStateStore: Send + Sync {
     fn list_all_delegations(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
     /// Persist a delegation with an updated `revoked_at` field.
-    fn save_revoked_delegation(
-        &self,
-        delegation: &Delegation,
-        revoked_at: Timestamp,
-    ) -> Result<()>;
+    fn save_revoked_delegation(&self, delegation: &Delegation, revoked_at: Timestamp)
+        -> Result<()>;
 
     // --- Governance proofs ---
 
