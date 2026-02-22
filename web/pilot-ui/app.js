@@ -7890,14 +7890,17 @@ async function loadFederation() {
     }
 
     try {
-        // Fetch status and coops in parallel
-        const [statusData, coopsData] = await Promise.all([
-            fetchFederationStatus(),
-            fetchFederationCoops()
-        ]);
-
+        // Fetch status first — coops endpoint 400s when federation not initialized
+        const statusData = await fetchFederationStatus();
         renderFederationStatus(statusData, statusEl);
-        renderFederationCoops(coopsData, coopsEl, peerCountEl);
+
+        if (statusData && statusData.initialized) {
+            const coopsData = await fetchFederationCoops();
+            renderFederationCoops(coopsData, coopsEl, peerCountEl);
+        } else {
+            coopsEl.innerHTML = '';
+            peerCountEl.textContent = '';
+        }
         federationLoaded = true;
     } catch (err) {
         const msg = err.message || 'Failed to load federation data';
@@ -7973,7 +7976,7 @@ function renderFederationCoops(data, container, peerCountEl) {
     const rows = coops.map(coop => {
         const did = coop.public_did || '--';
         const shortDid = did.length > 30 ? did.substring(0, 28) + '...' : did;
-        const endpoints = (coop.gateway_endpoints || []).join(', ') || '--';
+        const endpoints = (coop.gateway_endpoints || []).map(e => escapeHtml(e)).join(', ') || '--';
         const caps = (coop.capabilities || []).join(', ') || '--';
         const lastSeen = coop.last_seen
             ? new Date(coop.last_seen * 1000).toLocaleString()
@@ -7985,9 +7988,9 @@ function renderFederationCoops(data, container, peerCountEl) {
                 <td><code>${escapeHtml(coop.coop_id)}</code></td>
                 <td class="federation-did" title="${escapeHtml(did)}">
                     <code>${escapeHtml(shortDid)}</code>
-                    ${did !== '--' ? `<button class="btn-copy-inline" onclick="copyToClipboard('${escapeHtml(did)}')" title="Copy DID">Copy</button>` : ''}
+                    ${did !== '--' ? `<button class="btn-copy-inline" onclick="copyToClipboard(decodeURIComponent('${encodeURIComponent(did)}'))" title="Copy DID">Copy</button>` : ''}
                 </td>
-                <td><span class="federation-endpoints">${escapeHtml(endpoints)}</span></td>
+                <td><span class="federation-endpoints">${endpoints}</span></td>
                 <td>${(coop.capabilities || []).map(c => `<span class="federation-cap-badge">${escapeHtml(c)}</span>`).join(' ') || '--'}</td>
                 <td class="help-text">${escapeHtml(lastSeen)}</td>
             </tr>`;
