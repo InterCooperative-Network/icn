@@ -1154,17 +1154,15 @@ impl ComputeActor {
         if let Some(ref policy) = self.commons_pool_policy {
             // Standing check: member must meet minimum participation threshold.
             // Uses the same trust score already computed above.
-            policy
-                .check_standing(trust)
-                .inspect_err(|_| {
-                    tracing::warn!(
-                        task_id = %task.id,
-                        submitter = %task.submitter,
-                        trust_score = trust,
-                        required = policy.min_standing,
-                        "Commons task rejected: insufficient member standing"
-                    );
-                })?;
+            policy.check_standing(trust).inspect_err(|_| {
+                tracing::warn!(
+                    task_id = %task.id,
+                    submitter = %task.submitter,
+                    trust_score = trust,
+                    required = policy.min_standing,
+                    "Commons task rejected: insufficient member standing"
+                );
+            })?;
 
             // Credit ceiling check: submitter must have headroom under their ceiling.
             if let Some(ref balance_cb) = self.balance_callback {
