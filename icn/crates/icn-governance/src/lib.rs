@@ -50,6 +50,8 @@ pub mod handle;
 pub mod membership;
 #[allow(missing_docs)]
 pub mod message;
+#[allow(missing_docs)]
+pub mod power_diff;
 pub mod profile;
 pub mod proof;
 #[allow(missing_docs)]
