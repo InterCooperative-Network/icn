@@ -158,6 +158,43 @@ impl PowerDiff {
     }
 }
 
+/// Self-authenticating cryptographic receipt for a Power Diff.
+/// Same pattern as GovernanceDecisionReceipt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerDiffReceipt {
+    pub diff_hash: [u8; 32],
+    pub manifest_hash: [u8; 32],
+    pub baseline_snapshot_hash: [u8; 32],
+    pub report_hash: [u8; 32],
+    pub computed_by: Did,
+    pub timestamp: u64,
+    /// Ed25519 signature over the receipt hash.
+    pub signature: Vec<u8>,
+    /// Deterministic hash of the receipt (signed content).
+    pub receipt_hash: [u8; 32],
+}
+
+impl PowerDiffReceipt {
+    /// Compute the receipt hash (the content that gets signed).
+    pub fn compute_receipt_hash(
+        diff_hash: [u8; 32],
+        manifest_hash: [u8; 32],
+        baseline_snapshot_hash: [u8; 32],
+        report_hash: [u8; 32],
+        computed_by: &str,
+        timestamp: u64,
+    ) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&diff_hash);
+        hasher.update(&manifest_hash);
+        hasher.update(&baseline_snapshot_hash);
+        hasher.update(&report_hash);
+        hasher.update(computed_by.as_bytes());
+        hasher.update(&timestamp.to_le_bytes());
+        *hasher.finalize().as_bytes()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +235,27 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         let parsed: PowerDiff = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.diff_hash, d.diff_hash);
+    }
+
+    #[test]
+    fn test_receipt_hash_deterministic() {
+        let h1 = PowerDiffReceipt::compute_receipt_hash(
+            [1u8; 32],
+            [2u8; 32],
+            [3u8; 32],
+            [4u8; 32],
+            "did:icn:a",
+            12345,
+        );
+        let h2 = PowerDiffReceipt::compute_receipt_hash(
+            [1u8; 32],
+            [2u8; 32],
+            [3u8; 32],
+            [4u8; 32],
+            "did:icn:a",
+            12345,
+        );
+        assert_eq!(h1, h2);
+        assert_ne!(h1, [0u8; 32]);
     }
 }
