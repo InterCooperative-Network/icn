@@ -617,6 +617,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -671,6 +672,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -743,6 +745,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -815,6 +818,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -862,6 +866,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -907,6 +912,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -955,6 +961,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1018,6 +1025,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1085,6 +1093,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1141,6 +1150,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1225,6 +1235,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {
@@ -1304,6 +1315,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let mut ctx = ExecutionContext {

@@ -7,7 +7,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use super::consensus::{outcome_to_value, results_match};
-use super::types::{ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus, SendCallback};
+use super::types::{
+    CommonsPaymentRequest, ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus,
+    SendCallback,
+};
 use super::ComputeActor;
 use crate::error::ComputeError;
 use crate::executor::Executor;
@@ -956,6 +959,42 @@ impl ComputeActor {
                     });
                     icn_obs::metrics::compute::payments_settled_inc();
                     icn_obs::metrics::compute::payment_amount_add(amount);
+                }
+            }
+        }
+
+        // Commons credit settlement (E7 - #948)
+        //
+        // When a commons-scope task completes successfully, fire the commons settlement
+        // callback. The callback is responsible for fetching the consumer's balance,
+        // calling settle_commons_receipt(), and appending the entries to the ledger.
+        //
+        // Belt + suspenders: settle_commons_receipt() hard-rejects any scope != Commons,
+        // so even if this check is bypassed, the ledger invariant holds.
+        if let crate::types::ExecutionOutcome::Success(_) = &result.outcome {
+            if claimed_task.scope == icn_kernel_api::ScopeLevel::Commons {
+                if let Some(ref commons_cb) = self.commons_settlement_callback {
+                    // Compute credits earned from resource consumption.
+                    // duration_ms approximates CPU time; this mirrors the formula in
+                    // icn_ledger::commons_credits::compute_credits_earned() with
+                    // memory/storage/egress=0 (not yet tracked per-result).
+                    // Formula: cpu_millis + (mem_mb_millis/1000) + (storage/1M) + (egress/100k)
+                    // Minimum 1 credit per commons task to account for task overhead.
+                    let credits: u64 = result.duration_ms.max(1);
+                    tracing::info!(
+                        task_id = %claimed_task.id,
+                        contributor = %self.own_did,
+                        consumer = %claimed_task.submitter,
+                        credits = credits,
+                        "Settling commons credits for completed task"
+                    );
+                    commons_cb(CommonsPaymentRequest {
+                        contributor: self.own_did.clone(),
+                        consumer: claimed_task.submitter.clone(),
+                        amount: credits,
+                        receipt_hash: result.task_hash,
+                        task_id: claimed_task.id.clone(),
+                    });
                 }
             }
         }

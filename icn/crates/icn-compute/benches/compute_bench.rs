@@ -46,6 +46,7 @@ fn create_test_task(id: u8) -> ComputeTask {
         privacy_class: PrivacyClass::default(),
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     }
 }
 

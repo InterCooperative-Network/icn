@@ -55,33 +55,6 @@ components:
           - integer
           - 'null'
           format: int64
-    ActivityEvent:
-      type: object
-      description: Recent activity event
-      required:
-      - event_type
-      - description
-      - timestamp
-      - resource_id
-      - resource_type
-      properties:
-        description:
-          type: string
-          description: Event description
-        event_type:
-          type: string
-          description: Event type
-        resource_id:
-          type: string
-          description: Resource ID (proposal/amendment/appeal)
-        resource_type:
-          type: string
-          description: Resource type
-        timestamp:
-          type: integer
-          format: int64
-          description: Timestamp
-          minimum: 0
     AddMemberRequest:
       type: object
       description: Add a member to a cooperative
@@ -734,6 +707,33 @@ components:
         total_founders:
           type: integer
           minimum: 0
+    GovernanceActivityEvent:
+      type: object
+      description: Recent governance activity event
+      required:
+      - event_type
+      - description
+      - timestamp
+      - resource_id
+      - resource_type
+      properties:
+        description:
+          type: string
+          description: Event description
+        event_type:
+          type: string
+          description: Event type
+        resource_id:
+          type: string
+          description: Resource ID (proposal/amendment/appeal)
+        resource_type:
+          type: string
+          description: Resource type
+        timestamp:
+          type: integer
+          format: int64
+          description: Timestamp
+          minimum: 0
     GovernanceDashboard:
       type: object
       description: Governance dashboard data
@@ -766,7 +766,7 @@ components:
         recent_activity:
           type: array
           items:
-            $ref: '#/components/schemas/ActivityEvent'
+            $ref: '#/components/schemas/GovernanceActivityEvent'
           description: Recent activity events
     HealthResponse:
       type: object
@@ -1164,7 +1164,7 @@ components:
             - config_change
           value:
             type: string
-      description: Proposal payload types (matches icn_governance::ProposalPayload)
+      description: Proposal payload types (gateway-local variant of the governance proposal payload)
     ProposalScopeRequest:
       oneOf:
       - type: object
