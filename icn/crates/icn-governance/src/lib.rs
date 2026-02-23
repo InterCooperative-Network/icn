@@ -43,6 +43,8 @@ pub mod delegation;
 pub mod discussion;
 pub mod domain;
 #[allow(missing_docs)]
+pub mod effect_manifest;
+#[allow(missing_docs)]
 pub mod error;
 pub mod handle;
 pub mod membership;
