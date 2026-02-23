@@ -34,6 +34,7 @@ members = [
     "crates/icn-encoding",
     "crates/icn-api",
     "crates/icn-naming",
+    "crates/icn-authz",
     "apps/governance",
     "apps/membership",
     "apps/ledger",
@@ -145,6 +146,7 @@ icn-encoding = { path = "crates/icn-encoding" }
 icn-coop = { path = "crates/icn-coop" }
 icn-api = { path = "crates/icn-api" }
 icn-naming = { path = "crates/icn-naming" }
+icn-authz = { path = "crates/icn-authz" }
 
 [workspace.lints.clippy]
 # Error handling - warn for now, will be upgraded to deny after cleanup
