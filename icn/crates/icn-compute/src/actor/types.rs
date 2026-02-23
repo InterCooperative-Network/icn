@@ -116,3 +116,9 @@ pub type EventCallback = Arc<dyn Fn(ComputeEvent) + Send + Sync>;
 /// - Blob locality information
 /// - Region information
 pub type LocalityCallback = Arc<dyn Fn(&str) -> crate::scheduler::LocalityContext + Send + Sync>;
+
+/// Callback for querying a submitter's ledger balance (E7 - commons credit ceiling checks).
+///
+/// Takes a submitter DID string and returns their current credit balance as a signed integer.
+/// Negative balances indicate debt. Used by `CommonsPoolPolicy::validate_submitter_credit`.
+pub type BalanceCallback = Arc<dyn Fn(&str) -> i64 + Send + Sync>;

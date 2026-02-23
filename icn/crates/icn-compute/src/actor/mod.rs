@@ -14,8 +14,8 @@ mod types;
 // Re-export public types
 pub use handle::ComputeHandle;
 pub use types::{
-    ComputeEvent, EventCallback, LocalityCallback, PaymentCallback, PaymentRequest, SendCallback,
-    TrustCallback,
+    BalanceCallback, ComputeEvent, EventCallback, LocalityCallback, PaymentCallback,
+    PaymentRequest, SendCallback, TrustCallback,
 };
 
 // Internal imports from submodules
@@ -107,6 +107,13 @@ pub struct ComputeActor {
     /// Commons resource pool for tracking nodes contributing to the commons (Epic 6 #946).
     /// Advisory scheduling state only — ledger is authoritative economic state.
     commons_pool: Arc<RwLock<crate::commons_pool::CommonsPool>>,
+    /// Commons pool governance policy (E7 - #1134).
+    /// When set, all task submissions are validated against this policy:
+    /// standing checks, credit ceiling enforcement, and charter priority ordering.
+    commons_pool_policy: Option<crate::policy::CommonsPoolPolicy>,
+    /// Callback for querying submitter ledger balances (E7 - #1134).
+    /// Required for credit ceiling enforcement via `CommonsPoolPolicy::validate_submitter_credit`.
+    balance_callback: Option<BalanceCallback>,
     /// WASM registry for execute-by-hash (Issue #1074)
     wasm_registry: Option<Arc<WasmRegistry>>,
     /// Resource refresh configuration
@@ -153,6 +160,8 @@ impl ComputeActor {
             capacity_budget: Arc::new(RwLock::new(crate::scheduler::CapacityBudget::default())),
             demand_adjustment_config: crate::scheduler::DemandAdjustmentConfig::default(),
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
+            commons_pool_policy: None,
+            balance_callback: None,
             wasm_registry: None,
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
@@ -173,6 +182,24 @@ impl ComputeActor {
     /// Set policy manager for cooperative scheduling policies
     pub fn set_policy_manager(&mut self, manager: Arc<crate::policy::PolicyManager>) {
         self.policy_manager = Some(manager);
+    }
+
+    /// Set commons pool governance policy (E7 - #1134).
+    ///
+    /// When set, task submissions are validated against this policy:
+    /// - Minimum standing check (`CommonsPoolPolicy::check_standing`)
+    /// - Credit ceiling check (`CommonsPoolPolicy::validate_submitter_credit`, requires balance callback)
+    /// - Charter priority ordering applied to the adjusted task priority
+    pub fn set_commons_pool_policy(&mut self, policy: crate::policy::CommonsPoolPolicy) {
+        self.commons_pool_policy = Some(policy);
+    }
+
+    /// Set balance callback for commons credit ceiling enforcement (E7 - #1134).
+    ///
+    /// The callback receives a submitter DID string and returns their current credit balance.
+    /// Must be set alongside `set_commons_pool_policy` for credit validation to activate.
+    pub fn set_balance_callback(&mut self, cb: BalanceCallback) {
+        self.balance_callback = Some(cb);
     }
 
     /// Set dispute resolution system (Phase 18 Week 4)

@@ -11,9 +11,10 @@ use super::types::{ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus, 
 use super::ComputeActor;
 use crate::error::ComputeError;
 use crate::executor::Executor;
+use crate::policy::CharterPriority;
 use crate::result_quorum::{QuorumStatus, TaskVerification};
 use crate::task::{TaskManager, TaskStatus};
-use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash};
+use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash, TaskPriority};
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
 
 impl ComputeActor {
@@ -1148,6 +1149,37 @@ impl ComputeActor {
             });
         }
 
+        // Commons pool governance checks (E7 - #1134)
+        // Standing and credit ceiling validation gate access to shared compute resources.
+        if let Some(ref policy) = self.commons_pool_policy {
+            // Standing check: member must meet minimum participation threshold.
+            // Uses the same trust score already computed above.
+            policy.check_standing(trust).inspect_err(|_| {
+                tracing::warn!(
+                    task_id = %task.id,
+                    submitter = %task.submitter,
+                    trust_score = trust,
+                    required = policy.min_standing,
+                    "Commons task rejected: insufficient member standing"
+                );
+            })?;
+
+            // Credit ceiling check: submitter must have headroom under their ceiling.
+            if let Some(ref balance_cb) = self.balance_callback {
+                let balance = balance_cb(&task.submitter);
+                policy
+                    .validate_submitter_credit(&task, balance)
+                    .inspect_err(|_| {
+                        tracing::warn!(
+                            task_id = %task.id,
+                            submitter = %task.submitter,
+                            balance = balance,
+                            "Commons task rejected: credit ceiling exceeded"
+                        );
+                    })?;
+            }
+        }
+
         // Check policy compliance (Phase 16E)
         let mut adjusted_task = task.clone();
         if let Some(ref policy_manager) = self.policy_manager {
@@ -1188,6 +1220,23 @@ impl ComputeActor {
                         "Policy check passed with adjustments"
                     );
                 }
+            }
+        }
+
+        // Apply charter-defined priority ordering (E7 - #1134).
+        // Charter priority may cap or reorder priorities relative to member standing.
+        // This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
+        if let Some(ref policy) = self.commons_pool_policy {
+            let original = adjusted_task.priority;
+            adjusted_task.priority = apply_commons_charter_priority(policy, &adjusted_task, trust);
+            if adjusted_task.priority != original {
+                tracing::debug!(
+                    task_id = %task.id,
+                    original_priority = ?original,
+                    charter_priority = ?adjusted_task.priority,
+                    charter_policy = ?policy.priority,
+                    "Charter priority applied"
+                );
             }
         }
 
@@ -1339,6 +1388,50 @@ impl ComputeActor {
             let mut depths = self.scope_queue_depths.lock().await;
             if let Some(count) = depths.get_mut(&scope) {
                 *count = count.saturating_sub(1);
+            }
+        }
+    }
+}
+
+/// Apply charter-defined priority ordering for commons compute (E7 - #1134).
+///
+/// Charter policies express cooperative values as scheduling constraints:
+/// - `Fifo`: Pure arrival order. Equal treatment, minimal overhead.
+/// - `EmergencyFirst`: Critical tasks preempt; cooperative constitution declares emergencies.
+/// - `UbsFirst`: Essential services (health, energy, comms) hold Critical priority;
+///   commercial tasks are capped at Normal to preserve headroom.
+/// - `FairShare`: Member standing gates maximum priority. High contributors get
+///   full priority access; low-standing members are throttled proportionally.
+///
+/// This runs after `CoopSchedulingPolicy` adjustments so both layers compose.
+pub(super) fn apply_commons_charter_priority(
+    policy: &crate::policy::CommonsPoolPolicy,
+    task: &ComputeTask,
+    standing: f64,
+) -> TaskPriority {
+    match policy.priority {
+        // Arrival order: no priority modification.
+        CharterPriority::Fifo => task.priority,
+        // Emergency policy: preserve priority as-is; Critical tasks already sort highest.
+        CharterPriority::EmergencyFirst => task.priority,
+        // UBS-first: UBS infrastructure submits as Critical.
+        // Non-essential commercial work is capped at Normal.
+        CharterPriority::UbsFirst => {
+            if task.priority < TaskPriority::Critical {
+                task.priority.min(TaskPriority::Normal)
+            } else {
+                TaskPriority::Critical
+            }
+        }
+        // Fair share: standing proportionally gates maximum allowed priority.
+        // Ensures high-participation members aren't crowded out by low-standing submitters.
+        CharterPriority::FairShare => {
+            if standing >= 0.7 {
+                task.priority // High standing: full priority access
+            } else if standing >= 0.4 {
+                task.priority.min(TaskPriority::Normal) // Medium: cap at Normal
+            } else {
+                task.priority.min(TaskPriority::Low) // Low standing: cap at Low
             }
         }
     }

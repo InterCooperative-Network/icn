@@ -1,9 +1,11 @@
 use super::consensus::{outcome_to_value, results_match};
+use super::lifecycle::apply_commons_charter_priority;
 use super::*;
+use crate::policy::{CharterPriority, CommonsPoolPolicy};
 use crate::task::TaskStatus;
 use crate::types::{
     ComputeResult, ComputeTask, DeterminismClass, ExecutorCapability, FuelLimit, PrivacyClass,
-    TaskCode,
+    TaskCode, TaskPriority,
 };
 
 fn simple_ccl() -> String {
@@ -1732,4 +1734,176 @@ async fn test_execute_by_hash_authz_before_fetch() {
         !fetch_attempted.load(Ordering::SeqCst),
         "Fetch should NOT be attempted when executor trust is too low"
     );
+}
+
+// ============================================================================
+// E7: Commons Compute Governance Hardening (#1134)
+// ============================================================================
+
+fn commons_policy(
+    min_standing: f64,
+    priority: CharterPriority,
+    credit_ceiling: Option<i64>,
+) -> CommonsPoolPolicy {
+    CommonsPoolPolicy {
+        min_standing,
+        priority,
+        max_concurrent_per_submitter: 5,
+        preemption_enabled: false,
+        credit_ceiling,
+    }
+}
+
+#[tokio::test]
+async fn test_commons_standing_rejected() {
+    // Trust = 0.2, min_standing = 0.3 → rejected
+    let trust_cb: TrustCallback = Arc::new(|_| 0.2);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_commons_pool_policy(commons_policy(0.3, CharterPriority::Fifo, None));
+    let handle = actor.spawn();
+
+    let task = make_task("commons-standing-fail", "did:icn:low-standing");
+    let result = handle.submit(task).await;
+
+    assert!(
+        matches!(result, Err(ComputeError::InsufficientTrust { required, actual }) if (required - 0.3).abs() < 0.001 && (actual - 0.2).abs() < 0.001),
+        "Expected InsufficientTrust rejection, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_commons_standing_passes() {
+    // Trust = 0.5, min_standing = 0.3 → allowed
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_commons_pool_policy(commons_policy(0.3, CharterPriority::Fifo, None));
+    let handle = actor.spawn();
+
+    let task = make_task("commons-standing-pass", "did:icn:good-standing");
+    let result = handle.submit(task).await;
+
+    assert!(
+        result.is_ok(),
+        "Expected submission to succeed, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_commons_credit_ceiling_rejected() {
+    // Balance 91, ceiling 100, estimated_cost = FuelLimit(10_000) / 1000 = 10.
+    // available = 100 - 91 = 9 < 10 → rejected.
+    let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_commons_pool_policy(commons_policy(0.3, CharterPriority::Fifo, Some(100)));
+    // Balance callback: returns 91 (9 credits below ceiling, but task costs 10)
+    let balance_cb: BalanceCallback = Arc::new(|_| 91);
+    actor.set_balance_callback(balance_cb);
+    let handle = actor.spawn();
+
+    let task = make_task("commons-credit-fail", "did:icn:alice");
+    let result = handle.submit(task).await;
+
+    assert!(
+        matches!(result, Err(ComputeError::InsufficientCommonsCredits { .. })),
+        "Expected InsufficientCommonsCredits rejection, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_commons_credit_ceiling_passes() {
+    // Balance 85, ceiling 100, cost 10. available = 15 >= 10 → allowed.
+    let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+    let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    actor.set_commons_pool_policy(commons_policy(0.3, CharterPriority::Fifo, Some(100)));
+    let balance_cb: BalanceCallback = Arc::new(|_| 85);
+    actor.set_balance_callback(balance_cb);
+    let handle = actor.spawn();
+
+    let task = make_task("commons-credit-pass", "did:icn:alice");
+    let result = handle.submit(task).await;
+
+    assert!(
+        result.is_ok(),
+        "Expected submission to succeed, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_commons_charter_priority_fair_share_caps_low_standing() {
+    // FairShare policy: standing 0.2 → capped at Low regardless of submitted priority.
+    let policy = commons_policy(0.0, CharterPriority::FairShare, None);
+    let task = ComputeTask {
+        priority: TaskPriority::High,
+        ..make_task("test", "did:icn:member")
+    };
+    let result = apply_commons_charter_priority(&policy, &task, 0.2);
+    assert_eq!(result, TaskPriority::Low);
+}
+
+#[tokio::test]
+async fn test_commons_charter_priority_fair_share_medium_standing() {
+    // FairShare: standing 0.5 → capped at Normal.
+    let policy = commons_policy(0.0, CharterPriority::FairShare, None);
+    let task = ComputeTask {
+        priority: TaskPriority::High,
+        ..make_task("test", "did:icn:member")
+    };
+    let result = apply_commons_charter_priority(&policy, &task, 0.5);
+    assert_eq!(result, TaskPriority::Normal);
+}
+
+#[tokio::test]
+async fn test_commons_charter_priority_fair_share_high_standing() {
+    // FairShare: standing 0.8 → full priority access.
+    let policy = commons_policy(0.0, CharterPriority::FairShare, None);
+    let task = ComputeTask {
+        priority: TaskPriority::High,
+        ..make_task("test", "did:icn:member")
+    };
+    let result = apply_commons_charter_priority(&policy, &task, 0.8);
+    assert_eq!(result, TaskPriority::High);
+}
+
+#[tokio::test]
+async fn test_commons_charter_priority_ubs_first_caps_non_critical() {
+    // UbsFirst: non-critical tasks capped at Normal; Critical UBS tasks preserved.
+    let policy = commons_policy(0.0, CharterPriority::UbsFirst, None);
+
+    let commercial = ComputeTask {
+        priority: TaskPriority::High,
+        ..make_task("commercial", "did:icn:member")
+    };
+    assert_eq!(
+        apply_commons_charter_priority(&policy, &commercial, 0.9),
+        TaskPriority::Normal,
+        "Commercial High → Normal under UbsFirst"
+    );
+
+    let ubs = ComputeTask {
+        priority: TaskPriority::Critical,
+        ..make_task("ubs-infra", "did:icn:member")
+    };
+    assert_eq!(
+        apply_commons_charter_priority(&policy, &ubs, 0.9),
+        TaskPriority::Critical,
+        "UBS Critical stays Critical"
+    );
+}
+
+#[tokio::test]
+async fn test_commons_charter_priority_fifo_no_change() {
+    // Fifo: no priority modification.
+    let policy = commons_policy(0.0, CharterPriority::Fifo, None);
+    for &prio in &[
+        TaskPriority::Low,
+        TaskPriority::Normal,
+        TaskPriority::High,
+        TaskPriority::Critical,
+    ] {
+        let task = ComputeTask {
+            priority: prio,
+            ..make_task("fifo", "did:icn:member")
+        };
+        assert_eq!(apply_commons_charter_priority(&policy, &task, 0.3), prio);
+    }
 }
