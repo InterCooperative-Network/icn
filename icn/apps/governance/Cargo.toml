@@ -42,7 +42,7 @@ icn-http-kit = { path = "../../crates/icn-http-kit" }
 
 # HTTP framework (for governance HTTP handlers)
 actix-web = "4"
-utoipa = { version = "4", features = ["actix_extras"] }
+utoipa = { version = "5", features = ["actix_extras"] }
 
 # Persistent storage for action items
 sled = "0.34"
