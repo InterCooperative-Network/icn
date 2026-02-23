@@ -970,6 +970,11 @@ mod metric_tests {
             let after_first = counter_total(&snapshotter, "icn_compute_receipt_settlement_total");
             assert_eq!(after_first, 1, "counter must be 1 after first settlement");
 
+            let after_first_earned =
+                counter_total(&snapshotter, "icn_compute_commons_credits_earned_total");
+            let after_first_spent =
+                counter_total(&snapshotter, "icn_compute_commons_credits_spent_total");
+
             // Duplicate — must return DuplicateEntry, counters must not change.
             let result = engine.settle_commons_receipt(&req);
             assert!(
@@ -980,6 +985,16 @@ mod metric_tests {
                 counter_total(&snapshotter, "icn_compute_receipt_settlement_total"),
                 after_first,
                 "receipt_settlement_total must not increment on duplicate"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_commons_credits_earned_total"),
+                after_first_earned,
+                "earned_total must not increment on duplicate"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_commons_credits_spent_total"),
+                after_first_spent,
+                "spent_total must not increment on duplicate"
             );
         });
     }
