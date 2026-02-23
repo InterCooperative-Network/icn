@@ -660,6 +660,17 @@ Do not jump to hardware/compiler blame without strong evidence.
 - Example:
   - `cargo test -p icn-core --test backup_restore_integration`
 
+## Domain Advisor Agents
+
+Specialized agents in `.claude/agents/` auto-activate based on crate scope. Invoke via the `Task` tool with `subagent_type` matching the agent name.
+
+| Agent | Auto-activates when working on... |
+|-------|----------------------------------|
+| `icn-economics-advisor` | `icn-ledger`, mutual credit, commons credits, settlement, `EarningTracker`, credit policy |
+| `icn-governance-advisor` | `icn-governance`, `icn-ccl`, `icn-community`, `icn-coop`, proposals, voting, CCL semantics |
+| `icn-identity-iam-advisor` | `icn-identity`, `icn-naming`, DIDs, keystore, key rotation, capability tokens, DID-TLS |
+| `icn-trust-federation-advisor` | `icn-trust`, `icn-federation`, `TrustPolicyOracle`, trust scores, federation treaties |
+
 ## Multi-Agent Worktree Pattern
 - Give each agent an isolated worktree and branch.
 - Keep territory constraints strict: each agent only touches its assigned crate/app.
