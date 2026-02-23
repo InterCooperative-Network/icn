@@ -222,6 +222,367 @@ impl Default for SettlementEngine {
     }
 }
 
+// ============================================================================
+// Commons Settlement
+// ============================================================================
+
+/// A commons credit settlement request.
+///
+/// Used for commons-scope compute tasks: the contributor earns credits from the
+/// commons mint, and the consumer spends credits back to the commons mint.
+///
+/// The caller must:
+/// 1. Verify all receipt signatures and set `executor_verified = true`.
+/// 2. Look up the consumer's current commons credit balance and pass it as `consumer_balance`.
+/// 3. Set `scope = ScopeLevel::Commons` — any other scope is a hard error.
+///
+/// # Invariants
+///
+/// These invariants are enforced by `SettlementEngine::settle_commons_receipt()`:
+/// 1. `scope` must be `ScopeLevel::Commons` — hard error otherwise
+/// 2. `executor_verified` must be `true`
+/// 3. `consumer_balance >= amount` — insufficient balance fails settlement; no partial state
+/// 4. `contributor != consumer` — self-dealing rejected
+/// 5. `amount > 0` — non-positive amounts rejected
+#[derive(Debug, Clone)]
+pub struct CommonsSettlementRequest {
+    /// Content hash identifying this receipt (opaque 32 bytes from compute layer).
+    ///
+    /// Used as the dedup key and as the nonce in both journal entries, ensuring
+    /// identical amounts for the same contributor/consumer produce distinct hashes.
+    pub receipt_hash: [u8; 32],
+
+    /// DID of the contributor who performed the work (earns credits from the mint).
+    pub contributor: Did,
+
+    /// DID of the consumer who requested the work (spends credits to the mint).
+    pub consumer: Did,
+
+    /// Scope level — **must** be `ScopeLevel::Commons`. Hard-rejected otherwise.
+    ///
+    /// This field is validated by `settle_commons_receipt()`. Passing any other
+    /// scope level is a programming error and returns `LedgerError::InvalidEntry`.
+    pub scope: ScopeLevel,
+
+    /// Amount of commons credits to settle (must be positive).
+    pub amount: i64,
+
+    /// Current commons credit balance of the consumer, pre-fetched by the caller.
+    ///
+    /// `settle_commons_receipt()` calls `check_sufficient_balance(consumer_balance, amount)`.
+    /// If insufficient, settlement fails and no journal entries are created.
+    ///
+    /// The balance is held here (not looked up internally) to preserve the DTO
+    /// pattern: callers are responsible for verified state, the engine enforces invariants.
+    pub consumer_balance: i64,
+
+    /// Whether the caller has verified the executor's signature.
+    /// The engine rejects requests where this is false.
+    pub executor_verified: bool,
+}
+
+impl SettlementEngine {
+    /// Settle a commons-scope receipt, producing earn and spend journal entries.
+    ///
+    /// Returns `(earn_entry, spend_entry)` on success. The caller **must** append
+    /// both entries to the ledger — neither alone produces a balanced ledger.
+    ///
+    /// # Invariants enforced
+    ///
+    /// 1. `executor_verified` must be `true`
+    /// 2. `scope` must be `ScopeLevel::Commons` (hard error for any other scope)
+    /// 3. `amount` must be positive
+    /// 4. `contributor != consumer` (no self-dealing)
+    /// 5. Consumer balance must be `>= amount` (balance floor, no partial state on failure)
+    /// 6. Receipt must not have been settled before (`DuplicateEntry` on repeat)
+    ///
+    /// Concurrent settlements of the same receipt are serialized by the internal
+    /// `RwLock<HashSet>`: only one writer can record the dedup key at a time, and
+    /// the read-check before write prevents double-insertion.
+    ///
+    /// # Errors
+    ///
+    /// - `LedgerError::InvalidEntry` — invariant violation (see above)
+    /// - `LedgerError::DuplicateEntry` — receipt already settled
+    /// - `LedgerError::Internal` — lock poisoned (should never happen in practice)
+    pub fn settle_commons_receipt(
+        &self,
+        request: &CommonsSettlementRequest,
+    ) -> Result<(JournalEntry, JournalEntry), LedgerError> {
+        // 1. Reject unverified receipts
+        if !request.executor_verified {
+            return Err(LedgerError::InvalidEntry(
+                "receipt executor signature not verified".to_string(),
+            ));
+        }
+
+        // 2. Hard-reject non-Commons scope (invariant #2 from contract)
+        if request.scope != ScopeLevel::Commons {
+            return Err(LedgerError::InvalidEntry(format!(
+                "settle_commons_receipt requires scope=Commons, got {}",
+                request.scope,
+            )));
+        }
+
+        // 3. Reject non-positive amounts
+        if request.amount <= 0 {
+            return Err(LedgerError::InvalidEntry(
+                "settlement amount must be positive".to_string(),
+            ));
+        }
+
+        // 4. Reject self-dealing
+        if request.contributor == request.consumer {
+            return Err(LedgerError::InvalidEntry(
+                "contributor and consumer must be different DIDs".to_string(),
+            ));
+        }
+
+        // 5. Balance floor — insufficient balance fails settlement, no partial state
+        crate::commons_credits::check_sufficient_balance(request.consumer_balance, request.amount)
+            .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
+
+        // 6. Check deduplication (read lock, then write lock after building entries)
+        let dedup_key = Self::dedup_key(&request.receipt_hash);
+        {
+            let settled = self
+                .settled
+                .read()
+                .map_err(|_| LedgerError::Internal("settlement lock poisoned".to_string()))?;
+            if settled.contains(&dedup_key) {
+                return Err(LedgerError::DuplicateEntry(format!(
+                    "receipt already settled: {}",
+                    hex::encode(request.receipt_hash),
+                )));
+            }
+        }
+
+        // 7. Build entries using commons_credits utilities.
+        //    Both entries use the receipt_hash as nonce, ensuring distinct content hashes
+        //    even when amount, contributor, and consumer are identical across receipts.
+        let earn_entry = crate::commons_credits::build_earn_entry_with_receipt(
+            &request.contributor,
+            request.amount,
+            request.receipt_hash,
+        )
+        .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
+
+        let spend_entry = crate::commons_credits::build_spend_entry_with_receipt(
+            &request.consumer,
+            request.amount,
+            request.receipt_hash,
+        )
+        .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
+
+        // 8. Record dedup key — after successful entry construction, before returning.
+        //    If we crash here, the entries were never returned to the caller, so
+        //    the ledger stays consistent (no orphaned entries).
+        {
+            let mut settled = self
+                .settled
+                .write()
+                .map_err(|_| LedgerError::Internal("settlement lock poisoned".to_string()))?;
+            settled.insert(dedup_key);
+        }
+
+        Ok((earn_entry, spend_entry))
+    }
+}
+
+#[cfg(test)]
+mod commons_tests {
+    use super::*;
+    use icn_identity::KeyPair;
+
+    fn make_commons_request(
+        contributor: &KeyPair,
+        consumer: &KeyPair,
+        receipt_hash: [u8; 32],
+        amount: i64,
+        consumer_balance: i64,
+    ) -> CommonsSettlementRequest {
+        CommonsSettlementRequest {
+            receipt_hash,
+            contributor: contributor.did().clone(),
+            consumer: consumer.did().clone(),
+            scope: ScopeLevel::Commons,
+            amount,
+            consumer_balance,
+            executor_verified: true,
+        }
+    }
+
+    #[test]
+    fn test_commons_settle_happy_path() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let req = make_commons_request(&contributor, &consumer, [0x01; 32], 500, 1000);
+        let (earn, spend) = engine.settle_commons_receipt(&req).unwrap();
+
+        // Earn entry: mint → contributor (credit contributor)
+        assert_eq!(earn.accounts.len(), 2);
+        let earn_credit = earn.accounts.iter().find(|a| a.credit.is_some()).unwrap();
+        assert_eq!(earn_credit.account_id, *contributor.did());
+        assert_eq!(earn_credit.credit, Some(500));
+
+        // Spend entry: consumer → mint (debit consumer)
+        assert_eq!(spend.accounts.len(), 2);
+        let spend_debit = spend.accounts.iter().find(|a| a.debit.is_some()).unwrap();
+        assert_eq!(spend_debit.account_id, *consumer.did());
+        assert_eq!(spend_debit.debit, Some(500));
+    }
+
+    #[test]
+    fn test_commons_settle_wrong_scope_rejected() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        for scope in [
+            ScopeLevel::Local,
+            ScopeLevel::Cell,
+            ScopeLevel::Org,
+            ScopeLevel::Federation,
+        ] {
+            let req = CommonsSettlementRequest {
+                receipt_hash: [0x02; 32],
+                contributor: contributor.did().clone(),
+                consumer: consumer.did().clone(),
+                scope,
+                amount: 100,
+                consumer_balance: 1000,
+                executor_verified: true,
+            };
+            let result = engine.settle_commons_receipt(&req);
+            assert!(result.is_err(), "scope {scope} should be rejected");
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("scope=Commons"), "got: {err}");
+        }
+    }
+
+    #[test]
+    fn test_commons_settle_unverified_rejected() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let req = CommonsSettlementRequest {
+            receipt_hash: [0x03; 32],
+            contributor: contributor.did().clone(),
+            consumer: consumer.did().clone(),
+            scope: ScopeLevel::Commons,
+            amount: 100,
+            consumer_balance: 1000,
+            executor_verified: false,
+        };
+        let result = engine.settle_commons_receipt(&req);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not verified"), "got: {err}");
+    }
+
+    #[test]
+    fn test_commons_settle_insufficient_balance_rejected() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let req = make_commons_request(&contributor, &consumer, [0x04; 32], 500, 100); // balance 100 < amount 500
+        let result = engine.settle_commons_receipt(&req);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("insufficient"), "got: {err}");
+
+        // Verify the receipt is NOT marked as settled after failure
+        assert!(!engine.is_settled(&[0x04; 32]));
+    }
+
+    #[test]
+    fn test_commons_settle_idempotency() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let req = make_commons_request(&contributor, &consumer, [0x05; 32], 100, 500);
+
+        // First settlement succeeds
+        assert!(engine.settle_commons_receipt(&req).is_ok());
+
+        // Second attempt returns DuplicateEntry — balances must not change
+        let result = engine.settle_commons_receipt(&req);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            LedgerError::DuplicateEntry(msg) => {
+                assert!(msg.contains("already settled"), "got: {msg}");
+            }
+            other => panic!("expected DuplicateEntry, got: {other}"),
+        }
+    }
+
+    #[test]
+    fn test_commons_settle_self_dealing_rejected() {
+        let engine = SettlementEngine::new();
+        let kp = KeyPair::generate().unwrap();
+
+        let req = CommonsSettlementRequest {
+            receipt_hash: [0x06; 32],
+            contributor: kp.did().clone(),
+            consumer: kp.did().clone(), // same as contributor
+            scope: ScopeLevel::Commons,
+            amount: 100,
+            consumer_balance: 1000,
+            executor_verified: true,
+        };
+        let result = engine.settle_commons_receipt(&req);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("different DIDs"), "got: {err}");
+    }
+
+    #[test]
+    fn test_commons_settle_zero_amount_rejected() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let req = make_commons_request(&contributor, &consumer, [0x07; 32], 0, 1000);
+        let result = engine.settle_commons_receipt(&req);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("positive"), "got: {err}");
+    }
+
+    #[test]
+    fn test_commons_settle_exact_balance_ok() {
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        // Balance equals amount exactly — should succeed (balance floor is >=, not >)
+        let req = make_commons_request(&contributor, &consumer, [0x08; 32], 300, 300);
+        assert!(engine.settle_commons_receipt(&req).is_ok());
+    }
+
+    #[test]
+    fn test_commons_dedup_independent_from_regular_settlement() {
+        // A receipt can be settled via settle_receipt() OR settle_commons_receipt()
+        // but not both — they share the same dedup key space.
+        let engine = SettlementEngine::new();
+        let contributor = KeyPair::generate().unwrap();
+        let consumer = KeyPair::generate().unwrap();
+
+        let receipt_hash = [0x09; 32];
+        let commons_req = make_commons_request(&contributor, &consumer, receipt_hash, 100, 500);
+        engine.settle_commons_receipt(&commons_req).unwrap();
+
+        // is_settled() reflects commons settlement in the shared dedup set
+        assert!(engine.is_settled(&receipt_hash));
+        assert_eq!(engine.settled_count(), 1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

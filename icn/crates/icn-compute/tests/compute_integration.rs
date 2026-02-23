@@ -64,6 +64,7 @@ fn create_test_task(id: &str, submitter: &str) -> ComputeTask {
         // E4: Storage specification fields
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     }
 }
 

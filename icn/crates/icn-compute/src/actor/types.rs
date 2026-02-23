@@ -122,3 +122,32 @@ pub type LocalityCallback = Arc<dyn Fn(&str) -> crate::scheduler::LocalityContex
 /// Takes a submitter DID string and returns their current credit balance as a signed integer.
 /// Negative balances indicate debt. Used by `CommonsPoolPolicy::validate_submitter_credit`.
 pub type BalanceCallback = Arc<dyn Fn(&str) -> i64 + Send + Sync>;
+
+/// Commons credit settlement request (E7 - #948).
+///
+/// Fired by the compute actor when a commons-scope task completes successfully.
+/// The injected `CommonsSettlementCallback` is responsible for calling
+/// `SettlementEngine::settle_commons_receipt()` and appending the resulting
+/// journal entries to the ledger.
+#[derive(Debug, Clone)]
+pub struct CommonsPaymentRequest {
+    /// DID of the contributor (executor — earns commons credits from the mint).
+    pub contributor: String,
+    /// DID of the consumer (submitter — spends commons credits to the mint).
+    pub consumer: String,
+    /// Amount of commons credits to settle (already computed by the actor).
+    pub amount: u64,
+    /// Receipt hash for deduplication — used as nonce in journal entries.
+    pub receipt_hash: [u8; 32],
+    /// Task ID for audit trail.
+    pub task_id: String,
+}
+
+/// Callback for settling commons credits via the ledger (E7 - #948).
+///
+/// Injected into `ComputeActor` at construction time by whoever owns the
+/// `SettlementEngine`. The callback is responsible for:
+/// 1. Fetching the consumer's current commons credit balance.
+/// 2. Constructing a `CommonsSettlementRequest` and calling `settle_commons_receipt()`.
+/// 3. Appending the resulting earn/spend entries to the ledger.
+pub type CommonsSettlementCallback = Arc<dyn Fn(CommonsPaymentRequest) + Send + Sync>;

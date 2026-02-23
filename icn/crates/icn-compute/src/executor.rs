@@ -483,6 +483,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         }
     }
 
@@ -577,6 +578,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -611,6 +613,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());

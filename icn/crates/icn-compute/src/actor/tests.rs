@@ -53,6 +53,7 @@ fn make_task(id: &str, submitter: &str) -> ComputeTask {
         // E4: Storage specification fields
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     }
 }
 
@@ -1518,6 +1519,7 @@ fn make_wasm_ref_task(id: &str, submitter: &str, wasm_hash: [u8; 32]) -> Compute
         // E4: Storage specification fields
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     }
 }
 
@@ -1906,4 +1908,136 @@ async fn test_commons_charter_priority_fifo_no_change() {
         };
         assert_eq!(apply_commons_charter_priority(&policy, &task, 0.3), prio);
     }
+}
+
+// ============================================================================
+// Commons scope dispatch tests (E7 - #948)
+// ============================================================================
+
+/// Valid ICN DID corresponding to signing key [1u8; 32].
+/// Must be a properly-formatted multibase-encoded Ed25519 public key so that
+/// the CCL executor can parse it as `icn_identity::Did`.
+const TEST_EXECUTOR_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
+/// Helper: make a task with scope set to Commons.
+///
+/// Uses TEST_EXECUTOR_DID as the contract participant — a valid multibase-encoded
+/// Ed25519 public key required by the CCL parser (`participants: Vec<Did>`).
+/// `simple_ccl()` uses `"did:icn:alice"` which is not a valid DID and would cause
+/// the CCL parser to fail, producing `ExecutionOutcome::Failed` instead of `Success`.
+fn make_commons_task(id: &str, submitter: &str) -> ComputeTask {
+    let ccl = format!(
+        r#"{{
+            "name": "CommonsTask",
+            "participants": ["{TEST_EXECUTOR_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "run",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 1 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+    );
+    ComputeTask {
+        scope: icn_kernel_api::ScopeLevel::Commons,
+        code: TaskCode::Ccl(ccl),
+        ..make_task(id, submitter)
+    }
+}
+
+#[tokio::test]
+async fn test_commons_task_triggers_settlement_callback() {
+    // A commons-scope task that completes successfully should fire the
+    // commons settlement callback with the correct contributor and consumer.
+    let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+    let mut actor = ComputeActor::new(TEST_EXECUTOR_DID.into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+
+    // Capture commons payment requests using std::sync::Mutex so the
+    // synchronous callback can push without spawning an additional task.
+    let captured: Arc<std::sync::Mutex<Vec<crate::CommonsPaymentRequest>>> =
+        Arc::new(std::sync::Mutex::new(Vec::new()));
+    let captured_clone = captured.clone();
+    actor.set_commons_settlement_callback(Arc::new(move |req| {
+        captured_clone.lock().unwrap().push(req);
+    }));
+
+    let handle = actor.spawn();
+
+    let task = make_commons_task("commons-1", "did:icn:submitter");
+    let msg = ComputeMessage::TaskSubmitted(Box::new(task.clone()));
+    handle.handle_gossip(msg).await.unwrap();
+
+    // Allow time for execution + settlement callback
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Task should have completed
+    let status = handle.status(task.hash()).await.unwrap();
+    assert!(
+        matches!(status, Some(TaskStatus::Completed { .. })),
+        "task should be completed, got: {status:?}"
+    );
+
+    // Commons callback should have fired
+    let reqs = captured.lock().unwrap();
+    assert_eq!(
+        reqs.len(),
+        1,
+        "expected exactly one commons settlement request, got {}",
+        reqs.len()
+    );
+    let req = &reqs[0];
+    assert_eq!(req.contributor, TEST_EXECUTOR_DID, "contributor = executor");
+    assert_eq!(req.consumer, "did:icn:submitter", "consumer = submitter");
+    assert_eq!(req.task_id, "commons-1");
+}
+
+#[tokio::test]
+async fn test_non_commons_task_does_not_trigger_commons_settlement() {
+    // A non-commons task (Local scope, the default) must NOT fire the
+    // commons settlement callback even if one is installed.
+    let trust_cb: TrustCallback = Arc::new(|_| 0.8);
+    let mut actor = ComputeActor::new(TEST_EXECUTOR_DID.into(), trust_cb);
+    actor.set_signing_key(vec![1u8; 32]);
+
+    let callback_fired = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = callback_fired.clone();
+    actor.set_commons_settlement_callback(Arc::new(move |_| {
+        flag.store(true, std::sync::atomic::Ordering::SeqCst);
+    }));
+
+    let handle = actor.spawn();
+
+    // Local scope task (default)
+    let task = make_task("local-1", "did:icn:submitter");
+    assert_eq!(task.scope, icn_kernel_api::ScopeLevel::Local);
+
+    let msg = ComputeMessage::TaskSubmitted(Box::new(task.clone()));
+    handle.handle_gossip(msg).await.unwrap();
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let status = handle.status(task.hash()).await.unwrap();
+    assert!(matches!(status, Some(TaskStatus::Completed { .. })));
+
+    assert!(
+        !callback_fired.load(std::sync::atomic::Ordering::SeqCst),
+        "commons settlement must NOT fire for non-commons tasks"
+    );
+}
+
+#[test]
+fn test_compute_task_scope_default_is_local() {
+    // The default scope for ComputeTask is Local — never accidentally collectivize.
+    let task = make_task("default-scope", "did:icn:alice");
+    assert_eq!(task.scope, icn_kernel_api::ScopeLevel::Local);
+}
+
+#[test]
+fn test_compute_task_commons_scope_explicit() {
+    let task = make_commons_task("commons-scope", "did:icn:alice");
+    assert_eq!(task.scope, icn_kernel_api::ScopeLevel::Commons);
 }

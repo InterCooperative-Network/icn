@@ -14,8 +14,8 @@ mod types;
 // Re-export public types
 pub use handle::ComputeHandle;
 pub use types::{
-    BalanceCallback, ComputeEvent, EventCallback, LocalityCallback, PaymentCallback,
-    PaymentRequest, SendCallback, TrustCallback,
+    BalanceCallback, CommonsPaymentRequest, CommonsSettlementCallback, ComputeEvent, EventCallback,
+    LocalityCallback, PaymentCallback, PaymentRequest, SendCallback, TrustCallback,
 };
 
 // Internal imports from submodules
@@ -114,6 +114,9 @@ pub struct ComputeActor {
     /// Callback for querying submitter ledger balances (E7 - #1134).
     /// Required for credit ceiling enforcement via `CommonsPoolPolicy::validate_submitter_credit`.
     balance_callback: Option<BalanceCallback>,
+    /// Callback for settling commons credits on task completion (E7 - #948).
+    /// Fires when a commons-scope task completes successfully.
+    commons_settlement_callback: Option<CommonsSettlementCallback>,
     /// WASM registry for execute-by-hash (Issue #1074)
     wasm_registry: Option<Arc<WasmRegistry>>,
     /// Resource refresh configuration
@@ -162,6 +165,7 @@ impl ComputeActor {
             commons_pool: Arc::new(RwLock::new(crate::commons_pool::CommonsPool::new())),
             commons_pool_policy: None,
             balance_callback: None,
+            commons_settlement_callback: None,
             wasm_registry: None,
             resource_refresh_config: crate::scheduler::ResourceRefreshConfig::default(),
             cached_capacity: Arc::new(Mutex::new(None)),
@@ -380,6 +384,11 @@ impl ComputeActor {
     /// Set the callback for settling payments
     pub fn set_payment_callback(&mut self, cb: PaymentCallback) {
         self.payment_callback = Some(cb);
+    }
+
+    /// Set the callback for settling commons credits on task completion (E7 - #948).
+    pub fn set_commons_settlement_callback(&mut self, cb: CommonsSettlementCallback) {
+        self.commons_settlement_callback = Some(cb);
     }
 
     /// Set the callback for broadcasting compute events

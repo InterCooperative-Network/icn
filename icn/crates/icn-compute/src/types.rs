@@ -142,6 +142,22 @@ pub struct ComputeTask {
     /// Default: CellLocal (most restrictive).
     #[serde(default)]
     pub data_locality: Option<icn_kernel_api::storage::DataLocality>,
+
+    // ========================================================================
+    // Commons Credit Scope (E7 - #948)
+    // ========================================================================
+    /// Scope level for commons credit settlement (E7 - #948).
+    ///
+    /// Determines how task completion is settled economically:
+    /// - `Local` (default): standard payment settlement via `settle_receipt()`.
+    /// - `Commons`: commons credit settlement via `settle_commons_receipt()`.
+    ///   Executor earns commons credits from the mint; submitter spends credits to the mint.
+    ///
+    /// **The default is `Local`** — tasks never accidentally collectivize resources.
+    /// Commons must be an explicit opt-in by the submitter at task creation.
+    /// Defaulting to a wider scope would silently collectivize resources.
+    #[serde(default)]
+    pub scope: icn_kernel_api::ScopeLevel,
 }
 
 impl ComputeTask {
@@ -747,6 +763,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let hash1 = task.hash();
@@ -912,6 +929,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         }
     }
 

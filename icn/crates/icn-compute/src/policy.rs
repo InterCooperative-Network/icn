@@ -873,6 +873,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         }
     }
 
@@ -1473,6 +1474,7 @@ mod tests {
             // E4: Storage specification fields
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         let decision5 = manager
@@ -1697,6 +1699,7 @@ mod tests {
             privacy_class: PrivacyClass::default(),
             storage_class: None,
             data_locality: None,
+            scope: Default::default(),
         };
 
         // With balance=60, available=40, required=50 -> should fail
