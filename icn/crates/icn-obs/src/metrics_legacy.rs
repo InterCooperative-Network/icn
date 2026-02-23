@@ -3915,6 +3915,14 @@ pub mod compute {
     pub fn commons_credits_spent_add(amount: u64) {
         counter!("icn_compute_commons_credits_spent_total").increment(amount);
     }
+
+    /// Increment the settlement counter for a completed commons receipt settlement.
+    ///
+    /// `scope` must be a `&'static str` (e.g. `"commons"`). Low-cardinality, stable label —
+    /// no heap allocation on the hot path.
+    pub fn receipt_settlement_inc(scope: &'static str) {
+        counter!("icn_compute_receipt_settlement_total", "scope" => scope).increment(1);
+    }
 }
 
 /// Misbehavior detection metrics (Phase 18)

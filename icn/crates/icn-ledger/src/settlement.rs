@@ -385,6 +385,11 @@ impl SettlementEngine {
             settled.insert(dedup_key);
         }
 
+        // ── Emit settlement metrics (only on guaranteed success, after dedup gate) ──
+        icn_obs::metrics::compute::receipt_settlement_inc("commons");
+        icn_obs::metrics::compute::commons_credits_earned_add(request.amount as u64);
+        icn_obs::metrics::compute::commons_credits_spent_add(request.amount as u64);
+
         Ok((earn_entry, spend_entry))
     }
 }
@@ -872,5 +877,169 @@ mod tests {
         // Settlement should succeed — attester is informational, not blocking
         let result = engine.settle_receipt(&request);
         assert!(result.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod metric_tests {
+    use super::*;
+    use icn_identity::Did;
+    use icn_kernel_api::ScopeLevel;
+    use metrics::with_local_recorder;
+    use metrics_util::debugging::{DebugValue, DebuggingRecorder, Snapshotter};
+
+    const EXECUTOR: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+    const CONSUMER: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu";
+
+    fn make_commons_request(hash: [u8; 32], amount: i64) -> CommonsSettlementRequest {
+        CommonsSettlementRequest {
+            receipt_hash: hash,
+            contributor: Did::from_str(EXECUTOR).unwrap(),
+            consumer: Did::from_str(CONSUMER).unwrap(),
+            scope: ScopeLevel::Commons,
+            amount,
+            consumer_balance: 100_000,
+            executor_verified: true,
+        }
+    }
+
+    /// Sum all counter values with the given metric name across all label sets.
+    fn counter_total(snapshotter: &Snapshotter, name: &str) -> u64 {
+        snapshotter
+            .snapshot()
+            .into_vec()
+            .into_iter()
+            .filter_map(|(key, _, _, value)| {
+                if key.key().name() == name {
+                    match value {
+                        DebugValue::Counter(v) => Some(v),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .sum()
+    }
+
+    /// Successful settlement increments all 3 counters by the settlement amount.
+    #[test]
+    fn successful_settlement_increments_all_counters() {
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+
+        with_local_recorder(&recorder, || {
+            let engine = SettlementEngine::new();
+            let req = make_commons_request([0xA1u8; 32], 100);
+            engine
+                .settle_commons_receipt(&req)
+                .expect("settle must succeed");
+        });
+
+        assert_eq!(
+            counter_total(&snapshotter, "icn_compute_receipt_settlement_total"),
+            1,
+            "receipt_settlement_total must be 1"
+        );
+        assert_eq!(
+            counter_total(&snapshotter, "icn_compute_commons_credits_earned_total"),
+            100,
+            "earned_total must equal settlement amount"
+        );
+        assert_eq!(
+            counter_total(&snapshotter, "icn_compute_commons_credits_spent_total"),
+            100,
+            "spent_total must equal settlement amount"
+        );
+    }
+
+    /// Duplicate settlement returns DuplicateEntry and must not increment counters.
+    #[test]
+    fn duplicate_settlement_does_not_increment_counters() {
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+
+        with_local_recorder(&recorder, || {
+            let engine = SettlementEngine::new();
+            let req = make_commons_request([0xB2u8; 32], 50);
+
+            // First settlement — must succeed.
+            engine
+                .settle_commons_receipt(&req)
+                .expect("first settle must succeed");
+            let after_first = counter_total(&snapshotter, "icn_compute_receipt_settlement_total");
+            assert_eq!(after_first, 1, "counter must be 1 after first settlement");
+
+            let after_first_earned =
+                counter_total(&snapshotter, "icn_compute_commons_credits_earned_total");
+            let after_first_spent =
+                counter_total(&snapshotter, "icn_compute_commons_credits_spent_total");
+
+            // Duplicate — must return DuplicateEntry, counters must not change.
+            let result = engine.settle_commons_receipt(&req);
+            assert!(
+                matches!(result, Err(crate::error::LedgerError::DuplicateEntry(_))),
+                "second settlement must be DuplicateEntry, got: {result:?}"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_receipt_settlement_total"),
+                after_first,
+                "receipt_settlement_total must not increment on duplicate"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_commons_credits_earned_total"),
+                after_first_earned,
+                "earned_total must not increment on duplicate"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_commons_credits_spent_total"),
+                after_first_spent,
+                "spent_total must not increment on duplicate"
+            );
+        });
+    }
+
+    /// Rejected settlements (scope mismatch, insufficient balance) must not touch counters.
+    #[test]
+    fn rejected_settlement_does_not_increment_counters() {
+        let recorder = DebuggingRecorder::new();
+        let snapshotter = recorder.snapshotter();
+
+        with_local_recorder(&recorder, || {
+            let engine = SettlementEngine::new();
+
+            // Scope mismatch.
+            let mut req = make_commons_request([0xC3u8; 32], 50);
+            req.scope = ScopeLevel::Local;
+            assert!(
+                engine.settle_commons_receipt(&req).is_err(),
+                "scope mismatch must be rejected"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_receipt_settlement_total"),
+                0,
+                "scope mismatch must not increment counter"
+            );
+
+            // Insufficient balance.
+            let req2 = CommonsSettlementRequest {
+                receipt_hash: [0xD4u8; 32],
+                contributor: Did::from_str(EXECUTOR).unwrap(),
+                consumer: Did::from_str(CONSUMER).unwrap(),
+                scope: ScopeLevel::Commons,
+                amount: 999,
+                consumer_balance: 10, // far below amount
+                executor_verified: true,
+            };
+            assert!(
+                engine.settle_commons_receipt(&req2).is_err(),
+                "insufficient balance must be rejected"
+            );
+            assert_eq!(
+                counter_total(&snapshotter, "icn_compute_receipt_settlement_total"),
+                0,
+                "insufficient balance must not increment counter"
+            );
+        });
     }
 }

@@ -234,7 +234,6 @@ fn build_earn_entry_inner(
 
     let entry = builder.build()?;
 
-    icn_obs::metrics::compute::commons_credits_earned_add(amount as u64);
     Ok(entry)
 }
 
@@ -289,7 +288,6 @@ fn build_spend_entry_inner(
 
     let entry = builder.build()?;
 
-    icn_obs::metrics::compute::commons_credits_spent_add(amount as u64);
     Ok(entry)
 }
 
