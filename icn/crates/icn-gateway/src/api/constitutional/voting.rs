@@ -157,7 +157,7 @@ fn ratification_to_vote(r: &Ratification) -> VoteResponse {
 
 fn format_status(status: &AmendmentStatus) -> String {
     match status {
-        AmendmentStatus::Draft => "draft".to_string(),
+        AmendmentStatus::Draft | AmendmentStatus::DraftWithArtifacts { .. } => "draft".to_string(),
         AmendmentStatus::Submitted { .. } => "submitted".to_string(),
         AmendmentStatus::UnderReview { .. } => "under_review".to_string(),
         AmendmentStatus::Voting { .. } => "voting".to_string(),
