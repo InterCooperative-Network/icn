@@ -49,6 +49,23 @@ make logs                                # View logs
 
 The Cargo workspace is located in the `icn/` subdirectory. All build/test commands must be run from the `icn/` directory within the repository root.
 
+### Repo Topology (Two Roots)
+
+This monorepo has **two important roots** — mixing them up causes subtle failures:
+
+| Root | Path | Contains |
+|------|------|----------|
+| **Monorepo root** | `/home/ubuntu/projects/icn` | `sdk/`, `docs/`, `web/`, `deploy/`, `scripts/`, `CLAUDE.md` |
+| **Rust workspace** | `/home/ubuntu/projects/icn/icn` | `Cargo.toml`, `crates/`, `bins/`, `Cargo.lock` |
+
+**Rule**: Rust commands (`cargo *`) run from `icn/icn/`. SDK/OpenAPI commands run from the monorepo root's subdirectories (`sdk/typescript/`, `docs/api/`).
+
+```bash
+# Quick "where am I?" check
+git rev-parse --show-toplevel
+test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
+```
+
 **Crates** (in `icn/crates/`):
 - `icn-core` - Tokio runtime, supervisor, actor lifecycle management
 - `icn-identity` - DID generation, Ed25519 keypairs, Age-encrypted keystore
@@ -299,6 +316,17 @@ See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for full details 
 2. Register in `init_metrics()`
 3. Follow naming: `{actor}_{metric}_{unit}`
 
+**Adding a new crate** (template from `icn-authz`):
+1. Create `crates/<name>/Cargo.toml` — workspace-inherited version/edition/license/repository, `[lints] workspace = true`
+2. Create `src/lib.rs` with module declarations + public re-exports
+3. Create `src/error.rs` with crate-specific error enum (derives `thiserror::Error`)
+4. Organize by concern: `model/`, `graph/`, `adapters/` (or domain-appropriate dirs)
+5. Add to workspace `members` in `icn/Cargo.toml` (alphabetical within group)
+6. Add to workspace `[dependencies]` with `path = "crates/<name>"`
+7. Integration tests in `tests/` directory
+8. Verify: `cargo check -p <name> && cargo test -p <name>`
+9. If kernel-level: no persistence, no domain imports, no side effects
+
 ## Git Workflow
 
 **Goal**: `main` is always releasable. Work happens on short-lived branches, merged via PR.
@@ -381,6 +409,30 @@ cargo test --all-features
 cd sdk/typescript && npm test && npm run build
 ```
 
+### CI Failure Index
+
+Common CI failures and their minimal fixes:
+
+| CI Check | Usual Cause | Fix |
+|----------|------------|-----|
+| **Check API Types Drift** | TS types out of date after API change | `cd sdk/typescript && npm ci && npm run generate-types` — commit only `src/generated/api-types.ts` |
+| **non-exhaustive patterns** | Enum variant added in shared crate | Add match arm in consumer crate, map to closest existing semantics |
+| **Clippy** | Lint regression in changed code | Fix the warning — never suppress with `#[allow]` unless pre-existing |
+| **Compare Against Base** | Benchmark compare flaky | If not required: ignore. If required: `gh run rerun <run-id> --failed` once before touching code |
+| **claude-review** | 15-min job timeout (infra flake) | Never blocks merge |
+
+**Full drift chain**: shared crate change → gateway/API match updates → OpenAPI regen → TS type regen → CI passes. Don't skip the second half.
+
+**Drift fix recipe** (TypeScript API Types):
+```bash
+cd sdk/typescript && npm ci && npm run generate-types
+git diff --stat  # must show ONLY sdk/typescript/src/generated/* paths
+git add sdk/typescript/src/generated/api-types.ts
+git commit -m "chore(sdk): regenerate TypeScript API types"
+```
+
+**Generated-commit gate**: A regen commit must touch only `sdk/typescript/src/generated/*`. No lockfile changes unless `npm ci` actually updated deps (rare). No mixed "refactor + regen" commits.
+
 ### Agent Behavior
 
 The Claude Code agent **must**:
@@ -442,6 +494,24 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete de
 - Shutdown via `tokio::sync::broadcast`
 - Integration tests need unique ports per node
 - Vector clocks prevent duplicate gossip processing
+
+### Canonical Type Ownership
+
+| Type | Canonical Home | Notes |
+|------|---------------|-------|
+| `Did` | `icn-identity` | Newtype `Did(String)` — `.as_str()` for &str, `.to_string()` for String |
+| `BlockHeight` | `icn-kernel-api::invariants` | `pub type BlockHeight = u64` (alias, not newtype) |
+| `ErrCode` | `icn-kernel-api::error` | 10 codes, lowercase snake_case wire format |
+| `ArtifactReceipt` | `icn-kernel-api::proofs` | Phase A addition |
+| `GovernanceProof` | `icn-governance::proof` | Phase A addition |
+
+If a type can't be imported yet (unmerged PR), use a local alias with a migration comment citing the PR number.
+
+### Lockfile Policy
+
+- Rust `Cargo.lock` changes belong in Rust commits only
+- Node `package-lock.json` changes belong in SDK commits only
+- If a lockfile changed unintentionally (branch switching churn), revert it before committing
 
 ## Kernel/App Separation Architecture
 
@@ -602,6 +672,10 @@ Before making ANY code change:
 
 If any of these are ambiguous, STOP and ask.
 
+**Cross-PR rule**: One phase = one branch = one PR. Never commit Phase B work onto a Phase A branch (or vice versa). If scope bleed happens, fix immediately via `git reset --hard HEAD~N` + `git cherry-pick` onto the correct branch.
+
+**Stashes are debt**: Before switching branches, `git status --short` must be clean — commit or stash intentionally. After switching, `git stash list` should be empty. Drop unneeded stashes immediately; don't leave them for archaeology.
+
 ### PR Workflow Gates (for Rust workspace)
 When applying review feedback or fixing CI:
 - After changes and before pushing:
@@ -610,6 +684,23 @@ When applying review feedback or fixing CI:
   - `cargo test` (or `cargo test --workspace` if appropriate)
 - Do not push broken formatting/lints/tests.
 - **Never run `git push` directly. Always use `/push`.** This is the only sanctioned push path.
+
+### PR Readiness Definition
+A PR is ready to merge when:
+- All review feedback, comments, and review threads addressed (`gh pr view <id> --json reviews,reviewRequests,comments`)
+- Required CI checks green (flaky non-required checks don't block)
+- No scope-bleed commits (every commit belongs to this phase)
+- Diff size matches phase expectations (no surprise 2000-line PRs)
+- Generated commits labeled as such (`chore(sdk): …`) and contain only generated files
+
+**Do not merge until PR Readiness Definition is satisfied.**
+
+```bash
+# Merge preflight
+gh pr view <id> --json state,mergeable,reviews,reviewRequests,comments,statusCheckRollup
+gh pr checks <id>
+git status --short
+```
 
 ### Do Not "Fix the World"
 - Do NOT upgrade toolchains, refactor unrelated code, or address pre-existing lints unless explicitly asked.
