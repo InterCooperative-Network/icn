@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::hash::hash_edge_set;
 use super::ids::{Action, BlockHeight, Constraint, EdgeSource, ResourceId, SubjectId};
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,11 @@ impl CapabilityGraph {
     /// Borrow the canonical edge list.
     pub fn edges(&self) -> &[CapabilityEdge] {
         &self.edges
+    }
+
+    /// Deterministic hash of the entire edge set.
+    pub fn hash(&self) -> [u8; 32] {
+        hash_edge_set(&self.edges)
     }
 
     /// Query whether `subject` may perform `action` on `resource`.
