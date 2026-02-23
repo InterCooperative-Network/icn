@@ -95,6 +95,7 @@ async fn test_compute_events_to_websocket() {
         privacy_class: PrivacyClass::default(),
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     };
 
     let task_hash = handle
@@ -212,6 +213,7 @@ async fn test_multiple_subscribers_receive_events() {
         privacy_class: PrivacyClass::default(),
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     };
 
     handle
@@ -333,6 +335,7 @@ async fn test_events_have_sequence_numbers() {
         privacy_class: PrivacyClass::default(),
         storage_class: None,
         data_locality: None,
+        scope: Default::default(),
     };
 
     handle
