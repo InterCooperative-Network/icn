@@ -191,6 +191,9 @@ pub enum EdgeSource {
 // ---------------------------------------------------------------------------
 
 /// Block height for temporal validity. Alias for `u64`.
+///
+/// Defined locally until `icn-kernel-api::BlockHeight` (Phase A, PR #1282) merges
+/// to main. Switch to re-export at that point.
 pub type BlockHeight = u64;
 
 // ---------------------------------------------------------------------------
