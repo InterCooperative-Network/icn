@@ -115,6 +115,13 @@ impl fmt::Display for AmendmentScope {
 pub enum AmendmentStatus {
     /// Initial draft, not yet submitted
     Draft,
+    /// Draft with computed artifacts (manifest, diff, report).
+    /// Must pass invariant gate to reach this state.
+    DraftWithArtifacts {
+        manifest_hash: [u8; 32],
+        power_diff_hash: Option<[u8; 32]>,
+        report_hash: [u8; 32],
+    },
     /// Submitted for review
     Submitted { submitted_at: Timestamp },
     /// Under review period before voting
@@ -312,6 +319,15 @@ pub struct Amendment {
     pub created_at: Timestamp,
     /// When last updated
     pub updated_at: Timestamp,
+    /// Effect manifest (set when artifacts are attached).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effect_manifest: Option<crate::effect_manifest::EffectManifest>,
+    /// Power diff (set when artifacts are attached).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_diff: Option<crate::power_diff::PowerDiff>,
+    /// Invariant report (set when artifacts are attached).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invariant_report: Option<icn_kernel_api::invariants::InvariantReport>,
 }
 
 /// A specific change within an amendment
@@ -403,6 +419,9 @@ impl Amendment {
             supersedes: None,
             created_at: now,
             updated_at: now,
+            effect_manifest: None,
+            power_diff: None,
+            invariant_report: None,
         }
     }
 
@@ -677,6 +696,48 @@ impl Amendment {
 
     fn touch(&mut self) {
         self.updated_at = self.now();
+    }
+
+    /// Attach governance safety artifacts. Transitions Draft -> DraftWithArtifacts.
+    /// Rejects if invariant report has failures.
+    pub fn attach_artifacts(
+        &mut self,
+        manifest: crate::effect_manifest::EffectManifest,
+        power_diff: Option<crate::power_diff::PowerDiff>,
+        report: icn_kernel_api::invariants::InvariantReport,
+    ) -> Result<(), String> {
+        if !matches!(self.status, AmendmentStatus::Draft) {
+            return Err("Can only attach artifacts to Draft amendments".into());
+        }
+        if !report.passed {
+            return Err(format!(
+                "Invariant gate failed: {} violations",
+                report.violations.len()
+            ));
+        }
+
+        self.status = AmendmentStatus::DraftWithArtifacts {
+            manifest_hash: manifest.manifest_hash,
+            power_diff_hash: power_diff.as_ref().map(|pd| pd.diff_hash),
+            report_hash: report.report_hash,
+        };
+        self.effect_manifest = Some(manifest);
+        self.power_diff = power_diff;
+        self.invariant_report = Some(report);
+        self.updated_at = icn_time::current_timestamp_secs();
+        Ok(())
+    }
+
+    /// Submit for review. Only allowed from DraftWithArtifacts.
+    /// This enforces "no manifest, no activation."
+    pub fn submit_for_review(&mut self) -> Result<(), String> {
+        if !matches!(self.status, AmendmentStatus::DraftWithArtifacts { .. }) {
+            return Err("Must attach artifacts before submitting for review".into());
+        }
+        let now = icn_time::current_timestamp_secs();
+        self.status = AmendmentStatus::Submitted { submitted_at: now };
+        self.updated_at = now;
+        Ok(())
     }
 }
 
@@ -1088,5 +1149,129 @@ mod tests {
         });
 
         assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod interceptor_tests {
+    use super::*;
+    use crate::effect_manifest::EffectManifest;
+    use icn_kernel_api::invariants::InvariantReport;
+
+    #[test]
+    fn test_amendment_attach_artifacts_passes_gate() {
+        let mut amendment = Amendment::new(
+            AmendmentType::Policy,
+            AmendmentScope::Jurisdiction {
+                domain_id: "test".into(),
+            },
+            "Test".into(),
+            "Test amendment".into(),
+            Did::from_anchor_id(&[42u8; 32]),
+        );
+        assert!(matches!(amendment.status, AmendmentStatus::Draft));
+
+        let manifest = EffectManifest::new(
+            [0u8; 32],
+            [0u8; 32],
+            "did:icn:proposer".into(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        let report = InvariantReport::new(manifest.manifest_hash, None, vec![]);
+
+        let result = amendment.attach_artifacts(manifest, None, report);
+        assert!(result.is_ok());
+        assert!(matches!(
+            amendment.status,
+            AmendmentStatus::DraftWithArtifacts { .. }
+        ));
+    }
+
+    #[test]
+    fn test_amendment_attach_artifacts_rejects_failed_report() {
+        let mut amendment = Amendment::new(
+            AmendmentType::Policy,
+            AmendmentScope::Jurisdiction {
+                domain_id: "test".into(),
+            },
+            "Test".into(),
+            "Test amendment".into(),
+            Did::from_anchor_id(&[42u8; 32]),
+        );
+        let manifest = EffectManifest::new(
+            [0u8; 32],
+            [0u8; 32],
+            "did:icn:proposer".into(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        let violation = icn_kernel_api::invariants::InvariantViolation {
+            id: icn_kernel_api::invariants::InvariantId::BoundedAuthority,
+            domain: icn_kernel_api::invariants::InvariantDomain::AntiCaptureCore,
+            message: "test failure".into(),
+            details: vec![],
+        };
+        let report = InvariantReport::new(manifest.manifest_hash, None, vec![violation]);
+
+        let result = amendment.attach_artifacts(manifest, None, report);
+        assert!(result.is_err());
+        assert!(matches!(amendment.status, AmendmentStatus::Draft));
+    }
+
+    #[test]
+    fn test_submit_requires_artifacts() {
+        let mut amendment = Amendment::new(
+            AmendmentType::Policy,
+            AmendmentScope::Jurisdiction {
+                domain_id: "test".into(),
+            },
+            "Test".into(),
+            "Test amendment".into(),
+            Did::from_anchor_id(&[42u8; 32]),
+        );
+        // Cannot submit directly from Draft -- must go through DraftWithArtifacts
+        let result = amendment.submit_for_review();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_full_artifact_then_submit_lifecycle() {
+        let mut amendment = Amendment::new(
+            AmendmentType::Policy,
+            AmendmentScope::Jurisdiction {
+                domain_id: "test".into(),
+            },
+            "Test".into(),
+            "Test amendment".into(),
+            Did::from_anchor_id(&[42u8; 32]),
+        );
+
+        let manifest = EffectManifest::new(
+            [0u8; 32],
+            [0u8; 32],
+            "did:icn:proposer".into(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        let report = InvariantReport::new(manifest.manifest_hash, None, vec![]);
+
+        amendment.attach_artifacts(manifest, None, report).unwrap();
+        assert!(matches!(
+            amendment.status,
+            AmendmentStatus::DraftWithArtifacts { .. }
+        ));
+
+        amendment.submit_for_review().unwrap();
+        assert!(matches!(
+            amendment.status,
+            AmendmentStatus::Submitted { .. }
+        ));
     }
 }
