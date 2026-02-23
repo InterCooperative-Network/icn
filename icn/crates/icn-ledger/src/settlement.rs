@@ -385,6 +385,11 @@ impl SettlementEngine {
             settled.insert(dedup_key);
         }
 
+        // ── Emit settlement metrics (only on guaranteed success, after dedup gate) ──
+        icn_obs::metrics::compute::receipt_settlement_inc("commons");
+        icn_obs::metrics::compute::commons_credits_earned_add(request.amount as u64);
+        icn_obs::metrics::compute::commons_credits_spent_add(request.amount as u64);
+
         Ok((earn_entry, spend_entry))
     }
 }
