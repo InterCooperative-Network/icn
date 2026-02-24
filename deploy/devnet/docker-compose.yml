@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   node-a:
+    image: icn:latest
     build:
       context: ../..
       dockerfile: deploy/Dockerfile.icnd
@@ -10,20 +11,21 @@ services:
     environment:
       - ICN_NODE_NAME=node-a
       - ICN_DATA_DIR=/data/node-a
-      - ICN_GATEWAY_PORT=8000
+      - ICN_GATEWAY_PORT=8080
       - ICN_P2P_PORT=9000
       - ICN_BOOTSTRAP_PEERS=
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:
-      - "8000:8000"  # Gateway
+      - "8080:8080"  # Gateway
       - "9000:9000"  # P2P
     volumes:
       - node-a-data:/data/node-a
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - icn-devnet
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/v1/health"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -31,6 +33,7 @@ services:
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
 
   node-b:
+    image: icn:latest
     build:
       context: ../..
       dockerfile: deploy/Dockerfile.icnd
@@ -39,23 +42,24 @@ services:
     environment:
       - ICN_NODE_NAME=node-b
       - ICN_DATA_DIR=/data/node-b
-      - ICN_GATEWAY_PORT=8000
+      - ICN_GATEWAY_PORT=8080
       - ICN_P2P_PORT=9000
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:
-      - "8001:8000"  # Gateway (external 8001 → internal 8000)
+      - "8081:8080"  # Gateway (external 8081 → internal 8080)
       - "9001:9000"  # P2P
     volumes:
       - node-b-data:/data/node-b
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - icn-devnet
     depends_on:
       node-a:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/v1/health"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -63,6 +67,7 @@ services:
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
 
   node-c:
+    image: icn:latest
     build:
       context: ../..
       dockerfile: deploy/Dockerfile.icnd
@@ -71,16 +76,17 @@ services:
     environment:
       - ICN_NODE_NAME=node-c
       - ICN_DATA_DIR=/data/node-c
-      - ICN_GATEWAY_PORT=8000
+      - ICN_GATEWAY_PORT=8080
       - ICN_P2P_PORT=9000
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000,icn://node-b:9000
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:
-      - "8002:8000"  # Gateway (external 8002 → internal 8000)
+      - "8082:8080"  # Gateway (external 8082 → internal 8080)
       - "9002:9000"  # P2P
     volumes:
       - node-c-data:/data/node-c
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
     networks:
       - icn-devnet
     depends_on:
@@ -89,7 +95,7 @@ services:
       node-b:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/v1/health"]
       interval: 5s
       timeout: 3s
       retries: 10

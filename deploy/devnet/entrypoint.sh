@@ -21,15 +21,22 @@ if [ ! -f "$CONFIG_FILE" ]; then
   echo "[$NODE_NAME] Identity initialized."
 fi
 
-# Override config for devnet: enable gateway, set ports, disable mDNS
-# Use sed for simple config patching
-if grep -q 'gateway_enabled' "$CONFIG_FILE" 2>/dev/null; then
-  sed -i 's/gateway_enabled.*/gateway_enabled = true/' "$CONFIG_FILE"
+# Override config for devnet: enable gateway, set ports.
+# Patch in-place if [gateway] section already exists (icnd --init writes one);
+# append a new section only if it's absent.
+if grep -q '^\[gateway\]' "$CONFIG_FILE" 2>/dev/null; then
+  # Section already there — patch enabled and bind_addr within that section.
+  # sed range: from [gateway] up to (not including) the next section header or EOF.
+  sed -i "/^\[gateway\]/,/^\[/{
+    s|^enabled *=.*|enabled = true|
+    s|^bind_addr *=.*|bind_addr = \"0.0.0.0:${GATEWAY_PORT}\"|
+  }" "$CONFIG_FILE"
+  # If bind_addr was absent in the section, append it after the [gateway] line.
+  if ! grep -A20 '^\[gateway\]' "$CONFIG_FILE" | grep -q '^bind_addr'; then
+    sed -i "/^\[gateway\]/a bind_addr = \"0.0.0.0:${GATEWAY_PORT}\"" "$CONFIG_FILE"
+  fi
 else
-  echo "" >> "$CONFIG_FILE"
-  echo "[gateway]" >> "$CONFIG_FILE"
-  echo "enabled = true" >> "$CONFIG_FILE"
-  echo "bind_addr = \"0.0.0.0:${GATEWAY_PORT}\"" >> "$CONFIG_FILE"
+  printf '\n[gateway]\nenabled = true\nbind_addr = "0.0.0.0:%s"\n' "$GATEWAY_PORT" >> "$CONFIG_FILE"
 fi
 
 # Set JWT secret for gateway (deterministic for devnet — NOT for production)
