@@ -37,6 +37,12 @@ pub enum KernelEffect {
     Control(ControlEffect),
     /// Federation effects
     Federation(FederationEffect),
+    /// Dispute resolution effects
+    Dispute(DisputeEffect),
+    /// Resource access effects
+    Resource(ResourceEffect),
+    /// SDIS effects
+    Sdis(SdisEffect),
     /// No-op effect (e.g., for text proposals)
     NoOp { reason: String },
 }

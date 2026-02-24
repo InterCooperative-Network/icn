@@ -153,6 +153,37 @@ export class WasmClient {
     return modules;
   }
 
+  /**
+   * Submit a compute task referencing a previously deployed WASM module by hash.
+   *
+   * @param wasmHash - 64-char hex Blake3 hash of the module
+   * @param inputs - Optional input arguments for the task
+   * @param options - Optional execution parameters (fuelLimit, priority, etc.)
+   * @returns Task hash and ID
+   */
+  async submitCompute(
+    wasmHash: string,
+    inputs?: unknown,
+    options?: {
+      fuelLimit?: number;
+      priority?: string;
+      taskId?: string;
+    },
+  ): Promise<{ task_hash: string; task_id: string }> {
+    return this.request<{ task_hash: string; task_id: string }>(
+      'POST',
+      '/compute/submit',
+      {
+        code_type: 'wasm',
+        wasm_hash: wasmHash,
+        inputs: inputs ?? null,
+        fuel_limit: options?.fuelLimit,
+        priority: options?.priority,
+        task_id: options?.taskId,
+      },
+    );
+  }
+
   // --------------------------------------------------------------------------
   // Internal HTTP helper
   // --------------------------------------------------------------------------

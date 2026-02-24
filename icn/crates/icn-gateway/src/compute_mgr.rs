@@ -38,6 +38,25 @@ impl ComputeManager {
         }
     }
 
+    /// Create a compute manager with daemon connection and WASM registry
+    pub fn with_service_and_registry(
+        service: Arc<icn_api::ComputeService>,
+        registry: Arc<icn_compute::WasmRegistry>,
+    ) -> Self {
+        ComputeManager {
+            compute_service: Some(service),
+            wasm_registry: Some(registry),
+        }
+    }
+
+    /// Create a compute manager with only a WASM registry (standalone mode)
+    pub fn with_registry(registry: Arc<icn_compute::WasmRegistry>) -> Self {
+        ComputeManager {
+            compute_service: None,
+            wasm_registry: Some(registry),
+        }
+    }
+
     /// Set compute service (for late binding)
     pub fn set_service(&mut self, service: Arc<icn_api::ComputeService>) {
         self.compute_service = Some(service);

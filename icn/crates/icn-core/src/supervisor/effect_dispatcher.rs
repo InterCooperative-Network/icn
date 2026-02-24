@@ -147,6 +147,9 @@ fn effect_type_label(effect: &KernelEffect) -> &'static str {
         KernelEffect::Membership(_) => "membership",
         KernelEffect::Control(_) => "control",
         KernelEffect::Federation(_) => "federation",
+        KernelEffect::Dispute(_) => "dispute",
+        KernelEffect::Resource(_) => "resource",
+        KernelEffect::Sdis(_) => "sdis",
         KernelEffect::NoOp { .. } => "noop",
     }
 }

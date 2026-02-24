@@ -329,6 +329,7 @@ export class ICNClient {
   public readonly treasury: TreasuryClient;
   public readonly governance: GovernanceClient;
   public readonly names: NamesClient;
+  public readonly wasm: WasmClient;
 
   constructor(options: ICNClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
@@ -339,6 +340,12 @@ export class ICNClient {
     this.retryOptions = { ...DEFAULT_RETRY, ...options.retry };
     this.autoRefresh = options.autoRefresh ?? false;
     this.refreshBeforeExpiry = options.refreshBeforeExpiry ?? 60;
+    this.wasm = new WasmClient({
+      baseUrl: this.baseUrl,
+      token: this.token,
+      timeout: this.timeout,
+      fetch: this.fetchImpl,
+    });
     this.treasury = {
       balance: async (coopId: string): Promise<TreasuryBalanceResponse> =>
         this.get<TreasuryBalanceResponse>(
@@ -408,6 +415,7 @@ export class ICNClient {
   setToken(token: string, expiresAt?: number): void {
     this.token = token;
     this.tokenExpiresAt = expiresAt;
+    this.wasm.setToken(token);
   }
 
   /**
@@ -420,6 +428,7 @@ export class ICNClient {
     this.did = undefined;
     this.coopId = undefined;
     this.scopes = undefined;
+    this.wasm.clearToken();
   }
 
   /**
