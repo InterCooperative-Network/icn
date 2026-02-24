@@ -538,25 +538,31 @@ impl GatewayServer {
             info!("WASM registry initialized (shared from supervisor)");
             Some(registry)
         } else {
-            if let Some(ref data_dir) = self.data_dir {
-                let wasm_path = data_dir.join("store").join("wasm");
-                match sled::open(&wasm_path) {
-                    Ok(db) => {
-                        info!("WASM registry store opened at {:?}", wasm_path);
-                        Some(Arc::new(icn_compute::WasmRegistry::with_store(db)))
+            #[cfg(feature = "wasm")]
+            {
+                if let Some(ref data_dir) = self.data_dir {
+                    let wasm_path = data_dir.join("store").join("wasm");
+                    match sled::open(&wasm_path) {
+                        Ok(db) => {
+                            info!("WASM registry store opened at {:?}", wasm_path);
+                            Some(Arc::new(icn_compute::WasmRegistry::with_store(db)))
+                        }
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                "Failed to open WASM registry store at {:?}; falling back to temporary storage",
+                                wasm_path
+                            );
+                            Some(Arc::new(icn_compute::WasmRegistry::new()))
+                        }
                     }
-                    Err(e) => {
-                        warn!(
-                            error = %e,
-                            "Failed to open WASM registry store; WASM registry will be unavailable"
-                        );
-                        None
-                    }
+                } else {
+                    info!("WASM registry initialized with temporary storage");
+                    Some(Arc::new(icn_compute::WasmRegistry::new()))
                 }
-            } else {
-                info!("WASM registry initialized with temporary storage");
-                Some(Arc::new(icn_compute::WasmRegistry::new()))
             }
+            #[cfg(not(feature = "wasm"))]
+            None
         };
 
         // Create governance manager with Sled-backed action items

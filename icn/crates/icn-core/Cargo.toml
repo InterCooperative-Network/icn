@@ -73,7 +73,7 @@ tokio = { version = "1.49", features = ["test-util"] }
 
 [features]
 default = []
-wasm = ["icn-compute/wasm"]
+wasm = ["icn-compute/wasm", "icn-gateway/wasm"]
 
 [lints]
 workspace = true
