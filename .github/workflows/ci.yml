@@ -425,6 +425,10 @@ jobs:
         continue-on-error: ${{ env.GATE_RATCHET_PHASE_COVERAGE != 'blocking' }}  # Tarpaulin can have spurious failures even when tests pass
 
       - name: Upload coverage to Codecov
+        # Only upload if tarpaulin actually produced the report.
+        # When tarpaulin crashes (continue-on-error above), the XML may not exist;
+        # Codecov treating a missing file as a hard failure defeats the non-blocking intent.
+        if: hashFiles('./icn/coverage/cobertura.xml') != ''
         uses: codecov/codecov-action@v5
         with:
           files: ./icn/coverage/cobertura.xml
