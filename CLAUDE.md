@@ -702,6 +702,11 @@ gh pr checks <id>
 git status --short
 ```
 
+### CI Owns the Truth
+- **Local green does not override CI red.** Fix exactly what CI says, nothing more.
+- Don't pre-fix unrelated suspected issues before CI runs.
+- Rerun flaky checks once before touching code (see CI Failure Index for classification).
+
 ### Do Not "Fix the World"
 - Do NOT upgrade toolchains, refactor unrelated code, or address pre-existing lints unless explicitly asked.
 - If you encounter unrelated failures, report them, but do not start a toolchain/infra project.
