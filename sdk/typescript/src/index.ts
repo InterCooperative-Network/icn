@@ -179,6 +179,8 @@ import {
   ResolveNameResponse,
 } from './types';
 
+import { WasmClient } from './wasm';
+
 export * from './types';
 export { WasmClient } from './wasm';
 export type { WasmModuleInfo, WasmDeployResult, WasmClientOptions } from './wasm';

@@ -187,7 +187,9 @@ pub fn translate_payload_to_effects(
                     capabilities_hash: String::new(),
                 })]
             }
-            icn_governance::sdis::SdisProposal::RemoveSteward { steward, reason, .. } => {
+            icn_governance::sdis::SdisProposal::RemoveSteward {
+                steward, reason, ..
+            } => {
                 vec![KernelEffect::Sdis(SdisEffect::RevokeSteward {
                     steward_did: steward.to_string(),
                     reason: reason.clone(),

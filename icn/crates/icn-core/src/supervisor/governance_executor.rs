@@ -593,49 +593,55 @@ impl EffectExecutor for KernelGovernanceExecutor {
             }
             KernelEffect::Membership(membership_effect) => {
                 // Execute membership effect (add, remove, update, freeze, unfreeze)
-                                    let outcome = self
-                                    .membership
-                                    .execute_membership_operation(&receipt_id, membership_effect)
-                                    .await?;
-                                Ok(execution_outcome_to_effect_result(
-                                    outcome,
-                                    decision_receipt_id,
-                                ))
-                            }
-                            KernelEffect::Dispute(dispute_effect) => {
-                                info!(?dispute_effect, "Executing dispute effect (placeholder)");
-                                Ok(EffectResult {
-                                    effect_id: decision_receipt_id.to_string(),
-                                    success: true,
-                                    message: format!("Dispute effect executed (placeholder): {:?}", dispute_effect),
-                                    state_change_hash: None,
-                                    ledger_entry_id: None,
-                                })
-                            }
-                            KernelEffect::Resource(resource_effect) => {
-                                info!(?resource_effect, "Executing resource effect (placeholder)");
-                                Ok(EffectResult {
-                                    effect_id: decision_receipt_id.to_string(),
-                                    success: true,
-                                    message: format!("Resource effect executed (placeholder): {:?}", resource_effect),
-                                    state_change_hash: None,
-                                    ledger_entry_id: None,
-                                })
-                            }
-                            KernelEffect::Sdis(sdis_effect) => {
-                                info!(?sdis_effect, "Executing SDIS effect (placeholder)");
-                                Ok(EffectResult {
-                                    effect_id: decision_receipt_id.to_string(),
-                                    success: true,
-                                    message: format!("SDIS effect executed (placeholder): {:?}", sdis_effect),
-                                    state_change_hash: None,
-                                    ledger_entry_id: None,
-                                })
-                            }
-                        }
-                    }
-                }
-                /// Treasury executor implementation.
+                let outcome = self
+                    .membership
+                    .execute_membership_operation(&receipt_id, membership_effect)
+                    .await?;
+                Ok(execution_outcome_to_effect_result(
+                    outcome,
+                    decision_receipt_id,
+                ))
+            }
+            KernelEffect::Dispute(dispute_effect) => {
+                info!(?dispute_effect, "Executing dispute effect (placeholder)");
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: true,
+                    message: format!(
+                        "Dispute effect executed (placeholder): {:?}",
+                        dispute_effect
+                    ),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                })
+            }
+            KernelEffect::Resource(resource_effect) => {
+                info!(?resource_effect, "Executing resource effect (placeholder)");
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: true,
+                    message: format!(
+                        "Resource effect executed (placeholder): {:?}",
+                        resource_effect
+                    ),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                })
+            }
+            KernelEffect::Sdis(sdis_effect) => {
+                info!(?sdis_effect, "Executing SDIS effect (placeholder)");
+                Ok(EffectResult {
+                    effect_id: decision_receipt_id.to_string(),
+                    success: true,
+                    message: format!("SDIS effect executed (placeholder): {:?}", sdis_effect),
+                    state_change_hash: None,
+                    ledger_entry_id: None,
+                })
+            }
+        }
+    }
+}
+/// Treasury executor implementation.
 ///
 /// Executes treasury operations (spend, allocate, reserve, release) by
 /// delegating to the kernel's ledger services.
