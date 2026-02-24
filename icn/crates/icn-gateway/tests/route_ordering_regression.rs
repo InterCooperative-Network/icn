@@ -88,7 +88,9 @@ async fn test_empty_scope_first_shadows_later_scopes() {
     // /services is unreachable — swallowed by the empty governance scope
     let resp = test::call_service(
         &app,
-        test::TestRequest::get().uri("/services/discover").to_request(),
+        test::TestRequest::get()
+            .uri("/services/discover")
+            .to_request(),
     )
     .await;
     assert_eq!(
@@ -133,26 +135,42 @@ async fn test_empty_scope_last_all_routes_reachable() {
         test::TestRequest::get().uri("/gov/proposals").to_request(),
     )
     .await;
-    assert_eq!(resp.status().as_u16(), 200, "/gov/proposals must be reachable");
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "/gov/proposals must be reachable"
+    );
 
     let resp = test::call_service(
         &app,
         test::TestRequest::get().uri("/gov/domains").to_request(),
     )
     .await;
-    assert_eq!(resp.status().as_u16(), 200, "/gov/domains must be reachable");
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "/gov/domains must be reachable"
+    );
 
     // /services routes are now reachable
     let resp = test::call_service(
         &app,
-        test::TestRequest::get().uri("/services/discover").to_request(),
+        test::TestRequest::get()
+            .uri("/services/discover")
+            .to_request(),
     )
     .await;
-    assert_eq!(resp.status().as_u16(), 200, "/services/discover must be reachable");
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "/services/discover must be reachable"
+    );
 
     let resp = test::call_service(
         &app,
-        test::TestRequest::post().uri("/services/announce").to_request(),
+        test::TestRequest::post()
+            .uri("/services/announce")
+            .to_request(),
     )
     .await;
     assert_eq!(
@@ -167,5 +185,9 @@ async fn test_empty_scope_last_all_routes_reachable() {
         test::TestRequest::get().uri("/names/lookup").to_request(),
     )
     .await;
-    assert_eq!(resp.status().as_u16(), 200, "/names/lookup must be reachable");
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "/names/lookup must be reachable"
+    );
 }
