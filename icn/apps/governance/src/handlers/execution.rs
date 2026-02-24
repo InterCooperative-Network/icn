@@ -447,14 +447,13 @@ mod tests {
 
     #[test]
     fn test_translate_unhandled_payload_to_noop() {
-        let payload = icn_governance::ProposalPayload::DisputeResolution {
-            dispute_entry_hash: "hash-001".to_string(),
-            filer: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
+        let payload = icn_governance::ProposalPayload::ShareRedemption {
+            member: "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
                 .parse()
                 .expect("valid did"),
-            reason: "insufficient evidence".to_string(),
-            escalation_reason: "requires community vote".to_string(),
-            proposed_outcome: icn_governance::DisputeResolutionOutcome::Reject,
+            share_ids: vec![],
+            payout_schedule: vec![],
+            reason: "voluntary departure".to_string(),
         };
         let effects = translate_payload_to_effects(&payload, "receipt-abc", "decision-hash-abc");
         assert_eq!(effects.len(), 1);
