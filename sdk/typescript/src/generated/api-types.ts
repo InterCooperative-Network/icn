@@ -16,22 +16,6 @@ export interface components {
             /** Format: int64 */
             debit?: number | null;
         };
-        /** @description Recent activity event */
-        ActivityEvent: {
-            /** @description Event description */
-            description: string;
-            /** @description Event type */
-            event_type: string;
-            /** @description Resource ID (proposal/amendment/appeal) */
-            resource_id: string;
-            /** @description Resource type */
-            resource_type: string;
-            /**
-             * Format: int64
-             * @description Timestamp
-             */
-            timestamp: number;
-        };
         /** @description Add a member to a cooperative */
         AddMemberRequest: {
             did: string;
@@ -224,6 +208,7 @@ export interface components {
             description: string;
             domain_id: string;
             payload: components["schemas"]["ProposalPayloadRequest"];
+            scope?: null | components["schemas"]["ProposalScopeRequest"];
             title: string;
         };
         /** @description Create a new login session for QR-based authentication */
@@ -301,6 +286,22 @@ export interface components {
             ready_for_activation: boolean;
             total_founders: number;
         };
+        /** @description Recent governance activity event */
+        GovernanceActivityEvent: {
+            /** @description Event description */
+            description: string;
+            /** @description Event type */
+            event_type: string;
+            /** @description Resource ID (proposal/amendment/appeal) */
+            resource_id: string;
+            /** @description Resource type */
+            resource_type: string;
+            /**
+             * Format: int64
+             * @description Timestamp
+             */
+            timestamp: number;
+        };
         /** @description Governance dashboard data */
         GovernanceDashboard: {
             /** @description Amendments breakdown */
@@ -314,13 +315,15 @@ export interface components {
             /** @description Pending amendments count */
             pending_amendments: number;
             /** @description Recent activity events */
-            recent_activity: components["schemas"]["ActivityEvent"][];
+            recent_activity: components["schemas"]["GovernanceActivityEvent"][];
         };
         /** @description Health check response */
         HealthResponse: {
+            build_time?: string | null;
             checks?: {
                 [key: string]: components["schemas"]["ComponentHealth"];
             } | null;
+            git_sha?: string | null;
             status: string;
             version: string;
         };
@@ -464,7 +467,7 @@ export interface components {
          * @enum {string}
          */
         Platform: "ios" | "android" | "web";
-        /** @description Proposal payload types (matches icn_governance::ProposalPayload) */
+        /** @description Proposal payload types (gateway-local variant of the governance proposal payload) */
         ProposalPayloadRequest: {
             body: string;
             /** @enum {string} */
@@ -487,6 +490,16 @@ export interface components {
             /** @enum {string} */
             type: "config_change";
             value: string;
+        };
+        /** @description Scope for a proposal (local or federation-wide) */
+        ProposalScopeRequest: {
+            /** @enum {string} */
+            type: "local";
+        } | {
+            /** @description Federation identifier */
+            federation_id: string;
+            /** @enum {string} */
+            type: "federation";
         };
         /** @description Register device request */
         RegisterDeviceRequest: {
