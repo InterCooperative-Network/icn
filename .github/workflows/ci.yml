@@ -503,7 +503,7 @@ jobs:
 
       - name: Upload binaries
         if: needs.changes.outputs.docs_only != 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: icn-binaries
           path: |
@@ -597,7 +597,7 @@ jobs:
 
       - name: Upload accessibility report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: accessibility-report
           path: web/pilot-ui/test-results/
