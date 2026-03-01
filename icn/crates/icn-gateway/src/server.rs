@@ -1176,20 +1176,6 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
-                        // Governance endpoints — served by apps/governance HTTP layer.
-                        // Routes are registered by configure_governance(); auth + rate
-                        // limiting applied via the wrapping empty scope.
-                        .service(
-                            web::scope("")
-                                .configure({
-                                    let ctx = gov_ctx.clone();
-                                    move |cfg| configure_governance(cfg, ctx.clone())
-                                })
-                                .wrap(middleware::from_fn(
-                                    crate::rate_limit::trust_rate_limit_middleware,
-                                ))
-                                .wrap(auth.clone()),
-                        )
                         // Rights summary endpoint (auth + rate limiting)
                         .service(
                             web::scope("/rights")
@@ -1446,6 +1432,21 @@ impl GatewayServer {
                         .service(
                             web::scope("")
                                 .configure(api::communities::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::trust_rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Governance endpoints — served by apps/governance HTTP layer.
+                        // Routes are registered by configure_governance(); auth + rate
+                        // limiting applied via the wrapping empty scope.
+                        // MUST be last: web::scope("") matches all paths.
+                        .service(
+                            web::scope("")
+                                .configure({
+                                    let ctx = gov_ctx.clone();
+                                    move |cfg| configure_governance(cfg, ctx.clone())
+                                })
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))
