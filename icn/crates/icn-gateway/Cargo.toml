@@ -9,6 +9,8 @@ repository.workspace = true
 default = []
 # Enable sled storage backend tests
 sled-storage = []
+# Enable WASM compute support
+wasm = ["icn-compute/wasm"]
 
 
 [dependencies]

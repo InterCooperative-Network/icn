@@ -113,6 +113,8 @@ pub struct GatewayServer {
     service_discovery_manager: Option<Arc<crate::service_discovery_mgr::ServiceDiscoveryManager>>,
     /// Optional naming service for `/v1/names/*` resolution.
     naming_service_handle: Option<Arc<dyn NamingService>>,
+    /// Optional WASM registry for module management.
+    wasm_registry_handle: Option<Arc<icn_compute::WasmRegistry>>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
     /// Default trust score for unknown peers (overrides DEFAULT_TRUST_SCORE)
@@ -144,6 +146,7 @@ impl GatewayServer {
             agreement_manager_handle: None,
             service_discovery_manager: None,
             naming_service_handle: None,
+            wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -185,6 +188,7 @@ impl GatewayServer {
             agreement_manager_handle: None,
             service_discovery_manager: None,
             naming_service_handle: None,
+            wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -227,6 +231,7 @@ impl GatewayServer {
             agreement_manager_handle: None,
             service_discovery_manager: None,
             naming_service_handle: None,
+            wasm_registry_handle: None,
             audit_prune_config: None,
             default_trust_score: None,
         }
@@ -386,6 +391,14 @@ impl GatewayServer {
         self
     }
 
+    /// Set WASM registry for module management.
+    ///
+    /// When set, distributed compute can reference WASM modules by hash.
+    pub fn with_wasm_registry(mut self, registry: Arc<icn_compute::WasmRegistry>) -> Self {
+        self.wasm_registry_handle = Some(registry);
+        self
+    }
+
     /// Set custom rate limiting configuration
     pub fn with_rate_limit_config(mut self, config: RateLimitConfig) -> Self {
         self.rate_limit_config = Some(config);
@@ -518,6 +531,40 @@ impl GatewayServer {
 
         let ledger_handle_for_service = self.ledger_handle.clone();
 
+        // Initialize WASM registry for module management (Flow A)
+        let wasm_registry: Option<Arc<icn_compute::WasmRegistry>> = if let Some(registry) =
+            self.wasm_registry_handle
+        {
+            info!("WASM registry initialized (shared from supervisor)");
+            Some(registry)
+        } else {
+            #[cfg(feature = "wasm")]
+            {
+                if let Some(ref data_dir) = self.data_dir {
+                    let wasm_path = data_dir.join("store").join("wasm");
+                    match sled::open(&wasm_path) {
+                        Ok(db) => {
+                            info!("WASM registry store opened at {:?}", wasm_path);
+                            Some(Arc::new(icn_compute::WasmRegistry::with_store(db)))
+                        }
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                "Failed to open WASM registry store at {:?}; falling back to temporary storage",
+                                wasm_path
+                            );
+                            Some(Arc::new(icn_compute::WasmRegistry::new()))
+                        }
+                    }
+                } else {
+                    info!("WASM registry initialized with temporary storage");
+                    Some(Arc::new(icn_compute::WasmRegistry::new()))
+                }
+            }
+            #[cfg(not(feature = "wasm"))]
+            None
+        };
+
         // Create governance manager with Sled-backed action items
         // (uses GovernanceActor if handle available for proposals/votes/domains)
         let governance_manager: Arc<GovernanceManager> =
@@ -562,10 +609,18 @@ impl GatewayServer {
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
             let service = Arc::new(icn_api::ComputeService::new(handle));
-            Arc::new(ComputeManager::with_service(service))
+            if let Some(registry) = wasm_registry {
+                Arc::new(ComputeManager::with_service_and_registry(service, registry))
+            } else {
+                Arc::new(ComputeManager::with_service(service))
+            }
         } else {
             info!("Compute manager running standalone (no daemon connection)");
-            Arc::new(ComputeManager::new())
+            if let Some(registry) = wasm_registry {
+                Arc::new(ComputeManager::with_registry(registry))
+            } else {
+                Arc::new(ComputeManager::new())
+            }
         };
 
         // Create contract registry handle for contract management API

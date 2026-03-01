@@ -46,6 +46,7 @@ pub mod events;
 pub mod execution;
 pub mod governance;
 pub mod identity;
+pub mod invariants;
 pub mod naming;
 pub mod proofs;
 pub mod protocol_params;
@@ -119,6 +120,10 @@ pub use state::{
 pub use storage::{DataLocality, StorageClass, StorageValidationError};
 pub use time::TimeService;
 pub use version::Version;
+
+pub use invariants::{
+    BlockHeight, InvariantDomain, InvariantId, InvariantReport, InvariantViolation,
+};
 
 // Re-export common types
 pub use types::*;

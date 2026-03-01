@@ -43,11 +43,17 @@ pub mod delegation;
 pub mod discussion;
 pub mod domain;
 #[allow(missing_docs)]
+pub mod effect_manifest;
+#[allow(missing_docs)]
 pub mod error;
 pub mod handle;
+#[allow(missing_docs)]
+pub mod invariant_gate;
 pub mod membership;
 #[allow(missing_docs)]
 pub mod message;
+#[allow(missing_docs)]
+pub mod power_diff;
 pub mod profile;
 pub mod proof;
 #[allow(missing_docs)]
