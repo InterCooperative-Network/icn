@@ -12,7 +12,7 @@ use icn_ledger::{
 use icn_obs::metrics::gateway as metrics;
 use icn_store::{SledStore, Store};
 
-use crate::models::{CrossPaymentQuote, CrossPaymentResponse};
+use crate::models::{CrossTransferQuote, CrossTransferResponse};
 
 use crate::coop::CoopId;
 use crate::error::{GatewayError, Result};
@@ -344,7 +344,7 @@ impl LedgerManager {
         to_currency: &str,
         max_target_amount: Option<i64>,
         _memo: Option<String>,
-    ) -> Result<CrossPaymentResponse> {
+    ) -> Result<CrossTransferResponse> {
         use icn_ledger::oracle::CurrencyPair;
 
         // Enforce budget limits if store is available
@@ -458,16 +458,16 @@ impl LedgerManager {
             });
         }
 
-        Ok(CrossPaymentResponse {
+        Ok(CrossTransferResponse {
             hash,
             from: from.to_string(),
             to: to.to_string(),
             source_amount: amount,
-            from_currency: from_currency.to_string(),
+            from_unit: from_currency.to_string(),
             gross_target_amount: details.gross_target_amount,
             fee_amount: details.fee_amount,
             net_target_amount: details.net_target_amount,
-            to_currency: to_currency.to_string(),
+            to_unit: to_currency.to_string(),
             rate_used: details.rate,
             rate_timestamp: details.rate_timestamp,
             rate_sources: details.rate_sources,
@@ -484,7 +484,7 @@ impl LedgerManager {
         amount: i64,
         from_currency: &str,
         to_currency: &str,
-    ) -> Result<CrossPaymentQuote> {
+    ) -> Result<CrossTransferQuote> {
         let ledger_arc = self.get_ledger(coop_id).await?;
 
         // Get FX config and oracle under lock, then release before await
@@ -545,13 +545,13 @@ impl LedgerManager {
         // Quote valid until rate expires
         let valid_until = rate.aggregated_at + rate.ttl_secs;
 
-        Ok(CrossPaymentQuote {
+        Ok(CrossTransferQuote {
             source_amount: amount,
-            from_currency: from_currency.to_string(),
+            from_unit: from_currency.to_string(),
             gross_target_amount,
             fee_amount,
             net_target_amount,
-            to_currency: to_currency.to_string(),
+            to_unit: to_currency.to_string(),
             rate: rate.rate,
             rate_timestamp: rate.aggregated_at,
             rate_sources: rate.sources(),
@@ -564,17 +564,20 @@ impl LedgerManager {
     ///
     /// This is a lower-level method that returns the FxConversionDetails directly.
     #[allow(dead_code)]
-    pub fn get_fx_conversion_details(&self, details: &FxConversionDetails) -> CrossPaymentResponse {
-        CrossPaymentResponse {
+    pub fn get_fx_conversion_details(
+        &self,
+        details: &FxConversionDetails,
+    ) -> CrossTransferResponse {
+        CrossTransferResponse {
             hash: String::new(), // Not available without actual execution
             from: String::new(),
             to: String::new(),
             source_amount: details.source_amount,
-            from_currency: details.from_currency.clone(),
+            from_unit: details.from_currency.clone(),
             gross_target_amount: details.gross_target_amount,
             fee_amount: details.fee_amount,
             net_target_amount: details.net_target_amount,
-            to_currency: details.to_currency.clone(),
+            to_unit: details.to_currency.clone(),
             rate_used: details.rate,
             rate_timestamp: details.rate_timestamp,
             rate_sources: details.rate_sources.clone(),
