@@ -132,23 +132,23 @@ pub struct UpdateSettingsRequest {
 
 // === Ledger Operations ===
 
-/// Create a payment/transaction
+/// Record a transfer between participants (user-signed obligation exchange)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CreatePaymentRequest {
+pub struct RecordTransferRequest {
     pub from: String, // DID
     pub to: String,   // DID
     pub amount: i64,
-    pub currency: String, // e.g., "hours", "USD"
+    pub unit: String, // e.g., "hours", "commons-capacity"
     pub memo: Option<String>,
 }
 
-/// Balance response
+/// Account state response (net positions derived from signed receipt graph)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct BalanceResponse {
+pub struct AccountStateResponse {
     pub did: String,
-    pub balances: std::collections::HashMap<String, i64>, // currency -> balance
-    /// Credit limits per currency (max negative balance allowed)
-    /// Absence of a key means no credit limit for that currency
+    pub positions: std::collections::HashMap<String, i64>, // unit -> net position
+    /// Obligation ceilings per unit (max negative position allowed)
+    /// Absence of a key means no ceiling for that unit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credit_limits: Option<std::collections::HashMap<String, i64>>,
 }
@@ -172,7 +172,7 @@ pub struct TransactionHistoryEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AccountDeltaResponse {
     pub account_id: String, // DID
-    pub currency: String,
+    pub unit: String,
     pub debit: Option<i64>,
     pub credit: Option<i64>,
 }
@@ -534,33 +534,33 @@ pub struct DelegationListResponse {
     pub received: Vec<DelegationResponse>,
 }
 
-// === Cross-Currency Payments ===
+// === Cross-Unit Transfers ===
 
-/// Create a cross-currency payment
+/// Record a cross-unit transfer (converts between units of account)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CreateCrossPaymentRequest {
+pub struct CreateCrossTransferRequest {
     /// Sender DID
     pub from: String,
     /// Recipient DID
     pub to: String,
-    /// Amount to send in source currency
+    /// Amount to send in source unit
     pub amount: i64,
-    /// Source currency (what sender pays)
-    pub from_currency: String,
-    /// Target currency (what recipient receives)
-    pub to_currency: String,
+    /// Source unit (what sender provides)
+    pub from_unit: String,
+    /// Target unit (what recipient receives)
+    pub to_unit: String,
     /// Optional slippage protection: max target amount to receive
     /// If the converted amount exceeds this, the transfer is rejected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_target_amount: Option<i64>,
-    /// Optional memo/note for the payment
+    /// Optional memo/note for the transfer
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,
 }
 
-/// Response for a cross-currency payment
+/// Response for a cross-unit transfer
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CrossPaymentResponse {
+pub struct CrossTransferResponse {
     /// Hash of the journal entry
     pub hash: String,
     /// Sender DID
@@ -569,16 +569,16 @@ pub struct CrossPaymentResponse {
     pub to: String,
     /// Amount debited from sender
     pub source_amount: i64,
-    /// Source currency
-    pub from_currency: String,
+    /// Source unit
+    pub from_unit: String,
     /// Gross amount before fees
     pub gross_target_amount: i64,
     /// Fee amount (sent to treasury)
     pub fee_amount: i64,
     /// Net amount credited to recipient
     pub net_target_amount: i64,
-    /// Target currency
-    pub to_currency: String,
+    /// Target unit
+    pub to_unit: String,
     /// Exchange rate used
     pub rate_used: f64,
     /// When the rate was fetched (Unix seconds)
@@ -587,32 +587,32 @@ pub struct CrossPaymentResponse {
     pub rate_sources: Vec<String>,
 }
 
-/// Request for a cross-currency payment quote
+/// Request for a cross-unit transfer quote
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CrossPaymentQuoteRequest {
-    /// Amount to send in source currency
+pub struct CrossTransferQuoteRequest {
+    /// Amount to send in source unit
     pub amount: i64,
-    /// Source currency (what sender pays)
-    pub from_currency: String,
-    /// Target currency (what recipient receives)
-    pub to_currency: String,
+    /// Source unit (what sender provides)
+    pub from_unit: String,
+    /// Target unit (what recipient receives)
+    pub to_unit: String,
 }
 
-/// Quote for a cross-currency payment (preview without execution)
+/// Quote for a cross-unit transfer (preview without execution)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct CrossPaymentQuote {
+pub struct CrossTransferQuote {
     /// Amount that would be debited from sender
     pub source_amount: i64,
-    /// Source currency
-    pub from_currency: String,
+    /// Source unit
+    pub from_unit: String,
     /// Gross amount before fees
     pub gross_target_amount: i64,
     /// Fee amount that would be deducted
     pub fee_amount: i64,
     /// Net amount that would be credited to recipient
     pub net_target_amount: i64,
-    /// Target currency
-    pub to_currency: String,
+    /// Target unit
+    pub to_unit: String,
     /// Exchange rate
     pub rate: f64,
     /// When the rate was fetched (Unix seconds)
@@ -1202,7 +1202,7 @@ mod schema_contract_tests {
                 author: "did:icn:test123".to_string(),
                 accounts: vec![AccountDeltaResponse {
                     account_id: "treasury:main".to_string(),
-                    currency: "HOURS".to_string(),
+                    unit: "HOURS".to_string(),
                     debit: Some(100),
                     credit: None,
                 }],
@@ -1251,7 +1251,7 @@ mod schema_contract_tests {
             acct.get("account_id").is_some(),
             "Account must have account_id"
         );
-        assert!(acct.get("currency").is_some(), "Account must have currency");
+        assert!(acct.get("unit").is_some(), "Account must have unit");
 
         // Contract: provenance fields present when set
         assert!(tx.get("decision_receipt_id").is_some());

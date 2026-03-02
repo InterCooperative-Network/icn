@@ -9,8 +9,8 @@ use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
-    AccountDeltaResponse, BalanceResponse, CreateCrossPaymentRequest, CreatePaymentRequest,
-    CrossPaymentQuoteRequest, PaginationInfo, TransactionHistoryEntry,
+    AccountDeltaResponse, AccountStateResponse, CreateCrossTransferRequest,
+    CrossTransferQuoteRequest, PaginationInfo, RecordTransferRequest, TransactionHistoryEntry,
 };
 use crate::rate_limit::VelocityLimiter;
 use crate::trust_mgr::TrustManager;
@@ -39,20 +39,20 @@ pub async fn get_balance(
     // Track balance query
     gateway::balance_queries_inc();
 
-    // TODO: Retrieve actual credit limits from CreditPolicy when available
+    // TODO: Retrieve actual obligation ceilings from CreditPolicy when available
     // For now, return None to maintain backward compatibility
-    let response = BalanceResponse {
+    let response = AccountStateResponse {
         did: did_str,
-        balances,
+        positions: balances,
         credit_limits: None,
     };
 
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// POST /ledger/:coop_id/payment - Create a payment
-#[post("/{coop_id}/payment")]
-pub async fn create_payment(
+/// POST /ledger/:coop_id/settle - Record a settlement (transfer of obligations)
+#[post("/{coop_id}/settle")]
+pub async fn create_settlement(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     budget_store: web::Data<BudgetStore>,
@@ -61,7 +61,7 @@ pub async fn create_payment(
     notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     event_broadcaster: web::Data<Arc<crate::events::EventBroadcaster>>,
     coop_id: web::Path<String>,
-    req: web::Json<CreatePaymentRequest>,
+    req: web::Json<RecordTransferRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "ledger:write")?;
@@ -99,7 +99,7 @@ pub async fn create_payment(
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.currency)?;
+    validation::validate_currency(&req.unit)?;
     validation::validate_memo(&req.memo)?;
 
     // Check budget limits before creating payment
@@ -118,7 +118,7 @@ pub async fn create_payment(
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
     let hash = ledger_mgr
-        .create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())
+        .create_payment(&coop_id, &from, &to, req.amount, req.unit.clone())
         .await?;
 
     // Record spending in budget tracker
@@ -132,15 +132,15 @@ pub async fn create_payment(
         );
     }
 
-    // Track payment creation metrics
+    // Track settlement creation metrics
     gateway::payments_created_inc();
-    gateway::payment_amount_record(&req.currency, req.amount);
+    gateway::payment_amount_record(&req.unit, req.amount);
 
     // Broadcast TransactionCompleted event to both sender and recipient
     let from_did_str = req.from.clone();
     let to_did_str = req.to.clone();
     let amount_val = req.amount;
-    let currency_val = req.currency.clone();
+    let currency_val = req.unit.clone();
     let hash_val = hash.clone();
     let coop_id_val = coop_id.to_string();
     let broadcaster = event_broadcaster.into_inner();
@@ -193,7 +193,7 @@ pub async fn create_payment(
         "from": req.from,
         "to": req.to,
         "amount": req.amount,
-        "currency": req.currency,
+        "unit": req.unit,
     })))
 }
 
@@ -304,7 +304,7 @@ pub async fn get_history(
                 .iter()
                 .map(|delta| AccountDeltaResponse {
                     account_id: delta.account_id.to_string(),
-                    currency: delta.currency.clone(),
+                    unit: delta.currency.clone(),
                     debit: delta.debit,
                     credit: delta.credit,
                 })
@@ -407,7 +407,7 @@ pub async fn get_entries_by_decision(
                     .into_iter()
                     .map(|delta| AccountDeltaResponse {
                         account_id: delta.account_id,
-                        currency: delta.currency,
+                        unit: delta.currency,
                         debit: delta.debit,
                         credit: delta.credit,
                     })
@@ -456,7 +456,7 @@ pub async fn get_entries_by_decision(
                 .iter()
                 .map(|delta| AccountDeltaResponse {
                     account_id: delta.account_id.to_string(),
-                    currency: delta.currency.clone(),
+                    unit: delta.currency.clone(),
                     debit: delta.debit,
                     credit: delta.credit,
                 })
@@ -492,19 +492,19 @@ pub async fn get_entries_by_decision(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// POST /ledger/:coop_id/payment/convert - Create a cross-currency payment
+/// POST /ledger/:coop_id/settle/convert - Record a cross-unit transfer
 ///
-/// Executes a payment where the sender pays in one currency and the recipient
-/// receives in another. Uses the exchange rate oracle for conversion.
-#[post("/{coop_id}/payment/convert")]
-pub async fn create_cross_payment(
+/// Records a transfer where the sender provides one unit and the recipient
+/// receives another. Uses the exchange rate oracle for conversion.
+#[post("/{coop_id}/settle/convert")]
+pub async fn create_cross_settlement(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     budget_store: web::Data<BudgetStore>,
     velocity_limiter: web::Data<VelocityLimiter>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     coop_id: web::Path<String>,
-    req: web::Json<CreateCrossPaymentRequest>,
+    req: web::Json<CreateCrossTransferRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "ledger:write")?;
@@ -538,17 +538,17 @@ pub async fn create_cross_payment(
         ));
     }
 
-    // Validate cross-currency specific: currencies must differ
-    if req.from_currency == req.to_currency {
+    // Validate cross-unit specific: units must differ
+    if req.from_unit == req.to_unit {
         return Err(GatewayError::BadRequest(
-            "For same-currency payments, use /payment endpoint instead".to_string(),
+            "For same-unit transfers, use /settle endpoint instead".to_string(),
         ));
     }
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.from_currency)?;
-    validation::validate_currency(&req.to_currency)?;
+    validation::validate_currency(&req.from_unit)?;
+    validation::validate_currency(&req.to_unit)?;
     validation::validate_memo(&req.memo)?;
 
     // Check budget limits
@@ -557,7 +557,7 @@ pub async fn create_cross_payment(
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
     if !can_spend {
         return Err(GatewayError::BadRequest(
-            "Payment exceeds budget limit".to_string(),
+            "Transfer exceeds budget limit".to_string(),
         ));
     }
 
@@ -565,15 +565,15 @@ pub async fn create_cross_payment(
     let trust_score = trust_mgr.compute_trust_score_for_velocity(&from).await;
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
-    // Execute the cross-currency payment
+    // Execute the cross-unit transfer
     let response = ledger_mgr
         .create_cross_payment(
             &coop_id,
             &from,
             &to,
             req.amount,
-            &req.from_currency,
-            &req.to_currency,
+            &req.from_unit,
+            &req.to_unit,
             req.max_target_amount,
             req.memo.clone(),
         )
@@ -592,51 +592,51 @@ pub async fn create_cross_payment(
 
     // Track metrics
     gateway::payments_created_inc();
-    gateway::payment_amount_record(&req.from_currency, req.amount);
+    gateway::payment_amount_record(&req.from_unit, req.amount);
 
     // Track FX-specific metrics
-    gateway::fx_payments_total_inc(&req.from_currency, &req.to_currency);
-    gateway::fx_payment_source_amount_record(&req.from_currency, req.amount);
-    gateway::fx_payment_target_amount_record(&req.to_currency, response.net_target_amount);
-    gateway::fx_payment_fee_amount_record(&req.to_currency, response.fee_amount);
+    gateway::fx_payments_total_inc(&req.from_unit, &req.to_unit);
+    gateway::fx_payment_source_amount_record(&req.from_unit, req.amount);
+    gateway::fx_payment_target_amount_record(&req.to_unit, response.net_target_amount);
+    gateway::fx_payment_fee_amount_record(&req.to_unit, response.fee_amount);
 
     Ok(HttpResponse::Created().json(response))
 }
 
-/// POST /ledger/:coop_id/payment/convert/quote - Get a cross-currency payment quote
+/// POST /ledger/:coop_id/settle/convert/quote - Get a cross-unit transfer quote
 ///
-/// Returns a preview of what a cross-currency payment would look like without
+/// Returns a preview of what a cross-unit transfer would look like without
 /// actually executing it. Useful for showing users the expected conversion.
-#[post("/{coop_id}/payment/convert/quote")]
-pub async fn get_cross_payment_quote(
+#[post("/{coop_id}/settle/convert/quote")]
+pub async fn get_cross_settlement_quote(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     coop_id: web::Path<String>,
-    req: web::Json<CrossPaymentQuoteRequest>,
+    req: web::Json<CrossTransferQuoteRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "ledger:read")?;
     require_coop_access(&http_req, &coop_id)?;
 
-    // Validate currencies must differ
-    if req.from_currency == req.to_currency {
+    // Validate units must differ
+    if req.from_unit == req.to_unit {
         return Err(GatewayError::BadRequest(
-            "Quote requires different currencies".to_string(),
+            "Quote requires different units".to_string(),
         ));
     }
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.from_currency)?;
-    validation::validate_currency(&req.to_currency)?;
+    validation::validate_currency(&req.from_unit)?;
+    validation::validate_currency(&req.to_unit)?;
 
     // Get the quote
     let quote = ledger_mgr
-        .get_cross_payment_quote(&coop_id, req.amount, &req.from_currency, &req.to_currency)
+        .get_cross_payment_quote(&coop_id, req.amount, &req.from_unit, &req.to_unit)
         .await?;
 
     // Track FX quote metrics
-    gateway::fx_quote_requests_inc(&req.from_currency, &req.to_currency);
+    gateway::fx_quote_requests_inc(&req.from_unit, &req.to_unit);
 
     Ok(HttpResponse::Ok().json(quote))
 }
@@ -677,18 +677,18 @@ mod tests {
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
-                        .service(create_payment)
+                        .service(create_settlement)
                         .service(get_balance),
                 ),
         )
         .await;
 
         // Create payment with authorization
-        let req_body = CreatePaymentRequest {
+        let req_body = RecordTransferRequest {
             from: alice.did().to_string(),
             to: bob.did().to_string(),
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             memo: None,
         };
 
@@ -701,7 +701,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment")
+            .uri("/ledger/test-coop/settle")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims.clone());
@@ -722,8 +722,8 @@ mod tests {
         let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims);
 
-        let resp: BalanceResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.balances.get("hours"), Some(&10));
+        let resp: AccountStateResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.positions.get("hours"), Some(&10));
         assert_eq!(resp.credit_limits, None); // No credit limits configured in test
     }
 
@@ -892,18 +892,18 @@ mod tests {
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
-                        .service(create_payment)
+                        .service(create_settlement)
                         .service(get_balance),
                 ),
         )
         .await;
 
         // Try to create payment with only "ledger:read" scope (should fail)
-        let req_body = CreatePaymentRequest {
+        let req_body = RecordTransferRequest {
             from: alice.did().to_string(),
             to: alice.did().to_string(),
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             memo: None,
         };
 
@@ -916,7 +916,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment")
+            .uri("/ledger/test-coop/settle")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -967,16 +967,16 @@ mod tests {
                 .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(web::scope("/ledger").service(create_payment)),
+                .service(web::scope("/ledger").service(create_settlement)),
         )
         .await;
 
         // Alice tries to create payment from Bob's account (should fail)
-        let req_body = CreatePaymentRequest {
+        let req_body = RecordTransferRequest {
             from: bob.did().to_string(), // Bob's account
             to: charlie.did().to_string(),
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             memo: None,
         };
 
@@ -989,7 +989,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment")
+            .uri("/ledger/test-coop/settle")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1037,7 +1037,7 @@ mod tests {
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
                     web::scope("/ledger")
-                        .service(create_payment)
+                        .service(create_settlement)
                         .service(get_balance)
                         .service(get_history),
                 ),
@@ -1045,11 +1045,11 @@ mod tests {
         .await;
 
         // Alice tries to create payment in coop-tech using coop-food token (should fail)
-        let payment_req = CreatePaymentRequest {
+        let payment_req = RecordTransferRequest {
             from: alice.did().to_string(),
             to: bob.did().to_string(),
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             memo: None,
         };
 
@@ -1062,7 +1062,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/coop-tech/payment") // Trying to access coop-tech!
+            .uri("/ledger/coop-tech/settle") // Trying to access coop-tech!
             .set_json(&payment_req)
             .to_request();
         req.extensions_mut().insert(claims_write);
@@ -1120,16 +1120,16 @@ mod tests {
                 .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
-                .service(web::scope("/ledger").service(create_payment)),
+                .service(web::scope("/ledger").service(create_settlement)),
         )
         .await;
 
         // Alice tries to pay herself (should fail)
-        let req_body = CreatePaymentRequest {
+        let req_body = RecordTransferRequest {
             from: alice.did().to_string(),
             to: alice.did().to_string(), // Same as from!
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             memo: None,
         };
 
@@ -1142,7 +1142,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment")
+            .uri("/ledger/test-coop/settle")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1167,17 +1167,17 @@ mod tests {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 .app_data(web::Data::new(trust_mgr.clone()))
-                .service(web::scope("/ledger").service(create_cross_payment)),
+                .service(web::scope("/ledger").service(create_cross_settlement)),
         )
         .await;
 
         // Try cross-payment with same currency (should fail)
-        let req_body = CreateCrossPaymentRequest {
+        let req_body = CreateCrossTransferRequest {
             from: alice.did().to_string(),
             to: bob.did().to_string(),
             amount: 10,
-            from_currency: "hours".to_string(),
-            to_currency: "hours".to_string(), // Same currency!
+            from_unit: "hours".to_string(),
+            to_unit: "hours".to_string(), // Same currency!
             max_target_amount: None,
             memo: None,
         };
@@ -1191,7 +1191,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert")
+            .uri("/ledger/test-coop/settle/convert")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1215,17 +1215,17 @@ mod tests {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 .app_data(web::Data::new(trust_mgr.clone()))
-                .service(web::scope("/ledger").service(create_cross_payment)),
+                .service(web::scope("/ledger").service(create_cross_settlement)),
         )
         .await;
 
         // Try cross-payment to self (should fail)
-        let req_body = CreateCrossPaymentRequest {
+        let req_body = CreateCrossTransferRequest {
             from: alice.did().to_string(),
             to: alice.did().to_string(), // Self-payment!
             amount: 10,
-            from_currency: "hours".to_string(),
-            to_currency: "USD".to_string(),
+            from_unit: "hours".to_string(),
+            to_unit: "USD".to_string(),
             max_target_amount: None,
             memo: None,
         };
@@ -1239,7 +1239,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert")
+            .uri("/ledger/test-coop/settle/convert")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1264,17 +1264,17 @@ mod tests {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 .app_data(web::Data::new(trust_mgr.clone()))
-                .service(web::scope("/ledger").service(create_cross_payment)),
+                .service(web::scope("/ledger").service(create_cross_settlement)),
         )
         .await;
 
         // Try cross-payment with read-only scope (should fail)
-        let req_body = CreateCrossPaymentRequest {
+        let req_body = CreateCrossTransferRequest {
             from: alice.did().to_string(),
             to: bob.did().to_string(),
             amount: 10,
-            from_currency: "hours".to_string(),
-            to_currency: "USD".to_string(),
+            from_unit: "hours".to_string(),
+            to_unit: "USD".to_string(),
             max_target_amount: None,
             memo: None,
         };
@@ -1288,7 +1288,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert")
+            .uri("/ledger/test-coop/settle/convert")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1305,15 +1305,15 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(web::scope("/ledger").service(get_cross_payment_quote)),
+                .service(web::scope("/ledger").service(get_cross_settlement_quote)),
         )
         .await;
 
         // Try quote with same currency (should fail)
-        let req_body = CrossPaymentQuoteRequest {
+        let req_body = CrossTransferQuoteRequest {
             amount: 10,
-            from_currency: "hours".to_string(),
-            to_currency: "hours".to_string(), // Same currency!
+            from_unit: "hours".to_string(),
+            to_unit: "hours".to_string(), // Same currency!
         };
 
         let claims = TokenClaims {
@@ -1325,7 +1325,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert/quote")
+            .uri("/ledger/test-coop/settle/convert/quote")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1351,17 +1351,17 @@ mod tests {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 .app_data(web::Data::new(trust_mgr.clone()))
-                .service(web::scope("/ledger").service(create_cross_payment)),
+                .service(web::scope("/ledger").service(create_cross_settlement)),
         )
         .await;
 
         // Alice tries to create cross-payment from Bob's account (should fail)
-        let req_body = CreateCrossPaymentRequest {
+        let req_body = CreateCrossTransferRequest {
             from: bob.did().to_string(), // Bob's account
             to: charlie.did().to_string(),
             amount: 10,
-            from_currency: "hours".to_string(),
-            to_currency: "USD".to_string(),
+            from_unit: "hours".to_string(),
+            to_unit: "USD".to_string(),
             max_target_amount: None,
             memo: None,
         };
@@ -1375,7 +1375,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert")
+            .uri("/ledger/test-coop/settle/convert")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1404,18 +1404,18 @@ mod tests {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 .app_data(web::Data::new(trust_mgr.clone()))
-                .service(web::scope("/ledger").service(create_cross_payment)),
+                .service(web::scope("/ledger").service(create_cross_settlement)),
         )
         .await;
 
         // Cross-payment with different currencies - will reach FX code which returns
         // FX_NOT_CONFIGURED since no oracle is configured in test LedgerManager
-        let req_body = CreateCrossPaymentRequest {
+        let req_body = CreateCrossTransferRequest {
             from: alice.did().to_string(),
             to: bob.did().to_string(),
             amount: 100,
-            from_currency: "hours".to_string(),
-            to_currency: "USD".to_string(), // Different currencies -> reaches FX code
+            from_unit: "hours".to_string(),
+            to_unit: "USD".to_string(), // Different currencies -> reaches FX code
             max_target_amount: None,
             memo: None,
         };
@@ -1429,7 +1429,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert")
+            .uri("/ledger/test-coop/settle/convert")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);
@@ -1468,16 +1468,16 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
-                .service(web::scope("/ledger").service(get_cross_payment_quote)),
+                .service(web::scope("/ledger").service(get_cross_settlement_quote)),
         )
         .await;
 
         // Quote with different currencies - will reach FX code which returns
         // FX_NOT_CONFIGURED since no oracle is configured in test LedgerManager
-        let req_body = CrossPaymentQuoteRequest {
+        let req_body = CrossTransferQuoteRequest {
             amount: 100,
-            from_currency: "hours".to_string(),
-            to_currency: "USD".to_string(), // Different currencies -> reaches FX code
+            from_unit: "hours".to_string(),
+            to_unit: "USD".to_string(), // Different currencies -> reaches FX code
         };
 
         let claims = TokenClaims {
@@ -1489,7 +1489,7 @@ mod tests {
         };
 
         let req = test::TestRequest::post()
-            .uri("/ledger/test-coop/payment/convert/quote")
+            .uri("/ledger/test-coop/settle/convert/quote")
             .set_json(&req_body)
             .to_request();
         req.extensions_mut().insert(claims);

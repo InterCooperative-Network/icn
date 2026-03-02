@@ -19,8 +19,8 @@ use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-/// Currency identifier for commons credits.
-pub const COMMONS_CREDIT_CURRENCY: &str = "commons-credits";
+/// Unit of account identifier for commons capacity credits.
+pub const COMMONS_CREDIT_CURRENCY: &str = "commons-capacity";
 
 // --- Credit formula weights (subject to governance adjustment) ---
 // TODO(governance): These constants should be configurable via CCL governance
