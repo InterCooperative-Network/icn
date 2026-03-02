@@ -1200,11 +1200,11 @@ impl GatewayServer {
                         .service(
                             web::scope("/ledger")
                                 .service(api::ledger::get_balance)
-                                .service(api::ledger::create_payment)
+                                .service(api::ledger::create_settlement)
                                 .service(api::ledger::get_history)
                                 .service(api::ledger::get_entries_by_decision)
-                                .service(api::ledger::create_cross_payment)
-                                .service(api::ledger::get_cross_payment_quote)
+                                .service(api::ledger::create_cross_settlement)
+                                .service(api::ledger::get_cross_settlement_quote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,

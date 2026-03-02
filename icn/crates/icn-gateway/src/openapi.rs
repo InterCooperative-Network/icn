@@ -6,12 +6,12 @@ use utoipa::OpenApi;
 
 // Re-export models for schema registration
 use crate::models::{
-    AccountDeltaResponse, AddMemberRequest, BalanceResponse, CastVoteRequest, ChallengeRequest,
-    ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest,
-    CreateInviteRequest, CreatePaymentRequest, CreateProposalRequest, CreateSessionRequest,
-    CreateSessionResponse, DetailedComponentHealth, DetailedHealthResponse, HealthResponse,
-    HealthStatus, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
-    OpenProposalRequest, PaginationInfo, ProposalPayloadRequest, SessionQrData,
+    AccountDeltaResponse, AccountStateResponse, AddMemberRequest, CastVoteRequest,
+    ChallengeRequest, ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest,
+    CreateInviteRequest, CreateProposalRequest, CreateSessionRequest, CreateSessionResponse,
+    DetailedComponentHealth, DetailedHealthResponse, HealthResponse, HealthStatus, InviteInfo,
+    InviteListResponse, InviteResponse, JoinRequest, JoinResponse, OpenProposalRequest,
+    PaginationInfo, ProposalPayloadRequest, RecordTransferRequest, SessionQrData,
     SessionStatusResponse, TokenResponse, TransactionHistoryEntry, TransactionHistoryResponse,
     UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
 };
@@ -86,7 +86,7 @@ use crate::notification_store::{InAppNotification, Platform};
             // Coops
             CreateCoopRequest, AddMemberRequest, UpdateRoleRequest, UpdateSettingsRequest,
             // Ledger
-            CreatePaymentRequest, BalanceResponse, AccountDeltaResponse,
+            RecordTransferRequest, AccountStateResponse, AccountDeltaResponse,
             TransactionHistoryEntry, TransactionHistoryResponse, PaginationInfo,
             // Governance
             CreateDomainRequest, CreateProposalRequest, ProposalPayloadRequest,
