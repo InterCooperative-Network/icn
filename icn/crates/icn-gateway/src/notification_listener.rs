@@ -49,33 +49,33 @@ pub async fn handle_event_for_notifications(
     notification_service: &Arc<NotificationService>,
 ) {
     match event {
-        GatewayEvent::PaymentCreated {
+        GatewayEvent::SettlementCreated {
             from, to, amount, ..
         } => {
             // Parse DIDs
             if let (Ok(from_did), Ok(to_did)) = (from.parse::<Did>(), to.parse::<Did>()) {
                 // Notify recipient
                 let recipient_notif =
-                    NotificationService::payment_received_notification(*amount, &from_did, "");
+                    NotificationService::settlement_received_notification(*amount, &from_did, "");
                 if let Err(e) = notification_service
                     .send_to_did(&to_did, recipient_notif)
                     .await
                 {
-                    warn!("Failed to send payment notification to recipient: {}", e);
+                    warn!("Failed to send settlement notification to recipient: {}", e);
                 } else {
-                    info!("Sent payment received notification to {}", to);
+                    info!("Sent settlement received notification to {}", to);
                 }
 
                 // Notify sender (confirmation)
                 let sender_notif =
-                    NotificationService::payment_sent_notification(*amount, &to_did, "");
+                    NotificationService::settlement_sent_notification(*amount, &to_did, "");
                 if let Err(e) = notification_service
                     .send_to_did(&from_did, sender_notif)
                     .await
                 {
-                    warn!("Failed to send payment confirmation to sender: {}", e);
+                    warn!("Failed to send settlement confirmation to sender: {}", e);
                 } else {
-                    info!("Sent payment confirmation to {}", from);
+                    info!("Sent settlement confirmation to {}", from);
                 }
             }
         }
@@ -157,13 +157,13 @@ mod tests {
             crate::notifications::Platform::Ios,
         );
 
-        let event = GatewayEvent::PaymentCreated {
+        let event = GatewayEvent::SettlementCreated {
             coop_id: "test-coop".to_string(),
             hash: "hash123".to_string(),
             from: alice.to_string(),
             to: bob.to_string(),
             amount: 100,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
         };
 
         handle_event_for_notifications(&event, &notification_service).await;

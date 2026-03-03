@@ -25,13 +25,13 @@ async fn test_backfill_buffer_wraparound() {
 
     // Broadcast more events than the backfill buffer size (default: 100)
     for i in 0..150 {
-        let event = GatewayEvent::PaymentCreated {
+        let event = GatewayEvent::SettlementCreated {
             coop_id: "test-coop".to_string(),
             hash: format!("hash{i}"),
             from: "did:icn:alice".to_string(),
             to: "did:icn:bob".to_string(),
             amount: i as i64,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
         };
         broadcaster.broadcast("test-coop", event).await;
     }
@@ -61,7 +61,7 @@ async fn test_backfill_buffer_wraparound() {
     let amounts: Vec<i64> = backfill
         .iter()
         .filter_map(|e| match &e.event {
-            GatewayEvent::PaymentCreated { amount, .. } => Some(*amount),
+            GatewayEvent::SettlementCreated { amount, .. } => Some(*amount),
             _ => None,
         })
         .collect();
@@ -145,13 +145,13 @@ async fn test_concurrent_subscribers_receive_all() {
     // Broadcast events rapidly
     let num_events = 100;
     for i in 0..num_events {
-        let event = GatewayEvent::PaymentCreated {
+        let event = GatewayEvent::SettlementCreated {
             coop_id: "test-coop".to_string(),
             hash: format!("hash{i}"),
             from: "did:icn:alice".to_string(),
             to: "did:icn:bob".to_string(),
             amount: i as i64,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
         };
         broadcaster.broadcast("test-coop", event).await;
     }
@@ -313,13 +313,13 @@ async fn test_active_client_survives_cleanup() {
         broadcaster
             .broadcast(
                 "test-coop",
-                GatewayEvent::PaymentCreated {
+                GatewayEvent::SettlementCreated {
                     coop_id: "test-coop".to_string(),
                     hash: format!("hash{i}"),
                     from: "did:icn:alice".to_string(),
                     to: "did:icn:bob".to_string(),
                     amount: i as i64,
-                    currency: "hours".to_string(),
+                    unit: "hours".to_string(),
                 },
             )
             .await;
@@ -413,13 +413,13 @@ async fn test_minimal_backfill_buffer() {
         broadcaster
             .broadcast(
                 "test-coop",
-                GatewayEvent::PaymentCreated {
+                GatewayEvent::SettlementCreated {
                     coop_id: "test-coop".to_string(),
                     hash: format!("hash{i}"),
                     from: "did:icn:alice".to_string(),
                     to: "did:icn:bob".to_string(),
                     amount: i as i64,
-                    currency: "hours".to_string(),
+                    unit: "hours".to_string(),
                 },
             )
             .await;
@@ -435,10 +435,10 @@ async fn test_minimal_backfill_buffer() {
 
     // Should be the last event (amount = 9)
     match &backfill[0].event {
-        GatewayEvent::PaymentCreated { amount, .. } => {
+        GatewayEvent::SettlementCreated { amount, .. } => {
             assert_eq!(*amount, 9, "Should be the last event");
         }
-        _ => panic!("Expected PaymentCreated"),
+        _ => panic!("Expected SettlementCreated"),
     }
 }
 

@@ -101,10 +101,10 @@ pub struct QueuedNotification {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationType {
-    /// Payment received
-    PaymentReceived,
-    /// Payment sent confirmation
-    PaymentSent,
+    /// Settlement received
+    SettlementReceived,
+    /// Settlement sent confirmation
+    SettlementSent,
     /// New proposal created
     ProposalCreated,
     /// Proposal closing soon
@@ -425,57 +425,57 @@ fn current_timestamp() -> u64 {
 // Notification Factory Functions
 // ============================================================================
 
-/// Create payment received notification
-pub fn payment_received_notification(
+/// Create settlement received notification
+pub fn settlement_received_notification(
     recipient: &str,
     coop_id: &str,
     amount: i64,
-    currency: &str,
+    unit: &str,
     from: &str,
     tx_hash: &str,
 ) -> QueuedNotification {
     QueuedNotification::new(
         recipient,
         coop_id,
-        "Payment Received",
+        "Settlement Received",
         format!(
             "You received {} {} from {}",
             amount,
-            currency,
+            unit,
             truncate_did(from)
         ),
-        NotificationType::PaymentReceived,
+        NotificationType::SettlementReceived,
     )
     .with_data(serde_json::json!({
-        "type": "payment_received",
+        "type": "settlement_received",
         "amount": amount,
-        "currency": currency,
+        "unit": unit,
         "from": from,
         "tx_hash": tx_hash,
     }))
     .with_priority(NotificationPriority::High)
 }
 
-/// Create payment sent confirmation
-pub fn payment_sent_notification(
+/// Create settlement sent confirmation
+pub fn settlement_sent_notification(
     sender: &str,
     coop_id: &str,
     amount: i64,
-    currency: &str,
+    unit: &str,
     to: &str,
     tx_hash: &str,
 ) -> QueuedNotification {
     QueuedNotification::new(
         sender,
         coop_id,
-        "Payment Sent",
-        format!("You sent {} {} to {}", amount, currency, truncate_did(to)),
-        NotificationType::PaymentSent,
+        "Settlement Sent",
+        format!("You sent {} {} to {}", amount, unit, truncate_did(to)),
+        NotificationType::SettlementSent,
     )
     .with_data(serde_json::json!({
-        "type": "payment_sent",
+        "type": "settlement_sent",
         "amount": amount,
-        "currency": currency,
+        "unit": unit,
         "to": to,
         "tx_hash": tx_hash,
     }))
@@ -648,8 +648,8 @@ mod tests {
     }
 
     #[test]
-    fn test_payment_notification_factory() {
-        let notif = payment_received_notification(
+    fn test_settlement_notification_factory() {
+        let notif = settlement_received_notification(
             "did:icn:bob",
             "coop-1",
             100,
@@ -658,9 +658,12 @@ mod tests {
             "hash123",
         );
 
-        assert_eq!(notif.notification_type, NotificationType::PaymentReceived);
+        assert_eq!(
+            notif.notification_type,
+            NotificationType::SettlementReceived
+        );
         assert_eq!(notif.priority, NotificationPriority::High);
-        assert!(notif.title.contains("Payment Received"));
+        assert!(notif.title.contains("Settlement Received"));
     }
 
     #[test]

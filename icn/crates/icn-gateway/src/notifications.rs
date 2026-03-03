@@ -116,36 +116,40 @@ impl NotificationService {
         Ok(())
     }
 
-    /// Create notification for payment received
-    pub fn payment_received_notification(
+    /// Create notification for settlement received
+    pub fn settlement_received_notification(
         amount: i64,
         from_did: &Did,
-        payment_id: &str,
+        settlement_id: &str,
     ) -> Notification {
         Notification {
-            title: "Payment Received".to_string(),
+            title: "Settlement Received".to_string(),
             body: format!(
                 "You received {} hours from {}",
                 amount,
                 format_did(from_did)
             ),
             data: Some(serde_json::json!({
-                "type": "payment",
-                "payment_id": payment_id,
+                "type": "settlement",
+                "settlement_id": settlement_id,
                 "amount": amount,
                 "from": from_did.to_string(),
             })),
         }
     }
 
-    /// Create notification for payment sent
-    pub fn payment_sent_notification(amount: i64, to_did: &Did, payment_id: &str) -> Notification {
+    /// Create notification for settlement sent
+    pub fn settlement_sent_notification(
+        amount: i64,
+        to_did: &Did,
+        settlement_id: &str,
+    ) -> Notification {
         Notification {
-            title: "Payment Confirmed".to_string(),
+            title: "Settlement Confirmed".to_string(),
             body: format!("Sent {} hours to {}", amount, format_did(to_did)),
             data: Some(serde_json::json!({
-                "type": "payment",
-                "payment_id": payment_id,
+                "type": "settlement",
+                "settlement_id": settlement_id,
                 "amount": amount,
                 "to": to_did.to_string(),
             })),
@@ -283,8 +287,8 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        let notif = NotificationService::payment_received_notification(10, &did, "pay123");
-        assert_eq!(notif.title, "Payment Received");
+        let notif = NotificationService::settlement_received_notification(10, &did, "settle123");
+        assert_eq!(notif.title, "Settlement Received");
         assert!(notif.body.contains("10 hours"));
 
         let notif = NotificationService::proposal_created_notification("prop1", "Upgrade Policy");
