@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use icn_gateway::api::recurring_payments::{
-    execute_due_payments, PaymentFrequency, RecurringPayment, RecurringPaymentStore,
-    RecurringStatus,
+use icn_gateway::api::recurring_settlements::{
+    execute_due_settlements as execute_due_payments, PaymentFrequency, RecurringPayment,
+    RecurringPaymentStore, RecurringStatus,
 };
 use icn_gateway::ledger_mgr::LedgerManager;
 use icn_identity::IdentityBundle;
@@ -68,13 +68,13 @@ async fn test_scheduler_execution_flow() {
     assert!(updated.next_execution > now);
 
     // Verify ledger transaction
-    // Note: get_balance requires currency string
+    // Note: get_position requires currency string
     let alice_balance = ledger_mgr
-        .get_balance(&coop_id, alice.did(), "USD")
+        .get_position(&coop_id, alice.did(), "USD")
         .await
         .unwrap();
     let bob_balance = ledger_mgr
-        .get_balance(&coop_id, bob.did(), "USD")
+        .get_position(&coop_id, bob.did(), "USD")
         .await
         .unwrap();
 

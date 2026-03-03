@@ -106,7 +106,7 @@ pub async fn update_settings(
         validation::validate_credit_policy(policy)?;
     }
     if let Some(currency) = &req.currency {
-        validation::validate_currency(currency)?;
+        validation::validate_unit(currency)?;
     }
 
     // Clone the request data for the closure

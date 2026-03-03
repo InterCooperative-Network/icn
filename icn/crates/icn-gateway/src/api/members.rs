@@ -24,8 +24,8 @@ pub struct MemberProfile {
     pub role: MemberRole,
     /// Timestamp when member joined
     pub joined_at: u64,
-    /// Current balance in the cooperative
-    pub balance: f64,
+    /// Current position in the cooperative
+    pub position: f64,
     /// Total number of transactions
     pub transaction_count: usize,
     /// Trust score from requester's perspective (None if unauthenticated or unavailable)
@@ -63,9 +63,9 @@ pub async fn get_member_profile(
         .find(|m| m.did == did_obj)
         .ok_or_else(|| GatewayError::NotFound("Member not found in cooperative".to_string()))?;
 
-    // Get balance from ledger (using default currency "hours")
-    let balance = ledger_manager
-        .get_balance(&coop_id, &did_obj, "hours")
+    // Get position from ledger (using default unit "hours")
+    let position = ledger_manager
+        .get_position(&coop_id, &did_obj, "hours")
         .await
         .unwrap_or(0) as f64;
 
@@ -109,7 +109,7 @@ pub async fn get_member_profile(
         name: display_name,
         role: member.role.clone(),
         joined_at: member.joined_at,
-        balance,
+        position,
         transaction_count,
         trust_score,
     };
@@ -246,7 +246,7 @@ mod tests {
         let profile: MemberProfile = test::read_body_json(resp).await;
         assert_eq!(profile.did, did_str);
         assert_eq!(profile.role, MemberRole::Steward);
-        assert_eq!(profile.balance, 0.0);
+        assert_eq!(profile.position, 0.0);
     }
 
     #[actix_web::test]

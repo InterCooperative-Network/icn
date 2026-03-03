@@ -127,7 +127,7 @@ pub async fn handle_ledger_balance(
     };
 
     match ledger_service
-        .get_balances(
+        .get_positions(
             &balance_params.account_id,
             balance_params.currency.as_deref(),
         )
@@ -137,7 +137,7 @@ pub async fn handle_ledger_balance(
             if balance_params.currency.is_some() {
                 let first = balances.pop().unwrap_or(icn_api::AccountBalance {
                     account_id: balance_params.account_id,
-                    currency: String::new(),
+                    unit: String::new(),
                     amount: 0,
                 });
                 match serde_json::to_value(&first) {
@@ -149,7 +149,7 @@ pub async fn handle_ledger_balance(
                     .into_iter()
                     .map(|b| LedgerBalance {
                         account_id: b.account_id,
-                        currency: b.currency,
+                        currency: b.unit,
                         amount: b.amount,
                     })
                     .collect();

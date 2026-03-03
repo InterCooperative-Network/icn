@@ -83,7 +83,7 @@ async fn test_escrow_lifecycle() {
         // Mock the ledger transaction call that API would do
         // Note: Ledger uses (Recipient, Payer) signature for Mutual Credit logic (Debit Recipient (+), Credit Payer (-))
         let res = ledger_mgr
-            .create_payment(
+            .create_settlement(
                 &coop_id,
                 bob.did(),   // Recipient
                 alice.did(), // Payer
@@ -104,7 +104,7 @@ async fn test_escrow_lifecycle() {
 
     // Verify Ledger State
     let bob_balance = ledger_mgr
-        .get_balance(&coop_id, bob.did(), "USD")
+        .get_position(&coop_id, bob.did(), "USD")
         .await
         .unwrap();
     assert_eq!(bob_balance, 100);

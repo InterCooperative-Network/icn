@@ -71,11 +71,11 @@ pub struct SubmitTaskRequest {
     /// Deadline in milliseconds from now (optional)
     #[serde(default)]
     pub deadline_ms: Option<u64>,
-    /// Payment rate per 1000 fuel (optional)
-    #[serde(default)]
+    /// Settlement rate per 1000 fuel (optional)
+    #[serde(default, rename = "settlement_rate")]
     pub payment_rate: Option<u64>,
-    /// Payment currency (default: credits)
-    #[serde(default)]
+    /// Settlement unit (default: credits)
+    #[serde(default, rename = "settlement_unit")]
     pub payment_currency: Option<String>,
     /// Resource requirements for the task (optional)
     #[serde(default)]

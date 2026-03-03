@@ -17,9 +17,9 @@ use crate::trust_mgr::TrustManager;
 use crate::validation;
 use icn_obs::metrics::gateway;
 
-/// GET /ledger/:coop_id/balance/:did - Get account balance
-#[get("/{coop_id}/balance/{did}")]
-pub async fn get_balance(
+/// GET /ledger/:coop_id/position/:did - Get account position
+#[get("/{coop_id}/position/{did}")]
+pub async fn get_position(
     req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     path: web::Path<(String, String)>,
@@ -34,7 +34,7 @@ pub async fn get_balance(
         .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let balances = ledger_mgr.get_all_balances(&coop_id, &did).await?;
+    let balances = ledger_mgr.get_all_positions(&coop_id, &did).await?;
 
     // Track balance query
     gateway::balance_queries_inc();
@@ -99,7 +99,7 @@ pub async fn create_settlement(
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.unit)?;
+    validation::validate_unit(&req.unit)?;
     validation::validate_memo(&req.memo)?;
 
     // Check budget limits before creating payment
@@ -118,7 +118,7 @@ pub async fn create_settlement(
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
     let hash = ledger_mgr
-        .create_payment(&coop_id, &from, &to, req.amount, req.unit.clone())
+        .create_settlement(&coop_id, &from, &to, req.amount, req.unit.clone())
         .await?;
 
     // Record spending in budget tracker
@@ -176,13 +176,13 @@ pub async fn create_settlement(
         use crate::events::GatewayEvent;
         use crate::notification_listener::handle_event_for_notifications;
 
-        let event = GatewayEvent::PaymentCreated {
+        let event = GatewayEvent::SettlementCreated {
             coop_id: coop_str,
             hash: hash_str,
             from: from_str,
             to: to_str,
             amount,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
         };
 
         handle_event_for_notifications(&event, &notif_service).await;
@@ -407,7 +407,7 @@ pub async fn get_entries_by_decision(
                     .into_iter()
                     .map(|delta| AccountDeltaResponse {
                         account_id: delta.account_id,
-                        unit: delta.currency,
+                        unit: delta.unit,
                         debit: delta.debit,
                         credit: delta.credit,
                     })
@@ -547,8 +547,8 @@ pub async fn create_cross_settlement(
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.from_unit)?;
-    validation::validate_currency(&req.to_unit)?;
+    validation::validate_unit(&req.from_unit)?;
+    validation::validate_unit(&req.to_unit)?;
     validation::validate_memo(&req.memo)?;
 
     // Check budget limits
@@ -627,8 +627,8 @@ pub async fn get_cross_settlement_quote(
 
     // Validate input fields
     validation::validate_payment_amount(req.amount)?;
-    validation::validate_currency(&req.from_unit)?;
-    validation::validate_currency(&req.to_unit)?;
+    validation::validate_unit(&req.from_unit)?;
+    validation::validate_unit(&req.to_unit)?;
 
     // Get the quote
     let quote = ledger_mgr
@@ -651,7 +651,7 @@ mod tests {
     use icn_identity::IdentityBundle;
 
     #[actix_web::test]
-    async fn test_create_payment_and_get_balance() {
+    async fn test_create_settlement_and_get_position() {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
@@ -678,7 +678,7 @@ mod tests {
                 .service(
                     web::scope("/ledger")
                         .service(create_settlement)
-                        .service(get_balance),
+                        .service(get_position),
                 ),
         )
         .await;
@@ -710,7 +710,7 @@ mod tests {
         assert!(resp.status().is_success());
 
         // Get Alice's balance with authorization
-        let uri = format!("/ledger/test-coop/balance/{}", alice.did());
+        let uri = format!("/ledger/test-coop/position/{}", alice.did());
         let claims = TokenClaims {
             sub: alice.did().to_string(),
             iat: 1000000000,
@@ -735,9 +735,9 @@ mod tests {
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
-        // Create payment directly
+        // Create settlement directly
         ledger_mgr
-            .create_payment(
+            .create_settlement(
                 &"test-coop".to_string(),
                 alice.did(),
                 bob.did(),
@@ -893,7 +893,7 @@ mod tests {
                 .service(
                     web::scope("/ledger")
                         .service(create_settlement)
-                        .service(get_balance),
+                        .service(get_position),
                 ),
         )
         .await;
@@ -925,7 +925,7 @@ mod tests {
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
 
         // Try to read balance with "ledger:write" scope (should fail)
-        let uri = format!("/ledger/test-coop/balance/{}", alice.did());
+        let uri = format!("/ledger/test-coop/position/{}", alice.did());
         let claims = TokenClaims {
             sub: alice.did().to_string(),
             iat: 1000000000,
@@ -1015,9 +1015,9 @@ mod tests {
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
-        // Create payment in coop-food
+        // Create settlement in coop-food
         let _ = ledger_mgr
-            .create_payment(
+            .create_settlement(
                 &"coop-food".to_string(),
                 alice.did(),
                 bob.did(),
@@ -1038,7 +1038,7 @@ mod tests {
                 .service(
                     web::scope("/ledger")
                         .service(create_settlement)
-                        .service(get_balance)
+                        .service(get_position)
                         .service(get_history),
                 ),
         )
@@ -1079,7 +1079,7 @@ mod tests {
             exp: 9999999999,
         };
 
-        let uri = format!("/ledger/coop-tech/balance/{}", bob.did()); // Accessing coop-tech
+        let uri = format!("/ledger/coop-tech/position/{}", bob.did()); // Accessing coop-tech
         let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims.clone());
 

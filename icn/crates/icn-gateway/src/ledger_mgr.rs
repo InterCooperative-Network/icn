@@ -119,8 +119,8 @@ impl LedgerManager {
         self.budget_store = Some(budget_store);
     }
 
-    /// Create a payment transaction
-    pub async fn create_payment(
+    /// Create a settlement transaction
+    pub async fn create_settlement(
         &self,
         coop_id: &CoopId,
         from: &Did,
@@ -174,13 +174,13 @@ impl LedgerManager {
 
         // Broadcast event if broadcaster is available
         if let Some(broadcaster) = &self.event_broadcaster {
-            let event = GatewayEvent::PaymentCreated {
+            let event = GatewayEvent::SettlementCreated {
                 coop_id: coop_id.clone(),
                 hash: hash_str.clone(),
                 from: from.to_string(),
                 to: to.to_string(),
                 amount,
-                currency,
+                unit: currency,
             };
             let broadcaster = broadcaster.clone();
             let coop_id = coop_id.clone();
@@ -192,16 +192,16 @@ impl LedgerManager {
         Ok(hash_str)
     }
 
-    /// Get balance for an account
-    pub async fn get_balance(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
+    /// Get position for an account
+    pub async fn get_position(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
         let ledger_arc = self.get_ledger(coop_id).await?;
         let ledger = ledger_arc.read().await;
 
         Ok(ledger.get_balance(did, currency))
     }
 
-    /// Get all balances for an account
-    pub async fn get_all_balances(
+    /// Get all positions for an account
+    pub async fn get_all_positions(
         &self,
         coop_id: &CoopId,
         did: &Did,
@@ -440,15 +440,15 @@ impl LedgerManager {
 
         // Broadcast event if broadcaster is available
         if let Some(broadcaster) = &self.event_broadcaster {
-            let event = GatewayEvent::CrossPaymentCreated {
+            let event = GatewayEvent::CrossSettlementCreated {
                 coop_id: coop_id.clone(),
                 hash: hash.clone(),
                 from: from.to_string(),
                 to: to.to_string(),
                 source_amount: amount,
-                from_currency: from_currency.to_string(),
+                from_unit: from_currency.to_string(),
                 target_amount: details.net_target_amount,
-                to_currency: to_currency.to_string(),
+                to_unit: to_currency.to_string(),
                 rate: details.rate,
             };
             let broadcaster = broadcaster.clone();
@@ -591,13 +591,13 @@ mod tests {
     use icn_identity::IdentityBundle;
 
     #[tokio::test]
-    async fn test_create_payment() {
+    async fn test_create_settlement() {
         let mgr = LedgerManager::new();
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
         let hash = mgr
-            .create_payment(
+            .create_settlement(
                 &"test-coop".to_string(),
                 alice.did(),
                 bob.did(),
@@ -609,13 +609,13 @@ mod tests {
 
         assert!(!hash.is_empty());
 
-        // Check balances
+        // Check positions
         let alice_balance = mgr
-            .get_balance(&"test-coop".to_string(), alice.did(), "hours")
+            .get_position(&"test-coop".to_string(), alice.did(), "hours")
             .await
             .unwrap();
         let bob_balance = mgr
-            .get_balance(&"test-coop".to_string(), bob.did(), "hours")
+            .get_position(&"test-coop".to_string(), bob.did(), "hours")
             .await
             .unwrap();
 
@@ -624,12 +624,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_all_balances() {
+    async fn test_get_all_positions() {
         let mgr = LedgerManager::new();
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
-        mgr.create_payment(
+        mgr.create_settlement(
             &"test-coop".to_string(),
             alice.did(),
             bob.did(),
@@ -640,7 +640,7 @@ mod tests {
         .unwrap();
 
         let balances = mgr
-            .get_all_balances(&"test-coop".to_string(), alice.did())
+            .get_all_positions(&"test-coop".to_string(), alice.did())
             .await
             .unwrap();
         assert_eq!(balances.get("hours"), Some(&10));
@@ -652,7 +652,7 @@ mod tests {
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
-        mgr.create_payment(
+        mgr.create_settlement(
             &"test-coop".to_string(),
             alice.did(),
             bob.did(),
