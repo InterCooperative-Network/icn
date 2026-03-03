@@ -39,7 +39,7 @@ components:
       description: Account delta for transaction history
       required:
       - account_id
-      - currency
+      - unit
       properties:
         account_id:
           type: string
@@ -48,13 +48,41 @@ components:
           - integer
           - 'null'
           format: int64
-        currency:
-          type: string
         debit:
           type:
           - integer
           - 'null'
           format: int64
+        unit:
+          type: string
+    AccountStateResponse:
+      type: object
+      description: Account state response (net positions derived from signed receipt graph)
+      required:
+      - did
+      - positions
+      properties:
+        credit_limits:
+          type:
+          - object
+          - 'null'
+          description: |-
+            Obligation ceilings per unit (max negative position allowed)
+            Absence of a key means no ceiling for that unit
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
+        did:
+          type: string
+        positions:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
     AddMemberRequest:
       type: object
       description: Add a member to a cooperative
@@ -217,34 +245,6 @@ components:
           items:
             type: string
         jurisdiction_id:
-          type: string
-    BalanceResponse:
-      type: object
-      description: Balance response
-      required:
-      - did
-      - balances
-      properties:
-        balances:
-          type: object
-          additionalProperties:
-            type: integer
-            format: int64
-          propertyNames:
-            type: string
-        credit_limits:
-          type:
-          - object
-          - 'null'
-          description: |-
-            Credit limits per currency (max negative balance allowed)
-            Absence of a key means no credit limit for that currency
-          additionalProperties:
-            type: integer
-            format: int64
-          propertyNames:
-            type: string
-        did:
           type: string
     BanMemberRequest:
       type: object
@@ -486,28 +486,6 @@ components:
         role:
           type: string
           description: 'Role for the invitee: "member", "admin", "participant", "facilitator"'
-    CreatePaymentRequest:
-      type: object
-      description: Create a payment/transaction
-      required:
-      - from
-      - to
-      - amount
-      - currency
-      properties:
-        amount:
-          type: integer
-          format: int64
-        currency:
-          type: string
-        from:
-          type: string
-        memo:
-          type:
-          - string
-          - 'null'
-        to:
-          type: string
     CreateProposalRequest:
       type: object
       description: Create a new proposal
@@ -1190,6 +1168,28 @@ components:
             enum:
             - federation
       description: Scope for a proposal (local or federation-wide)
+    RecordTransferRequest:
+      type: object
+      description: Record a transfer between participants (user-signed obligation exchange)
+      required:
+      - from
+      - to
+      - amount
+      - unit
+      properties:
+        amount:
+          type: integer
+          format: int64
+        from:
+          type: string
+        memo:
+          type:
+          - string
+          - 'null'
+        to:
+          type: string
+        unit:
+          type: string
     RegisterDeviceRequest:
       type: object
       description: Register device request

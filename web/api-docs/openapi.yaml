@@ -24,8 +24,8 @@ info:
     ## Authorization Scopes
 
     JWT tokens include scopes that control access to endpoints:
-    - `ledger:read` - View balances and transaction history
-    - `ledger:write` - Create payments
+    - `ledger:read` - View positions and transaction history
+    - `ledger:write` - Create settlements
     - `coop:read` - View cooperative information
     - `coop:write` - Update cooperative settings
     - `coop:admin` - Manage members and roles
@@ -384,11 +384,11 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
-  /v1/ledger/{coop_id}/balance/{did}:
+  /v1/ledger/{coop_id}/position/{did}:
     get:
       tags: [Ledger]
-      summary: Get balance
-      operationId: getBalance
+      summary: Get position
+      operationId: getPosition
       security:
         - bearerAuth: []
       parameters:
@@ -396,11 +396,11 @@ paths:
         - $ref: '#/components/parameters/Did'
       responses:
         '200':
-          description: Balance retrieved
+          description: Position retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Balance'
+                $ref: '#/components/schemas/Position'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -410,12 +410,12 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
-  /v1/ledger/{coop_id}/payment:
+  /v1/ledger/{coop_id}/settle:
     post:
       tags: [Ledger]
-      summary: Create payment
-      description: Create a mutual credit payment from the authenticated user to another member.
-      operationId: createPayment
+      summary: Create settlement
+      description: Create a mutual credit settlement from the authenticated user to another member.
+      operationId: createSettlement
       security:
         - bearerAuth: []
       parameters:
@@ -425,20 +425,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentRequest'
+              $ref: '#/components/schemas/SettlementRequest'
       responses:
         '201':
-          description: Payment created
+          description: Settlement created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Payment'
+                $ref: '#/components/schemas/Settlement'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
-          description: Insufficient balance or credit limit exceeded
+          description: Insufficient position or credit limit exceeded
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -769,7 +769,7 @@ paths:
         - **WASM**: Submit a WebAssembly module as base64-encoded bytes
 
         The task is broadcast to the network where trusted executors can claim and run it.
-        Payment is automatically settled based on fuel consumed.
+        Settlement is automatically recorded based on fuel consumed.
 
         **Priority levels**: low, normal (default), high, critical
       operationId: submitComputeTask
@@ -915,7 +915,7 @@ paths:
 
         To request missed events after reconnection: `{"type": "Backfill", "after_seq": N}`
 
-        Events include: PaymentCreated, MemberAdded, MemberRemoved,
+        Events include: SettlementCreated, MemberAdded, MemberRemoved,
         RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
         GovernanceProposalCreated, GovernanceProposalOpened,
         GovernanceProposalClosed, GovernanceVoteCast,
@@ -1128,31 +1128,31 @@ components:
         role:
           type: string
 
-    Balance:
+    Position:
       type: object
       properties:
         did:
           type: string
-        balance:
+        position:
           type: integer
-        currency:
+        unit:
           type: string
 
-    PaymentRequest:
+    SettlementRequest:
       type: object
-      required: [to, amount, currency]
+      required: [to, amount, unit]
       properties:
         to:
           type: string
         amount:
           type: integer
           minimum: 1
-        currency:
+        unit:
           type: string
         memo:
           type: string
 
-    Payment:
+    Settlement:
       type: object
       properties:
         id:
@@ -1164,7 +1164,7 @@ components:
           type: string
         amount:
           type: integer
-        currency:
+        unit:
           type: string
         memo:
           type: string
@@ -1183,7 +1183,7 @@ components:
           enum: [sent, received]
         amount:
           type: integer
-        currency:
+        unit:
           type: string
         counterparty:
           type: string
@@ -1292,7 +1292,7 @@ components:
 
     BudgetPayload:
       type: object
-      required: [type, amount, recipient, currency, purpose]
+      required: [type, amount, recipient, unit, purpose]
       properties:
         type:
           type: string
@@ -1302,7 +1302,7 @@ components:
         recipient:
           type: string
           description: DID of the recipient
-        currency:
+        unit:
           type: string
         purpose:
           type: string
@@ -1398,12 +1398,12 @@ components:
         deadline_ms:
           type: integer
           description: Deadline in milliseconds from now (optional)
-        payment_rate:
+        settlement_rate:
           type: integer
-          description: Payment rate per 1000 fuel (optional)
-        payment_currency:
+          description: Settlement rate per 1000 fuel (optional)
+        settlement_unit:
           type: string
-          description: Payment currency (default credits)
+          description: Settlement unit (default credits)
 
     # CCL task submission (code_type: ccl or omitted)
     # Note: Server accepts requests without code_type, defaulting to "ccl"
