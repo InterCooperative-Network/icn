@@ -34,6 +34,7 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         // Treasury effects
         "Treasury::Spend",
         "Treasury::CreateBudget",
+        "Treasury::DistributeSurplus",
         // Membership effects
         "Membership::AddMember",
         "Membership::RemoveMember",
@@ -42,6 +43,7 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         // Protocol effects
         "Protocol::SetGovernanceConfig",
         "Protocol::SetSchedulingPolicy",
+        "Protocol::SetParameter",
         "Protocol::Upgrade",
         // Control effects
         "Control::VetoProposal",
@@ -51,6 +53,16 @@ fn approved_emitted_effects() -> BTreeSet<&'static str> {
         "Federation::JoinFederation",
         "Federation::LeaveFederation",
         "Federation::EstablishClearing",
+        "Federation::VouchForCoop",
+        // Dispute effects
+        "Dispute::ResolveDispute",
+        "Dispute::RollbackLedger",
+        // Resource effects
+        "Resource::GrantAccess",
+        "Resource::RevokeAccess",
+        // SDIS effects
+        "Sdis::ApproveSteward",
+        "Sdis::RevokeSteward",
         // Fallback (always allowed)
         "NoOp",
     ]
