@@ -421,7 +421,7 @@ mod tests {
                 title: "Test 2".to_string(),
                 body: "Body 2".to_string(),
                 data: None,
-                notification_type: "PaymentReceived".to_string(),
+                notification_type: "SettlementReceived".to_string(),
                 created_at: 2000,
                 read: true,
                 read_at: Some(2500),
@@ -567,7 +567,7 @@ mod tests {
                 title: "Payment 1".to_string(),
                 body: "Body".to_string(),
                 data: None,
-                notification_type: "PaymentReceived".to_string(),
+                notification_type: "SettlementReceived".to_string(),
                 created_at: 1000,
                 read: false,
                 read_at: None,
@@ -597,7 +597,7 @@ mod tests {
                 title: "Payment 2".to_string(),
                 body: "Body".to_string(),
                 data: None,
-                notification_type: "PaymentReceived".to_string(),
+                notification_type: "SettlementReceived".to_string(),
                 created_at: 3000,
                 read: false,
                 read_at: None,
@@ -611,7 +611,7 @@ mod tests {
         // Filter in code (simulating what the API does)
         let payment_only: Vec<_> = all
             .into_iter()
-            .filter(|n| n.notification_type == "PaymentReceived")
+            .filter(|n| n.notification_type == "SettlementReceived")
             .collect();
         assert_eq!(payment_only.len(), 2);
     }

@@ -169,20 +169,20 @@ paths:
           description: Trust edge created
 
   # Ledger Endpoints
-  /ledger/balance:
+  /ledger/position:
     get:
       tags: [Ledger]
-      summary: Get balance
-      description: Get the current balance for the authenticated user
+      summary: Get position
+      description: Get the current position for the authenticated user
       responses:
         '200':
-          description: Current balance
+          description: Current position
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  balance:
+                  position:
                     type: integer
                     format: int64
                     example: 1000

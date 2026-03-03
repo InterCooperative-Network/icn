@@ -863,21 +863,21 @@ impl GatewayServer {
 
         // receipt_store was created earlier (before governance manager) for shared use
 
-        // Create recurring payment store
+        // Create recurring settlement store
         let recurring_payment_store =
-            crate::api::recurring_payments::RecurringPaymentStore::new(db.clone());
-        info!("Recurring payment store initialized");
+            crate::api::recurring_settlements::RecurringPaymentStore::new(db.clone());
+        info!("Recurring settlement store initialized");
 
         // Create escrow store
         let escrow_store = crate::api::escrow::EscrowStore::new(db.clone());
         info!("Escrow store initialized");
 
-        let _recurring_payments_handle = crate::api::recurring_payments::start_scheduler(
+        let _recurring_settlements_handle = crate::api::recurring_settlements::start_scheduler(
             recurring_payment_store.clone(),
             ledger_manager.clone(),
             60, // Check every minute
         );
-        info!("Recurring payments scheduler started");
+        info!("Recurring settlements scheduler started");
 
         // Start listings expiry scheduler
         let _listings_expiry_handle = crate::listings_mgr::start_expiry_scheduler(
@@ -1199,7 +1199,7 @@ impl GatewayServer {
                         // Protected ledger endpoints (auth + rate limiting)
                         .service(
                             web::scope("/ledger")
-                                .service(api::ledger::get_balance)
+                                .service(api::ledger::get_position)
                                 .service(api::ledger::create_settlement)
                                 .service(api::ledger::get_history)
                                 .service(api::ledger::get_entries_by_decision)
@@ -1450,7 +1450,7 @@ impl GatewayServer {
                         // Recurring payments endpoints (auth + rate limiting)
                         .service(
                             web::scope("")
-                                .configure(api::recurring_payments::configure)
+                                .configure(api::recurring_settlements::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::trust_rate_limit_middleware,
                                 ))

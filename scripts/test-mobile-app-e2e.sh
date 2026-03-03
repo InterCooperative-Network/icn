@@ -58,18 +58,18 @@ echo ""
 echo -e "${BLUE}Step 3: Test Authenticated Endpoints${NC}"
 echo "----------------------------------------"
 
-# Test 1: Get Balance
-echo -n "Testing GET /v1/ledger/$COOP_ID/balance/$DID... "
+# Test 1: Get Position
+echo -n "Testing GET /v1/ledger/$COOP_ID/position/$DID... "
 balance_response=$(curl -s -w "\n%{http_code}" \
     -H "Authorization: Bearer $TOKEN" \
-    "$GATEWAY/v1/ledger/$COOP_ID/balance/$DID")
+    "$GATEWAY/v1/ledger/$COOP_ID/position/$DID")
 
 balance_status=$(echo "$balance_response" | tail -n1)
 balance_body=$(echo "$balance_response" | head -n-1)
 
 if [ "$balance_status" = "200" ]; then
     echo -e "${GREEN}✓${NC}"
-    echo "  Balance: $balance_body"
+    echo "  Position: $balance_body"
 else
     echo -e "${RED}✗${NC} ($balance_status)"
     echo "  Response: $balance_body"

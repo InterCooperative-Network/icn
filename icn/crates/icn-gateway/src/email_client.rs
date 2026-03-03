@@ -353,8 +353,10 @@ impl EmailTemplates {
         data: Option<&serde_json::Value>,
     ) -> EmailMessage {
         let (subject, text_body, html_body) = match notification_type {
-            NotificationType::PaymentReceived => self.payment_received_template(title, body, data),
-            NotificationType::PaymentSent => self.payment_sent_template(title, body, data),
+            NotificationType::SettlementReceived => {
+                self.payment_received_template(title, body, data)
+            }
+            NotificationType::SettlementSent => self.payment_sent_template(title, body, data),
             NotificationType::ProposalCreated => self.proposal_template(title, body, data),
             NotificationType::ProposalClosing => self.proposal_closing_template(title, body, data),
             NotificationType::VoteRecorded => self.vote_recorded_template(title, body, data),
@@ -389,8 +391,8 @@ impl EmailTemplates {
             .and_then(|d| d.get("amount"))
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        let currency = data
-            .and_then(|d| d.get("currency"))
+        let unit = data
+            .and_then(|d| d.get("unit"))
             .and_then(|v| v.as_str())
             .unwrap_or("credits");
         let from = data
@@ -401,7 +403,7 @@ impl EmailTemplates {
         let subject = format!("[{}] {}", self.coop_name, title);
         let text = format!(
             "{}\n\nAmount: {} {}\nFrom: {}\n\nView your account at: {}/account",
-            body, amount, currency, from, self.base_url
+            body, amount, unit, from, self.base_url
         );
         let html = format!(
             r#"<!DOCTYPE html>
@@ -422,7 +424,7 @@ impl EmailTemplates {
             title,
             body,
             amount,
-            currency,
+            unit,
             truncate_did(from),
             self.base_url,
             self.coop_name
@@ -441,8 +443,8 @@ impl EmailTemplates {
             .and_then(|d| d.get("amount"))
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        let currency = data
-            .and_then(|d| d.get("currency"))
+        let unit = data
+            .and_then(|d| d.get("unit"))
             .and_then(|v| v.as_str())
             .unwrap_or("credits");
         let to = data
@@ -453,12 +455,12 @@ impl EmailTemplates {
         let subject = format!("[{}] {}", self.coop_name, title);
         let text = format!(
             "{}\n\nAmount: {} {}\nTo: {}\n\nView your account at: {}/account",
-            body, amount, currency, to, self.base_url
+            body, amount, unit, to, self.base_url
         );
         let html = self.simple_notification_html(
             title,
             body,
-            &format!("Amount: {} {} | To: {}", amount, currency, truncate_did(to)),
+            &format!("Amount: {} {} | To: {}", amount, unit, truncate_did(to)),
         );
 
         (subject, text, html)
@@ -871,17 +873,17 @@ mod tests {
 
         let email = templates.generate_email(
             "user@example.com",
-            NotificationType::PaymentReceived,
-            "Payment Received",
-            "You received a payment",
+            NotificationType::SettlementReceived,
+            "Settlement Received",
+            "You received a settlement",
             Some(&serde_json::json!({
                 "amount": 100,
-                "currency": "hours",
+                "unit": "hours",
                 "from": "did:icn:alice"
             })),
         );
 
-        assert!(email.subject.contains("Payment Received"));
+        assert!(email.subject.contains("Settlement Received"));
         assert!(email.text_body.contains("100"));
         assert!(email.html_body.unwrap().contains("hours"));
     }

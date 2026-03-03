@@ -9,11 +9,11 @@ use icn_ledger::Ledger;
 
 use crate::error::ApiError;
 
-/// Canonical account balance response used by shared ledger service consumers.
+/// Canonical account position response used by shared ledger service consumers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AccountBalance {
     pub account_id: String,
-    pub currency: String,
+    pub unit: String,
     pub amount: i64,
 }
 
@@ -21,7 +21,7 @@ pub struct AccountBalance {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LedgerAccountDeltaView {
     pub account_id: String,
-    pub currency: String,
+    pub unit: String,
     pub debit: Option<i64>,
     pub credit: Option<i64>,
 }
@@ -55,14 +55,14 @@ impl LedgerService {
         Self { ledger }
     }
 
-    /// Get balances for an account.
+    /// Get positions for an account.
     ///
-    /// When `currency` is provided, returns one balance entry for that currency.
-    /// Otherwise returns all known balances for the account.
-    pub async fn get_balances(
+    /// When `unit` is provided, returns one position entry for that unit.
+    /// Otherwise returns all known positions for the account.
+    pub async fn get_positions(
         &self,
         account_id: &str,
-        currency: Option<&str>,
+        unit: Option<&str>,
     ) -> Result<Vec<AccountBalance>, ApiError> {
         let account_did: Did = account_id
             .parse()
@@ -70,11 +70,11 @@ impl LedgerService {
 
         let ledger = self.ledger.read().await;
 
-        if let Some(currency) = currency {
-            let amount = ledger.get_balance(&account_did, currency);
+        if let Some(unit) = unit {
+            let amount = ledger.get_balance(&account_did, unit);
             Ok(vec![AccountBalance {
                 account_id: account_id.to_string(),
-                currency: currency.to_string(),
+                unit: unit.to_string(),
                 amount,
             }])
         } else {
@@ -84,7 +84,7 @@ impl LedgerService {
                 .iter()
                 .map(|(currency, amount)| AccountBalance {
                     account_id: account_id.to_string(),
-                    currency: currency.clone(),
+                    unit: currency.clone(),
                     amount: *amount,
                 })
                 .collect())
@@ -132,7 +132,7 @@ impl LedgerService {
                     .iter()
                     .map(|delta| LedgerAccountDeltaView {
                         account_id: delta.account_id.to_string(),
-                        currency: delta.currency.clone(),
+                        unit: delta.currency.clone(),
                         debit: delta.debit,
                         credit: delta.credit,
                     })

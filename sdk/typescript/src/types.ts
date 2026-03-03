@@ -54,7 +54,7 @@ export interface Cooperative {
 
 export interface CoopSettings {
   description?: string;
-  currency?: string;
+  unit?: string;
   credit_limit?: number;
   [key: string]: unknown;
 }
@@ -123,7 +123,7 @@ export interface MemberProfile {
   /** Role in canonical format */
   role: CanonicalRole;
   joined_at: number;
-  balance: number;
+  position: number;
   transaction_count: number;
   trust_score?: number;
 }
@@ -141,36 +141,36 @@ export interface UpdateMemberRequest {
 // Ledger
 // ============================================================================
 
-export interface Balance {
+export interface Position {
   did: string;
-  balance: number;
-  currency: string;
+  position: number;
+  unit: string;
 }
 
-export interface PaymentRequest {
+export interface SettlementRequest {
   from: string;
   to: string;
   amount: number;
-  currency: string;
+  unit: string;
   memo?: string;
 }
 
-export interface PaymentResponse {
+export interface SettlementResponse {
   id: string;
   from: string;
   to: string;
   amount: number;
-  currency: string;
+  unit: string;
   memo?: string;
   timestamp: number;
 }
 
 // ============================================================================
-// Cross-Currency Payments
+// Cross-Unit Settlements
 // ============================================================================
 
 /**
- * Request for a cross-currency payment where sender pays in one currency
+ * Request for a cross-unit settlement where sender pays in one unit
  * and recipient receives in another.
  */
 export interface CrossPaymentRequest {
@@ -265,7 +265,7 @@ export interface Transaction {
   from: string;
   to: string;
   amount: number;
-  currency: string;
+  unit: string;
   memo?: string;
   timestamp: number;
 }
@@ -429,10 +429,10 @@ export interface SubmitTaskRequest {
   priority?: string;
   /** Deadline in milliseconds from now */
   deadline_ms?: number;
-  /** Payment rate per 1000 fuel */
-  payment_rate?: number;
-  /** Payment currency (default credits) */
-  payment_currency?: string;
+  /** Settlement rate per 1000 fuel */
+  settlement_rate?: number;
+  /** Settlement unit (default credits) */
+  settlement_unit?: string;
 }
 
 export interface SubmitTaskResponse {
@@ -517,26 +517,26 @@ export interface WsShutdownMessage {
 // Gateway Event Payloads (Discriminated Union)
 // ============================================================================
 
-export interface PaymentCreatedEvent {
-  type: 'PaymentCreated';
+export interface SettlementCreatedEvent {
+  type: 'SettlementCreated';
   coop_id: string;
   hash: string;
   from: string;
   to: string;
   amount: number;
-  currency: string;
+  unit: string;
 }
 
-export interface CrossPaymentCreatedEvent {
-  type: 'CrossPaymentCreated';
+export interface CrossSettlementCreatedEvent {
+  type: 'CrossSettlementCreated';
   coop_id: string;
   hash: string;
   from: string;
   to: string;
   source_amount: number;
-  from_currency: string;
+  from_unit: string;
   target_amount: number;
-  to_currency: string;
+  to_unit: string;
   rate: number;
 }
 
@@ -642,8 +642,8 @@ export interface ShutdownEvent {
  * Use the `type` field to narrow the type in event handlers.
  */
 export type GatewayEventPayload =
-  | PaymentCreatedEvent
-  | CrossPaymentCreatedEvent
+  | SettlementCreatedEvent
+  | CrossSettlementCreatedEvent
   | MemberAddedEvent
   | MemberRemovedEvent
   | RoleUpdatedEvent
@@ -1769,30 +1769,30 @@ export interface TreasuryStatus {
   coop_id: string;
   /** Treasury DID */
   treasury_did: string;
-  /** Current balance */
-  balance: number;
-  /** Currency */
-  currency: string;
+  /** Current position */
+  position: number;
+  /** Unit of account */
+  unit: string;
   /** Number of pending spend proposals */
   pending_proposals: number;
 }
 
-/** Treasury balance response */
+/** Treasury position response */
 export interface TreasuryBalance {
   /** Cooperative ID */
   coop_id: string;
-  /** Current balance */
-  balance: number;
-  /** Currency */
-  currency: string;
+  /** Current position */
+  position: number;
+  /** Unit of account */
+  unit: string;
 }
 
-/** Flow C treasury balance response */
+/** Flow C treasury position response */
 export interface TreasuryBalanceResponse {
   /** Treasury DID */
   treasury_did: string;
-  /** Balances by currency code */
-  balances: Record<string, number>;
+  /** Positions by unit code */
+  positions: Record<string, number>;
 }
 
 /** Request to propose a treasury spend */
@@ -1801,8 +1801,8 @@ export interface ProposeTreasurySpendRequest {
   amount: number;
   /** Recipient DID */
   recipient: string;
-  /** Currency */
-  currency: string;
+  /** Unit of account */
+  unit: string;
   /** Memo/reason for the spend */
   memo: string;
 }
@@ -1888,7 +1888,7 @@ export interface GovernanceReceiptResponse {
 
 /** Flow C treasury sub-client surface */
 export interface TreasuryClient {
-  balance(coopId: string): Promise<TreasuryBalanceResponse>;
+  position(coopId: string): Promise<TreasuryBalanceResponse>;
 }
 
 /** Flow C governance sub-client surface */

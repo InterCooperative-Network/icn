@@ -1,4 +1,4 @@
-//! Payment Escrow API
+//! Settlement Escrow API
 //!
 //! Hold funds for conditional release with multi-party authorization.
 
@@ -23,7 +23,7 @@ pub struct CreateEscrowRequest {
     pub from_account: String,
     pub to_account: String,
     pub amount: i64,
-    pub currency: String,
+    pub unit: String,
     pub description: String,
     pub conditions: Vec<EscrowCondition>,
     pub expires_at: Option<u64>,
@@ -42,7 +42,7 @@ pub async fn create_escrow(
     store: web::Data<EscrowStore>,
     req: web::Json<CreateEscrowRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -60,7 +60,7 @@ pub async fn create_escrow(
         from_account: req.from_account.clone(),
         to_account: req.to_account.clone(),
         amount: req.amount,
-        currency: req.currency.clone(),
+        currency: req.unit.clone(),
         status: EscrowStatus::Pending,
         conditions: req.conditions.clone(),
         approvals: Vec::new(),
@@ -84,7 +84,7 @@ pub async fn list_escrows(
     store: web::Data<EscrowStore>,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:read")?;
+    require_scope(&http_req, "settlements:read")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -125,7 +125,7 @@ pub async fn get_escrow(
     store: web::Data<EscrowStore>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:read")?;
+    require_scope(&http_req, "settlements:read")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -156,7 +156,7 @@ pub async fn release_escrow(
     id: web::Path<String>,
     req: web::Json<ApproveEscrowRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -201,7 +201,7 @@ pub async fn release_escrow(
             .map_err(|e| GatewayError::BadRequest(format!("Invalid to_account DID: {e}")))?;
 
         let tx_hash = match ledger_mgr
-            .create_payment(
+            .create_settlement(
                 &escrow.coop_id,
                 &to_did,   // Recipient (debited/gains credits in this mutual credit system)
                 &from_did, // Payer (credited/loses credits)
@@ -268,7 +268,7 @@ pub async fn refund_escrow(
     _ledger_mgr: web::Data<Arc<LedgerManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;

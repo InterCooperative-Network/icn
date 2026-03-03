@@ -67,15 +67,15 @@ impl LedgerEventBridge {
             LedgerEvent::TransactionCreated(tx) => {
                 let coop_id = tx.domain_id.unwrap_or_else(|| self.default_coop_id.clone());
 
-                // Emit PaymentCreated for each transfer
+                // Emit SettlementCreated for each transfer
                 for transfer in tx.transfers {
-                    let gateway_event = GatewayEvent::PaymentCreated {
+                    let gateway_event = GatewayEvent::SettlementCreated {
                         coop_id: coop_id.clone(),
                         hash: tx.entry_hash.clone(),
                         from: transfer.from,
                         to: transfer.to,
                         amount: transfer.amount,
-                        currency: transfer.currency,
+                        unit: transfer.currency,
                     };
                     self.gateway_broadcaster
                         .broadcast(&coop_id, gateway_event)
@@ -223,15 +223,15 @@ impl LedgerEventBridge {
                 let coop_id = cct
                     .domain_id
                     .unwrap_or_else(|| self.default_coop_id.clone());
-                let gateway_event = GatewayEvent::CrossPaymentCreated {
+                let gateway_event = GatewayEvent::CrossSettlementCreated {
                     coop_id: coop_id.clone(),
                     hash: cct.entry_hash,
                     from: cct.from,
                     to: cct.to,
                     source_amount: cct.source_amount,
-                    from_currency: cct.from_currency,
+                    from_unit: cct.from_currency,
                     target_amount: cct.net_target_amount,
-                    to_currency: cct.to_currency,
+                    to_unit: cct.to_currency,
                     rate: cct.rate,
                 };
                 self.gateway_broadcaster
@@ -311,13 +311,13 @@ mod tests {
         // Check that gateway received the event
         if let Ok(sequenced) = rx.try_recv() {
             match sequenced.event {
-                GatewayEvent::PaymentCreated {
+                GatewayEvent::SettlementCreated {
                     coop_id: c, amount, ..
                 } => {
                     assert_eq!(c, "test-coop");
                     assert_eq!(amount, 10);
                 }
-                _ => panic!("Expected PaymentCreated event"),
+                _ => panic!("Expected SettlementCreated event"),
             }
         } else {
             // Event may not have arrived yet - that's okay for this test

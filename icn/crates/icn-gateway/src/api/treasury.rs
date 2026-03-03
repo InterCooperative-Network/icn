@@ -92,26 +92,26 @@ pub struct TreasuryStatusResponse {
     /// Entity ID (type-safe entity reference, preferred over coop_id)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity_id: Option<String>,
-    /// Primary currency
-    pub currency: String,
+    /// Primary unit of account
+    pub unit: String,
     /// Whether treasury is active
     pub is_active: bool,
-    /// Current balance (from ledger) - None if ledger lookup not yet implemented
+    /// Current position (from ledger) - None if ledger lookup not yet implemented
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub balance: Option<i64>,
+    pub position: Option<i64>,
     /// Number of active budgets
     pub active_budget_count: usize,
     /// Number of spending rules
     pub spending_rule_count: usize,
 }
 
-/// Response for treasury balance
+/// Response for treasury position
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TreasuryBalanceResponse {
     /// Treasury DID
     pub treasury_did: String,
-    /// Balance by currency
-    pub balances: HashMap<String, i64>,
+    /// Position by unit of account
+    pub positions: HashMap<String, i64>,
 }
 
 /// Response for treasury nonce
@@ -142,8 +142,8 @@ pub struct BudgetSummary {
     pub percentage_used: u8,
     /// Budget status
     pub status: String,
-    /// Currency
-    pub currency: String,
+    /// Unit of account
+    pub unit: String,
 }
 
 /// Response for budget list
@@ -172,8 +172,8 @@ pub struct BudgetDetailResponse {
     pub spent_amount: i64,
     /// Remaining amount
     pub remaining: i64,
-    /// Currency
-    pub currency: String,
+    /// Unit of account
+    pub unit: String,
     /// Period start timestamp
     pub period_start: u64,
     /// Period end timestamp (optional)
@@ -203,8 +203,8 @@ pub struct SpendingRuleSummary {
     pub name: String,
     /// Threshold amount (spending above this requires approval)
     pub threshold_amount: i64,
-    /// Currency
-    pub currency: String,
+    /// Unit of account
+    pub unit: String,
     /// Approval type required
     pub approval_type: String,
     /// Whether the rule is active
@@ -263,8 +263,8 @@ pub struct CreateBudgetRequest {
     pub purpose: String,
     /// Amount to allocate
     pub amount: i64,
-    /// Currency
-    pub currency: String,
+    /// Unit of account
+    pub unit: String,
     /// Period end (optional, Unix timestamp)
     pub period_end: Option<u64>,
 }
@@ -274,8 +274,8 @@ pub struct CreateBudgetRequest {
 pub struct DepositRequest {
     /// Amount to deposit
     pub amount: i64,
-    /// Currency
-    pub currency: String,
+    /// Unit of account
+    pub unit: String,
     /// Memo/note
     pub memo: Option<String>,
 }
@@ -339,9 +339,9 @@ pub async fn get_treasury_status(
         treasury_did: treasury.treasury_did.to_string(),
         coop_id: treasury.coop_id.clone(),
         entity_id: treasury.entity_id().map(|e| e.to_string()),
-        currency: treasury.currency,
+        unit: treasury.currency,
         is_active: treasury.is_active,
-        balance,
+        position: balance,
         active_budget_count,
         spending_rule_count: rules.len(),
     };
@@ -349,19 +349,19 @@ pub async fn get_treasury_status(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// GET /treasury/{coop_id}/balance - Get treasury balance
+/// GET /treasury/{coop_id}/position - Get treasury position
 ///
-/// Returns the current balance of the cooperative's treasury.
-#[get("/{coop_id}/balance")]
-pub async fn get_treasury_balance(
+/// Returns the current position of the cooperative's treasury.
+#[get("/{coop_id}/position")]
+pub async fn get_treasury_position(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
-    do_get_treasury_balance(req, path, treasury_mgr).await
+    do_get_treasury_position(req, path, treasury_mgr).await
 }
 
-pub(crate) async fn do_get_treasury_balance(
+pub(crate) async fn do_get_treasury_position(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
@@ -371,7 +371,7 @@ pub(crate) async fn do_get_treasury_balance(
     let coop_id = path.into_inner();
     require_coop_access(&req, &coop_id)?;
 
-    info!(coop_id = %coop_id, "Treasury balance requested");
+    info!(coop_id = %coop_id, "Treasury position requested");
 
     // Get treasury for this cooperative
     let treasury = treasury_mgr
@@ -385,24 +385,24 @@ pub(crate) async fn do_get_treasury_balance(
         )));
     };
 
-    // Check if ledger is wired for balance queries
+    // Check if ledger is wired for position queries
     if !treasury_mgr.is_ledger_wired() {
         return Err(GatewayError::ServiceUnavailable(
-            "Treasury balance lookup requires daemon integration. \
-             Start icnd with full identity to enable balance queries."
+            "Treasury position lookup requires daemon integration. \
+             Start icnd with full identity to enable position queries."
                 .to_string(),
         ));
     }
 
-    // Query all balances from ledger
-    let balances = treasury_mgr
+    // Query all positions from ledger
+    let positions = treasury_mgr
         .get_all_treasury_balances(&treasury.treasury_did)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     let response = TreasuryBalanceResponse {
         treasury_did: treasury.treasury_did.to_string(),
-        balances,
+        positions,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -497,7 +497,7 @@ pub async fn list_budgets(
             remaining: b.remaining(),
             percentage_used: b.percentage_used().round().clamp(0.0, 100.0) as u8,
             status: format!("{:?}", b.status),
-            currency: b.currency.clone(),
+            unit: b.currency.clone(),
         })
         .collect();
 
@@ -546,7 +546,7 @@ pub async fn get_budget(
         allocated_amount: budget.allocated_amount,
         spent_amount: budget.spent_amount,
         remaining: budget.remaining(),
-        currency: budget.currency.clone(),
+        unit: budget.currency.clone(),
         period_start: budget.period_start,
         period_end: budget.period_end,
         status: format!("{:?}", budget.status),
@@ -599,10 +599,8 @@ pub async fn create_budget(
         ));
     }
 
-    if body.currency.trim().is_empty() {
-        return Err(GatewayError::BadRequest(
-            "Currency cannot be empty".to_string(),
-        ));
+    if body.unit.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Unit cannot be empty".to_string()));
     }
 
     // Validate period_end is in the future
@@ -649,7 +647,7 @@ pub async fn create_budget(
             treasury_did: treasury.treasury_did.clone(),
             purpose: body.purpose.clone(),
             amount: body.amount,
-            currency: body.currency.clone(),
+            currency: body.unit.clone(),
             period_end: body.period_end,
         },
     };
@@ -657,7 +655,7 @@ pub async fn create_budget(
     let title = format!("Budget Allocation: {}", body.purpose);
     let description = format!(
         "Proposal to allocate {} {} from treasury for: {}",
-        body.amount, body.currency, body.purpose
+        body.amount, body.unit, body.purpose
     );
 
     // Submit proposal to governance system
@@ -687,7 +685,7 @@ pub async fn create_budget(
         "coop_id": coop_id,
         "purpose": body.purpose,
         "amount": body.amount,
-        "currency": body.currency
+        "unit": body.unit
     });
 
     Ok(HttpResponse::Accepted().json(response))
@@ -735,7 +733,7 @@ pub async fn list_spending_rules(
             id: r.id.clone(),
             name: r.name.clone(),
             threshold_amount: r.threshold_amount,
-            currency: r.currency.clone(),
+            unit: r.currency.clone(),
             approval_type: format!("{:?}", r.approval_type),
             is_active: r.is_active,
         })
@@ -850,10 +848,8 @@ pub async fn deposit_to_treasury(
         ));
     }
 
-    if body.currency.trim().is_empty() {
-        return Err(GatewayError::BadRequest(
-            "Currency cannot be empty".to_string(),
-        ));
+    if body.unit.trim().is_empty() {
+        return Err(GatewayError::BadRequest("Unit cannot be empty".to_string()));
     }
 
     // Get depositor DID from auth token
@@ -883,7 +879,7 @@ pub async fn deposit_to_treasury(
         depositor = %depositor_did,
         treasury = %treasury.treasury_did,
         amount = body.amount,
-        currency = %body.currency,
+        unit = %body.unit,
         "Treasury deposit requested"
     );
 
@@ -902,7 +898,7 @@ pub async fn deposit_to_treasury(
             &treasury.treasury_did,
             &depositor_did,
             body.amount,
-            body.currency.clone(),
+            body.unit.clone(),
             body.memo.clone(),
         )
         .await
@@ -919,7 +915,7 @@ pub async fn deposit_to_treasury(
         "message": "Treasury deposit successful",
         "coop_id": coop_id,
         "amount": body.amount,
-        "currency": body.currency,
+        "unit": body.unit,
         "entry_hash": entry_hash.to_string()
     });
 
@@ -939,15 +935,15 @@ pub struct SpendRequest {
     pub recipient: String,
     /// Human-readable memo / purpose
     pub memo: String,
-    /// Currency (defaults to "credits")
-    #[serde(default = "default_spend_currency")]
-    pub currency: String,
+    /// Unit of account (defaults to "credits")
+    #[serde(default = "default_spend_unit")]
+    pub unit: String,
     /// Optional expected treasury nonce. If omitted, gateway resolves current nonce.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_nonce: Option<u64>,
 }
 
-fn default_spend_currency() -> String {
+fn default_spend_unit() -> String {
     "credits".to_string()
 }
 
@@ -1040,17 +1036,17 @@ pub(crate) async fn do_propose_spend(
         operation: TreasuryProposalOperation::Spend {
             treasury_did: treasury.treasury_did.clone(),
             amount: body.amount,
-            currency: body.currency.clone(),
+            currency: body.unit.clone(),
             recipient: recipient_did,
             memo: body.memo.clone(),
             nonce,
         },
     };
 
-    let title = format!("Treasury Spend: {} {}", body.amount, body.currency);
+    let title = format!("Treasury Spend: {} {}", body.amount, body.unit);
     let description = format!(
         "Proposal to spend {} {} from treasury to {} — {}",
-        body.amount, body.currency, body.recipient, body.memo
+        body.amount, body.unit, body.recipient, body.memo
     );
 
     let created_proposal_id = governance_mgr
@@ -1079,7 +1075,7 @@ pub(crate) async fn do_propose_spend(
         "proposal_id": created_proposal_id.to_string(),
         "coop_id": coop_id,
         "amount": body.amount,
-        "currency": body.currency,
+        "unit": body.unit,
         "recipient": body.recipient,
         "memo": body.memo,
         "nonce": nonce
@@ -1095,7 +1091,7 @@ pub(crate) async fn do_propose_spend(
 /// Configure treasury routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(get_treasury_status)
-        .service(get_treasury_balance)
+        .service(get_treasury_position)
         .service(get_treasury_nonce)
         .service(list_budgets)
         .service(get_budget)
@@ -1226,7 +1222,7 @@ mod tests {
         let body = CreateBudgetRequest {
             purpose: "Test budget".to_string(),
             amount: 1000,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
             period_end: None,
         };
 
@@ -1333,7 +1329,7 @@ mod tests {
                 "amount": 42,
                 "recipient": recipient.did().to_string(),
                 "memo": "Ops budget",
-                "currency": "credits",
+                "unit": "credits",
                 "expected_nonce": 0
             }))
             .to_request();

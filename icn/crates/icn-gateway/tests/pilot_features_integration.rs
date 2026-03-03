@@ -6,7 +6,7 @@
 use icn_gateway::api::{
     budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore},
     escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore},
-    recurring_payments::{
+    recurring_settlements::{
         PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus,
     },
 };

@@ -13,8 +13,8 @@ pub const MAX_COOP_ID_LEN: usize = 64;
 /// Maximum length for cooperative name
 pub const MAX_COOP_NAME_LEN: usize = 256;
 
-/// Maximum length for currency identifier
-pub const MAX_CURRENCY_LEN: usize = 32;
+/// Maximum length for unit of account identifier
+pub const MAX_UNIT_LEN: usize = 32;
 
 /// Maximum length for transaction memo
 pub const MAX_MEMO_LEN: usize = 1024;
@@ -52,9 +52,9 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     // Governance operations
     "governance:read",
     "governance:write",
-    // Payment operations
-    "payments:read",
-    "payments:write",
+    // Settlement operations
+    "settlements:read",
+    "settlements:write",
     // Federation operations
     "federation:read",
     "federation:write",
@@ -206,17 +206,17 @@ pub fn validate_coop_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Validate currency identifier
-pub fn validate_currency(currency: &str) -> Result<()> {
-    if currency.is_empty() || currency.trim().is_empty() {
+/// Validate unit of account identifier
+pub fn validate_unit(unit: &str) -> Result<()> {
+    if unit.is_empty() || unit.trim().is_empty() {
         return Err(GatewayError::BadRequest(
-            "Currency cannot be empty or whitespace-only".to_string(),
+            "Unit cannot be empty or whitespace-only".to_string(),
         ));
     }
 
-    if currency.len() > MAX_CURRENCY_LEN {
+    if unit.len() > MAX_UNIT_LEN {
         return Err(GatewayError::BadRequest(format!(
-            "Currency identifier exceeds maximum length of {MAX_CURRENCY_LEN} characters"
+            "Unit identifier exceeds maximum length of {MAX_UNIT_LEN} characters"
         )));
     }
 
@@ -756,12 +756,12 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_currency() {
-        assert!(validate_currency("hours").is_ok());
-        assert!(validate_currency("USD").is_ok());
-        assert!(validate_currency("").is_err()); // Empty
-        assert!(validate_currency("   ").is_err()); // Whitespace-only
-        assert!(validate_currency(&"a".repeat(33)).is_err()); // Too long
+    fn test_validate_unit() {
+        assert!(validate_unit("hours").is_ok());
+        assert!(validate_unit("USD").is_ok());
+        assert!(validate_unit("").is_err()); // Empty
+        assert!(validate_unit("   ").is_err()); // Whitespace-only
+        assert!(validate_unit(&"a".repeat(33)).is_err()); // Too long
     }
 
     #[test]

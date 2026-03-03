@@ -16,7 +16,7 @@ use crate::middleware::{get_claims, require_scope};
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateBudgetRequest {
     pub account: String,
-    pub currency: String,
+    pub unit: String,
     pub limit: i64,
     pub period: BudgetPeriod,
     pub description: String,
@@ -38,7 +38,7 @@ pub async fn create_budget(
     store: web::Data<BudgetStore>,
     req: web::Json<CreateBudgetRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -62,7 +62,7 @@ pub async fn create_budget(
         id: uuid::Uuid::new_v4().to_string(),
         owner: owner.to_string(),
         account: req.account.clone(),
-        currency: req.currency.clone(),
+        currency: req.unit.clone(),
         limit: req.limit,
         spent: 0,
         period: req.period,
@@ -90,7 +90,7 @@ pub async fn list_budgets(
     store: web::Data<BudgetStore>,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:read")?;
+    require_scope(&http_req, "settlements:read")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -130,7 +130,7 @@ pub async fn get_budget(
     store: web::Data<BudgetStore>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:read")?;
+    require_scope(&http_req, "settlements:read")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -165,7 +165,7 @@ pub async fn update_budget(
     id: web::Path<String>,
     req: web::Json<UpdateBudgetRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -215,7 +215,7 @@ pub async fn delete_budget(
     store: web::Data<BudgetStore>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "payments:write")?;
+    require_scope(&http_req, "settlements:write")?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;

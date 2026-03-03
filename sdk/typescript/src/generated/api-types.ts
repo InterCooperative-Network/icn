@@ -12,9 +12,23 @@ export interface components {
             account_id: string;
             /** Format: int64 */
             credit?: number | null;
-            currency: string;
             /** Format: int64 */
             debit?: number | null;
+            unit: string;
+        };
+        /** @description Account state response (net positions derived from signed receipt graph) */
+        AccountStateResponse: {
+            /**
+             * @description Obligation ceilings per unit (max negative position allowed)
+             *     Absence of a key means no ceiling for that unit
+             */
+            credit_limits?: {
+                [key: string]: number;
+            } | null;
+            did: string;
+            positions: {
+                [key: string]: number;
+            };
         };
         /** @description Add a member to a cooperative */
         AddMemberRequest: {
@@ -83,20 +97,6 @@ export interface components {
         ApplyMembershipRequest: {
             capabilities_requested?: string[];
             jurisdiction_id: string;
-        };
-        /** @description Balance response */
-        BalanceResponse: {
-            balances: {
-                [key: string]: number;
-            };
-            /**
-             * @description Credit limits per currency (max negative balance allowed)
-             *     Absence of a key means no credit limit for that currency
-             */
-            credit_limits?: {
-                [key: string]: number;
-            } | null;
-            did: string;
         };
         /** @description Ban member request */
         BanMemberRequest: {
@@ -193,15 +193,6 @@ export interface components {
             expires_in_seconds?: number | null;
             /** @description Role for the invitee: "member", "admin", "participant", "facilitator" */
             role: string;
-        };
-        /** @description Create a payment/transaction */
-        CreatePaymentRequest: {
-            /** Format: int64 */
-            amount: number;
-            currency: string;
-            from: string;
-            memo?: string | null;
-            to: string;
         };
         /** @description Create a new proposal */
         CreateProposalRequest: {
@@ -500,6 +491,15 @@ export interface components {
             federation_id: string;
             /** @enum {string} */
             type: "federation";
+        };
+        /** @description Record a transfer between participants (user-signed obligation exchange) */
+        RecordTransferRequest: {
+            /** Format: int64 */
+            amount: number;
+            from: string;
+            memo?: string | null;
+            to: string;
+            unit: string;
         };
         /** @description Register device request */
         RegisterDeviceRequest: {

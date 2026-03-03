@@ -10,8 +10,8 @@ use tokio::sync::broadcast;
 use tracing::{debug, info, warn};
 
 use crate::notification_queue::{
-    balance_change_notification, payment_received_notification, payment_sent_notification,
-    security_alert_notification, NotificationQueue, NotificationType, QueuedNotification,
+    balance_change_notification, security_alert_notification, settlement_received_notification,
+    settlement_sent_notification, NotificationQueue, NotificationType, QueuedNotification,
 };
 
 /// Triggers notifications based on ledger events
@@ -75,7 +75,7 @@ impl LedgerNotificationTrigger {
                 // Create notifications for each transfer
                 for transfer in tx.transfers {
                     // Notify recipient
-                    let notif = payment_received_notification(
+                    let notif = settlement_received_notification(
                         &transfer.to,
                         &coop_id,
                         transfer.amount,
@@ -86,7 +86,7 @@ impl LedgerNotificationTrigger {
                     self.queue.queue(notif).await?;
 
                     // Notify sender
-                    let notif = payment_sent_notification(
+                    let notif = settlement_sent_notification(
                         &transfer.from,
                         &coop_id,
                         transfer.amount,
@@ -99,7 +99,7 @@ impl LedgerNotificationTrigger {
 
                 debug!(
                     entry_hash = %tx.entry_hash,
-                    "Queued payment notifications"
+                    "Queued settlement notifications"
                 );
             }
 
@@ -165,11 +165,11 @@ impl LedgerNotificationTrigger {
                     .domain_id
                     .unwrap_or_else(|| self.default_coop_id.clone());
 
-                // Notify recipient of cross-currency payment
+                // Notify recipient of cross-unit settlement
                 let notif = QueuedNotification::new(
                     &cct.to,
                     &coop_id,
-                    "Cross-Currency Payment Received",
+                    "Cross-Unit Settlement Received",
                     format!(
                         "You received {} {} (converted from {} {}) from {}",
                         cct.net_target_amount,
@@ -178,7 +178,7 @@ impl LedgerNotificationTrigger {
                         &cct.from_currency,
                         &cct.from
                     ),
-                    NotificationType::PaymentReceived,
+                    NotificationType::SettlementReceived,
                 );
                 self.queue.queue(notif).await?;
 
@@ -186,7 +186,7 @@ impl LedgerNotificationTrigger {
                 let notif = QueuedNotification::new(
                     &cct.from,
                     &coop_id,
-                    "Cross-Currency Payment Sent",
+                    "Cross-Unit Settlement Sent",
                     format!(
                         "You sent {} {} (converted to {} {}) to {}",
                         cct.source_amount,
@@ -195,13 +195,13 @@ impl LedgerNotificationTrigger {
                         &cct.to_currency,
                         &cct.to
                     ),
-                    NotificationType::PaymentSent,
+                    NotificationType::SettlementSent,
                 );
                 self.queue.queue(notif).await?;
 
                 debug!(
                     entry_hash = %cct.entry_hash,
-                    "Queued cross-currency payment notifications"
+                    "Queued cross-unit settlement notifications"
                 );
             }
 

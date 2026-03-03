@@ -85,25 +85,25 @@ static SLOW_CLIENT_DISCONNECTS: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum GatewayEvent {
-    /// A new payment was created
-    PaymentCreated {
+    /// A new settlement was created
+    SettlementCreated {
         coop_id: String,
         hash: String,
         from: String,
         to: String,
         amount: i64,
-        currency: String,
+        unit: String,
     },
-    /// A cross-currency payment was created
-    CrossPaymentCreated {
+    /// A cross-unit settlement was created
+    CrossSettlementCreated {
         coop_id: String,
         hash: String,
         from: String,
         to: String,
         source_amount: i64,
-        from_currency: String,
+        from_unit: String,
         target_amount: i64,
-        to_currency: String,
+        to_unit: String,
         rate: f64,
     },
     /// A member was added to a cooperative
@@ -606,13 +606,13 @@ mod tests {
             .await
             .expect("Should subscribe successfully");
 
-        let event = GatewayEvent::PaymentCreated {
+        let event = GatewayEvent::SettlementCreated {
             coop_id: "test-coop".to_string(),
             hash: "abc123".to_string(),
             from: "did:icn:alice".to_string(),
             to: "did:icn:bob".to_string(),
             amount: 10,
-            currency: "hours".to_string(),
+            unit: "hours".to_string(),
         };
 
         broadcaster.broadcast("test-coop", event.clone()).await;
@@ -623,7 +623,7 @@ mod tests {
         let sequenced = received.unwrap();
         assert!(sequenced.seq > 0);
         match sequenced.event {
-            GatewayEvent::PaymentCreated {
+            GatewayEvent::SettlementCreated {
                 coop_id, amount, ..
             } => {
                 assert_eq!(coop_id, "test-coop");
@@ -639,13 +639,13 @@ mod tests {
 
         // Broadcast 3 events
         for i in 0..3 {
-            let event = GatewayEvent::PaymentCreated {
+            let event = GatewayEvent::SettlementCreated {
                 coop_id: "test-coop".to_string(),
                 hash: format!("hash{i}"),
                 from: "did:icn:alice".to_string(),
                 to: "did:icn:bob".to_string(),
                 amount: i as i64,
-                currency: "hours".to_string(),
+                unit: "hours".to_string(),
             };
             broadcaster.broadcast("test-coop", event).await;
         }
@@ -720,13 +720,13 @@ mod tests {
 
         // Broadcast more events than channel capacity (slow client scenario)
         for i in 0..5 {
-            let event = GatewayEvent::PaymentCreated {
+            let event = GatewayEvent::SettlementCreated {
                 coop_id: "test-coop".to_string(),
                 hash: format!("hash{i}"),
                 from: "did:icn:alice".to_string(),
                 to: "did:icn:bob".to_string(),
                 amount: i as i64,
-                currency: "hours".to_string(),
+                unit: "hours".to_string(),
             };
             broadcaster.broadcast("test-coop", event).await;
         }

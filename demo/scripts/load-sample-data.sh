@@ -95,10 +95,10 @@ else
 fi
 
 echo
-echo "2. Check current identity balance:"
-BALANCE=$(curl -s "$GATEWAY/v1/ledger/$COOP_ID/balance/$CURRENT_DID" -H "Authorization: Bearer $TOKEN")
+echo "2. Check current identity position:"
+BALANCE=$(curl -s "$GATEWAY/v1/ledger/$COOP_ID/position/$CURRENT_DID" -H "Authorization: Bearer $TOKEN")
 
-echo -e "${GREEN}✓${NC} Balance payload:"
+echo -e "${GREEN}✓${NC} Position payload:"
 if command -v jq >/dev/null 2>&1; then
     echo "$BALANCE" | jq .
 else
@@ -116,7 +116,7 @@ echo
 echo "1. Start demo: ./demo/scripts/run-tool-library-demo.sh"
 echo "2. Create identities (or invite users from UI)"
 echo "3. Add members to coop via /v1/coops/{coop_id}/members"
-echo "4. Create historical payments via /v1/ledger/{coop_id}/payment"
+echo "4. Create historical settlements via /v1/ledger/{coop_id}/settle"
 echo
 echo "Gateway: $GATEWAY"
 echo "Cooperative: $COOP_ID"

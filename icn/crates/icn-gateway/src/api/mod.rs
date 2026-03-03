@@ -28,7 +28,7 @@ pub mod names;
 pub mod notifications;
 pub mod oracle;
 pub mod receipts;
-pub mod recurring_payments;
+pub mod recurring_settlements;
 pub mod registry;
 pub mod rights;
 pub mod sdis;

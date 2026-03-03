@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 
-use crate::api::treasury::{do_get_treasury_balance, do_propose_spend, SpendRequest};
+use crate::api::treasury::{do_get_treasury_position, do_propose_spend, SpendRequest};
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
@@ -29,14 +29,14 @@ pub async fn propose_spend_alias(
     do_propose_spend(req, path, body, treasury_mgr, governance_mgr).await
 }
 
-/// GET /v1/coops/{coop_id}/treasury/balance - Treasury balance read.
-#[get("/{coop_id}/treasury/balance")]
-pub async fn get_treasury_balance_alias(
+/// GET /v1/coops/{coop_id}/treasury/position - Treasury position read.
+#[get("/{coop_id}/treasury/position")]
+pub async fn get_treasury_position_alias(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
-    do_get_treasury_balance(req, path, treasury_mgr).await
+    do_get_treasury_position(req, path, treasury_mgr).await
 }
 
 /// POST /v1/proposals/{id}/vote - Cast vote alias.
@@ -144,7 +144,7 @@ pub async fn get_proof_alias(
 /// Configure /v1/coops Flow C alias routes.
 pub fn configure_coops(cfg: &mut web::ServiceConfig) {
     cfg.service(propose_spend_alias)
-        .service(get_treasury_balance_alias);
+        .service(get_treasury_position_alias);
 }
 
 /// Configure /v1/proposals Flow C alias routes.
@@ -192,7 +192,7 @@ mod tests {
         .await;
 
         let req = test::TestRequest::get()
-            .uri("/coops/test-coop/treasury/balance")
+            .uri("/coops/test-coop/treasury/position")
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_ne!(resp.status(), StatusCode::NOT_FOUND);
@@ -203,7 +203,7 @@ mod tests {
                 "amount": 5,
                 "recipient": "did:icn:z8eQZfY3RY75YwQ6MrFCHt9phbi3HGx1caFXE3291ow8t",
                 "memo": "flow-c alias",
-                "currency": "credits"
+                "unit": "credits"
             }))
             .to_request();
         let resp = test::call_service(&app, req).await;
@@ -246,7 +246,7 @@ mod tests {
         .await;
 
         let req = test::TestRequest::get()
-            .uri("/coops/other-coop/treasury/balance")
+            .uri("/coops/other-coop/treasury/position")
             .to_request();
         req.extensions_mut()
             .insert(test_claims("test-coop", vec!["treasury:read"]));
