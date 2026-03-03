@@ -370,31 +370,31 @@ if [ -n "$TOKEN" ] && [ -n "$CURRENT_DID" ]; then
 
     # Create sample ledger transactions between named members
     if [ ${#MEMBER_DIDS[@]} -ge 3 ]; then
-        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/settle" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[0]}\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \
             >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Sarah Chen (3 hrs)" || echo -e "  ${YELLOW}⚠${NC} Transaction failed"
 
-        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/settle" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[1]}\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Tool maintenance — sharpened mower blades and pruning shears\"}" \
             >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Marcus Rivera (2 hrs)" || true
 
-        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/settle" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[2]}\",\"amount\":1,\"currency\":\"hours\",\"memo\":\"Workshop instruction — intro to power tools safety\"}" \
             >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Demo User -> Priya Patel (1 hr)" || true
 
-        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/settle" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"from\":\"${MEMBER_DIDS[0]}\",\"to\":\"${MEMBER_DIDS[3]}\",\"amount\":2,\"currency\":\"hours\",\"memo\":\"Furniture repair — reglued two dining chairs\"}" \
             >/dev/null 2>&1 && echo -e "  ${GREEN}✓${NC} Transaction: Sarah Chen -> James Okafor (2 hrs)" || true
     elif [ ${#MEMBER_DIDS[@]} -ge 1 ]; then
-        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+        curl -s -X POST "$GATEWAY/v1/ledger/$COOP_ID/settle" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"from\":\"$CURRENT_DID\",\"to\":\"${MEMBER_DIDS[0]}\",\"amount\":3,\"currency\":\"hours\",\"memo\":\"Garden bed construction — built 4x8 raised bed\"}" \

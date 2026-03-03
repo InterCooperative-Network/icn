@@ -215,24 +215,24 @@ else
     ALICE_DID="did:icn:z${PREFIX}alice"
     BOB_DID="did:icn:z${PREFIX}bob"
 
-    step "Create payment: Alice → Bob"
-    RESP=$(http_post "$GATEWAY/v1/ledger/$COOP_ID/payment" \
+    step "Create settlement: Alice → Bob"
+    RESP=$(http_post "$GATEWAY/v1/ledger/$COOP_ID/settle" \
       "{
         \"from\":\"$ALICE_DID\",
         \"to\":\"$BOB_DID\",
         \"amount\":100,
-        \"currency\":\"hours\",
+        \"unit\":\"hours\",
         \"memo\":\"Community garden volunteer hours\"
       }")
-    ok "Payment created"
+    ok "Settlement created"
 
-    step "Check Alice's balance"
-    RESP=$(http_get "$GATEWAY/v1/ledger/$COOP_ID/balance/$ALICE_DID")
-    ok "Alice balances: $(echo "$RESP" | jq -c '.balances // .' 2>/dev/null || echo "$RESP")"
+    step "Check Alice's position"
+    RESP=$(http_get "$GATEWAY/v1/ledger/$COOP_ID/position/$ALICE_DID")
+    ok "Alice positions: $(echo "$RESP" | jq -c '.positions // .' 2>/dev/null || echo "$RESP")"
 
-    step "Check Bob's balance"
-    RESP=$(http_get "$GATEWAY/v1/ledger/$COOP_ID/balance/$BOB_DID")
-    ok "Bob balances: $(echo "$RESP" | jq -c '.balances // .' 2>/dev/null || echo "$RESP")"
+    step "Check Bob's position"
+    RESP=$(http_get "$GATEWAY/v1/ledger/$COOP_ID/position/$BOB_DID")
+    ok "Bob positions: $(echo "$RESP" | jq -c '.positions // .' 2>/dev/null || echo "$RESP")"
 
     step "Transaction history"
     RESP=$(http_get "$GATEWAY/v1/ledger/$COOP_ID/history")
@@ -255,10 +255,10 @@ else
       && ok "Treasury: $(jq_field "$RESP" '.is_active // .status // "responded"')" \
       || ok "Treasury status not available (may need federation init)"
 
-    step "Treasury balances"
-    RESP=$(http_get "$GATEWAY/v1/treasury/balances") \
-      && ok "Balance: $(jq_field "$RESP" '.balance // "responded"')" \
-      || ok "Treasury balances not available"
+    step "Treasury positions"
+    RESP=$(http_get "$GATEWAY/v1/treasury/positions") \
+      && ok "Position: $(jq_field "$RESP" '.position // "responded"')" \
+      || ok "Treasury positions not available"
 
     step "Treasury budgets"
     RESP=$(http_get "$GATEWAY/v1/treasury/budgets") \

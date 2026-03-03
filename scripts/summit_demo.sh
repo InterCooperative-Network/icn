@@ -240,7 +240,7 @@ record_decisions() {
     "amount": 200,
     "from": "treasury:'"$COOP_ID"'",
     "to": "did:icn:venue-downtown-deposit",
-    "currency": "credits"
+    "unit": "credits"
   }'
   record_decision "Disburse 200 credits to venue deposit" "treasury_spend" "$treasury_effect"
 }

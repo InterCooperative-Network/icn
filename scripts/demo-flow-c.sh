@@ -33,15 +33,15 @@ if [ -n "$STATUS_RESP" ]; then
   ok "Treasury balance: $BALANCE"
 fi
 
-# Step 2: Get treasury balance
-step "Getting treasury balance..."
-BALANCE_RESP=$(curl -sf "$GATEWAY/v1/treasury/$COOP_ID/balance" \
+# Step 2: Get treasury position
+step "Getting treasury position..."
+BALANCE_RESP=$(curl -sf "$GATEWAY/v1/treasury/$COOP_ID/position" \
   ${AUTH_HEADER:+-H "$AUTH_HEADER"} 2>&1) \
-  || { ok "Treasury balance endpoint not available (expected for new coop)"; BALANCE_RESP=""; }
+  || { ok "Treasury position endpoint not available (expected for new coop)"; BALANCE_RESP=""; }
 
 if [ -n "$BALANCE_RESP" ]; then
-  CURRENCY=$(echo "$BALANCE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('currency', 'credits'))" 2>/dev/null || echo "credits")
-  ok "Currency: $CURRENCY"
+  UNIT=$(echo "$BALANCE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('unit', 'credits'))" 2>/dev/null || echo "credits")
+  ok "Unit: $UNIT"
 fi
 
 # Step 3: Propose a treasury spend
