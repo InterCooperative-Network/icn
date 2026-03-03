@@ -334,14 +334,14 @@ describe('ledger operations', () => {
       fetch: mockFetch as unknown as typeof fetch,
     });
 
-    const result = await client.getBalance('test-coop', 'did:icn:alice');
+    const result = await client.getPosition('test-coop', 'did:icn:alice');
 
     expect(result).toEqual(mockResponse);
     const [url] = mockFetch.mock.calls[0];
-    expect(url).toContain('/ledger/test-coop/balance/');
+    expect(url).toContain('/ledger/test-coop/position/');
   });
 
-  it('should create payment with correct request', async () => {
+  it('should create settlement with correct request', async () => {
     const mockResponse = {
       transaction_id: 'tx-123',
       success: true,
@@ -359,26 +359,26 @@ describe('ledger operations', () => {
       fetch: mockFetch as unknown as typeof fetch,
     });
 
-    const result = await client.pay('test-coop', {
+    const result = await client.settle('test-coop', {
       from: 'did:icn:alice',
       to: 'did:icn:bob',
       amount: 50,
-      currency: 'credits',
-      memo: 'Test payment',
+      unit: 'credits',
+      memo: 'Test settlement',
     });
 
     expect(result).toEqual(mockResponse);
 
     const [url, options] = mockFetch.mock.calls[0];
-    expect(url).toBe('http://localhost:8080/v1/ledger/test-coop/payment');
+    expect(url).toBe('http://localhost:8080/v1/ledger/test-coop/settle');
     expect(options.method).toBe('POST');
 
     const body = JSON.parse(options.body);
     expect(body.from).toBe('did:icn:alice');
     expect(body.to).toBe('did:icn:bob');
     expect(body.amount).toBe(50);
-    expect(body.currency).toBe('credits');
-    expect(body.memo).toBe('Test payment');
+    expect(body.unit).toBe('credits');
+    expect(body.memo).toBe('Test settlement');
   });
 
   it('should get history with pagination', async () => {
@@ -590,10 +590,10 @@ describe('compute task cancellation', () => {
 });
 
 describe('flow c sdk methods', () => {
-  it('should get treasury balance via flow c alias route', async () => {
+  it('should get treasury position via flow c alias route', async () => {
     const mockResponse = {
       treasury_did: 'did:icn:treasury123',
-      balances: { credits: 4200 },
+      positions: { credits: 4200 },
     };
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -608,11 +608,11 @@ describe('flow c sdk methods', () => {
       fetch: mockFetch as unknown as typeof fetch,
     });
 
-    const result = await client.treasury.balance('coop-alpha');
+    const result = await client.treasury.position('coop-alpha');
 
     expect(result).toEqual(mockResponse);
     const [url, options] = mockFetch.mock.calls[0];
-    expect(url).toBe('http://localhost:8080/v1/coops/coop-alpha/treasury/balance');
+    expect(url).toBe('http://localhost:8080/v1/coops/coop-alpha/treasury/position');
     expect(options.method).toBe('GET');
   });
 
@@ -1635,14 +1635,14 @@ describe('compute task submission - CCL', () => {
       code: '{}',
       fuel_limit: 10000,
       priority: 'high',
-      payment_rate: 100,
+      settlement_rate: 100,
     });
 
     expect(result.task_hash).toBe('abc123');
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
     expect(body.priority).toBe('high');
-    expect(body.payment_rate).toBe(100);
+    expect(body.settlement_rate).toBe(100);
   });
 });
 

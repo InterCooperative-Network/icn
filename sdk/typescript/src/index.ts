@@ -55,9 +55,9 @@ import {
   ROLE_MAP,
   AddMemberRequest,
   UpdateMemberRequest,
-  Balance,
-  PaymentRequest,
-  PaymentResponse,
+  Position,
+  SettlementRequest,
+  SettlementResponse,
   CrossPaymentRequest,
   CrossPaymentResponse,
   CrossPaymentQuoteRequest,
@@ -80,8 +80,8 @@ import {
   WsShutdownMessage,
   GatewayEventPayload,
   CoopEventType,
-  PaymentCreatedEvent,
-  CrossPaymentCreatedEvent,
+  SettlementCreatedEvent,
+  CrossSettlementCreatedEvent,
   MemberAddedEvent,
   MemberRemovedEvent,
   RoleUpdatedEvent,
@@ -349,9 +349,9 @@ export class ICNClient {
       fetch: this.fetchImpl,
     });
     this.treasury = {
-      balance: async (coopId: string): Promise<TreasuryBalanceResponse> =>
+      position: async (coopId: string): Promise<TreasuryBalanceResponse> =>
         this.get<TreasuryBalanceResponse>(
-          `/coops/${encodeURIComponent(coopId)}/treasury/balance`
+          `/coops/${encodeURIComponent(coopId)}/treasury/position`
         ),
     };
     this.governance = {
@@ -783,17 +783,17 @@ export class ICNClient {
   // ===========================================================================
 
   /**
-   * Get balance for a member
+   * Get position for a member
    */
-  async getBalance(coopId: string, did: string): Promise<Balance> {
-    return this.get<Balance>(`/ledger/${coopId}/balance/${encodeURIComponent(did)}`);
+  async getPosition(coopId: string, did: string): Promise<Position> {
+    return this.get<Position>(`/ledger/${coopId}/position/${encodeURIComponent(did)}`);
   }
 
   /**
-   * Create a payment
+   * Create a settlement
    */
-  async pay(coopId: string, req: PaymentRequest): Promise<PaymentResponse> {
-    return this.post<PaymentResponse>(`/ledger/${coopId}/payment`, req);
+  async settle(coopId: string, req: SettlementRequest): Promise<SettlementResponse> {
+    return this.post<SettlementResponse>(`/ledger/${coopId}/settle`, req);
   }
 
   /**
@@ -1370,16 +1370,16 @@ export class ICNClient {
   }
 
   /**
-   * Get treasury balance for a cooperative
+   * Get treasury position for a cooperative
    *
    * @example
    * ```typescript
-   * const balance = await client.getTreasuryBalance('my-coop');
-   * console.log(`${balance.balance} ${balance.currency}`);
+   * const pos = await client.getTreasuryPosition('my-coop');
+   * console.log(`${pos.position} ${pos.unit}`);
    * ```
    */
-  async getTreasuryBalance(coopId: string): Promise<TreasuryBalance> {
-    return this.get<TreasuryBalance>(`/treasury/${coopId}/balance`);
+  async getTreasuryPosition(coopId: string): Promise<TreasuryBalance> {
+    return this.get<TreasuryBalance>(`/treasury/${coopId}/position`);
   }
 
   /**
@@ -2100,20 +2100,20 @@ export class ICNClient {
    *
    * @example
    * ```typescript
-   * const results = await client.batchPay('food-coop', [
-   *   { from: 'did:icn:alice', to: 'did:icn:bob', amount: 2.5, currency: 'hours', memo: 'Garden help' },
-   *   { from: 'did:icn:alice', to: 'did:icn:carol', amount: 1.0, currency: 'hours', memo: 'Bookkeeping' },
+   * const results = await client.batchSettle('food-coop', [
+   *   { from: 'did:icn:alice', to: 'did:icn:bob', amount: 2.5, unit: 'hours', memo: 'Garden help' },
+   *   { from: 'did:icn:alice', to: 'did:icn:carol', amount: 1.0, unit: 'hours', memo: 'Bookkeeping' },
    * ]);
    * console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
    * ```
    */
-  async batchPay(coopId: string, payments: PaymentRequest[]): Promise<{
+  async batchSettle(coopId: string, payments: SettlementRequest[]): Promise<{
     succeeded: number;
     failed: number;
-    results: Array<{ success: boolean; payment?: PaymentResponse; error?: string }>;
+    results: Array<{ success: boolean; payment?: SettlementResponse; error?: string }>;
   }> {
     const results = await Promise.allSettled(
-      payments.map(payment => this.pay(coopId, payment))
+      payments.map(payment => this.settle(coopId, payment))
     );
 
     return {
