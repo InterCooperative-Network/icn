@@ -36,6 +36,34 @@ impl std::fmt::Display for ContentHash {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Signature(pub Vec<u8>);
 
+/// Provenance of a journal entry — who or what authorized this ledger change.
+///
+/// Every entry must carry exactly one provenance ref. This is a pilot-grade
+/// invariant: the ledger must be able to answer "why was this entry created?"
+/// for every record it holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProvenanceRef {
+    /// Entry was authorized by a governance decision (proposal + vote).
+    ///
+    /// `receipt_id` is the node-local decision receipt identifier.
+    /// `decision_hash` is the canonical cross-node equality anchor.
+    Governance {
+        receipt_id: String,
+        decision_hash: String,
+    },
+
+    /// Entry was created directly by a member (not via governance).
+    ///
+    /// `did` identifies the authorizing member.
+    /// `signature` is their Ed25519 signature over the entry content.
+    DirectMember { did: Did, signature: String },
+
+    /// Entry was created by the system (FX transfer, DID migration, mint, etc.).
+    ///
+    /// `reason` is a short human-readable label for audit logs.
+    SystemGenerated { reason: String },
+}
+
 /// Journal entry in the ledger's Merkle-DAG
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JournalEntry {
@@ -79,24 +107,15 @@ pub struct JournalEntry {
     pub nonce: Option<[u8; 32]>,
 
     // =========================================================================
-    // PROVENANCE FIELDS (Pilot-grade invariant: governance → ledger traceability)
+    // PROVENANCE (Pilot-grade invariant: every entry must be traceable)
     // =========================================================================
-    /// Governance decision receipt ID that authorized this entry.
+    /// Who or what authorized this ledger entry.
     ///
-    /// Links this ledger entry back to the governance decision that caused it.
-    /// This is the node-local identifier for the decision receipt.
-    ///
-    /// Example: `"gov:proposal:2024-001:receipt:abc123"`
-    pub decision_receipt_id: Option<String>,
-
-    /// Canonical decision hash (cross-node equality anchor).
-    ///
-    /// This is the cryptographic hash of the canonical decision content,
-    /// ensuring that any node can verify this ledger entry was authorized
-    /// by the same decision, regardless of receipt ID format.
-    ///
-    /// Example: `"sha256:abc123def456..."`
-    pub decision_hash: Option<String>,
+    /// Required on every entry. Use [`ProvenanceRef::Governance`] for
+    /// governance-authorized changes, [`ProvenanceRef::DirectMember`] for
+    /// member-direct changes, and [`ProvenanceRef::SystemGenerated`] for
+    /// internal system operations (FX, migration, mint/burn).
+    pub provenance: ProvenanceRef,
 }
 
 /// Delta for a single account in a journal entry
