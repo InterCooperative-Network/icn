@@ -15,6 +15,7 @@ use icn_identity::Did;
 use icn_ledger::treasury::{
     ApprovalType, BudgetStatus, SpendingRule, TreasuryManager, TreasuryOperation, VelocityLimit,
 };
+use icn_ledger::types::ProvenanceRef;
 use icn_ledger::{AccountDelta, ContentHash, JournalEntry};
 use icn_store::SledStore;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -243,8 +244,9 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
-            decision_receipt_id: None,
-            decision_hash: None,
+            provenance: ProvenanceRef::SystemGenerated {
+                reason: "test".to_string(),
+            },
         };
 
         let result = guard.validate_entry(&entry);
@@ -279,8 +281,9 @@ async fn test_spending_rule_enforcement() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
-            decision_receipt_id: None,
-            decision_hash: None,
+            provenance: ProvenanceRef::SystemGenerated {
+                reason: "test".to_string(),
+            },
         };
 
         let result = guard.validate_entry(&entry);
@@ -338,8 +341,9 @@ async fn test_spending_below_threshold_allowed() -> Result<()> {
             parents: vec![],
             signature: None,
             nonce: None,
-            decision_receipt_id: None,
-            decision_hash: None,
+            provenance: ProvenanceRef::SystemGenerated {
+                reason: "test".to_string(),
+            },
         };
 
         let result = guard.validate_entry(&entry);
@@ -1218,15 +1222,13 @@ async fn test_ledger_entry_carries_decision_provenance() -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("Entry not found in ledger"))?;
 
         // THE PILOT-CRITICAL ASSERTIONS:
-        assert_eq!(
-            entry.decision_receipt_id.as_ref(),
-            Some(&decision_receipt_id),
-            "Ledger entry must carry decision_receipt_id"
-        );
-        assert_eq!(
-            entry.decision_hash.as_ref(),
-            Some(&decision_hash),
-            "Ledger entry must carry decision_hash (canonical cross-node anchor)"
+        assert!(
+            matches!(
+                &entry.provenance,
+                ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                    if receipt_id == &decision_receipt_id && dh == &decision_hash
+            ),
+            "Ledger entry must carry Governance provenance with matching receipt_id and decision_hash"
         );
 
         info!(
@@ -1359,15 +1361,13 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("Entry not found in ledger"))?;
 
         // THE E2E PILOT-CRITICAL ASSERTIONS:
-        assert_eq!(
-            entry.decision_receipt_id.as_ref(),
-            Some(&decision_receipt_id.to_string()),
-            "Ledger entry must carry decision_receipt_id from executor path"
-        );
-        assert_eq!(
-            entry.decision_hash.as_ref(),
-            Some(&decision_hash),
-            "Ledger entry must carry decision_hash from executor path"
+        assert!(
+            matches!(
+                &entry.provenance,
+                ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                    if receipt_id == &decision_receipt_id.to_string() && dh == &decision_hash
+            ),
+            "Ledger entry must carry Governance provenance with matching receipt_id and decision_hash from executor path"
         );
 
         // Print the pilot chain for demo visibility (machine-parseable + human-readable)

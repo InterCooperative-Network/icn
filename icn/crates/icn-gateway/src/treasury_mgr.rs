@@ -454,6 +454,7 @@ impl GatewayTreasuryManager {
         let mut entry = icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
             .credit(from_did.clone(), currency.clone(), amount) // Depositor gives funds
             .debit(treasury_did.clone(), currency.clone(), amount) // Treasury receives funds
+            .with_system_provenance("treasury deposit")
             .build()?;
 
         // Compute the hash

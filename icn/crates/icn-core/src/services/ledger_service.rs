@@ -22,7 +22,7 @@ use icn_kernel_api::services::{
 };
 use icn_kernel_api::types::Did;
 use icn_kernel_api::PolicyOracle;
-use icn_ledger::{entry::JournalEntryBuilder, AccountDelta, Ledger};
+use icn_ledger::{entry::JournalEntryBuilder, types::ProvenanceRef, AccountDelta, Ledger};
 use icn_store::SledStore;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
@@ -188,7 +188,15 @@ impl LedgerServiceImpl {
             .map_err(|e| format!("Failed to query ledger entries: {e}"))?;
 
         for mut existing_entry in entries {
-            if existing_entry.decision_receipt_id.as_deref() != Some(decision_receipt_id) {
+            let (entry_receipt_id, entry_decision_hash) = match &existing_entry.provenance {
+                ProvenanceRef::Governance {
+                    receipt_id,
+                    decision_hash,
+                } => (Some(receipt_id.as_str()), Some(decision_hash.clone())),
+                _ => (None, None),
+            };
+
+            if entry_receipt_id != Some(decision_receipt_id) {
                 continue;
             }
 
@@ -201,7 +209,7 @@ impl LedgerServiceImpl {
                     .to_hex()
             };
 
-            return Ok(Some((entry_hash_hex, existing_entry.decision_hash.clone())));
+            return Ok(Some((entry_hash_hex, entry_decision_hash)));
         }
 
         Ok(None)
