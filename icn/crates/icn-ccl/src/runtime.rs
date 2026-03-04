@@ -154,6 +154,7 @@ impl ContractRuntime {
                     let entry = JournalEntryBuilder::new(from.clone())
                         .debit(to.clone(), currency.clone(), *amount)
                         .credit(from.clone(), currency.clone(), *amount)
+                        .with_system_provenance("ccl-contract-execution")
                         .build()?;
 
                     ledger.append_entry(entry).await?;
