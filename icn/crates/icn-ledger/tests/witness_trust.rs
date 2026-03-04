@@ -101,6 +101,7 @@ async fn test_witness_trust_validation_sufficient_trust() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -154,6 +155,7 @@ async fn test_witness_trust_validation_insufficient_trust() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -211,6 +213,7 @@ async fn test_witness_trust_validation_unknown_witness() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -266,6 +269,7 @@ async fn test_witness_trust_validation_backward_compatible() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -315,6 +319,7 @@ async fn test_witness_trust_validation_no_trust_graph() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -397,6 +402,7 @@ async fn test_witness_trust_validation_quorum_with_trust() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 100)
         .credit(bob.clone(), "hours".to_string(), 100)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -494,6 +500,7 @@ async fn test_witness_trust_validation_quorum_insufficient_trusted_witnesses() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 100)
         .credit(bob.clone(), "hours".to_string(), 100)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 

@@ -51,6 +51,7 @@ async fn test_dynamic_limits_integration_basic() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -112,6 +113,7 @@ async fn test_activity_updates_dynamic_state() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 5)
         .credit(bob.clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -169,6 +171,7 @@ async fn test_credit_limit_enforcement_with_dynamic_manager() {
     let entry1 = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 50)
         .credit(bob.clone(), "hours".to_string(), 50)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -181,6 +184,7 @@ async fn test_credit_limit_enforcement_with_dynamic_manager() {
     let entry2 = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 60)
         .credit(bob.clone(), "hours".to_string(), 60)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -218,6 +222,7 @@ async fn test_fallback_to_static_limits_on_error() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -262,6 +267,7 @@ async fn test_multiple_currencies_tracked_separately() {
     let hours_entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 50)
         .credit(bob.clone(), "hours".to_string(), 50)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -272,6 +278,7 @@ async fn test_multiple_currencies_tracked_separately() {
     let kwh_entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "kwh".to_string(), 80)
         .credit(bob.clone(), "kwh".to_string(), 80)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -295,6 +302,7 @@ async fn test_multiple_currencies_tracked_separately() {
     let hours_exceed = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 60)
         .credit(bob.clone(), "hours".to_string(), 60)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -309,6 +317,7 @@ async fn test_multiple_currencies_tracked_separately() {
     let kwh_ok = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "kwh".to_string(), 15)
         .credit(bob.clone(), "kwh".to_string(), 15)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 

@@ -83,6 +83,7 @@ mod tests {
         let entry = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 10)
             .credit(bob.clone(), "hours".to_string(), 10)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 

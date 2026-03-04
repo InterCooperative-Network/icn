@@ -88,6 +88,7 @@ async fn test_direct_sync_message() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -126,6 +127,7 @@ async fn test_ledger_publishes_to_gossip() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -172,12 +174,14 @@ async fn test_multiple_entries_to_gossip() {
     let entry1 = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
     let entry2 = JournalEntryBuilder::new(bob.clone())
         .debit(bob.clone(), "hours".to_string(), 5)
         .credit(charlie.clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -211,6 +215,7 @@ async fn test_duplicate_entry_handling() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -256,6 +261,7 @@ async fn test_witnessed_entry_with_valid_signature() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -300,6 +306,7 @@ async fn test_witnessed_entry_with_invalid_signature() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -348,6 +355,7 @@ async fn test_witnessed_entry_insufficient_signatures() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -386,6 +394,7 @@ async fn test_witnessed_entry_sync_message() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -437,6 +446,7 @@ async fn test_witness_policy_threshold() {
     let small_entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -446,6 +456,7 @@ async fn test_witness_policy_threshold() {
     let large_entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 200)
         .credit(bob.clone(), "hours".to_string(), 200)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -473,6 +484,7 @@ async fn test_witnessed_entry_invalid_signature_quarantined_via_sync() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 
@@ -543,6 +555,7 @@ async fn test_witnessed_entry_insufficient_signatures_quarantined_via_sync() {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()
         .unwrap();
 

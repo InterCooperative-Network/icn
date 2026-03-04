@@ -171,6 +171,7 @@ impl SettlementEngine {
                 request.currency.clone(),
                 request.amount,
             )
+            .with_system_provenance("compute-settlement")
             .build()
             .map_err(|e| LedgerError::InvalidEntry(e.to_string()))?;
 

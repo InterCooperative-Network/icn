@@ -226,7 +226,8 @@ fn build_earn_entry_inner(
             contributor.clone(),
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
-        );
+        )
+        .with_system_provenance("commons-mint");
 
     if let Some(n) = nonce {
         builder = builder.nonce(n);
@@ -280,7 +281,8 @@ fn build_spend_entry_inner(
             COMMONS_CREDIT_CURRENCY.to_string(),
             amount,
         )
-        .credit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount);
+        .credit(mint_did, COMMONS_CREDIT_CURRENCY.to_string(), amount)
+        .with_system_provenance("commons-spend");
 
     if let Some(n) = nonce {
         builder = builder.nonce(n);

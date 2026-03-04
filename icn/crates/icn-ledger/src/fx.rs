@@ -813,7 +813,7 @@ mod tests {
     }
 
     fn create_test_prepared_transfer(valid_until: u64) -> PreparedFxTransfer {
-        use crate::types::JournalEntry;
+        use crate::types::{JournalEntry, ProvenanceRef};
         let sender = Did::from_anchor_id(&[3u8; 32]);
         let entry = JournalEntry {
             id: None,
@@ -824,8 +824,9 @@ mod tests {
             parents: vec![],
             signature: None,
             nonce: None,
-            decision_receipt_id: None,
-            decision_hash: None,
+            provenance: ProvenanceRef::SystemGenerated {
+                reason: "test".to_string(),
+            },
         };
 
         PreparedFxTransfer {

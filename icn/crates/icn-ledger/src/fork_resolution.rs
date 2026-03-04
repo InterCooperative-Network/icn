@@ -412,7 +412,7 @@ impl Default for ForkDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::AccountDelta;
+    use crate::types::{AccountDelta, ProvenanceRef};
     use icn_identity::{Did, KeyPair};
 
     fn make_test_did() -> Did {
@@ -439,8 +439,9 @@ mod tests {
             parents,
             signature: None,
             nonce: None,
-            decision_receipt_id: None,
-            decision_hash: None,
+            provenance: ProvenanceRef::SystemGenerated {
+                reason: "test".to_string(),
+            },
         }
     }
 
