@@ -71,6 +71,7 @@ pub mod ledger;
 mod ledger_impl; // Internal implementation modules
 pub mod membership;
 pub mod merge;
+pub mod obligation;
 pub mod oracle;
 pub mod progressive_limits;
 pub mod quarantine;
@@ -97,6 +98,7 @@ pub use freeze::{FreezeManager, FrozenMember, UnfreezeEvent};
 pub use ledger::{ForkStats, Ledger, PaginationCursor};
 pub use membership::{MembershipStore, SledMembershipStore};
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
+pub use obligation::{Obligation, ObligationId, ObligationRegistry, ObligationState};
 pub use progressive_limits::{
     AccountVelocityWindow, BalanceLimits, CommonsHolderLookup, DefaultWeakLookup,
     FnCommonsHolderLookup, ProgressiveLimitConfig, ProgressiveLimitManager, VelocityLimitConfig,
