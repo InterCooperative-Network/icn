@@ -643,12 +643,14 @@ async fn test_multicurrency_fork_invariants() -> Result<()> {
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
         .add_parent(parent.clone())
+        .with_system_provenance("test")
         .build()?;
 
     let entry_usd = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "USD".to_string(), 100)
         .credit(alice.did().clone(), "USD".to_string(), 100)
         .add_parent(parent.clone())
+        .with_system_provenance("test")
         .build()?;
 
     // Both entries together should maintain invariant

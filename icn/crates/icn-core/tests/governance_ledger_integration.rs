@@ -102,6 +102,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
                     let entry_result = JournalEntryBuilder::new(from_did.clone())
                         .credit(from_did.clone(), currency.clone(), amount)
                         .debit(recipient.clone(), currency.clone(), amount)
+                        .with_system_provenance("test")
                         .build();
 
                     match entry_result {
@@ -358,6 +359,7 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                         let entry_result = JournalEntryBuilder::new(from_did.clone())
                             .credit(from_did.clone(), currency.clone(), amount)
                             .debit(recipient.clone(), currency.clone(), amount)
+                            .with_system_provenance("test")
                             .build();
 
                         if let Ok(entry) = entry_result {

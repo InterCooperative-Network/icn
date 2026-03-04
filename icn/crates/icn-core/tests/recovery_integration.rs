@@ -472,6 +472,7 @@ async fn test_full_recovery_flow() -> Result<()> {
         let entry = JournalEntryBuilder::new(alice_did.clone())
             .debit(alice_did.clone(), "hours".to_string(), 100) // Alice receives 100 hours
             .credit(bob_did.clone(), "hours".to_string(), 100) // Bob gives 100 hours
+            .with_system_provenance("test")
             .build()?;
         ledger.append_entry(entry).await?;
     }

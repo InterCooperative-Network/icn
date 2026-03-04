@@ -112,12 +112,14 @@ async fn test_backup_restore_ledger_entries() -> Result<()> {
     let entry1 = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
     let hash1 = ledger.append_entry(entry1).await?;
 
     let entry2 = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 5)
         .credit(charlie.did().clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()?;
     let hash2 = ledger.append_entry(entry2).await?;
 

@@ -244,6 +244,7 @@ async fn test_partition_groups_ledger_sync() -> Result<()> {
     let entry_a = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 50)
         .credit(bob.did().clone(), "hours".to_string(), 50)
+        .with_system_provenance("test")
         .build()?;
 
     // Add to group A nodes (0, 1)
@@ -254,6 +255,7 @@ async fn test_partition_groups_ledger_sync() -> Result<()> {
     let entry_b = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 30)
         .credit(charlie.did().clone(), "hours".to_string(), 30)
+        .with_system_provenance("test")
         .build()?;
 
     // Add to group B nodes (2, 3, 4)
@@ -392,6 +394,7 @@ async fn test_no_balance_corruption_on_heal() -> Result<()> {
     let genesis = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 100)
         .credit(bob.did().clone(), "hours".to_string(), 100)
+        .with_system_provenance("test")
         .build()?;
 
     for node in &nodes {
@@ -403,6 +406,7 @@ async fn test_no_balance_corruption_on_heal() -> Result<()> {
     let entry_a = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 20)
         .credit(charlie.did().clone(), "hours".to_string(), 20)
+        .with_system_provenance("test")
         .build()?;
 
     nodes[0].add_entry(entry_a.clone()).await?;
@@ -412,6 +416,7 @@ async fn test_no_balance_corruption_on_heal() -> Result<()> {
     let entry_b = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 30)
         .credit(charlie.did().clone(), "hours".to_string(), 30)
+        .with_system_provenance("test")
         .build()?;
 
     nodes[2].add_entry(entry_b.clone()).await?;
@@ -480,6 +485,7 @@ async fn test_concurrent_partition_operations() -> Result<()> {
     let mut entry_a = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
     entry_a.timestamp = 1000; // Earlier
 
@@ -487,6 +493,7 @@ async fn test_concurrent_partition_operations() -> Result<()> {
     let mut entry_b = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 5)
         .credit(alice.did().clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()?;
     entry_b.timestamp = 2000; // Later
 

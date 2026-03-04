@@ -183,6 +183,7 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
             let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
                 .debit(from_did, req.currency.clone(), req.amount as i64)
                 .credit(to_did, req.currency.clone(), req.amount as i64)
+                .with_system_provenance("compute-payment")
                 .build()
             {
                 Ok(e) => e,

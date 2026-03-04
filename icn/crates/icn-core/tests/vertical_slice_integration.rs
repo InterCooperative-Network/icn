@@ -233,6 +233,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
                     let entry = JournalEntryBuilder::new(from_did.clone())
                         .credit(from_did.clone(), currency.clone(), amount)
                         .debit(recipient.clone(), currency.clone(), amount)
+                        .with_system_provenance("test")
                         .build()
                         .unwrap();
 
@@ -491,6 +492,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         let asset_entry = JournalEntryBuilder::new(alice.did())
             .debit(alice.did(), "TOOLS".to_string(), 1)
             .credit(supplier.did(), "TOOLS".to_string(), 1)
+            .with_system_provenance("test")
             .build()?;
 
         asset_ledger_hash = guard.append_entry(asset_entry).await?;
@@ -529,6 +531,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         let checkout_entry = JournalEntryBuilder::new(dave.did())
             .debit(dave.did(), "TOOL_ACCESS".to_string(), 1)
             .credit(alice.did(), "TOOL_ACCESS".to_string(), 1)
+            .with_system_provenance("test")
             .build()?;
 
         let checkout_hash = guard.append_entry(checkout_entry).await?;
@@ -558,6 +561,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         let return_entry = JournalEntryBuilder::new(dave.did())
             .credit(dave.did(), "TOOL_ACCESS".to_string(), 1)
             .debit(alice.did(), "TOOL_ACCESS".to_string(), 1)
+            .with_system_provenance("test")
             .build()?;
 
         let return_hash = guard.append_entry(return_entry).await?;

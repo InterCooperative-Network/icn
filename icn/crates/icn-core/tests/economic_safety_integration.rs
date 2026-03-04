@@ -56,6 +56,7 @@ async fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()
         let entry = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 5_000) // 50 hours
             .credit(bob.clone(), "hours".to_string(), 5_000)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -75,6 +76,7 @@ async fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()
             .add_parent(hash1.clone())
             .debit(alice.clone(), "hours".to_string(), 6_000) // 60 hours
             .credit(bob.clone(), "hours".to_string(), 6_000)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -97,6 +99,7 @@ async fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()
             .add_parent(hash1.clone())
             .debit(alice.clone(), "hours".to_string(), 4_750) // 47.5 hours - leaves small margin
             .credit(bob.clone(), "hours".to_string(), 4_750)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -116,6 +119,7 @@ async fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()
             .add_parent(hash3.clone())
             .debit(alice.clone(), "hours".to_string(), 5_000) // 50 hours - clearly over
             .credit(bob.clone(), "hours".to_string(), 5_000)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -270,6 +274,7 @@ async fn test_new_member_ramping_enforced() -> Result<()> {
         let entry = JournalEntryBuilder::new(new_member.clone())
             .debit(new_member.clone(), "hours".to_string(), 800) // 8 hours - within initial limit
             .credit(established.clone(), "hours".to_string(), 800)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -288,6 +293,7 @@ async fn test_new_member_ramping_enforced() -> Result<()> {
             .add_parent(hash1.clone())
             .debit(new_member.clone(), "hours".to_string(), 500) // 5 hours more - exceeds initial limit
             .credit(established.clone(), "hours".to_string(), 500)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;
@@ -309,6 +315,7 @@ async fn test_new_member_ramping_enforced() -> Result<()> {
             .add_parent(hash1.clone())
             .debit(new_member.clone(), "hours".to_string(), 150) // 1.5 hours more - within limit
             .credit(established.clone(), "hours".to_string(), 150)
+            .with_system_provenance("test")
             .build()?;
 
         let result = ledger.append_entry(entry).await;

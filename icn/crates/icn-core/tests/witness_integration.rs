@@ -50,6 +50,7 @@ fn create_test_entry(
     let entry = JournalEntryBuilder::new(author.did().clone())
         .debit(from.clone(), currency.to_string(), amount)
         .credit(to.clone(), currency.to_string(), amount)
+        .with_system_provenance("test")
         .build()?;
     Ok(entry)
 }
@@ -231,6 +232,7 @@ async fn test_all_parties_policy_enforcement() -> Result<()> {
         .debit(alice.did().clone(), "hours".to_string(), 20)
         .credit(bob.did().clone(), "hours".to_string(), 10)
         .credit(charlie.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
     let entry_hash = entry.id.clone().unwrap();
 
