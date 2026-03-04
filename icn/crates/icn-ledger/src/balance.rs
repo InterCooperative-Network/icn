@@ -120,6 +120,7 @@ mod tests {
         let entry1 = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 10)
             .credit(bob.clone(), "hours".to_string(), 10)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -127,6 +128,7 @@ mod tests {
         let entry2 = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 5)
             .credit(bob.clone(), "hours".to_string(), 5)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -152,6 +154,7 @@ mod tests {
             .credit(bob.clone(), "hours".to_string(), 10)
             .debit(alice.clone(), "USD".to_string(), 100)
             .credit(bob.clone(), "USD".to_string(), 100)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -173,12 +176,14 @@ mod tests {
         let entry1 = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 10)
             .credit(bob.clone(), "hours".to_string(), 10)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
         let entry2 = JournalEntryBuilder::new(bob.clone())
             .debit(bob.clone(), "hours".to_string(), 5)
             .credit(charlie.clone(), "hours".to_string(), 5)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -212,6 +217,7 @@ mod tests {
         let entry = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 60)
             .credit(bob.clone(), "hours".to_string(), 60)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -238,6 +244,7 @@ mod tests {
         let entry = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), 50)
             .credit(bob.clone(), "hours".to_string(), 50)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
@@ -302,12 +309,14 @@ mod tests {
         let entry1 = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), i64::MAX / 2)
             .credit(bob.clone(), "hours".to_string(), i64::MAX / 2)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 
         let entry2 = JournalEntryBuilder::new(alice.clone())
             .debit(alice.clone(), "hours".to_string(), i64::MAX / 2 + 100)
             .credit(bob.clone(), "hours".to_string(), i64::MAX / 2 + 100)
+            .with_system_provenance("test")
             .build()
             .unwrap();
 

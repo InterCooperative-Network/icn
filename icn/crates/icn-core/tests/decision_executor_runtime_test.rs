@@ -20,7 +20,7 @@ use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
 use icn_kernel_api::AllowAllOracle;
-use icn_ledger::types::ContentHash;
+use icn_ledger::types::{ContentHash, ProvenanceRef};
 use icn_ledger::Ledger;
 use icn_store::SledStore;
 use tempfile::TempDir;
@@ -584,11 +584,14 @@ async fn test_treasury_entry_persisted_with_provenance() {
         let hash = hash.unwrap();
         let ledger_guard = ledger.read().await;
         let entry = ledger_guard.get_entry(&hash).unwrap().unwrap();
-        assert_eq!(
-            entry.decision_receipt_id.as_deref(),
-            Some(decision_receipt_id)
+        assert!(
+            matches!(
+                &entry.provenance,
+                ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                    if receipt_id == decision_receipt_id && dh == decision_hash
+            ),
+            "entry provenance must be Governance with matching receipt_id and decision_hash"
         );
-        assert_eq!(entry.decision_hash.as_deref(), Some(decision_hash));
         drop(ledger_guard);
 
         entry_hash
@@ -598,11 +601,14 @@ async fn test_treasury_entry_persisted_with_provenance() {
     let reopened_ledger = Ledger::new(reopened_ledger_store).unwrap();
     let reopened_hash = content_hash_from_hex(&entry_hash).unwrap();
     let reopened_entry = reopened_ledger.get_entry(&reopened_hash).unwrap().unwrap();
-    assert_eq!(
-        reopened_entry.decision_receipt_id.as_deref(),
-        Some(decision_receipt_id)
+    assert!(
+        matches!(
+            &reopened_entry.provenance,
+            ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                if receipt_id == decision_receipt_id && dh == decision_hash
+        ),
+        "reopened entry provenance must be Governance with matching receipt_id and decision_hash"
     );
-    assert_eq!(reopened_entry.decision_hash.as_deref(), Some(decision_hash));
 
     let reopened_exec_backend = Arc::new(SledStore::open(&exec_store_path).unwrap());
     let reopened_exec_store = SledExecutionStore::new(reopened_exec_backend);
@@ -693,11 +699,14 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
 
         let parsed = content_hash_from_hex(&entry_hash).unwrap();
         let entry = ledger.read().await.get_entry(&parsed).unwrap().unwrap();
-        assert_eq!(
-            entry.decision_receipt_id.as_deref(),
-            Some(decision_receipt_id)
+        assert!(
+            matches!(
+                &entry.provenance,
+                ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                    if receipt_id == decision_receipt_id && dh == decision_hash
+            ),
+            "entry provenance must be Governance with matching receipt_id and decision_hash"
         );
-        assert_eq!(entry.decision_hash.as_deref(), Some(decision_hash));
         assert_eq!(ledger.read().await.count_entries().unwrap(), 1);
 
         entry_hash
@@ -749,11 +758,14 @@ async fn test_withdraw_payload_restart_resume_single_mutation() {
         .get_entry(&parsed)
         .unwrap()
         .unwrap();
-    assert_eq!(
-        reopened_entry.decision_receipt_id.as_deref(),
-        Some(decision_receipt_id)
+    assert!(
+        matches!(
+            &reopened_entry.provenance,
+            ProvenanceRef::Governance { receipt_id, decision_hash: dh }
+                if receipt_id == decision_receipt_id && dh == decision_hash
+        ),
+        "reopened entry provenance must be Governance with matching receipt_id and decision_hash"
     );
-    assert_eq!(reopened_entry.decision_hash.as_deref(), Some(decision_hash));
 
     let reopened_record = reopened_exec_store.get(decision_hash).unwrap().unwrap();
     assert_eq!(reopened_record.status, ExecutionStatus::Confirmed);

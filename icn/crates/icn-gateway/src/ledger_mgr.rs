@@ -149,6 +149,7 @@ impl LedgerManager {
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from.clone(), currency.clone(), amount)
             .credit(to.clone(), currency.clone(), amount)
+            .with_system_provenance("direct settlement")
             .build()
             .map_err(GatewayError::SubstrateError)?;
 

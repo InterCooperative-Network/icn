@@ -1176,7 +1176,7 @@ mod tests {
         let entry = JournalEntryBuilder::new(from.clone())
             .debit(from, "credits".to_string(), 25)
             .credit(to, "credits".to_string(), 25)
-            .with_decision_provenance(&decision_receipt_id, &decision_hash_hex)
+            .with_governance_provenance(&decision_receipt_id, &decision_hash_hex)
             .build()
             .unwrap();
         ledger.write().await.append_entry(entry).await.unwrap();

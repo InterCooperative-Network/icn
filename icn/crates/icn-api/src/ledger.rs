@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use icn_identity::Did;
-use icn_ledger::Ledger;
+use icn_ledger::{types::ProvenanceRef, Ledger};
 
 use crate::error::ApiError;
 
@@ -114,7 +114,16 @@ impl LedgerService {
         let mut page_entries = Vec::new();
 
         for entry in entries {
-            if entry.decision_hash.as_deref() != Some(decision_hash) {
+            // Extract governance provenance fields for filtering and view projection
+            let (view_receipt_id, view_decision_hash) = match &entry.provenance {
+                ProvenanceRef::Governance {
+                    receipt_id,
+                    decision_hash: dh,
+                } => (Some(receipt_id.clone()), Some(dh.clone())),
+                _ => (None, None),
+            };
+
+            if view_decision_hash.as_deref() != Some(decision_hash) {
                 continue;
             }
 
@@ -137,8 +146,8 @@ impl LedgerService {
                         credit: delta.credit,
                     })
                     .collect(),
-                decision_receipt_id: entry.decision_receipt_id.clone(),
-                decision_hash: entry.decision_hash.clone(),
+                decision_receipt_id: view_receipt_id,
+                decision_hash: view_decision_hash,
             });
         }
 

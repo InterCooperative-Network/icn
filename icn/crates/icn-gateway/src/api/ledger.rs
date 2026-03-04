@@ -15,6 +15,7 @@ use crate::models::{
 use crate::rate_limit::VelocityLimiter;
 use crate::trust_mgr::TrustManager;
 use crate::validation;
+use icn_ledger::types::ProvenanceRef;
 use icn_obs::metrics::gateway;
 
 /// GET /ledger/:coop_id/position/:did - Get account position
@@ -310,13 +311,21 @@ pub async fn get_history(
                 })
                 .collect();
 
+            let (decision_receipt_id, decision_hash) = match &entry.provenance {
+                ProvenanceRef::Governance {
+                    receipt_id,
+                    decision_hash: dh,
+                } => (Some(receipt_id.clone()), Some(dh.clone())),
+                _ => (None, None),
+            };
+
             TransactionHistoryEntry {
                 id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
                 timestamp: entry.timestamp,
                 author: entry.author.to_string(),
                 accounts,
-                decision_receipt_id: entry.decision_receipt_id.clone(),
-                decision_hash: entry.decision_hash.clone(),
+                decision_receipt_id,
+                decision_hash,
             }
         })
         .collect();
@@ -443,7 +452,12 @@ pub async fn get_entries_by_decision(
     // Filter entries by decision_hash
     let matching_entries: Vec<_> = entries
         .into_iter()
-        .filter(|entry| entry.decision_hash.as_deref() == Some(decision_hash.as_str()))
+        .filter(|entry| {
+            matches!(
+                &entry.provenance,
+                ProvenanceRef::Governance { decision_hash: dh, .. } if dh == decision_hash
+            )
+        })
         .collect();
     let has_more = matching_entries.len() > limit;
 
@@ -462,13 +476,21 @@ pub async fn get_entries_by_decision(
                 })
                 .collect();
 
+            let (decision_receipt_id, decision_hash) = match &entry.provenance {
+                ProvenanceRef::Governance {
+                    receipt_id,
+                    decision_hash: dh,
+                } => (Some(receipt_id.clone()), Some(dh.clone())),
+                _ => (None, None),
+            };
+
             TransactionHistoryEntry {
                 id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
                 timestamp: entry.timestamp,
                 author: entry.author.to_string(),
                 accounts,
-                decision_receipt_id: entry.decision_receipt_id.clone(),
-                decision_hash: entry.decision_hash.clone(),
+                decision_receipt_id,
+                decision_hash,
             }
         })
         .collect();
@@ -825,7 +847,7 @@ mod tests {
         let service_entry = JournalEntryBuilder::new(alice.did().clone())
             .debit(alice.did().clone(), "hours".to_string(), 10)
             .credit(bob.did().clone(), "hours".to_string(), 10)
-            .with_decision_provenance("receipt-123", decision_hash.as_str())
+            .with_governance_provenance("receipt-123", decision_hash.as_str())
             .build()
             .unwrap();
         service_ledger.append_entry(service_entry).await.unwrap();
