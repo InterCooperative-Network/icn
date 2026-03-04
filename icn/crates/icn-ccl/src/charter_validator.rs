@@ -156,6 +156,7 @@ mod tests {
         JournalEntryBuilder::new(author.clone())
             .debit(author, "hours".to_string(), debit)
             .credit(receiver, "hours".to_string(), credit)
+            .with_system_provenance("test")
             .build()
             .unwrap()
     }
