@@ -847,7 +847,7 @@ mod tests {
         let service_entry = JournalEntryBuilder::new(alice.did().clone())
             .debit(alice.did().clone(), "hours".to_string(), 10)
             .credit(bob.did().clone(), "hours".to_string(), 10)
-            .with_decision_provenance("receipt-123", decision_hash.as_str())
+            .with_governance_provenance("receipt-123", decision_hash.as_str())
             .build()
             .unwrap();
         service_ledger.append_entry(service_entry).await.unwrap();

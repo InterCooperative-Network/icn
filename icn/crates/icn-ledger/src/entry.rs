@@ -89,13 +89,22 @@ impl JournalEntryBuilder {
         self
     }
 
-    /// Set governance decision provenance (legacy name, same as `with_governance_provenance`).
-    pub fn with_decision_provenance(
-        self,
-        receipt_id: impl Into<String>,
-        decision_hash: impl Into<String>,
-    ) -> Self {
-        self.with_governance_provenance(receipt_id, decision_hash)
+    /// Set member-direct provenance.
+    ///
+    /// Use when a cooperative member directly authorizes a transfer without a
+    /// formal governance proposal — e.g., a member-to-member credit grant.
+    ///
+    /// # Arguments
+    /// * `did`       - DID of the authorizing member
+    /// * `signature` - Ed25519 signature of the entry by the member's key.
+    ///   A `DirectMember` entry without a signature has no verifiable
+    ///   authorization, so the signature is required.
+    pub fn with_direct_member_provenance(mut self, did: Did, signature: impl Into<String>) -> Self {
+        self.provenance = Some(ProvenanceRef::DirectMember {
+            did,
+            signature: signature.into(),
+        });
+        self
     }
 
     /// Set system-generated provenance.
@@ -113,7 +122,7 @@ impl JournalEntryBuilder {
     /// Returns `Err` if:
     /// - Double-entry invariant is violated (Σ debits ≠ Σ credits per currency)
     /// - Any amount is negative
-    /// - No provenance was set (use `with_governance_provenance` or `with_system_provenance`)
+    /// - No provenance was set (use `with_governance_provenance`, `with_direct_member_provenance`, or `with_system_provenance`)
     /// - The system clock is unavailable
     pub fn build(self) -> Result<JournalEntry> {
         // Validate double-entry invariant: Σ debits == Σ credits per currency
@@ -123,9 +132,12 @@ impl JournalEntryBuilder {
         validate_positive_amounts(&self.accounts)?;
 
         // Require provenance — every entry must be traceable
-        let provenance = self
-            .provenance
-            .ok_or_else(|| anyhow::anyhow!("JournalEntry requires provenance; call with_governance_provenance() or with_system_provenance()"))?;
+        let provenance = self.provenance.ok_or_else(|| {
+            anyhow::anyhow!(
+                "JournalEntry requires provenance; call with_governance_provenance(), \
+                 with_direct_member_provenance(), or with_system_provenance()"
+            )
+        })?;
 
         // Get current timestamp in milliseconds (security-critical: reject if clock is invalid)
         let timestamp = icn_time::try_current_timestamp_millis()
@@ -395,6 +407,36 @@ mod tests {
         }
 
         let json = serde_json::to_string(&entry).unwrap();
+        let de: JournalEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(de.provenance, entry.provenance);
+    }
+
+    /// Test that DirectMember provenance round-trips correctly.
+    #[test]
+    fn test_direct_member_provenance_roundtrip() {
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let sig = "ed25519:abcdef1234567890";
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 3)
+            .credit(bob.clone(), "hours".to_string(), 3)
+            .with_direct_member_provenance(alice.clone(), sig)
+            .build()
+            .expect("direct member provenance entry should build");
+
+        match &entry.provenance {
+            ProvenanceRef::DirectMember { did, signature } => {
+                assert_eq!(did, &alice);
+                assert_eq!(signature, sig);
+            }
+            other => panic!("Expected DirectMember, got {other:?}"),
+        }
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains(sig), "JSON should contain signature");
         let de: JournalEntry = serde_json::from_str(&json).unwrap();
         assert_eq!(de.provenance, entry.provenance);
     }

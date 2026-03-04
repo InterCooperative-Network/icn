@@ -613,7 +613,7 @@ impl LedgerService for LedgerServiceImpl {
         let mut builder = JournalEntryBuilder::new(self.treasury_did.clone());
 
         // Add decision provenance (PILOT-CRITICAL INVARIANT)
-        builder = builder.with_decision_provenance(&req.decision_receipt_id, &req.decision_hash);
+        builder = builder.with_governance_provenance(&req.decision_receipt_id, &req.decision_hash);
 
         // Add account deltas
         for delta in deltas {
