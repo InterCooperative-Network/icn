@@ -180,9 +180,20 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
                 };
 
             // Create journal entry for transfer
+            let amount_i64 = match i64::try_from(req.amount) {
+                Ok(v) => v,
+                Err(_) => {
+                    warn!(
+                        "Payment amount overflow: cannot convert {} to i64 for compute payment \
+                         (task {}, from {}, to {})",
+                        req.amount, req.task_id, req.from, req.to
+                    );
+                    return;
+                }
+            };
             let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
-                .debit(from_did, req.currency.clone(), req.amount as i64)
-                .credit(to_did, req.currency.clone(), req.amount as i64)
+                .debit(from_did, req.currency.clone(), amount_i64)
+                .credit(to_did, req.currency.clone(), amount_i64)
                 .with_system_provenance("compute-payment")
                 .build()
             {

@@ -170,7 +170,8 @@ fn create_test_entry(
 ) -> Result<icn_ledger::JournalEntry> {
     let mut builder = JournalEntryBuilder::new(author.did().clone())
         .debit(from.clone(), currency.to_string(), amount)
-        .credit(to.clone(), currency.to_string(), amount);
+        .credit(to.clone(), currency.to_string(), amount)
+        .with_system_provenance("test");
 
     for parent in parents {
         builder = builder.add_parent(parent);
