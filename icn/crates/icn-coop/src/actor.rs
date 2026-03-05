@@ -345,30 +345,46 @@ impl CoopActor {
                 anchor_32[..16].copy_from_slice(&anchor);
                 let treasury_did = Did::from_anchor_id(&anchor_32);
 
-                let created_by = self
-                    .store
-                    .list_members(&coop_id)
-                    .ok()
-                    .and_then(|members| members.first().map(|m| m.did.clone()))
-                    .unwrap_or_else(|| treasury_did.clone());
+                // Idempotency guard: if treasury is already registered (e.g. a prior activation
+                // attempt crashed after register_treasury but before save_cooperative), skip
+                // registration so that retries do not fail forever.
+                let already_registered = {
+                    let guard = treasury_mgr.read().await;
+                    guard.get_treasury_by_coop(&coop_id).is_some()
+                };
 
-                let mut treasury_guard = treasury_mgr.write().await;
-                treasury_guard
-                    .register_treasury(
-                        treasury_did.clone(),
-                        coop_id.clone(),
-                        "HOURS".to_string(),
-                        created_by,
-                        Some(format!("Treasury for cooperative {}", coop_id)),
-                    )
-                    .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
+                if already_registered {
+                    tracing::info!(
+                        coop_id = %coop_id,
+                        treasury_did = %treasury_did,
+                        "Treasury already registered in ledger; skipping duplicate registration"
+                    );
+                } else {
+                    let created_by = self
+                        .store
+                        .list_members(&coop_id)
+                        .ok()
+                        .and_then(|members| members.first().map(|m| m.did.clone()))
+                        .unwrap_or_else(|| treasury_did.clone());
 
-                tracing::info!(
-                    coop_id = %coop_id,
-                    treasury_id = %treasury_id,
-                    treasury_did = %treasury_did,
-                    "Registered treasury in ledger during activation"
-                );
+                    let mut treasury_guard = treasury_mgr.write().await;
+                    treasury_guard
+                        .register_treasury(
+                            treasury_did.clone(),
+                            coop_id.clone(),
+                            "HOURS".to_string(),
+                            created_by,
+                            Some(format!("Treasury for cooperative {}", coop_id)),
+                        )
+                        .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
+
+                    tracing::info!(
+                        coop_id = %coop_id,
+                        treasury_id = %treasury_id,
+                        treasury_did = %treasury_did,
+                        "Registered treasury in ledger during activation"
+                    );
+                }
             }
         }
 
