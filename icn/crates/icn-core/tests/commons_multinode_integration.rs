@@ -40,8 +40,8 @@ fn make_ledger() -> Ledger {
 /// Core scenario: one contributor, one consumer, two ledger replicas.
 ///
 /// After settlement on node A and replication to node B:
-///   - contributor balance on both nodes == +amount
-///   - consumer balance on both nodes == -amount
+///   - contributor balance on both nodes == -amount (credited)
+///   - consumer balance on both nodes == +amount (debited)
 #[tokio::test]
 async fn test_commons_settlement_replicates_to_second_node() {
     let contributor = KeyPair::generate().unwrap();
@@ -182,8 +182,8 @@ async fn test_commons_settlement_replicates_to_three_nodes() {
 }
 
 /// Dedup: re-submitting the same receipt hash must be rejected after first settlement.
-#[tokio::test]
-async fn test_commons_settlement_dedup_rejects_replay() {
+#[test]
+fn test_commons_settlement_dedup_rejects_replay() {
     let contributor = KeyPair::generate().unwrap();
     let consumer = KeyPair::generate().unwrap();
 
@@ -220,7 +220,12 @@ fn test_commons_settlement_rejects_non_commons_scope() {
 
     let engine = SettlementEngine::new();
 
-    for scope in [ScopeLevel::Local, ScopeLevel::Org, ScopeLevel::Federation] {
+    for scope in [
+        ScopeLevel::Local,
+        ScopeLevel::Cell,
+        ScopeLevel::Org,
+        ScopeLevel::Federation,
+    ] {
         let req = CommonsSettlementRequest {
             receipt_hash: [0x04; 32],
             contributor: contributor.did().clone(),
