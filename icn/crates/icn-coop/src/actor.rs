@@ -328,7 +328,50 @@ impl CoopActor {
         charter_hash: String,
     ) -> Result<Cooperative> {
         let coop = self.store.get_cooperative(&coop_id)?;
-        let (coop, treasury_id) = self.lifecycle.activate(coop, charter_hash).await?;
+        let (mut coop, treasury_id) = self.lifecycle.activate(coop, charter_hash).await?;
+
+        // Assign treasury DID onto cooperative if not already set (idempotency guard).
+        // This must happen before persisting so the saved record is complete.
+        if coop.treasury_did.is_none() {
+            let treasury_did_str = crate::lifecycle::derive_treasury_did(&coop_id);
+
+            coop.assign_treasury(treasury_did_str.clone())
+                .map_err(crate::CoopError::Governance)?;
+
+            // Register treasury account in ledger if treasury manager is available
+            if let Some(ref treasury_mgr) = self.treasury_manager {
+                let anchor = crate::lifecycle::derive_treasury_anchor(&coop_id);
+                let mut anchor_32 = [0u8; 32];
+                anchor_32[..16].copy_from_slice(&anchor);
+                let treasury_did = Did::from_anchor_id(&anchor_32);
+
+                let created_by = self
+                    .store
+                    .list_members(&coop_id)
+                    .ok()
+                    .and_then(|members| members.first().map(|m| m.did.clone()))
+                    .unwrap_or_else(|| treasury_did.clone());
+
+                let mut treasury_guard = treasury_mgr.write().await;
+                treasury_guard
+                    .register_treasury(
+                        treasury_did.clone(),
+                        coop_id.clone(),
+                        "HOURS".to_string(),
+                        created_by,
+                        Some(format!("Treasury for cooperative {}", coop_id)),
+                    )
+                    .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
+
+                tracing::info!(
+                    coop_id = %coop_id,
+                    treasury_id = %treasury_id,
+                    treasury_did = %treasury_did,
+                    "Registered treasury in ledger during activation"
+                );
+            }
+        }
+
         self.store.save_cooperative(&coop)?;
 
         tracing::info!(
@@ -1614,5 +1657,98 @@ mod tests {
         // Verify the coop has a treasury DID assigned
         let updated_coop = handle.get_cooperative(coop.id).await.unwrap();
         assert!(updated_coop.treasury_did.is_some());
+    }
+
+    // === Treasury assignment during activation (t10 — single-writer atomicity) ===
+
+    #[tokio::test]
+    async fn test_activate_cooperative_assigns_treasury_did() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Activate Test".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        assert!(
+            coop.treasury_did.is_none(),
+            "treasury_did must be None before activation"
+        );
+
+        let activated = handle
+            .activate_cooperative(coop.id.clone(), "charter-hash".to_string())
+            .await
+            .unwrap();
+
+        assert!(
+            activated.treasury_did.is_some(),
+            "treasury_did must be Some after activation"
+        );
+        let expected = crate::lifecycle::derive_treasury_did(&coop.id);
+        assert_eq!(activated.treasury_did.unwrap().as_str(), expected);
+    }
+
+    #[tokio::test]
+    async fn test_activate_cooperative_registers_treasury_in_ledger() {
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                Some("activate-ledger-coop".to_string()),
+                "Ledger Registration Test".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        let activated = handle
+            .activate_cooperative(coop.id.clone(), "charter-ledger".to_string())
+            .await
+            .unwrap();
+
+        assert!(activated.treasury_did.is_some());
+
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop.id);
+        assert!(
+            treasury.is_some(),
+            "Treasury must be registered in ledger on activation"
+        );
+        let treasury = treasury.unwrap();
+        assert_eq!(treasury.coop_id, coop.id);
+        assert_eq!(treasury.currency, "HOURS");
+        assert!(treasury.is_active);
+    }
+
+    #[tokio::test]
+    async fn test_activate_then_create_treasury_rejects_duplicate() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Dup Guard Test".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        let activated = handle
+            .activate_cooperative(coop.id.clone(), "charter-dup".to_string())
+            .await
+            .unwrap();
+        assert!(activated.treasury_did.is_some());
+
+        // CreateTreasury after activation must be rejected
+        let result = handle.create_treasury(coop.id).await;
+        assert!(
+            result.is_err(),
+            "CreateTreasury after activation must be rejected — treasury already exists"
+        );
     }
 }
