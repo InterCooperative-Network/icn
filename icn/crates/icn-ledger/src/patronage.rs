@@ -84,7 +84,9 @@ pub struct PatronageEntry {
 
 /// Manages internal capital accounts across cooperative members.
 ///
-/// Thread-safe via `Arc<dyn Store>`. All mutations are atomic at the KV level.
+/// Thread-safe via `Arc<dyn Store>`. Individual key/value writes are atomic,
+/// but multi-key operations (e.g., writing the entry record and then the
+/// account balance) are **not** atomic as a unit.
 pub struct PatronageTracker {
     store: Arc<dyn Store>,
 }
@@ -113,6 +115,11 @@ impl PatronageTracker {
         amount: i64,
         reference: &str,
     ) -> Result<()> {
+        // NOTE: The dedup check and subsequent writes are not transactionally atomic.
+        // Concurrent calls with the same reference can both pass the check. Callers
+        // operating within the single-writer actor model get correct behavior; external
+        // concurrent access requires additional coordination.
+
         // 1. Dedup check — reject if this reference was already applied.
         let entry_key = self.entry_key(coop_id, member_did, reference);
         if self
