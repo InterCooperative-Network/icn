@@ -209,6 +209,18 @@ pub enum GovernanceCommand {
         /// Member DID to act upon
         member: Did,
     },
+    /// Create a new vote delegation (persists + publishes gossip)
+    CreateDelegation {
+        /// The delegation to create
+        delegation: Delegation,
+    },
+    /// Revoke an existing vote delegation (persists + publishes gossip)
+    RevokeDelegation {
+        /// Delegation ID to revoke
+        id: DelegationId,
+        /// When the revocation takes effect
+        revoked_at: Timestamp,
+    },
 }
 
 /// Handle for interacting with the governance actor
@@ -263,9 +275,10 @@ impl GovernanceHandle {
         self.inner.read().await.load_proposal(id)
     }
 
-    /// Create a new delegation
+    /// Create a new delegation (persists to store and publishes gossip)
     pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
-        self.inner.write().await.create_delegation(delegation)
+        self.submit(GovernanceCommand::CreateDelegation { delegation })
+            .await
     }
 
     /// Get a delegation by ID
@@ -283,9 +296,13 @@ impl GovernanceHandle {
         self.inner.read().await.list_delegations_to(delegate)
     }
 
-    /// Revoke a delegation
+    /// Revoke a delegation (persists to store and publishes gossip)
     pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
-        self.inner.write().await.revoke_delegation(id, revoked_at)
+        self.submit(GovernanceCommand::RevokeDelegation {
+            id: id.clone(),
+            revoked_at,
+        })
+        .await
     }
 
     /// Get vote tally for a proposal
@@ -1969,6 +1986,35 @@ impl GovernanceActor {
                 icn_obs::metrics::governance::membership_updated_inc();
                 info!("✓ Membership update complete for domain {}", domain_id.0);
             }
+
+            GovernanceCommand::CreateDelegation { delegation } => {
+                let delegation_clone = delegation.clone();
+                self.create_delegation(delegation)?;
+                // Best-effort gossip publish — failure doesn't roll back the local write.
+                if let Err(e) = self
+                    .publish(GovernanceMessage::delegation_created(delegation_clone))
+                    .await
+                {
+                    warn!("Failed to publish DelegationCreated gossip: {e}");
+                }
+            }
+
+            GovernanceCommand::RevokeDelegation { id, revoked_at } => {
+                // Load the delegator DID before revoking — needed for the gossip message.
+                // If the delegation doesn't exist, revoke_delegation will also fail below.
+                let revoked_by = self.load_delegation(&id)?.map(|d| d.delegator.clone());
+                self.revoke_delegation(&id, revoked_at)?;
+                if let Some(revoked_by) = revoked_by {
+                    if let Err(e) = self
+                        .publish(GovernanceMessage::delegation_revoked(
+                            id, revoked_by, revoked_at,
+                        ))
+                        .await
+                    {
+                        warn!("Failed to publish DelegationRevoked gossip: {e}");
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -2568,6 +2614,50 @@ fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> 
             }
         }
 
+        GovernanceMessage::DelegationCreated { delegation } => {
+            match store.get_delegation(&delegation.id)? {
+                None => {
+                    store.save_delegation(&delegation)?;
+                    info!(
+                        "Delegation synced via gossip: {} -> {} (scope: {:?})",
+                        delegation.delegator, delegation.delegate, delegation.scope
+                    );
+                }
+                Some(existing) => {
+                    let existing_bytes = serde_json::to_vec(&existing)?;
+                    let incoming_bytes = serde_json::to_vec(&delegation)?;
+                    if existing_bytes == incoming_bytes {
+                        debug!(
+                            "Delegation gossip replay ignored (already stored): {} -> {} (scope: {:?})",
+                            delegation.delegator, delegation.delegate, delegation.scope
+                        );
+                    } else {
+                        warn!(
+                            "Delegation gossip conflict ignored: incoming {} differs from stored — possible tampering",
+                            delegation.id.0
+                        );
+                    }
+                }
+            }
+        }
+
+        GovernanceMessage::DelegationRevoked {
+            id,
+            revoked_at,
+            revoked_by: _,
+        } => {
+            if let Some(delegation) = store.get_delegation(&id)? {
+                store.save_revoked_delegation(&delegation, revoked_at)?;
+                info!("Delegation revocation synced via gossip: {}", id.0);
+            } else {
+                // May arrive before the DelegationCreated gossip — log and ignore.
+                debug!(
+                    "DelegationRevoked gossip for unknown delegation {} — ignoring",
+                    id.0
+                );
+            }
+        }
+
         _ => {
             // Ignore other message types for now (future: DomainUpdated, ProposalCancelled)
         }
@@ -2612,4 +2702,99 @@ fn validate_secure_v2_proof_for_proposal(
     }
 
     Ok(())
+}
+
+// ---- Tests ----
+
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icn_governance::{Delegation, DelegationScope};
+    use icn_identity::KeyPair;
+    use icn_store::SledStore;
+
+    fn make_store() -> SledGovernanceStateStore {
+        SledGovernanceStateStore::new(Arc::new(SledStore::temporary().expect("temp store")))
+    }
+
+    fn did() -> Did {
+        KeyPair::generate().unwrap().did().clone()
+    }
+
+    /// DelegationCreated gossip → delegation is persisted and readable.
+    #[test]
+    fn test_delegation_created_persisted() {
+        let store = make_store();
+        let d = Delegation::new(did(), did(), DelegationScope::Blanket);
+
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+
+        let loaded = store
+            .get_delegation(&d.id)
+            .unwrap()
+            .expect("delegation not persisted");
+        assert_eq!(loaded.id, d.id);
+        assert_eq!(loaded.delegator, d.delegator);
+        assert_eq!(loaded.delegate, d.delegate);
+        assert!(loaded.revoked_at.is_none());
+    }
+
+    /// Repeated DelegationCreated with the same delegation is idempotent — no error, same result.
+    #[test]
+    fn test_delegation_created_idempotent() {
+        let store = make_store();
+        let d = Delegation::new(did(), did(), DelegationScope::Blanket);
+
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+        // Second application of the same message must not error.
+        handle_incoming(&store, GovernanceMessage::delegation_created(d.clone())).unwrap();
+
+        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
+        assert_eq!(loaded.id, d.id);
+        assert!(loaded.revoked_at.is_none());
+    }
+
+    /// DelegationRevoked gossip after a DelegationCreated → revoked_at is set.
+    #[test]
+    fn test_delegation_revoked_sets_revoked_at() {
+        let store = make_store();
+        let delegator = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        // Persist first so the revoke handler finds it.
+        store.save_delegation(&d).unwrap();
+
+        let revoke_ts: Timestamp = 999_999;
+        handle_incoming(
+            &store,
+            GovernanceMessage::delegation_revoked(d.id.clone(), delegator, revoke_ts),
+        )
+        .unwrap();
+
+        let loaded = store.get_delegation(&d.id).unwrap().unwrap();
+        assert_eq!(loaded.revoked_at, Some(revoke_ts));
+    }
+
+    /// DelegationRevoked gossip for an unknown delegation is silently ignored (no error).
+    ///
+    /// This covers the out-of-order gossip case where the revoke arrives before the create.
+    #[test]
+    fn test_delegation_revoked_before_create_is_ignored() {
+        let store = make_store();
+        let delegator = did();
+        let d = Delegation::new(delegator.clone(), did(), DelegationScope::Blanket);
+
+        // Do NOT persist the delegation — simulate out-of-order gossip.
+        let result = handle_incoming(
+            &store,
+            GovernanceMessage::delegation_revoked(d.id.clone(), delegator, 1234),
+        );
+
+        assert!(result.is_ok(), "out-of-order revoke must not error");
+        assert!(
+            store.get_delegation(&d.id).unwrap().is_none(),
+            "unknown delegation must not be created by revoke"
+        );
+    }
 }
