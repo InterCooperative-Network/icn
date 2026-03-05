@@ -182,6 +182,7 @@ async fn test_ledger_sync_with_trust_levels() -> Result<()> {
     let entry1 = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     // Add to node1's ledger
@@ -195,6 +196,7 @@ async fn test_ledger_sync_with_trust_levels() -> Result<()> {
     let entry2 = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 5)
         .credit(charlie.did().clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()?;
 
     // Add to node2's ledger
@@ -249,18 +251,21 @@ async fn test_deterministic_ordering_across_nodes() -> Result<()> {
     let mut entry1 = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
     entry1.timestamp = 1000;
 
     let mut entry2 = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "hours".to_string(), 3)
         .credit(alice.did().clone(), "hours".to_string(), 3)
+        .with_system_provenance("test")
         .build()?;
     entry2.timestamp = 2000;
 
     let mut entry3 = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 5)
         .credit(bob.did().clone(), "hours".to_string(), 5)
+        .with_system_provenance("test")
         .build()?;
     entry3.timestamp = 3000;
 
@@ -390,6 +395,7 @@ async fn test_multi_currency_sync() -> Result<()> {
         .credit(bob.did().clone(), "USD".to_string(), 100)
         .debit(alice.did().clone(), "kWh".to_string(), 50)
         .credit(bob.did().clone(), "kWh".to_string(), 50)
+        .with_system_provenance("test")
         .build()?;
 
     // Add to both nodes
@@ -451,6 +457,7 @@ async fn test_gossip_message_handling() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.did().clone())
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     // Serialize entry for gossip

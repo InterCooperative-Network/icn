@@ -142,6 +142,7 @@ async fn test_ledger_balance_migration_on_rotation() -> Result<()> {
         let entry = JournalEntryBuilder::new(bank.did.clone())
             .credit(alice_old_did.clone(), "hours".to_string(), 100)
             .debit(bank.did.clone(), "hours".to_string(), 100)
+            .with_system_provenance("test")
             .build()?;
         ledger.append_entry(entry).await?;
     }
@@ -160,6 +161,7 @@ async fn test_ledger_balance_migration_on_rotation() -> Result<()> {
         let entry = JournalEntryBuilder::new(alice_old_did.clone()) // Signed by old key
             .debit(alice_old_did.clone(), "hours".to_string(), 100)
             .credit(alice_new_did.clone(), "hours".to_string(), 100)
+            .with_system_provenance("test")
             .build()?;
         ledger.append_entry(entry).await?;
     }
@@ -200,6 +202,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
         let entry = JournalEntryBuilder::new(bob.did.clone())
             .credit(alice_old_did.clone(), "credits".to_string(), 50)
             .debit(bob.did.clone(), "credits".to_string(), 50)
+            .with_system_provenance("test")
             .build()?;
         ledger.append_entry(entry).await?;
     }
@@ -228,6 +231,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
         let entry = JournalEntryBuilder::new(alice_old_did.clone())
             .debit(alice_old_did.clone(), "credits".to_string(), 50)
             .credit(alice_new_did.clone(), "credits".to_string(), 50)
+            .with_system_provenance("test")
             .build()?;
         ledger.append_entry(entry).await?;
     }

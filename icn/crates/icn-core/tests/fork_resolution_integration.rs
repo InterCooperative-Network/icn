@@ -170,7 +170,8 @@ fn create_test_entry(
 ) -> Result<icn_ledger::JournalEntry> {
     let mut builder = JournalEntryBuilder::new(author.did().clone())
         .debit(from.clone(), currency.to_string(), amount)
-        .credit(to.clone(), currency.to_string(), amount);
+        .credit(to.clone(), currency.to_string(), amount)
+        .with_system_provenance("test");
 
     for parent in parents {
         builder = builder.add_parent(parent);
@@ -643,12 +644,14 @@ async fn test_multicurrency_fork_invariants() -> Result<()> {
         .debit(alice.did().clone(), "hours".to_string(), 10)
         .credit(bob.did().clone(), "hours".to_string(), 10)
         .add_parent(parent.clone())
+        .with_system_provenance("test")
         .build()?;
 
     let entry_usd = JournalEntryBuilder::new(bob.did().clone())
         .debit(bob.did().clone(), "USD".to_string(), 100)
         .credit(alice.did().clone(), "USD".to_string(), 100)
         .add_parent(parent.clone())
+        .with_system_provenance("test")
         .build()?;
 
     // Both entries together should maintain invariant

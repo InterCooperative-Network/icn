@@ -104,6 +104,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                         let entry_result = JournalEntryBuilder::new(from_did.clone())
                             .credit(from_did.clone(), currency.clone(), amount)
                             .debit(recipient.clone(), currency.clone(), amount)
+                            .with_system_provenance("test")
                             .build();
 
                         if let Ok(entry) = entry_result {

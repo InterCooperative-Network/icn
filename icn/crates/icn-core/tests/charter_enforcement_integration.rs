@@ -45,6 +45,7 @@ async fn test_charter_validator_allows_valid_transaction() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 10)
         .credit(bob.clone(), "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     // Should be accepted (passes charter validation)
@@ -67,6 +68,7 @@ async fn test_charter_validator_passes_with_default_rules() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice, "hours".to_string(), 10)
         .credit(bob, "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     let result = validator.validate_entry(&entry);
@@ -97,6 +99,7 @@ async fn test_charter_validator_hook_integration() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice, "hours".to_string(), 10)
         .credit(bob, "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     // Should be rejected by validation hook
@@ -128,6 +131,7 @@ async fn test_charter_validator_quarantines_violations() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice, "hours".to_string(), 1000)
         .credit(bob, "hours".to_string(), 1000)
+        .with_system_provenance("test")
         .build()?;
 
     // Should be rejected and quarantined
@@ -164,6 +168,7 @@ async fn test_charter_validator_create_hook() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice, "hours".to_string(), 10)
         .credit(bob, "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     // Hook should be callable
@@ -185,6 +190,7 @@ async fn test_charter_validator_detailed_results() -> Result<()> {
     let entry = JournalEntryBuilder::new(alice.clone())
         .debit(alice, "hours".to_string(), 50)
         .credit(bob, "hours".to_string(), 50)
+        .with_system_provenance("test")
         .build()?;
 
     let results = validator.validate_entry_detailed(&entry)?;
@@ -239,6 +245,7 @@ async fn test_charter_validator_with_multiple_deltas() -> Result<()> {
         .debit(alice, "hours".to_string(), 20)
         .credit(bob, "hours".to_string(), 10)
         .credit(charlie, "hours".to_string(), 10)
+        .with_system_provenance("test")
         .build()?;
 
     let result = validator.validate_entry(&entry);
