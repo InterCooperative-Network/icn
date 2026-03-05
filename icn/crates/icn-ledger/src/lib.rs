@@ -73,6 +73,7 @@ pub mod membership;
 pub mod merge;
 pub mod obligation;
 pub mod oracle;
+pub mod patronage;
 pub mod progressive_limits;
 pub mod quarantine;
 pub mod settlement;
