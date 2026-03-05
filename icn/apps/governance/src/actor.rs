@@ -2615,12 +2615,30 @@ fn handle_incoming(store: &dyn GovernanceStateStore, msg: GovernanceMessage) -> 
         }
 
         GovernanceMessage::DelegationCreated { delegation } => {
-            // Idempotent: overwriting an existing key with the same value is safe.
-            store.save_delegation(&delegation)?;
-            info!(
-                "Delegation synced via gossip: {} -> {} (scope: {:?})",
-                delegation.delegator, delegation.delegate, delegation.scope
-            );
+            match store.get_delegation(&delegation.id)? {
+                None => {
+                    store.save_delegation(&delegation)?;
+                    info!(
+                        "Delegation synced via gossip: {} -> {} (scope: {:?})",
+                        delegation.delegator, delegation.delegate, delegation.scope
+                    );
+                }
+                Some(existing) => {
+                    let existing_bytes = serde_json::to_vec(&existing)?;
+                    let incoming_bytes = serde_json::to_vec(&delegation)?;
+                    if existing_bytes == incoming_bytes {
+                        debug!(
+                            "Delegation gossip replay ignored (already stored): {} -> {} (scope: {:?})",
+                            delegation.delegator, delegation.delegate, delegation.scope
+                        );
+                    } else {
+                        warn!(
+                            "Delegation gossip conflict ignored: incoming {} differs from stored — possible tampering",
+                            delegation.id.0
+                        );
+                    }
+                }
+            }
         }
 
         GovernanceMessage::DelegationRevoked {
