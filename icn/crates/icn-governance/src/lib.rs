@@ -46,6 +46,7 @@ pub mod domain;
 pub mod effect_manifest;
 #[allow(missing_docs)]
 pub mod error;
+pub mod gate;
 pub mod handle;
 #[allow(missing_docs)]
 pub mod invariant_gate;
@@ -115,6 +116,7 @@ pub use discussion::{
 };
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use error::{GovernanceError, Result};
+pub use gate::{check_execution_gate, GateError};
 pub use handle::GovernanceOps;
 pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
