@@ -1,0 +1,46 @@
+{
+  "organization": "BrightWorks Cooperative",
+  "type": "worker_cooperative",
+  "coop_id": "brightworks-cooperative",
+  "description": "A worker-owned manufacturing cooperative specializing in sustainable building materials",
+  "location": "Rochester, NY",
+  "members": [
+    {
+      "name": "Yusuf Okafor",
+      "role": "Board Secretary",
+      "labor_hours_q1": 120,
+      "skills": ["CNC Operation", "Quality Control", "Governance"],
+      "joined": "2023-03-15"
+    },
+    {
+      "name": "Camille Tran",
+      "role": "Member-Worker",
+      "labor_hours_q1": 98,
+      "skills": ["Woodworking", "Design", "3D Modeling"],
+      "joined": "2023-06-01"
+    },
+    {
+      "name": "Devraj Singh",
+      "role": "Member-Worker",
+      "labor_hours_q1": 115,
+      "skills": ["Metal Fabrication", "Welding", "Safety Officer"],
+      "joined": "2023-01-10"
+    },
+    {
+      "name": "Rosa Mendez",
+      "role": "Treasurer",
+      "labor_hours_q1": 87,
+      "skills": ["Bookkeeping", "Payroll", "Materials Sourcing"],
+      "joined": "2022-11-01"
+    },
+    {
+      "name": "Anton Kowalski",
+      "role": "Member-Worker",
+      "labor_hours_q1": 104,
+      "skills": ["Assembly", "Finishing", "Customer Delivery"],
+      "joined": "2024-01-08"
+    }
+  ],
+  "q1_surplus_credits": 3840,
+  "total_q1_labor_hours": 524
+}

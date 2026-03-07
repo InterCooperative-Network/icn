@@ -1,0 +1,32 @@
+{
+  "organization": "Finger Lakes Cooperative Development Network",
+  "type": "cooperative_development_organization",
+  "coop_id": "fingerlakes-cdn",
+  "description": "A regional cooperative development organization supporting cooperative startups and federations across the Finger Lakes region. We provide technical assistance, governance support, and facilitate inter-cooperative agreements without becoming a central authority.",
+  "location": "Ithaca, NY",
+  "members": [
+    {
+      "name": "Amara Diallo",
+      "role": "Executive Director",
+      "focus": ["Federation Strategy", "Funder Relations", "Policy"],
+      "joined": "2021-01-01"
+    },
+    {
+      "name": "Thomas Kowalczyk",
+      "role": "Program Officer",
+      "focus": ["Technical Assistance", "Governance Design", "Training"],
+      "joined": "2022-03-01"
+    },
+    {
+      "name": "Rebecca Nwosu",
+      "role": "Federation Liaison",
+      "focus": ["Inter-coop Agreements", "Settlement Facilitation", "Compliance Reporting"],
+      "joined": "2023-06-15"
+    }
+  ],
+  "member_coops": [
+    "brightworks-cooperative",
+    "river-city-tool-library",
+    "harbor-homes-cooperative"
+  ]
+}

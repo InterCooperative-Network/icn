@@ -1,0 +1,44 @@
+{
+  "organization": "River City Tool Library",
+  "type": "community_cooperative",
+  "coop_id": "river-city-tool-library",
+  "description": "A member-owned tool library serving the greater Rochester area. Members share access to 400+ tools in exchange for maintenance contributions.",
+  "location": "Rochester, NY",
+  "members": [
+    {
+      "name": "Priya Sharma",
+      "role": "Coordinator",
+      "contribution_hours": 45,
+      "skills": ["Tool Maintenance", "Member Onboarding", "Inventory Management"],
+      "joined": "2022-09-01"
+    },
+    {
+      "name": "Marcus Webb",
+      "role": "Member",
+      "contribution_hours": 32,
+      "skills": ["Power Tools", "Hand Tools", "Basic Repair"],
+      "joined": "2023-02-14"
+    },
+    {
+      "name": "Fatima Al-Amin",
+      "role": "Member",
+      "contribution_hours": 28,
+      "skills": ["Sewing Equipment", "Small Appliances", "Cleaning"],
+      "joined": "2023-07-22"
+    },
+    {
+      "name": "Lucas Ferreira",
+      "role": "Member",
+      "contribution_hours": 19,
+      "skills": ["Landscaping Tools", "Vehicle Equipment"],
+      "joined": "2024-02-01"
+    },
+    {
+      "name": "Aiko Nakamura",
+      "role": "Maintenance Lead",
+      "contribution_hours": 51,
+      "skills": ["Metalworking Tools", "Lathe Operation", "Precision Calibration"],
+      "joined": "2022-11-15"
+    }
+  ]
+}

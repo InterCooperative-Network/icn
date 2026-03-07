@@ -1,0 +1,59 @@
+{
+  "organization": "Harbor Homes Cooperative",
+  "type": "housing_cooperative",
+  "coop_id": "harbor-homes-cooperative",
+  "description": "A member-owned housing cooperative with 24 units across three buildings on the Rochester waterfront. Members hold proprietary leases and govern collectively.",
+  "location": "Rochester, NY",
+  "buildings": 3,
+  "total_units": 24,
+  "members": [
+    {
+      "name": "Delphine Moreau",
+      "role": "Board Chair",
+      "units": 1,
+      "building": "A",
+      "skills": ["Governance", "Community Organizing", "Mediation"],
+      "joined": "2020-05-01"
+    },
+    {
+      "name": "James Okafor",
+      "role": "Board Member",
+      "units": 1,
+      "building": "B",
+      "skills": ["Contract Review", "Maintenance Oversight"],
+      "joined": "2021-01-15"
+    },
+    {
+      "name": "Sunita Kapoor",
+      "role": "Treasurer",
+      "units": 1,
+      "building": "A",
+      "skills": ["Reserve Fund Management", "Bookkeeping", "Vendor Relations"],
+      "joined": "2019-09-01"
+    },
+    {
+      "name": "Patrick Brennan",
+      "role": "Member",
+      "units": 2,
+      "building": "C",
+      "skills": ["DIY Maintenance", "Building Systems"],
+      "joined": "2022-06-01"
+    },
+    {
+      "name": "Mei-Ling Chen",
+      "role": "Secretary",
+      "units": 1,
+      "building": "B",
+      "skills": ["Record Keeping", "Meeting Facilitation", "Compliance"],
+      "joined": "2021-08-20"
+    }
+  ],
+  "capital_reserve_balance_usd": 48000,
+  "pending_maintenance": {
+    "description": "Building A flat roof — water intrusion detected in 2026-02 inspection",
+    "urgency": "high",
+    "quote_amount_usd": 12000,
+    "contractor": "Harbor Roofing LLC",
+    "quote_ref": "HH-2026-14"
+  }
+}

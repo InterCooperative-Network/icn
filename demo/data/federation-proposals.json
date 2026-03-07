@@ -1,0 +1,53 @@
+{
+  "proposals": [
+    {
+      "id": "prop-harbor-2026-001",
+      "coop_id": "harbor-homes-cooperative",
+      "demo_flow": "flow1",
+      "title": "Authorize roof repair — Building A",
+      "description": "The building inspection report dated 2026-02-15 identified significant water intrusion at the Building A flat roof. This proposal authorizes up to $12,000 from the capital reserve fund for emergency repairs. Work to be performed by Harbor Roofing LLC per quote HH-2026-14. Sunita Kapoor (Treasurer) has confirmed reserve fund balance of $48,000.",
+      "type": "treasury_spend",
+      "amount_usd": 12000,
+      "proposed_by": "Delphine Moreau",
+      "status": "pending",
+      "quorum_required": 3,
+      "narrative_hook": "Did the thing we voted on actually happen, and can we prove it?"
+    },
+    {
+      "id": "prop-brightworks-2026-q1",
+      "coop_id": "brightworks-cooperative",
+      "demo_flow": "flow2",
+      "title": "Q1 2026 patronage distribution — 3,840 credits across 524 labor hours",
+      "description": "Q1 has closed. Total distributable surplus is 3,840 credits, to be allocated proportionally to member labor hours. Allocation formula: (member_hours / 524) * 3840. Rosa Mendez (Treasurer) has verified the figures.",
+      "type": "patronage_distribution",
+      "total_credits": 3840,
+      "total_hours": 524,
+      "allocations": [
+        {"member": "Yusuf Okafor",   "hours": 120, "credits": 880},
+        {"member": "Devraj Singh",   "hours": 115, "credits": 843},
+        {"member": "Anton Kowalski", "hours": 104, "credits": 763},
+        {"member": "Camille Tran",   "hours":  98, "credits": 719},
+        {"member": "Rosa Mendez",    "hours":  87, "credits": 638}
+      ],
+      "proposed_by": "Rosa Mendez",
+      "status": "approved",
+      "narrative_hook": "Why did this member get this distribution?"
+    },
+    {
+      "id": "prop-fingerlakes-equip-2026-001",
+      "coop_id": "fingerlakes-cdn",
+      "demo_flow": "flow3",
+      "title": "Authorize equipment-sharing agreement: River City Tool Library \u2194 BrightWorks Cooperative",
+      "description": "River City Tool Library provides access to metalworking equipment (lathe, drill press, metal bandsaw) during off-peak hours. BrightWorks Cooperative contributes 20 hours of maintenance labor per quarter. Agreement term: 90 days renewable. Facilitated by Finger Lakes CDN. Each party must independently ratify.",
+      "type": "federation_agreement",
+      "parties": ["river-city-tool-library", "brightworks-cooperative"],
+      "facilitator": "fingerlakes-cdn",
+      "term_days": 90,
+      "river_city_provides": "Metalworking equipment access during off-peak hours",
+      "brightworks_provides": "20 maintenance hours per quarter",
+      "proposed_by": "Rebecca Nwosu",
+      "status": "pending_ratification",
+      "narrative_hook": "How do independent co-ops work together without creating another bureaucracy?"
+    }
+  ]
+}
