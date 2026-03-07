@@ -17,12 +17,20 @@
 //! holds no mutable state.  The double-execution guard (preventing re-use of a
 //! decision hash that was already executed) is handled separately by
 //! `ExecutionRecord::is_terminal()` in the execution store.
+//!
+//! # Why not `InvariantGate`?
+//!
+//! [`crate::invariant_gate::InvariantGate`] checks `EffectManifest` + `PowerDiff`
+//! *before* a governance decision is made (Invariants 4–6, proposal phase).
+//! This gate operates *after* the vote, on the resulting `GovernanceDecisionReceipt`,
+//! guarding the ledger allocation write-path.  Different pipeline stage, different
+//! input type — intentionally separate.
 
 use crate::{proof::ProofOutcome, GovernanceDecisionReceipt};
 use thiserror::Error;
 
 /// Reasons a governance decision receipt was rejected by the gate.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum GateError {
     /// The receipt's outcome is not `Accepted`; allocations require acceptance.
     #[error("decision outcome is {actual:?}, expected Accepted")]
@@ -46,6 +54,12 @@ pub enum GateError {
 /// Returns `Err(GateError::OutcomeNotAccepted)` if the vote was rejected or
 /// lacked quorum, and `Err(GateError::DecisionHashInvalid)` if the receipt's
 /// internal hash is inconsistent.
+///
+/// # TODO
+///
+/// Wire this call into the ledger allocation write-path before creating any
+/// budget allocation entry (e.g. `icn_ledger::BudgetAllocator`).  Until that
+/// integration lands, Invariant 7 is defined but not enforced on the hot path.
 pub fn check_execution_gate(receipt: &GovernanceDecisionReceipt) -> Result<(), GateError> {
     if receipt.outcome != ProofOutcome::Accepted {
         return Err(GateError::OutcomeNotAccepted {
