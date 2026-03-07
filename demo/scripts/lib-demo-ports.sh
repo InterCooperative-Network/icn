@@ -42,8 +42,6 @@ else
   NC=''
 fi
 
-export BLUE GREEN YELLOW RED NC
-
 # ---------------------------------------------------------------------------
 # Exported configuration variables
 # ---------------------------------------------------------------------------
@@ -128,7 +126,17 @@ demo_ports_up() {
     >/tmp/pf-18084.log 2>&1 &
   _DEMO_PF_PIDS+=($!)
 
-  trap demo_ports_down EXIT INT TERM
+  # Give kubectl processes time to bind their ports before demo_wait_ready polls
+  sleep 1
+
+  # Chain with any existing EXIT trap so we don't overwrite caller's cleanup
+  local _existing_exit_trap
+  _existing_exit_trap=$(trap -p EXIT 2>/dev/null | sed "s/trap -- '//;s/' EXIT//")
+  if [ -n "$_existing_exit_trap" ]; then
+    trap "demo_ports_down; $_existing_exit_trap" EXIT INT TERM
+  else
+    trap demo_ports_down EXIT INT TERM
+  fi
 
   aside "Port-forward PIDs: ${_DEMO_PF_PIDS[*]:-none}"
 }
@@ -164,34 +172,37 @@ demo_wait_ready() {
   local max_wait="${1:-30}"
   local deadline=$(( $(date +%s) + max_wait ))
 
-  # Track which coops are ready
-  local -A ready=()
-  local -A urls=(
-    [brightworks]="$BRIGHTWORKS_URL"
-    [rivercity]="$RIVERCITY_URL"
-    [harbor]="$HARBOR_URL"
-    [fingerlakes]="$FINGERLAKES_URL"
-  )
+  # Track which coops are ready using parallel indexed arrays (bash 3.2 compatible)
+  local -a coop_names=("BrightWorks" "River City Tool Library" "Harbor Homes" "Finger Lakes CDN")
+  local -a coop_urls=("$BRIGHTWORKS_URL" "$RIVERCITY_URL" "$HARBOR_URL" "$FINGERLAKES_URL")
+  local -a coop_ready=(0 0 0 0)
 
   aside "Waiting up to ${max_wait}s for all 4 gateways..."
 
   while [ $(date +%s) -lt "$deadline" ]; do
-    for coop in brightworks rivercity harbor fingerlakes; do
-      if [ "${ready[$coop]:-}" = "1" ]; then
+    for i in 0 1 2 3; do
+      if [ "${coop_ready[$i]}" = "1" ]; then
         continue
       fi
-      local url="${urls[$coop]}"
+      local url="${coop_urls[$i]}"
       local code
       code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 \
         "${url}/v1/health" 2>/dev/null; true)
       if [ "$code" = "200" ]; then
-        ready[$coop]="1"
-        result "$coop gateway ready (${url})"
+        coop_ready[$i]="1"
+        result "${coop_names[$i]} gateway ready (${url})"
       fi
     done
 
     # Check if all 4 are ready
-    if [ ${#ready[@]} -eq 4 ]; then
+    local all_ready=1
+    for i in 0 1 2 3; do
+      if [ "${coop_ready[$i]}" != "1" ]; then
+        all_ready=0
+        break
+      fi
+    done
+    if [ "$all_ready" = "1" ]; then
       return 0
     fi
 
@@ -199,9 +210,9 @@ demo_wait_ready() {
   done
 
   # Report which ones failed
-  for coop in brightworks rivercity harbor fingerlakes; do
-    if [ "${ready[$coop]:-}" != "1" ]; then
-      fail "$coop gateway did not become ready within ${max_wait}s"
+  for i in 0 1 2 3; do
+    if [ "${coop_ready[$i]}" != "1" ]; then
+      fail "${coop_names[$i]} gateway did not become ready within ${max_wait}s"
     fi
   done
   return 1
@@ -223,8 +234,13 @@ _demo_get_passphrase() {
   fi
 }
 
+# NOTE: Tokens are cached per coop for the duration of the demo session.
+# Default ICN JWT lifetime is 1 hour (3600s). If a demo runs longer,
+# call: demo_get_token --refresh <coop> to force a fresh token.
+# Stale token symptoms: 401 responses from demo_curl calls.
+
 # ---------------------------------------------------------------------------
-# demo_get_token <coop_name>
+# demo_get_token [--refresh] <coop_name>
 # Fetch a JWT auth token for the given coop (alpha/beta/gamma/delta).
 #
 # Strategy: run icnctl auth token inside the pod via kubectl exec.
@@ -232,10 +248,19 @@ _demo_get_passphrase() {
 # Passphrase is read dynamically from K8s Secret at call time.
 # Token is cached in _DEMO_TOKEN_{COOP} after first successful fetch.
 #
+# Pass --refresh as first argument to force a fresh token (clears cache).
+#
 # Returns the token via stdout.
 # Also sets DEMO_TOKEN_ALPHA / _BETA / _GAMMA / _DELTA.
 # ---------------------------------------------------------------------------
 demo_get_token() {
+  # Handle optional --refresh flag
+  local _refresh=0
+  if [ "${1:-}" = "--refresh" ]; then
+    _refresh=1
+    shift
+  fi
+
   local coop="${1:-}"
   if [ -z "$coop" ]; then
     fail "demo_get_token: coop name required (alpha/beta/gamma/delta)"
@@ -244,6 +269,12 @@ demo_get_token() {
 
   # File-based cache: survives subshell $(...) calls unlike shell variables
   local cache_file="${_DEMO_TOKEN_CACHE_DIR}/token-${coop}"
+
+  # --refresh: delete the cached file to force a fresh fetch
+  if [ "$_refresh" = "1" ]; then
+    rm -f "$cache_file"
+  fi
+
   if [ -f "$cache_file" ] && [ -s "$cache_file" ]; then
     cat "$cache_file"
     return 0
@@ -283,7 +314,7 @@ demo_get_token() {
     /usr/local/bin/icnctl auth token \
     --coop-id "$coop_id" \
     --scopes "$DEMO_DEFAULT_SCOPES" \
-    2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1 || true)
+    2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+' | head -1 || true)
 
   # Clear passphrase from memory
   _DEMO_PASSPHRASE=""
@@ -308,6 +339,8 @@ demo_get_token() {
 #   - Returns response body via stdout
 # ---------------------------------------------------------------------------
 demo_curl() {
+  DEMO_LAST_HTTP_CODE=""
+
   local url="${1:-}"
   local method="${2:-GET}"
   local body="${3:-}"
@@ -318,7 +351,10 @@ demo_curl() {
     return 1
   fi
 
-  local curl_args=(-s -o /tmp/demo_curl_body.tmp -w "%{http_code}")
+  local _tmp_body
+  _tmp_body=$(mktemp)
+
+  local curl_args=(-s -o "$_tmp_body" -w "%{http_code}")
   curl_args+=(-X "$method")
   curl_args+=(-H "Accept: application/json")
 
@@ -334,7 +370,10 @@ demo_curl() {
   DEMO_LAST_HTTP_CODE=$(curl "${curl_args[@]}" "$url" 2>/dev/null || echo "000")
   export DEMO_LAST_HTTP_CODE
 
-  cat /tmp/demo_curl_body.tmp 2>/dev/null || true
+  local _body
+  _body=$(cat "$_tmp_body" 2>/dev/null || true)
+  rm -f "$_tmp_body"
+  echo "$_body"
 }
 
 # ---------------------------------------------------------------------------
