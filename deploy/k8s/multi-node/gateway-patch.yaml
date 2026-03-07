@@ -1,0 +1,67 @@
+# Gateway Patch — Strategic Merge Patch for all 4 coop deployments
+#
+# This patch enables the HTTP gateway on each coop pod.
+# Apply per-coop by substituting COOP_NAME (alpha/beta/gamma/delta) and NAMESPACE.
+#
+# Applied 2026-03-07 via kubectl patch (strategic merge).
+# JWT secrets stored in icn-{coop}-secrets under key "jwt-secret".
+# Secrets are NOT in git; see demo/docs/gateway-secrets.md for regeneration.
+#
+# To re-apply for a single coop (e.g., alpha):
+#
+#   kubectl patch deployment icn-alpha -n icn-coop-alpha \
+#     --type=strategic --patch "$(cat gateway-patch-alpha.json)"
+#
+# The canonical applied state is documented below for reference.
+# Each coop's patch is identical except for the secret name.
+
+---
+# icn-alpha — BrightWorks Cooperative
+# Namespace: icn-coop-alpha
+# Applied args:  --config /etc/icn/icn.toml --gateway-enable --gateway-bind 0.0.0.0:8080
+# JWT secret:    icn-alpha-secrets[jwt-secret]
+
+---
+# icn-beta — River City Tool Library
+# Namespace: icn-coop-beta
+# Applied args:  --config /etc/icn/icn.toml --gateway-enable --gateway-bind 0.0.0.0:8080
+# JWT secret:    icn-beta-secrets[jwt-secret]
+
+---
+# icn-gamma — Harbor Homes Cooperative
+# Namespace: icn-coop-gamma
+# Applied args:  --config /etc/icn/icn.toml --gateway-enable --gateway-bind 0.0.0.0:8080
+# JWT secret:    icn-gamma-secrets[jwt-secret]
+
+---
+# icn-delta — Finger Lakes CDN
+# Namespace: icn-coop-delta
+# Applied args:  --config /etc/icn/icn.toml --gateway-enable --gateway-bind 0.0.0.0:8080
+# JWT secret:    icn-delta-secrets[jwt-secret]
+
+---
+# JSON patch template (substitute COOP and NAMESPACE):
+#
+# {
+#   "spec": {
+#     "template": {
+#       "spec": {
+#         "containers": [{
+#           "name": "icnd",
+#           "args": ["--config", "/etc/icn/icn.toml", "--gateway-enable", "--gateway-bind", "0.0.0.0:8080"],
+#           "env": [
+#             {
+#               "name": "ICN_GATEWAY_JWT_SECRET",
+#               "valueFrom": {
+#                 "secretKeyRef": {
+#                   "name": "icn-{COOP}-secrets",
+#                   "key": "jwt-secret"
+#                 }
+#               }
+#             }
+#           ]
+#         }]
+#       }
+#     }
+#   }
+# }
