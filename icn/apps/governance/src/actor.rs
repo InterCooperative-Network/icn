@@ -11,19 +11,19 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::state_store::{GovernanceStateStore, SledGovernanceStateStore};
 use icn_gossip::GossipActor;
 use icn_identity::Did;
 
 use icn_governance::{
-    DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
-    GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
-    GovernanceProfileId, MembershipAction, MembershipConfig, MembershipResolver, MembershipSource,
-    PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
-    ProposalScope, ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot,
-    Timestamp, Vote, VoteChoice, VoteTally,
+    check_execution_gate, DecisionOutcome, Delegation, DelegationId, GovernanceConfig,
+    GovernanceDecisionReceipt, GovernanceDomain, GovernanceDomainId, GovernanceMessage,
+    GovernanceParams, GovernanceProfile, GovernanceProfileId, MembershipAction, MembershipConfig,
+    MembershipResolver, MembershipSource, PaginatedResult, ParameterChange, Proposal, ProposalId,
+    ProposalOutcome, ProposalPayload, ProposalScope, ProposalState, ProtocolParameter,
+    ProtocolParameterStore, TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
 };
 
 use icn_kernel_api::events::{EventEmitter, SystemEvent};
@@ -1650,6 +1650,40 @@ impl GovernanceActor {
 
                 // Persist updated state
                 self.store.save_proposal(&proposal)?;
+
+                // Invariant 7: gate all Accepted decisions before effect dispatch.
+                //
+                // Construct the receipt from current vote state and verify it passes
+                // check_execution_gate. This is the production enforcement point — no
+                // ProposalAccepted event fires without a receipt that is (a) Accepted and
+                // (b) internally consistent (verify() passes). Non-Accepted outcomes skip
+                // the gate entirely; they never produce resource-allocation effects.
+                if matches!(outcome_result, DecisionOutcome::Accepted) {
+                    use icn_governance::proof::ProofOutcome;
+                    let gate_receipt = GovernanceDecisionReceipt::new(
+                        proposal_id.0.clone(),
+                        proposal.domain_id.0.clone(),
+                        ProofOutcome::Accepted,
+                        tally.clone(),
+                        &votes,
+                    );
+                    if let Err(gate_err) = check_execution_gate(&gate_receipt) {
+                        error!(
+                            proposal_id = %proposal_id.0,
+                            error = %gate_err,
+                            "Invariant 7 gate rejected accepted proposal — blocking effect dispatch"
+                        );
+                        bail!(
+                            "Invariant 7 gate failure for proposal {}: {gate_err}",
+                            proposal_id.0
+                        );
+                    }
+                    info!(
+                        proposal_id = %proposal_id.0,
+                        decision_hash = %hex::encode(gate_receipt.decision_hash),
+                        "Invariant 7 gate passed"
+                    );
+                }
 
                 // Generate GovernanceProofV2 if signing key is available
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
