@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Smoke test for lib-demo-ports.sh
+# Usage: bash demo/scripts/lib-demo-ports.sh.test
+# Expected: all assertions pass, exits 0
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib-demo-ports.sh"
+
+_PASS=0
+_FAIL=0
+
+_pass() { echo "  PASS: $*"; (( _PASS++ )) || true; }
+_fail() { echo "  FAIL: $*"; (( _FAIL++ )) || true; }
+
+echo "=== lib-demo-ports.sh smoke test ==="
+echo
+
+# ---------------------------------------------------------------------------
+# Test 1: exported variables are set
+# ---------------------------------------------------------------------------
+echo "--- Test 1: exported variables ---"
+
+[ -n "$BRIGHTWORKS_URL" ]     && _pass "BRIGHTWORKS_URL set ($BRIGHTWORKS_URL)"       || _fail "BRIGHTWORKS_URL missing"
+[ -n "$RIVERCITY_URL" ]       && _pass "RIVERCITY_URL set"                             || _fail "RIVERCITY_URL missing"
+[ -n "$HARBOR_URL" ]          && _pass "HARBOR_URL set"                                || _fail "HARBOR_URL missing"
+[ -n "$FINGERLAKES_URL" ]     && _pass "FINGERLAKES_URL set"                           || _fail "FINGERLAKES_URL missing"
+[ -n "$BRIGHTWORKS_COOP_ID" ] && _pass "BRIGHTWORKS_COOP_ID set ($BRIGHTWORKS_COOP_ID)" || _fail "BRIGHTWORKS_COOP_ID missing"
+[ -n "$HARBOR_COOP_ID" ]      && _pass "HARBOR_COOP_ID set ($HARBOR_COOP_ID)"         || _fail "HARBOR_COOP_ID missing"
+[ -n "$BRIGHTWORKS_NS" ]      && _pass "BRIGHTWORKS_NS set ($BRIGHTWORKS_NS)"          || _fail "BRIGHTWORKS_NS missing"
+[ -n "$BRIGHTWORKS_GRPC" ]    && _pass "BRIGHTWORKS_GRPC set ($BRIGHTWORKS_GRPC)"      || _fail "BRIGHTWORKS_GRPC missing"
+
+# ---------------------------------------------------------------------------
+# Test 2: port-forwards start and gateways become ready
+# ---------------------------------------------------------------------------
+echo
+echo "--- Test 2: port-forwards and gateway health ---"
+
+demo_ports_up
+
+if demo_wait_ready 30; then
+  _pass "all gateways ready within 30s"
+else
+  _fail "gateway wait timed out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 3: direct health check via curl
+# ---------------------------------------------------------------------------
+echo
+echo "--- Test 3: direct health check ---"
+
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$BRIGHTWORKS_URL/v1/health" 2>/dev/null || echo "000")
+[ "$code" = "200" ] && _pass "BrightWorks health HTTP 200" || _fail "BrightWorks health returned $code"
+
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$RIVERCITY_URL/v1/health" 2>/dev/null || echo "000")
+[ "$code" = "200" ] && _pass "River City health HTTP 200" || _fail "River City health returned $code"
+
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$HARBOR_URL/v1/health" 2>/dev/null || echo "000")
+[ "$code" = "200" ] && _pass "Harbor Homes health HTTP 200" || _fail "Harbor Homes health returned $code"
+
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$FINGERLAKES_URL/v1/health" 2>/dev/null || echo "000")
+[ "$code" = "200" ] && _pass "Finger Lakes health HTTP 200" || _fail "Finger Lakes health returned $code"
+
+# ---------------------------------------------------------------------------
+# Test 4: token fetch for alpha
+# ---------------------------------------------------------------------------
+echo
+echo "--- Test 4: token fetch ---"
+
+TOKEN=$(demo_get_token alpha)
+if [ -n "$TOKEN" ]; then
+  _pass "token fetched for alpha (length=${#TOKEN})"
+else
+  _fail "token fetch failed for alpha"
+fi
+
+# Verify caching: second call should return same token instantly
+TOKEN2=$(demo_get_token alpha)
+[ "$TOKEN" = "$TOKEN2" ] && _pass "token caching works (same value returned)" || _fail "token caching broken (different value)"
+
+# ---------------------------------------------------------------------------
+# Test 5: demo_curl wrapper
+# ---------------------------------------------------------------------------
+echo
+echo "--- Test 5: demo_curl ---"
+
+demo_curl "$BRIGHTWORKS_URL/v1/health" GET
+[ "$DEMO_LAST_HTTP_CODE" = "200" ] && _pass "demo_curl sets DEMO_LAST_HTTP_CODE=200" || _fail "demo_curl code: $DEMO_LAST_HTTP_CODE"
+
+# Test with token
+DEMO_TOKEN="$TOKEN" demo_curl "$BRIGHTWORKS_URL/v1/health" GET
+[ "$DEMO_LAST_HTTP_CODE" = "200" ] && _pass "demo_curl with DEMO_TOKEN env works" || _fail "demo_curl with token code: $DEMO_LAST_HTTP_CODE"
+
+# Test demo_require_2xx passes on 200
+DEMO_LAST_HTTP_CODE="200"
+demo_require_2xx "test context" && _pass "demo_require_2xx passes on 200" || _fail "demo_require_2xx failed on 200"
+
+# ---------------------------------------------------------------------------
+# Test 6: ports go down after demo_ports_down
+# ---------------------------------------------------------------------------
+echo
+echo "--- Test 6: demo_ports_down ---"
+
+# Remove the trap so it doesn't fire on EXIT during our test
+trap - EXIT INT TERM
+demo_ports_down
+
+sleep 1
+# Note: curl with -w "%{http_code}" already prints "000" on connection refused AND exits non-zero.
+# Do NOT use "|| echo 000" — that concatenates two "000"s into "000000".
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "$BRIGHTWORKS_URL/v1/health" 2>/dev/null; true)
+[ "$code" = "000" ] && _pass "BrightWorks port closed after demo_ports_down" || _fail "BrightWorks port still open: $code"
+
+code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "$HARBOR_URL/v1/health" 2>/dev/null; true)
+[ "$code" = "000" ] && _pass "Harbor Homes port closed after demo_ports_down" || _fail "Harbor Homes port still open: $code"
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+echo
+echo "==================================="
+if [ "$_FAIL" -eq 0 ]; then
+  echo "  All ${_PASS} tests passed."
+  echo "==================================="
+  exit 0
+else
+  echo "  ${_PASS} passed, ${_FAIL} FAILED."
+  echo "==================================="
+  exit 1
+fi
