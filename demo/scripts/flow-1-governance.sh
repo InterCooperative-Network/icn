@@ -36,6 +36,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib-demo-ports.sh"
 
+# Parse presenter mode flag
+for _arg in "$@"; do
+  case "$_arg" in
+    --present)  export PRESENTER_MODE="present"  ;;
+    --narrated) export PRESENTER_MODE="narrated" ;;
+  esac
+done
+unset _arg
+
 # ---------------------------------------------------------------------------
 # Persona definitions (named voters)
 # ---------------------------------------------------------------------------
@@ -60,6 +69,15 @@ trap 'rm -f "$_RESP_FILE"' EXIT
 # _do_curl <url> <method> [body] [token]
 # Wrapper that writes response to $_RESP_FILE and checks code in-process.
 # DEMO_LAST_HTTP_CODE is set in the current shell (no subshell).
+#
+# WHY this exists: demo_curl in lib-demo-ports.sh sets DEMO_LAST_HTTP_CODE
+# in the current shell, but if called inside $(...) to capture output, the
+# assignment is lost (subshell doesn't propagate env back). This local
+# version writes the response to a temp file in the calling shell instead.
+#
+# MAINTENANCE NOTE: The curl flags here mirror lib-demo-ports.sh's
+# demo_curl. If lib adds --max-time, --retry, or new headers, update this
+# function too. They must stay behaviorally in sync.
 # ---------------------------------------------------------------------------
 _do_curl() {
   local url="$1" method="${2:-GET}" body="${3:-}" token="${4:-${DEMO_TOKEN:-}}"
@@ -109,6 +127,7 @@ else:
 # STEP 0: Setup
 # ---------------------------------------------------------------------------
 narrate "Step 0: Starting Harbor Homes gateway connection"
+_beat ""
 aside "Harbor Homes Cooperative runs on icn-gamma (port 18083)"
 
 demo_ports_up
@@ -116,6 +135,7 @@ demo_wait_ready 30
 result "All 4 coop gateways are up"
 
 narrate "Authenticating as Harbor Homes board"
+_beat ""
 
 # Store token to a variable WITHOUT subshell by using a temp file
 _TOKEN_FILE="$(mktemp)"
@@ -136,6 +156,7 @@ echo ""
 # STEP 1: Establish the problem
 # ---------------------------------------------------------------------------
 narrate "Step 1: The situation — inspection report received"
+_beat "Explain: this is a real cooperative making a real decision. The inspection report triggered a governance process — just like any coop board would run, but recorded on the network."
 echo "  Harbor Homes Cooperative manages 48 units across two buildings."
 echo ""
 echo "  An inspection of Building A has found water intrusion through"
@@ -157,6 +178,7 @@ echo ""
 # STEP 2: Create the governance domain
 # ---------------------------------------------------------------------------
 narrate "Step 2: Establish the governance domain for this vote"
+_beat "Point to the domain ID. Every coop has its own governance domain — Harbor Homes controls this one."
 aside "Harbor Homes uses a dedicated domain per major decision type."
 aside "quorum: 51% — approval: 60% — voting period: 7 days"
 aside "domain ID: ${HARBOR_DOMAIN_ID}"
@@ -177,6 +199,7 @@ echo ""
 # STEP 3: Create the roof repair proposal
 # ---------------------------------------------------------------------------
 narrate "Step 3: Delphine Moreau raises the roof repair proposal"
+_beat "Delphine is the board president. She's raising this to the full membership. Anyone can see this proposal — there's no back room."
 echo "  Delphine (Board Chair) creates the proposal with the full cost basis"
 echo "  and inspection evidence. Every member can read this before voting."
 echo ""
@@ -207,6 +230,7 @@ _pretty
 # STEP 4: Open for voting
 # ---------------------------------------------------------------------------
 narrate "Step 4: Board opens the proposal for member voting"
+_beat "The proposal is now open. Every member gets a vote. The voting period is enforced by the network, not by trust in an administrator."
 aside "Voting period: 7 days (voting_period_days configured in domain)"
 echo ""
 
@@ -221,6 +245,7 @@ _pretty
 # STEP 5: Members vote
 # ---------------------------------------------------------------------------
 narrate "Step 5: Members vote — transparent, named, recorded on-chain"
+_beat "Three votes: for, for, for. The DID next to each vote is that member's permanent cooperative identity. This vote is public and permanent."
 echo "  In a full Harbor Homes deployment, each of the 12 voting members"
 echo "  has their own DID and casts an independent vote."
 echo ""
@@ -249,26 +274,46 @@ _pretty
 # STEP 6: Show the tally
 # ---------------------------------------------------------------------------
 narrate "Step 6: Tally — the vote count is public to all members"
+_beat "100% in favor. Any member — or any outside observer the coop grants access to — can verify this tally independently."
 echo ""
 
 _do_curl "${HARBOR_URL}/v1/gov/proposals/${PROPOSAL_ID}/tally" GET "" "$HARBOR_TOKEN"
 demo_require_2xx "Get vote tally"
 
+# REHEARSAL: if these print empty, the tally response uses different field names.
+# Run raw: curl -s -H "Authorization: Bearer $TOKEN" $URL/v1/gov/proposals/$ID/tally
+# Confirm actual field names and update _field calls to match.
 FOR_VOTES=$(_field "for_votes")
 AGAINST_VOTES=$(_field "against_votes")
 TOTAL_VOTES=$(_field "total_votes")
 
-echo "  Vote tally:"
+echo "  Vote tally (raw record):"
 _pretty
 
 result "For: ${FOR_VOTES}  Against: ${AGAINST_VOTES}  Total: ${TOTAL_VOTES}"
+echo ""
+echo "  What this means:"
+echo "    The domain requires 51% quorum and 60% approval."
+if [ -n "$TOTAL_VOTES" ] && [ "$TOTAL_VOTES" -gt 0 ] 2>/dev/null; then
+  echo "    ${TOTAL_VOTES} vote(s) recorded so far."
+  echo "    For votes: ${FOR_VOTES} — this is the approval count toward the 60% threshold."
+  if [ -n "$AGAINST_VOTES" ] && [ "$AGAINST_VOTES" -gt 0 ] 2>/dev/null; then
+    echo "    Against votes: ${AGAINST_VOTES} — dissenting members' positions are recorded."
+  fi
+  echo "    The system calculates quorum and approval automatically when the proposal is closed."
+else
+  echo "    (Tally fields not populated until close, depending on API version.)"
+fi
+echo ""
 aside "Any member of Harbor Homes can query this tally at any time — not just the board"
+aside "The tally is append-only: votes cannot be retracted or altered after submission"
 echo ""
 
 # ---------------------------------------------------------------------------
 # STEP 7: Close the proposal
 # ---------------------------------------------------------------------------
 narrate "Step 7: Closing the proposal — result is final"
+_beat "The proposal is closed. The outcome is accepted. Nobody can change this."
 echo ""
 
 _do_curl "${HARBOR_URL}/v1/gov/proposals/${PROPOSAL_ID}/close" POST '{}' "$HARBOR_TOKEN"
@@ -290,6 +335,7 @@ fi
 # STEP 8: Governance proof (current deployment status)
 # ---------------------------------------------------------------------------
 narrate "Step 8: Governance proof — what is verifiable now"
+_beat "This is the key idea: the decision is a verifiable artifact. The roof contractor, a lender, a funder — anyone Harbor Homes chooses to share this with can confirm the vote happened."
 echo ""
 aside "Querying the governance proof endpoint (GovernanceReceipt)..."
 
@@ -321,6 +367,7 @@ echo ""
 # STEP 9: Full governance record — what any member can verify
 # ---------------------------------------------------------------------------
 narrate "Step 9: Provenance — what any Harbor Homes member can verify right now"
+_beat ""
 echo ""
 
 _do_curl "${HARBOR_URL}/v1/gov/proposals/${PROPOSAL_ID}" GET "" "$HARBOR_TOKEN"
@@ -338,22 +385,38 @@ echo ""
 # STEP 10: The authorized action — connecting governance to execution
 # ---------------------------------------------------------------------------
 narrate "Step 10: The authorized action — governance to execution"
+_beat "Governance authorizes action. The cooperative decided — now the network records that authorization so the execution can prove it was legitimate."
 echo ""
-echo "  The vote has passed. The cooperative's treasury staff now have"
-echo "  authorization to execute the \$12,000 spend against Lakeside Roofing."
-echo ""
-echo "  Authorization record:"
-echo "    Governance decision:  ${PROPOSAL_ID}"
-echo "    Decision outcome:     ${FINAL_STATE}"
-echo "    Authorized amount:    \$12,000"
-echo "    Payee:                Lakeside Roofing LLC"
-echo "    Purpose:              Building A roof repair — northeast parapet"
-echo "    Authorization date:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-echo "    Authorized by:        ${HARBOR_BOARD_DID:0:50}..."
-echo ""
-aside "Treasury API is not yet reachable in this deployment (scope 'treasury:read'"
-aside "is not in ALLOWED_SCOPES — this is a deployment gap, not a design gap)"
-aside "In Flow 1B: the treasury spend will be cryptographically bound to this proposal ID"
+
+if [ "$FINAL_STATE" = "Accepted" ]; then
+  echo "  The vote has passed. The cooperative's treasury staff now have"
+  echo "  authorization to execute the \$12,000 spend against Lakeside Roofing."
+  echo ""
+  echo "  Authorization record:"
+  echo "    Governance decision:  ${PROPOSAL_ID}"
+  echo "    Decision outcome:     ${FINAL_STATE}"
+  echo "    Authorized amount:    \$12,000"
+  echo "    Payee:                Lakeside Roofing LLC"
+  echo "    Purpose:              Building A roof repair — northeast parapet"
+  echo "    Authorization date:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "    Authorized by:        ${HARBOR_BOARD_DID:0:50}..."
+  echo ""
+  aside "Treasury API is not yet reachable in this deployment (scope 'treasury:read'"
+  aside "is not in ALLOWED_SCOPES — this is a deployment gap, not a design gap)"
+  aside "In Flow 1B: the treasury spend will be cryptographically bound to this proposal ID"
+else
+  warn "Proposal final state is '${FINAL_STATE}' — authorization step requires 'Accepted'."
+  warn "This may mean quorum or approval threshold was not met with the seeded member count."
+  echo ""
+  echo "  Governance record is still present and auditable:"
+  echo "    Governance decision:  ${PROPOSAL_ID}"
+  echo "    Decision outcome:     ${FINAL_STATE}"
+  echo "    Vote tally:           For=${FOR_VOTES}, Against=${AGAINST_VOTES}"
+  echo ""
+  aside "A non-Accepted outcome is itself a verifiable governance record —"
+  aside "the cooperative can show exactly what was proposed, what was voted, and what the result was."
+  aside "Presenter: check reseed-federation-demo.sh to verify the seeded member count matches quorum."
+fi
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -366,7 +429,8 @@ echo ""
 echo " What was shown:"
 echo "   - Domain: Harbor Homes capital reserve governance domain"
 echo "   - Proposal: Board chair raised roof repair with full cost basis"
-echo "   - Voting: Named voters cast transparent, recorded votes"
+echo "   - Voting: Voters cast transparent, recorded votes (each vote"
+echo "             anchored to a member DID — map DID→name via member registry)"
 echo "   - Result: Approval visible to all members, not just the board"
 echo "   - Record: Governance decision persisted on the cooperative's node"
 echo "   - Traceability: Proposal ID links governance to authorized action"
