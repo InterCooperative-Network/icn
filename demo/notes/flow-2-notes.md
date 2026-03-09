@@ -107,11 +107,11 @@
 
 **Setup**: Reseed demo state (`bash scripts/reseed-federation-demo.sh`).
 
-**Mechanism**: Do not cast the deciding vote. Let the proposal remain un-quorate, then close it normally (`close` endpoint). The domain quorum threshold will not be met.
+**Mechanism**: Set `DEMO_SKIP_VOTE=1` — the script will withhold the vote at Step 5 and warn, then close the proposal without quorum.
 
 **Run**:
 ```
-DEMO_BEAT_PAUSE=2 bash scripts/flow-2-patronage.sh --narrated
+DEMO_SKIP_VOTE=1 DEMO_BEAT_PAUSE=2 bash scripts/flow-2-patronage.sh --narrated
 ```
 
 **Expected result**:

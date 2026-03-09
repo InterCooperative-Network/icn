@@ -313,19 +313,24 @@ echo "  the formula, the proposal, and the vote are real. The demo cluster"
 echo "  currently has one identity; a production cooperative would have five"
 echo "  separate keystores and five separate vote transactions."
 echo ""
-echo "  Casting vote — Yusuf Okafor, Board Secretary (demo identity):"
+if [ -n "${DEMO_SKIP_VOTE:-}" ]; then
+  aside "DEMO_SKIP_VOTE set — withholding vote to exercise non-Accepted branch"
+  warn "Vote withheld — proposal will close without meeting quorum"
+else
+  echo "  Casting vote — Yusuf Okafor, Board Secretary (demo identity):"
 
-_do_curl "${BRIGHTWORKS_URL}/v1/gov/proposals/${PROPOSAL_ID}/vote" POST \
-  "{\"choice\":\"for\",\"comment\":\"The formula is correct and the figures match the quarterly labor log. I move to ratify.\"}" \
-  "$BRIGHTWORKS_TOKEN"
+  _do_curl "${BRIGHTWORKS_URL}/v1/gov/proposals/${PROPOSAL_ID}/vote" POST \
+    "{\"choice\":\"for\",\"comment\":\"The formula is correct and the figures match the quarterly labor log. I move to ratify.\"}" \
+    "$BRIGHTWORKS_TOKEN"
 
-demo_require_2xx "Cast ratification vote"
+  demo_require_2xx "Cast ratification vote"
 
-result "Vote recorded — For"
-aside "Vote anchored to member DID, timestamp, and comment — all public to members"
-echo ""
-echo "  Proposal record after vote:"
-_pretty
+  result "Vote recorded — For"
+  aside "Vote anchored to member DID, timestamp, and comment — all public to members"
+  echo ""
+  echo "  Proposal record after vote:"
+  _pretty
+fi
 
 # ---------------------------------------------------------------------------
 # STEP 6: Tally
