@@ -257,6 +257,9 @@ demo_ports_down() {
   _DEMO_PF_PIDS=()
   # Clean token cache
   rm -rf "${_DEMO_TOKEN_CACHE_DIR:-}" 2>/dev/null || true
+  # Clean last curl response temp file
+  rm -f "${_DEMO_LAST_RESP_FILE:-}" 2>/dev/null || true
+  _DEMO_LAST_RESP_FILE=""
 }
 
 # ---------------------------------------------------------------------------

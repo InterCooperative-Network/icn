@@ -69,7 +69,7 @@
 ---
 
 ## Beat: Step 9 — Live balance
-**Say**: "Yusuf's balance is now live. He can query it himself — the coop doesn't have to send him a statement. Any member can check their own balance at any time."
+**Say**: "The cooperative account balance is live. Any member can query their own balance at any time — the coop doesn't have to send a statement."
 **Point to**: The balance result
 **If asked**: "Yes, this is real-time. No waiting for month-end accounting."
 
@@ -82,7 +82,7 @@
 ---
 
 ## Beat: Step 11 — Receipt chain
-**Say**: "This is the foundation for external accountability. A funder, a union, a regulator — anyone Harbor Homes chooses to give access to can follow this chain and verify: the coop governed democratically, the formula was member-approved, the distribution happened as stated."
+**Say**: "This is the foundation for external accountability. A funder, a union, a regulator — anyone BrightWorks chooses to give access to can follow this chain and verify: the coop governed democratically, the formula was member-approved, the distribution happened as stated."
 **Point to**: The receipt chain
 **If asked**: "Right — this is what makes grant reporting real. Not a PDF anyone could have written — a verifiable chain of decisions and transactions."
 

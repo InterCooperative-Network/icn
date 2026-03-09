@@ -271,6 +271,7 @@ result "River City proposal closed — state: ${RC_FINAL_STATE}"
 aside "This decision was made by River City, on River City's node, by River City's members"
 aside "Finger Lakes CDN didn't vote. BrightWorks didn't vote. This was autonomous governance."
 echo ""
+_beat "River City's internal decision is on the record. Moving to BrightWorks."
 
 # ---------------------------------------------------------------------------
 # STEP 4: BrightWorks governs its side of the agreement
@@ -314,6 +315,7 @@ BW_FINAL_STATE=$(_field "state")
 result "BrightWorks proposal closed — state: ${BW_FINAL_STATE}"
 aside "Two coops. Two separate votes. Two separate governance decisions. One agreement."
 echo ""
+_beat "BrightWorks' internal decision is on the record. Now: Finger Lakes facilitates."
 
 # ---------------------------------------------------------------------------
 # STEP 5: Finger Lakes CDN registers both coops
@@ -466,6 +468,9 @@ if [[ "$CLEARING_ID" =~ ^[0-9a-f-]{20,} ]] 2>/dev/null || \
     echo "  (Position tracking available once first exchanges are recorded)"
   fi
   echo ""
+else
+  warn "Step 8 (clearing position) skipped — clearing agreement pending full scope deployment."
+  aside "CLEARING_ID=${CLEARING_ID}"
 fi
 
 # ---------------------------------------------------------------------------

@@ -331,7 +331,7 @@ _pretty
 # STEP 6: Tally
 # ---------------------------------------------------------------------------
 narrate "Step 6: Vote tally — ratification confirmed"
-_beat "Accepted. The allocation is now official. The ledger settlement is authorized."
+_beat "Pulling the tally — if ratified, the ledger settlement is authorized."
 echo ""
 
 _do_curl "${BRIGHTWORKS_URL}/v1/gov/proposals/${PROPOSAL_ID}/tally" GET "" "$BRIGHTWORKS_TOKEN"
@@ -381,6 +381,7 @@ if [ "$FINAL_STATE" != "Accepted" ]; then
   aside "The governance record still exists and is auditable regardless of outcome."
 fi
 echo ""
+_beat "The proposal is now closed. On to settlement — or the fallback explanation if quorum wasn't met."
 
 # ---------------------------------------------------------------------------
 # STEPS 8-11: Ledger settlement and provenance
@@ -539,6 +540,7 @@ echo ""
 else
   # FINAL_STATE != Accepted — settlement did not happen. Narrate what it would show.
   narrate "Steps 8-11: What happens when governance is accepted"
+  _beat "Governance didn't meet quorum — showing what the settled path would look like."
   echo ""
   warn "Proposal state is '${FINAL_STATE}' — the settlement steps below are illustrative."
   warn "They show what would happen if the vote had met quorum and been accepted."

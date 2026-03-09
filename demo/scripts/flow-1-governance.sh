@@ -230,7 +230,7 @@ _pretty
 # STEP 4: Open for voting
 # ---------------------------------------------------------------------------
 narrate "Step 4: Board opens the proposal for member voting"
-_beat "The proposal is now open. Every member gets a vote. The voting period is enforced by the network, not by trust in an administrator."
+_beat "Opening the proposal now — every member gets a vote. The voting period is enforced by the network."
 aside "Voting period: 7 days (voting_period_days configured in domain)"
 echo ""
 
@@ -274,7 +274,7 @@ _pretty
 # STEP 6: Show the tally
 # ---------------------------------------------------------------------------
 narrate "Step 6: Tally — the vote count is public to all members"
-_beat "100% in favor. Any member — or any outside observer the coop grants access to — can verify this tally independently."
+_beat "Pulling the tally now — any member can verify this count independently."
 echo ""
 
 _do_curl "${HARBOR_URL}/v1/gov/proposals/${PROPOSAL_ID}/tally" GET "" "$HARBOR_TOKEN"
@@ -313,7 +313,7 @@ echo ""
 # STEP 7: Close the proposal
 # ---------------------------------------------------------------------------
 narrate "Step 7: Closing the proposal — result is final"
-_beat "The proposal is closed. The outcome is accepted. Nobody can change this."
+_beat "Closing the proposal — the result is about to be locked in permanently."
 echo ""
 
 _do_curl "${HARBOR_URL}/v1/gov/proposals/${PROPOSAL_ID}/close" POST '{}' "$HARBOR_TOKEN"
@@ -330,6 +330,7 @@ if [ "$FINAL_STATE" != "Accepted" ]; then
   warn "Expected state 'Accepted' but got '${FINAL_STATE}'"
   warn "The proposal may not have met quorum. Check member count vs quorum_percent."
 fi
+_beat "The vote is final. This record cannot be altered."
 
 # ---------------------------------------------------------------------------
 # STEP 8: Governance proof (current deployment status)
