@@ -98,3 +98,28 @@
 
 **"What's the difference between this and just using QuickBooks?"**
 "QuickBooks is owned by Intuit, held on their servers, and visible only to the people with access. This record is held across the cooperative's own nodes, verifiable by any member with authorization, and not dependent on any vendor."
+
+---
+
+## Rehearsal: Non-Accepted Branch
+
+**Purpose**: Verify the illustrative fallback path and the `_beat` in the else branch.
+
+**Setup**: Reseed demo state (`bash scripts/reseed-federation-demo.sh`).
+
+**Mechanism**: Do not cast the deciding vote. Let the proposal remain un-quorate, then close it normally (`close` endpoint). The domain quorum threshold will not be met.
+
+**Run**:
+```
+DEMO_BEAT_PAUSE=2 bash scripts/flow-2-patronage.sh --narrated
+```
+
+**Expected result**:
+- Proposal closes in non-`Accepted` state
+- Real settlement does not execute (Steps 8-11 branch skips to illustrative path)
+- `narrate "Steps 8-11: What happens when governance is accepted"` fires
+- New `_beat "Governance didn't meet quorum..."` appears at the right moment
+- Audience pane shows no raw HTTP codes, JSON, or aside lines
+
+**Narration line**:
+"This proposal closed without sufficient participation, so settlement did not execute. The next steps show what the settled path would look like."
