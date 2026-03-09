@@ -50,7 +50,7 @@
 ---
 
 ## Beat: Step 6 — Tally confirmed
-**Say**: "Accepted. The allocation is now ratified. The ledger settlement is authorized."
+**Say**: "Pulling the tally now — if the vote is ratified, the ledger settlement is authorized."
 **Point to**: The tally
 
 ---
