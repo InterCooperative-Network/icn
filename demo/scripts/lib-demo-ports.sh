@@ -76,6 +76,21 @@ export DEMO_DEFAULT_SCOPES="ledger:read,ledger:write,coop:read,coop:write,govern
 # HTTP status code from the last demo_curl call
 export DEMO_LAST_HTTP_CODE=""
 
+# ---------------------------------------------------------------------------
+# Presenter mode — set by flow scripts that parse their own args
+# PRESENTER_MODE = "" (normal) | "present" (keypress) | "narrated" (auto)
+# DEMO_BEAT_PAUSE = seconds between beats in narrated mode (default 4)
+# PRESENTER_LOG = file path for technical detail output
+# ---------------------------------------------------------------------------
+export PRESENTER_MODE="${PRESENTER_MODE:-}"
+export DEMO_BEAT_PAUSE="${DEMO_BEAT_PAUSE:-4}"
+export PRESENTER_LOG="${PRESENTER_LOG:-/tmp/icn-demo-presenter-$$.log}"
+
+# Initialize log file
+if [ -n "$PRESENTER_MODE" ]; then
+  : > "$PRESENTER_LOG"
+fi
+
 # Internal: PID array for port-forwards started by demo_ports_up
 _DEMO_PF_PIDS=()
 
@@ -216,6 +231,79 @@ demo_wait_ready() {
     fi
   done
   return 1
+}
+
+# ---------------------------------------------------------------------------
+# demo_api_preflight
+#
+# Print the deployed gateway binary SHA/version and report which ledger API
+# surface is active. Call this after demo_wait_ready for any flow that
+# touches the ledger.
+#
+# API surface detection uses the git SHA from /v1/health. actix-web scope
+# middleware intercepts ALL requests matching /ledger prefix before route
+# lookup, so unauthenticated probes return 401 for both existing and
+# non-existing routes — making 401-vs-404 unreliable as a detection signal.
+# SHA-based lookup is exact and requires no token.
+#
+# Known SHAs:
+#   2bc85f83*  (2026-02-23) → OLD API  /payment + currency + /balance/{did}
+#   commit 439a8a2c (2026-03-01) renamed to:
+#   any newer SHA             → NEW API  /settle  + unit     + /position/{did}
+#
+# Exports: DEMO_LEDGER_MODE = "old" | "new" | "unknown"
+# ---------------------------------------------------------------------------
+demo_api_preflight() {
+  local health git_sha build_time version
+  health=$(curl -s --connect-timeout 3 "${BRIGHTWORKS_URL}/v1/health" 2>/dev/null || true)
+  git_sha=$(echo "$health" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('git_sha','unknown'))" 2>/dev/null \
+    || echo "unknown")
+  build_time=$(echo "$health" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('build_time','unknown')[:10])" 2>/dev/null \
+    || echo "unknown")
+  version=$(echo "$health" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(d.get('version','unknown'))" 2>/dev/null \
+    || echo "unknown")
+
+  # SHA-based API surface detection.
+  # Binaries predating commit 439a8a2c (2026-03-01) use old route names.
+  # The rename commit changed: /payment→/settle, currency→unit, /balance→/position.
+  local ledger_mode_label
+  case "$git_sha" in
+    2bc85f83*)
+      ledger_mode_label="OLD  /payment + currency + /balance/{did}  (sha=${git_sha:0:8})"
+      export DEMO_LEDGER_MODE="old"
+      ;;
+    unknown)
+      ledger_mode_label="UNKNOWN — health endpoint unreachable"
+      export DEMO_LEDGER_MODE="unknown"
+      ;;
+    *)
+      # Binary is newer than the last known-old SHA.
+      # If flow-2 settlement fails, re-run rehearsal-probe.sh to re-pin.
+      ledger_mode_label="NEW  /settle + unit + /position/{did}  (sha=${git_sha:0:8})"
+      export DEMO_LEDGER_MODE="new"
+      ;;
+  esac
+
+  echo ""
+  echo "  ┌────────────────────────────────────────────────────────────┐"
+  echo "  │  GATEWAY PREFLIGHT                                         │"
+  printf "  │  binary:  sha=%-45s│\n" "${git_sha} (${build_time})"
+  printf "  │  version: %-48s│\n" "${version}"
+  printf "  │  ledger:  %-48s│\n" "${ledger_mode_label}"
+  echo "  └────────────────────────────────────────────────────────────┘"
+  echo ""
+
+  if [ "$DEMO_LEDGER_MODE" = "unknown" ]; then
+    warn "Health endpoint unreachable — cannot determine API surface."
+    warn "Verify gateway is up, then re-run."
+  elif [ "$DEMO_LEDGER_MODE" = "new" ]; then
+    warn "Binary is newer than flow-2 was last rehearsed against (sha 2bc85f83)."
+    warn "If settlement fails, run: bash scripts/rehearsal-probe.sh"
+    warn "then update flow-2 route/field names to match the new API surface."
+  fi
 }
 
 # ---------------------------------------------------------------------------
