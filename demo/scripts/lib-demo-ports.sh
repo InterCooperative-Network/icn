@@ -76,6 +76,9 @@ export DEMO_DEFAULT_SCOPES="ledger:read,ledger:write,coop:read,coop:write,govern
 # HTTP status code from the last demo_curl call
 export DEMO_LAST_HTTP_CODE=""
 
+# Internal: temp file holding the last demo_curl response body (for _pretty)
+_DEMO_LAST_RESP_FILE=""
+
 # ---------------------------------------------------------------------------
 # Presenter mode — set by flow scripts that parse their own args
 # PRESENTER_MODE = "" (normal) | "present" (keypress) | "narrated" (auto)
@@ -151,7 +154,7 @@ fail() { echo -e "  ${RED}✗${NC} $*"; }
 # _pretty: pretty-print the last curl response body
 # In presenter mode, redirects to the log instead of showing on screen.
 _pretty() {
-  local src="${_RESP_FILE:-/dev/null}"
+  local src="${_DEMO_LAST_RESP_FILE:-/dev/null}"
   if [ -n "${PRESENTER_MODE:-}" ]; then
     echo "--- response body ---" >> "${PRESENTER_LOG:-/dev/null}"
     python3 -m json.tool < "$src" >> "${PRESENTER_LOG:-/dev/null}" 2>/dev/null \
@@ -536,9 +539,12 @@ demo_curl() {
   DEMO_LAST_HTTP_CODE=$(curl "${curl_args[@]}" "$url" 2>/dev/null || echo "000")
   export DEMO_LAST_HTTP_CODE
 
+  # Remove previous response file and expose current one for _pretty
+  rm -f "${_DEMO_LAST_RESP_FILE:-}"
+  _DEMO_LAST_RESP_FILE="$_tmp_body"
+
   local _body
   _body=$(cat "$_tmp_body" 2>/dev/null || true)
-  rm -f "$_tmp_body"
   echo "$_body"
 }
 
