@@ -116,6 +116,59 @@ code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "$HARBOR_URL/v
 [ "$code" = "000" ] && _pass "Harbor Homes port closed after demo_ports_down" || _fail "Harbor Homes port still open: $code"
 
 # ---------------------------------------------------------------------------
+# Test: presenter mode infrastructure
+# ---------------------------------------------------------------------------
+echo "--- Test: presenter mode ---"
+
+# Default: no presenter mode
+[ -z "${PRESENTER_MODE:-}" ] && _pass "PRESENTER_MODE unset by default" || _fail "PRESENTER_MODE should be unset"
+
+# aside goes to log in presenter mode
+PRESENTER_MODE="present"
+PRESENTER_LOG="$(mktemp)"
+aside "test-aside-message"
+grep -q "test-aside-message" "$PRESENTER_LOG" \
+  && _pass "aside redirected to log in presenter mode" \
+  || _fail "aside did not redirect to log"
+rm -f "$PRESENTER_LOG"
+unset PRESENTER_MODE PRESENTER_LOG
+
+# aside prints inline in normal mode
+OUTPUT=$(aside "test-inline" 2>&1)
+echo "$OUTPUT" | grep -q "test-inline" \
+  && _pass "aside prints inline in normal mode" \
+  || _fail "aside did not print inline in normal mode"
+
+# result strips HTTP codes in presenter mode
+PRESENTER_MODE="present"
+OUTPUT=$(result "Posted (HTTP 201)" 2>&1)
+echo "$OUTPUT" | grep -q "HTTP" \
+  && _fail "result should strip HTTP codes in presenter mode" \
+  || _pass "result strips HTTP codes in presenter mode"
+unset PRESENTER_MODE
+
+# _beat is a no-op in normal mode
+START=$(date +%s%N)
+_beat "some note"
+END=$(date +%s%N)
+ELAPSED=$(( (END - START) / 1000000 ))
+[ "$ELAPSED" -lt 500 ] \
+  && _pass "_beat is no-op in normal mode (${ELAPSED}ms)" \
+  || _fail "_beat took too long in normal mode (${ELAPSED}ms)"
+
+# _beat sleeps in narrated mode
+PRESENTER_MODE="narrated"
+DEMO_BEAT_PAUSE=1
+START=$(date +%s)
+_beat
+END=$(date +%s)
+ELAPSED=$(( END - START ))
+[ "$ELAPSED" -ge 1 ] \
+  && _pass "_beat sleeps in narrated mode" \
+  || _fail "_beat did not sleep in narrated mode"
+unset PRESENTER_MODE DEMO_BEAT_PAUSE
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo

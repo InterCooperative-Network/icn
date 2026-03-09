@@ -102,20 +102,98 @@ mkdir -p "$_DEMO_TOKEN_CACHE_DIR"
 # Narration helpers
 # ---------------------------------------------------------------------------
 
+# _strip_technical: remove HTTP codes and DID noise from a string
+# Used by result/warn/narrate in presenter mode to keep output clean.
+_strip_technical() {
+  sed -e 's/ (HTTP [0-9]\{3\})//g' \
+      -e 's/HTTP:[0-9]\{3\}//g'
+}
+
 # narrate: print a section header / step announcement
-narrate() { echo -e "\n${BLUE}▶${NC} $*\n"; }
+narrate() {
+  if [ -n "${PRESENTER_MODE:-}" ]; then
+    echo -e "\n${BLUE}▶${NC} $*\n" | _strip_technical
+  else
+    echo -e "\n${BLUE}▶${NC} $*\n"
+  fi
+}
 
 # result: print a success line
-result()  { echo -e "  ${GREEN}✓${NC} $*"; }
+result() {
+  if [ -n "${PRESENTER_MODE:-}" ]; then
+    echo -e "  ${GREEN}✓${NC} $*" | _strip_technical
+  else
+    echo -e "  ${GREEN}✓${NC} $*"
+  fi
+}
 
-# aside: print an informational line
-aside()   { echo -e "  ${YELLOW}→${NC} $*"; }
+# aside: in normal mode print inline; in presenter mode redirect to log only
+aside() {
+  if [ -n "${PRESENTER_MODE:-}" ]; then
+    echo "  → $*" >> "${PRESENTER_LOG:-/dev/null}"
+  else
+    echo -e "  ${YELLOW}→${NC} $*"
+  fi
+}
 
 # warn: print a warning line (non-fatal)
-warn()    { echo -e "  ${YELLOW}⚠${NC} $*"; }
+warn() {
+  if [ -n "${PRESENTER_MODE:-}" ]; then
+    echo -e "  ${YELLOW}⚠${NC} $*" | _strip_technical
+  else
+    echo -e "  ${YELLOW}⚠${NC} $*"
+  fi
+}
 
 # fail: print a failure line
-fail()    { echo -e "  ${RED}✗${NC} $*"; }
+fail() { echo -e "  ${RED}✗${NC} $*"; }
+
+# _pretty: pretty-print the last curl response body
+# In presenter mode, redirects to the log instead of showing on screen.
+_pretty() {
+  local src="${_RESP_FILE:-/dev/null}"
+  if [ -n "${PRESENTER_MODE:-}" ]; then
+    echo "--- response body ---" >> "${PRESENTER_LOG:-/dev/null}"
+    python3 -m json.tool < "$src" >> "${PRESENTER_LOG:-/dev/null}" 2>/dev/null \
+      || cat "$src" >> "${PRESENTER_LOG:-/dev/null}"
+  else
+    python3 -m json.tool < "$src" 2>/dev/null || cat "$src"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# _beat [presenter-note]
+# Pause point between story beats.
+#   --present mode: wait for keypress; ? shows presenter note
+#   --narrated mode: sleep DEMO_BEAT_PAUSE seconds
+#   normal mode: no-op
+# ---------------------------------------------------------------------------
+_beat() {
+  local note="${1:-}"
+  if [ "${PRESENTER_MODE:-}" = "present" ]; then
+    echo ""
+    if [ -n "$note" ]; then
+      printf "  \033[2m[ any key to continue — ? for notes ]\033[0m"
+    else
+      printf "  \033[2m[ any key to continue ]\033[0m"
+    fi
+    while IFS= read -r -s -n1 key 2>/dev/null; do
+      if [ "$key" = "?" ] && [ -n "$note" ]; then
+        echo ""
+        echo ""
+        echo -e "  ${YELLOW}📋 PRESENTER:${NC} $note"
+        echo ""
+        printf "  \033[2m[ any key to continue ]\033[0m"
+      else
+        break
+      fi
+    done
+    echo ""
+  elif [ "${PRESENTER_MODE:-}" = "narrated" ]; then
+    sleep "${DEMO_BEAT_PAUSE:-4}"
+  fi
+  # normal mode: no-op
+}
 
 # ---------------------------------------------------------------------------
 # demo_ports_up
