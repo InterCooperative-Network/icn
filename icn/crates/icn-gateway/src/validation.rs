@@ -70,6 +70,9 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     "entity:read",
     "entity:write",
     "entity:audit",
+    // Treasury operations
+    "treasury:read",
+    "treasury:write",
     // Admin operations
     "admin",
 ];
