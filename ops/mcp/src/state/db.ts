@@ -20,6 +20,8 @@ export function initDb(dbPath?: string): Database.Database {
   // WAL mode for concurrent reads across agent sessions
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  // Wait up to 5 s when another writer holds the lock (multi-agent safety)
+  db.pragma("busy_timeout = 5000");
 
   migrate(db);
   return db;
@@ -71,5 +73,47 @@ function migrate(db: Database.Database): void {
     .get() as { count: number };
   if (version.count === 0) {
     db.prepare("INSERT INTO schema_version (version) VALUES (1)").run();
+  }
+
+  // Schema v2: Event bus + mailbox + process watchers
+  const v2 = db
+    .prepare("SELECT COUNT(*) as count FROM schema_version WHERE version = 2")
+    .get() as { count: number };
+  if (v2.count === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY,
+        scope TEXT NOT NULL,
+        type TEXT NOT NULL,
+        payload TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_events_scope ON events(scope, id);
+      CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+
+      CREATE TABLE IF NOT EXISTS mailbox (
+        id INTEGER PRIMARY KEY,
+        to_session TEXT NOT NULL,
+        from_session TEXT,
+        kind TEXT NOT NULL DEFAULT 'text',
+        payload TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        read_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_mailbox_to ON mailbox(to_session, id);
+
+      CREATE TABLE IF NOT EXISTS watchers_process (
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        pid INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        completed_at INTEGER,
+        exit_code INTEGER,
+        status TEXT NOT NULL DEFAULT 'running'
+      );
+      CREATE INDEX IF NOT EXISTS idx_watchers_session ON watchers_process(session_id, status);
+    `);
+    db.prepare("INSERT INTO schema_version (version) VALUES (2)").run();
   }
 }

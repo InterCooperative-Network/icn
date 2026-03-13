@@ -11,6 +11,10 @@ import { startClusterPolling } from "./polling/cluster.js";
 import { startBuildsPolling } from "./polling/builds.js";
 import { readFileSync } from "fs";
 import { resolveMonorepoRoot, resolveOpsStatePath } from "./paths.js";
+import { registerEventTools } from "./tools/events.js";
+import { registerCommsTools } from "./tools/comms.js";
+import { registerWatcherTools } from "./tools/watchers.js";
+import { startProcessPolling } from "./polling/processes.js";
 
 const ICN_ROOT = resolveMonorepoRoot();
 const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
@@ -33,6 +37,9 @@ async function main() {
   registerRepoTools(server, db);
   registerHealthTools(server, db);
   registerDecisionTools(server, db);
+  registerEventTools(server, db);
+  registerCommsTools(server, db);
+  registerWatcherTools(server, db);
 
   // Resources — passively available context (sprint state, repo topology)
   server.resource(
@@ -70,6 +77,7 @@ async function main() {
     startGitPolling(db, ICN_ROOT),
     startClusterPolling(db),
     startBuildsPolling(db),
+    startProcessPolling(db),
   ];
 
   // Connect via stdio transport (Claude Code manages the process lifecycle)
@@ -84,6 +92,9 @@ async function main() {
   };
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
+  process.on("SIGHUP", shutdown);
+  process.stdin.on("end", shutdown);
+  process.stdin.on("close", shutdown);
 }
 
 main().catch((err) => {

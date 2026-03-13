@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "icn-ops": {
+      "command": "node",
+      "args": ["/home/ubuntu/projects/icn/ops/mcp/dist/index.js"],
+      "env": {
+        "ICN_ROOT": "/home/ubuntu/projects/icn"
+      }
+    }
+  }
+}

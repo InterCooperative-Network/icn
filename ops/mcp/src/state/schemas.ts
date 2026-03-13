@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SessionSchema = z.object({
   id: z.string().uuid(),
-  repo: z.enum(["icn", "homelab-inventory"]),
+  repo: z.enum(["icn", "icn-website", "icn-ops", "homelab-inventory"]),
   worktree: z.string().nullable(),
   task_description: z.string().nullable(),
   started_at: z.string(),
