@@ -13,8 +13,13 @@ Demonstrates the full cooperative governance flow:
 
 Usage:
     python3 demo-governance.py [GATEWAY_URL]
+    python3 demo-governance.py [GATEWAY_URL] --presenter
 
 Default GATEWAY_URL: http://localhost:8080
+
+Flags:
+    --presenter   Interactive mode with colored output, phase grouping,
+                  and Enter-to-continue pauses between phases.
 """
 
 import json
@@ -35,11 +40,31 @@ from cryptography.hazmat.primitives.serialization import (
 
 # ── Configuration ────────────────────────────────────────────────────────
 
-GATEWAY = os.environ.get("ICN_GATEWAY", sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080")
-COOP_ID = "brightworks"
-COOP_NAME = "Brightworks Cooperative"
+# Parse args: positional URL and --presenter flag
+PRESENTER_MODE = "--presenter" in sys.argv
+_positional = [a for a in sys.argv[1:] if not a.startswith("--")]
+GATEWAY = os.environ.get("ICN_GATEWAY", _positional[0] if _positional else "http://localhost:8080")
+COOP_ID = "finger-lakes-food"
+COOP_NAME = "Finger Lakes Food Co-op"
 DOMAIN_ID = f"coop:{COOP_ID}"
 DOMAIN_NAME = f"{COOP_NAME} Governance"
+
+# ── ANSI colors (for --presenter mode) ───────────────────────────────────
+
+class C:
+    """ANSI color codes, disabled if not a TTY or not in presenter mode."""
+    _on = PRESENTER_MODE and sys.stdout.isatty()
+    RESET  = "\033[0m"  if _on else ""
+    BOLD   = "\033[1m"  if _on else ""
+    DIM    = "\033[2m"  if _on else ""
+    GREEN  = "\033[32m" if _on else ""
+    RED    = "\033[31m" if _on else ""
+    YELLOW = "\033[33m" if _on else ""
+    CYAN   = "\033[36m" if _on else ""
+    BLUE   = "\033[34m" if _on else ""
+    MAGENTA= "\033[35m" if _on else ""
+    WHITE  = "\033[97m" if _on else ""
+
 
 # ── Base58 Bitcoin encoding (multibase compatible) ───────────────────────
 
@@ -119,14 +144,14 @@ def step(label: str):
 
 def ok(msg: str, data=None):
     """Print success."""
-    print(f"  ✓ {msg}")
+    print(f"  {C.GREEN}✓{C.RESET} {msg}")
     if data:
         print(f"    {json.dumps(data, indent=2)[:500]}")
 
 
 def fail(msg: str, status=None, data=None):
     """Print failure and exit."""
-    print(f"  ✗ {msg}")
+    print(f"  {C.RED}✗ {msg}{C.RESET}")
     if status:
         print(f"    HTTP {status}")
     if data:
@@ -134,10 +159,40 @@ def fail(msg: str, status=None, data=None):
     sys.exit(1)
 
 
+def narrator(msg: str):
+    """In presenter mode, print a narrative explanation."""
+    if PRESENTER_MODE:
+        print(f"  {C.DIM}{msg}{C.RESET}")
+
+
+def phase_header(num: int, title: str, description: str):
+    """In presenter mode, print a big phase header."""
+    if PRESENTER_MODE:
+        print()
+        print(f"  {C.BOLD}{C.CYAN}{'━' * 56}{C.RESET}")
+        print(f"  {C.BOLD}{C.CYAN}  Phase {num}: {title}{C.RESET}")
+        print(f"  {C.DIM}  {description}{C.RESET}")
+        print(f"  {C.BOLD}{C.CYAN}{'━' * 56}{C.RESET}")
+        print()
+
+
+def phase_pause(next_phase: str):
+    """In presenter mode, pause and wait for Enter."""
+    if PRESENTER_MODE:
+        print()
+        print(f"  {C.YELLOW}[Press Enter to continue to: {next_phase}]{C.RESET}")
+        try:
+            input()
+        except EOFError:
+            pass
+
+
 # ── Authentication ───────────────────────────────────────────────────────
 
 def authenticate(identity: Identity, coop_id: str, scopes: list[str]):
     """Perform challenge-response auth and get a JWT token."""
+    narrator(f"  {identity.name} proves their identity by signing a cryptographic challenge...")
+
     # Step 1: Request challenge
     status, resp = api("POST", "/auth/challenge", {"did": identity.did})
     if status != 200:
@@ -168,10 +223,23 @@ def authenticate(identity: Identity, coop_id: str, scopes: list[str]):
 # ── Main demo flow ───────────────────────────────────────────────────────
 
 def main():
-    print("=" * 60)
-    print("  ICN Cooperative Governance Demo")
-    print("=" * 60)
-    print(f"  Gateway: {GATEWAY}")
+    if PRESENTER_MODE:
+        print()
+        print(f"  {C.BOLD}{C.WHITE}╔══════════════════════════════════════════════════════╗{C.RESET}")
+        print(f"  {C.BOLD}{C.WHITE}║   Cooperative Governance Demo                        ║{C.RESET}")
+        print(f"  {C.BOLD}{C.WHITE}║   InterCooperative Network (ICN)                     ║{C.RESET}")
+        print(f"  {C.BOLD}{C.WHITE}╚══════════════════════════════════════════════════════╝{C.RESET}")
+        print()
+        print(f"  {C.DIM}This demo shows how a cooperative can make democratic{C.RESET}")
+        print(f"  {C.DIM}decisions using cryptographic identities and proofs.{C.RESET}")
+        print(f"  {C.DIM}Every vote is signed. Every decision is verifiable.{C.RESET}")
+        print()
+        print(f"  {C.DIM}Gateway: {GATEWAY}{C.RESET}")
+    else:
+        print("=" * 60)
+        print("  ICN Cooperative Governance Demo")
+        print("=" * 60)
+        print(f"  Gateway: {GATEWAY}")
     print()
 
     # Check health
@@ -180,8 +248,15 @@ def main():
         fail("Gateway not reachable", status, health)
     ok(f"Gateway healthy (version {health.get('version', '?')})")
 
+    # ═══════════════════════════════════════════════════════════
+    # PHASE 1: SETUP
+    # ═══════════════════════════════════════════════════════════
+    phase_header(1, "Set Up the Cooperative",
+                 "Create a co-op, generate digital identities, add members")
+
     # ── Generate identities ──────────────────────────────────────────
     step("1. Generate identities")
+    narrator("Each member gets a unique cryptographic keypair — like a digital signature.")
     admin = Identity("Admin")
     alice = Identity("Alice")
     bob = Identity("Bob")
@@ -201,17 +276,19 @@ def main():
 
     # ── Create cooperative ───────────────────────────────────────────
     step("3. Create cooperative")
+    narrator("A coordinator registers the co-op on the network...")
     status, resp = api("POST", "/coops", {
         "id": COOP_ID,
         "name": COOP_NAME,
     }, admin.token)
     if status == 200 or status == 201:
-        ok(f"Created cooperative: {COOP_NAME}")
+        ok(f"Created cooperative: {C.BOLD}{COOP_NAME}{C.RESET}")
     else:
         fail("Failed to create cooperative", status, resp)
 
     # ── Create governance domain ─────────────────────────────────────
     step("4. Create governance domain")
+    narrator("The governance domain defines voting rules: 50% quorum, simple majority.")
     status, resp = api("POST", "/gov/domains", {
         "id": DOMAIN_ID,
         "name": DOMAIN_NAME,
@@ -228,6 +305,7 @@ def main():
 
     # ── Add Alice to cooperative ─────────────────────────────────────
     step("5. Add Alice to cooperative")
+    narrator("Alice joins the co-op and gets voting rights...")
     status, resp = api("POST", f"/coops/{COOP_ID}/members", {
         "did": alice.did,
         "role": "participant",
@@ -251,6 +329,7 @@ def main():
 
     # ── Add Bob to cooperative ───────────────────────────────────────
     step("7. Add Bob to cooperative")
+    narrator("Bob joins too — each member has equal voting weight.")
     status, resp = api("POST", f"/coops/{COOP_ID}/members", {
         "did": bob.did,
         "role": "participant",
@@ -272,26 +351,40 @@ def main():
     else:
         fail("Failed to add Bob to governance domain", status, resp)
 
+    # ── Pause between phases ──────────────────────────────────────────
+    if PRESENTER_MODE:
+        print()
+        print(f"  {C.GREEN}{C.BOLD}Phase 1 complete:{C.RESET} {C.GREEN}Cooperative \"{COOP_NAME}\" created with 3 members.{C.RESET}")
+    phase_pause("Make a Decision Together")
+
+    # ═══════════════════════════════════════════════════════════
+    # PHASE 2: GOVERN
+    # ═══════════════════════════════════════════════════════════
+    phase_header(2, "Make a Decision Together",
+                 "Submit a proposal and vote on it democratically")
+
     # ── Authenticate Alice ───────────────────────────────────────────
     step("9. Authenticate Alice")
     authenticate(alice, COOP_ID, ["governance:read", "governance:write"])
 
     # ── Alice creates a proposal ─────────────────────────────────────
     step("10. Alice creates a proposal")
+    narrator("Alice submits a budget proposal for community kitchen equipment...")
     status, resp = api("POST", "/gov/proposals", {
         "domain_id": DOMAIN_ID,
-        "title": "Approve Q2 Budget of $12,000",
+        "title": "Approve $12,000 for community kitchen equipment",
         "description": (
-            "Proposal to allocate $12,000 for Q2 2026 operations. "
-            "This covers equipment maintenance ($4,000), member training ($3,000), "
-            "community outreach ($2,500), and administrative costs ($2,500)."
+            "Purchase commercial-grade equipment for the shared community kitchen: "
+            "convection oven ($4,000), industrial mixer ($3,000), "
+            "prep tables and storage ($2,500), safety equipment and small tools ($2,500). "
+            "This serves all 47 member households."
         ),
         "payload": {
             "type": "budget",
             "amount": 12000,
             "recipient": admin.did,
             "currency": "USD",
-            "purpose": "Q2 2026 Operating Budget",
+            "purpose": "Community Kitchen Equipment",
         },
     }, alice.token)
     if status == 200 or status == 201:
@@ -303,6 +396,7 @@ def main():
 
     # ── Alice opens the proposal for voting ──────────────────────────
     step("11. Open proposal for voting")
+    narrator("The proposal moves to a vote. Members have 1 hour to cast ballots.")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/open", {
         "voting_period_seconds": 3600,
     }, alice.token)
@@ -313,12 +407,13 @@ def main():
 
     # ── Alice votes "for" ────────────────────────────────────────────
     step("12. Alice votes FOR the proposal")
+    narrator("Alice signs her vote cryptographically — it cannot be altered after submission.")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/vote", {
         "choice": "for",
-        "comment": "Essential for our Q2 operations. Fully support.",
+        "comment": "Essential equipment for our community kitchen. Fully support.",
     }, alice.token)
     if status == 200 or status == 201:
-        ok("Alice voted: FOR")
+        ok(f"{C.GREEN}Alice voted: FOR{C.RESET}")
     else:
         fail("Alice failed to vote", status, resp)
 
@@ -328,17 +423,31 @@ def main():
 
     # ── Bob votes "for" ──────────────────────────────────────────────
     step("14. Bob votes FOR the proposal")
+    narrator("Bob reviews the proposal and casts his vote.")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/vote", {
         "choice": "for",
-        "comment": "Budget looks reasonable. Approved.",
+        "comment": "Great investment. The kitchen serves all our members.",
     }, bob.token)
     if status == 200 or status == 201:
-        ok("Bob voted: FOR")
+        ok(f"{C.GREEN}Bob voted: FOR{C.RESET}")
     else:
         fail("Bob failed to vote", status, resp)
 
+    # ── Pause between phases ──────────────────────────────────────────
+    if PRESENTER_MODE:
+        print()
+        print(f"  {C.GREEN}{C.BOLD}Phase 2 complete:{C.RESET} {C.GREEN}2 votes cast (Alice: FOR, Bob: FOR).{C.RESET}")
+    phase_pause("Verify the Result")
+
+    # ═══════════════════════════════════════════════════════════
+    # PHASE 3: VERIFY
+    # ═══════════════════════════════════════════════════════════
+    phase_header(3, "Verify the Result",
+                 "Close the vote and generate a tamper-proof receipt")
+
     # ── Admin closes the proposal ────────────────────────────────────
     step("15. Close proposal and tally votes")
+    narrator("The coordinator closes the vote. The system tallies and evaluates.")
     # Re-authenticate admin with governance scopes
     authenticate(admin, COOP_ID, all_scopes)
 
@@ -353,43 +462,95 @@ def main():
     step("16. Final proposal state")
     status, resp = api("GET", f"/gov/proposals/{proposal_id}", token=admin.token)
     if status == 200:
-        ok(f"Proposal state: {resp.get('state', 'unknown')}")
-        print(f"    {json.dumps(resp, indent=2)}")
+        state = resp.get("state", "unknown")
+        state_name = list(state.keys())[0] if isinstance(state, dict) else str(state)
+        ok(f"Proposal state: {C.BOLD}{C.GREEN}{state_name}{C.RESET}")
+        if not PRESENTER_MODE:
+            print(f"    {json.dumps(resp, indent=2)}")
     else:
         fail("Failed to get proposal", status, resp)
 
     # ── Get vote tally ───────────────────────────────────────────────
     step("17. Vote tally")
-    status, resp = api("GET", f"/gov/proposals/{proposal_id}/tally",
+    narrator("The tally is computed from all cryptographically signed ballots.")
+    status, tally = api("GET", f"/gov/proposals/{proposal_id}/tally",
                        token=admin.token)
     if status == 200:
         ok("Vote tally retrieved")
-        print(f"    {json.dumps(resp, indent=2)}")
+        total = tally.get("for_votes", 0) + tally.get("against_votes", 0) + tally.get("abstain_votes", 0)
+        for_pct = round(tally["for_votes"] / total * 100) if total > 0 else 0
+        if PRESENTER_MODE:
+            bar_width = 40
+            for_bars = round(for_pct / 100 * bar_width)
+            against_bars = bar_width - for_bars
+            print()
+            print(f"    {C.GREEN}{'█' * for_bars}{C.RED}{'█' * against_bars}{C.RESET}")
+            print(f"    {C.GREEN}For: {tally['for_votes']} ({for_pct}%){C.RESET}  {C.RED}Against: {tally['against_votes']}{C.RESET}  {C.DIM}Abstain: {tally['abstain_votes']}{C.RESET}")
+        else:
+            print(f"    {json.dumps(tally, indent=2)}")
     else:
         print(f"  ⚠ Tally not available (HTTP {status})")
-        print(f"    {json.dumps(resp, indent=2)[:300]}")
+        print(f"    {json.dumps(tally, indent=2)[:300]}")
 
     # ── Get cryptographic proof ──────────────────────────────────────
     step("18. Cryptographic proof")
+    narrator("A cryptographic receipt is generated — tamper-proof evidence of the decision.")
     status, resp = api("GET", f"/gov/proposals/{proposal_id}/proof",
                        token=admin.token)
+    proof_hash = None
     if status == 200:
         ok("Governance proof retrieved")
-        print(f"    {json.dumps(resp, indent=2)[:800]}")
+        receipt = resp.get("receipt", resp)
+        vote_hash_raw = receipt.get("vote_hash", [])
+        if isinstance(vote_hash_raw, list):
+            proof_hash = bytes(vote_hash_raw).hex()
+        else:
+            proof_hash = str(vote_hash_raw)
+        if PRESENTER_MODE:
+            print(f"    {C.DIM}Vote hash:     {proof_hash[:32]}...{C.RESET}")
+            decision_hash_raw = receipt.get("decision_hash", [])
+            if isinstance(decision_hash_raw, list):
+                dh = bytes(decision_hash_raw).hex()
+            else:
+                dh = str(decision_hash_raw)
+            print(f"    {C.DIM}Decision hash: {dh[:32]}...{C.RESET}")
+        else:
+            print(f"    {json.dumps(resp, indent=2)[:800]}")
     else:
         print(f"  ⚠ Proof not available (HTTP {status})")
         print(f"    {json.dumps(resp, indent=2)[:300]}")
 
     # ── Summary ──────────────────────────────────────────────────────
     print()
-    print("=" * 60)
-    print("  Demo Complete")
-    print("=" * 60)
-    print(f"""
+    if PRESENTER_MODE:
+        print(f"  {C.BOLD}{C.WHITE}╔══════════════════════════════════════════════════════╗{C.RESET}")
+        print(f"  {C.BOLD}{C.WHITE}║   Demo Complete                                      ║{C.RESET}")
+        print(f"  {C.BOLD}{C.WHITE}╚══════════════════════════════════════════════════════╝{C.RESET}")
+        print()
+        print(f"  {C.CYAN}🏪 Cooperative:{C.RESET}  {COOP_NAME}")
+        print(f"  {C.CYAN}👥 Members:{C.RESET}      Admin, Alice, Bob")
+        print(f"  {C.CYAN}📋 Proposal:{C.RESET}     \"Approve $12,000 for community kitchen equipment\"")
+        total_for = tally.get("for_votes", 0)
+        total_against = tally.get("against_votes", 0)
+        total_abstain = tally.get("abstain_votes", 0)
+        print(f"  {C.CYAN}🗳  Votes:{C.RESET}        {C.GREEN}{total_for} for{C.RESET}, {total_against} against, {total_abstain} abstain")
+        print(f"  {C.CYAN}✅ Result:{C.RESET}       {C.GREEN}{C.BOLD}ACCEPTED{C.RESET}")
+        if proof_hash:
+            print(f"  {C.CYAN}🔐 Proof:{C.RESET}        {C.DIM}{proof_hash[:40]}...{C.RESET}")
+        print()
+        print(f"  {C.DIM}Every vote was cryptographically signed.{C.RESET}")
+        print(f"  {C.DIM}Every decision has a tamper-proof receipt.{C.RESET}")
+        print(f"  {C.DIM}No votes can be altered or deleted after submission.{C.RESET}")
+        print()
+    else:
+        print("=" * 60)
+        print("  Demo Complete")
+        print("=" * 60)
+        print(f"""
   Cooperative:  {COOP_NAME}
   Members:      Admin, Alice, Bob
-  Proposal:     "Approve Q2 Budget of $12,000"
-  Result:       2 votes FOR, 0 against (100% approval)
+  Proposal:     "Approve $12,000 for community kitchen equipment"
+  Result:       {tally.get('for_votes', '?')} votes FOR, {tally.get('against_votes', '?')} against (100% approval)
   Status:       Closed with cryptographic audit trail
 
   This demonstrates:
