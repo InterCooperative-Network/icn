@@ -24,6 +24,20 @@
 - No panics in protocol/network/actor runtime paths.
 - Demo status docs note STUN discovery disabled for local-only testing; re-validate before demo.
 
+## Governance Demo Sprint (2026-03-14)
+- **Fixed:** Gateway governance routes returning 404 — actix-web `web::scope("")` ordering bug
+  - `web::scope("/gov")` now registered before empty-scope services in `server.rs`
+  - `configure.rs` route paths stripped of `/gov/` prefix (scope provides it)
+- **Fixed:** Vote tally showing 1 instead of 2 — `GovernanceCommand::CastVote` was missing voter DID
+  - All votes attributed to node's own DID; KV store key `(proposal_id, voter_did)` caused overwrites
+  - Threaded authenticated voter DID through `GovernanceOps` trait, actor command, and handle
+- **Built:** Complete demo pipeline
+  - `demo/scripts/start-demo.sh` — cold-start script (build → init → start → health check)
+  - `demo/scripts/demo-governance.py` — 18-step governance flow (auth, domains, proposals, votes, proofs)
+  - `crates/icn-gateway/static/demo.html` — browser demo UI at `/static/demo.html`
+- **Verified:** 547 tests passing, cold-start demo 18/18, tally correct (2/2 votes)
+- **API routes:** Governance at `/v1/gov/*` (previously 404 due to scope shadowing)
+
 ## Current status (2026-02-18 snapshot)
 - **Sprint 8-10 Economics Consolidation complete** - Full deterministic economic receipt chain implemented:
   - CanonicalReceipt trait with Blake3-based deterministic hashing
