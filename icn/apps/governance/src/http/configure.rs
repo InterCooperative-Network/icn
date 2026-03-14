@@ -43,128 +43,125 @@ where
     cfg.app_data(data.clone())
         // ── Domain endpoints ─────────────────────────────────────────────
         .service(
-            web::resource("/gov/domains")
+            web::resource("/domains")
                 .route(web::post().to(handlers::create_domain::<E>))
                 .route(web::get().to(handlers::list_domains::<E>)),
         )
         .service(
-            web::resource("/gov/domains/{domain_id}")
-                .route(web::get().to(handlers::get_domain::<E>)),
+            web::resource("/domains/{domain_id}").route(web::get().to(handlers::get_domain::<E>)),
         )
         .service(
-            web::resource("/gov/domains/{domain_id}/members")
+            web::resource("/domains/{domain_id}/members")
                 .route(web::post().to(handlers::add_domain_member::<E>))
                 .route(web::delete().to(handlers::remove_domain_member::<E>)),
         )
         // ── Proposal endpoints ────────────────────────────────────────────
         .service(
-            web::resource("/gov/proposals")
+            web::resource("/proposals")
                 .route(web::post().to(handlers::create_proposal::<E>))
                 .route(web::get().to(handlers::list_proposals::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}")
+            web::resource("/proposals/{proposal_id}")
                 .route(web::get().to(handlers::get_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/open")
+            web::resource("/proposals/{proposal_id}/open")
                 .route(web::post().to(handlers::open_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/close")
+            web::resource("/proposals/{proposal_id}/close")
                 .route(web::post().to(handlers::close_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/vote")
+            web::resource("/proposals/{proposal_id}/vote")
                 .route(web::post().to(handlers::cast_vote::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/tally")
+            web::resource("/proposals/{proposal_id}/tally")
                 .route(web::get().to(handlers::get_vote_tally::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/proof")
+            web::resource("/proposals/{proposal_id}/proof")
                 .route(web::get().to(handlers::get_proof::<E>)),
         )
         // ── Discussion endpoints ─────────────────────────────────────────
         .service(
-            web::resource("/gov/proposals/{proposal_id}/discussion")
+            web::resource("/proposals/{proposal_id}/discussion")
                 .route(web::get().to(handlers::get_discussion::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/discussion/comments")
+            web::resource("/proposals/{proposal_id}/discussion/comments")
                 .route(web::post().to(handlers::add_comment::<E>))
                 .route(web::get().to(handlers::list_comments::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/{proposal_id}/discussion/comments/{comment_id}")
+            web::resource("/proposals/{proposal_id}/discussion/comments/{comment_id}")
                 .route(web::put().to(handlers::edit_comment::<E>))
                 .route(web::delete().to(handlers::delete_comment::<E>)),
         )
         .service(
-            web::resource(
-                "/gov/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions",
-            )
-            .route(web::post().to(handlers::add_reaction::<E>))
-            .route(web::delete().to(handlers::remove_reaction::<E>)),
+            web::resource("/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions")
+                .route(web::post().to(handlers::add_reaction::<E>))
+                .route(web::delete().to(handlers::remove_reaction::<E>)),
         )
         // ── Delegation endpoints ─────────────────────────────────────────
         .service(
-            web::resource("/gov/delegations")
+            web::resource("/delegations")
                 .route(web::post().to(handlers::create_delegation::<E>))
                 .route(web::get().to(handlers::list_delegations::<E>)),
         )
         .service(
-            web::resource("/gov/delegations/{delegation_id}")
+            web::resource("/delegations/{delegation_id}")
                 .route(web::delete().to(handlers::revoke_delegation::<E>)),
         )
         // ── Action item endpoints ────────────────────────────────────────
         .service(
-            web::resource("/gov/domains/{domain_id}/action-items")
+            web::resource("/domains/{domain_id}/action-items")
                 .route(web::post().to(handlers::create_action_item::<E>))
                 .route(web::get().to(handlers::list_action_items::<E>)),
         )
         .service(
-            web::resource("/gov/domains/{domain_id}/action-items/{item_id}")
+            web::resource("/domains/{domain_id}/action-items/{item_id}")
                 .route(web::get().to(handlers::get_action_item::<E>))
                 .route(web::put().to(handlers::update_action_item::<E>))
                 .route(web::delete().to(handlers::delete_action_item::<E>)),
         )
         .service(
-            web::resource("/gov/domains/{domain_id}/action-items/{item_id}/status")
+            web::resource("/domains/{domain_id}/action-items/{item_id}/status")
                 .route(web::put().to(handlers::update_action_item_status::<E>)),
         )
         .service(
-            web::resource("/gov/domains/{domain_id}/action-items/{item_id}/notes")
+            web::resource("/domains/{domain_id}/action-items/{item_id}/notes")
                 .route(web::post().to(handlers::add_action_item_note::<E>)),
         )
         // ── Federation proposal endpoints ────────────────────────────────
         .service(
-            web::resource("/gov/proposals/federation/join")
+            web::resource("/proposals/federation/join")
                 .route(web::post().to(handlers::create_join_federation_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/leave")
+            web::resource("/proposals/federation/leave")
                 .route(web::post().to(handlers::create_leave_federation_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/clearing/establish")
+            web::resource("/proposals/federation/clearing/establish")
                 .route(web::post().to(handlers::create_establish_clearing_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/clearing/terminate")
+            web::resource("/proposals/federation/clearing/terminate")
                 .route(web::post().to(handlers::create_terminate_clearing_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/vouch")
+            web::resource("/proposals/federation/vouch")
                 .route(web::post().to(handlers::create_vouch_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/vouch/revoke")
+            web::resource("/proposals/federation/vouch/revoke")
                 .route(web::post().to(handlers::create_revoke_vouch_proposal::<E>)),
         )
         .service(
-            web::resource("/gov/proposals/federation/policy")
+            web::resource("/proposals/federation/policy")
                 .route(web::post().to(handlers::create_update_federation_policy_proposal::<E>)),
         );
 }

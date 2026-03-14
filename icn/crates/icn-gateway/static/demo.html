@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICN Governance Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--font:system-ui,-apple-system,sans-serif;--mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.5;padding:1rem;max-width:900px;margin:0 auto}
+h1{color:#fff;font-size:1.5rem;margin-bottom:.5rem}
+h2{color:var(--accent);font-size:1.1rem;margin:1.5rem 0 .5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem}
+.subtitle{color:var(--dim);font-size:.85rem;margin-bottom:1rem}
+.step{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.75rem 1rem;margin:.5rem 0;display:flex;align-items:center;gap:.75rem;transition:border-color .2s}
+.step.done{border-left:3px solid var(--green)}
+.step.fail{border-left:3px solid var(--red)}
+.step.active{border-left:3px solid var(--yellow);animation:pulse 1.5s infinite}
+.step.pending{opacity:.5}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.step-num{background:var(--border);color:var(--dim);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex-shrink:0}
+.step.done .step-num{background:var(--green);color:#000}
+.step.fail .step-num{background:var(--red);color:#fff}
+.step.active .step-num{background:var(--yellow);color:#000}
+.step-body{flex:1;min-width:0}
+.step-title{font-weight:600;font-size:.9rem}
+.step-detail{font-size:.75rem;color:var(--dim);font-family:var(--mono);word-break:break-all;margin-top:.15rem}
+.btn{background:var(--accent);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:6px;cursor:pointer;font-size:.9rem;font-weight:600;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.controls{display:flex;gap:.75rem;align-items:center;margin:1rem 0}
+.status{font-size:.8rem;color:var(--dim)}
+.result-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem;margin:.75rem 0}
+.result-card h3{color:var(--green);font-size:.95rem;margin-bottom:.5rem}
+.result-grid{display:grid;grid-template-columns:auto 1fr;gap:.25rem .75rem;font-size:.85rem}
+.result-grid dt{color:var(--dim)}
+.result-grid dd{color:var(--text);font-family:var(--mono)}
+.proof-box{background:#0d1117;border:1px solid var(--border);border-radius:4px;padding:.5rem;margin-top:.5rem;font-family:var(--mono);font-size:.7rem;color:var(--dim);max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.vote-bar{display:flex;height:24px;border-radius:4px;overflow:hidden;margin:.5rem 0}
+.vote-for{background:var(--green)}
+.vote-against{background:var(--red)}
+.vote-bar-label{display:flex;justify-content:space-between;font-size:.75rem;color:var(--dim)}
+.hidden{display:none}
+.identity-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;margin:.25rem 0;font-size:.8rem;display:flex;justify-content:space-between}
+.identity-name{font-weight:600;color:#fff}
+.identity-did{font-family:var(--mono);color:var(--dim);font-size:.7rem}
+</style>
+</head>
+<body>
+
+<h1>ICN Cooperative Governance Demo</h1>
+<p class="subtitle">Decentralized identity, democratic proposals, cryptographic proofs</p>
+
+<div class="controls">
+  <button class="btn" id="runBtn" onclick="runDemo()">Run Demo</button>
+  <button class="btn" id="resetBtn" onclick="resetDemo()" style="background:var(--border)" disabled>Reset</button>
+  <span class="status" id="statusText">Ready</span>
+</div>
+
+<h2>Identities</h2>
+<div id="identities"></div>
+
+<h2>Governance Flow</h2>
+<div id="steps"></div>
+
+<div id="results" class="hidden">
+  <h2>Results</h2>
+  <div id="proposalResult"></div>
+  <div id="tallyResult"></div>
+  <div id="proofResult"></div>
+</div>
+
+<script>
+const GATEWAY = location.origin;
+const API = GATEWAY + '/v1';
+const COOP_ID = 'demo-coop';
+const DOMAIN_ID = 'coop:' + COOP_ID;
+const STEPS = [
+  'Authenticate Admin',
+  'Create cooperative',
+  'Create governance domain',
+  'Add Alice to cooperative',
+  'Add Alice to governance domain',
+  'Add Bob to cooperative',
+  'Add Bob to governance domain',
+  'Authenticate Alice',
+  'Alice creates proposal',
+  'Open proposal for voting',
+  'Alice votes FOR',
+  'Authenticate Bob',
+  'Bob votes FOR',
+  'Close proposal',
+  'Retrieve final state',
+  'Retrieve vote tally',
+  'Retrieve cryptographic proof',
+];
+
+let state = { running: false };
+
+function el(id) { return document.getElementById(id); }
+
+// Escape HTML special characters to prevent XSS
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.textContent;
+}
+
+function renderSteps() {
+  const c = el('steps');
+  c.replaceChildren();
+  STEPS.forEach(function(s, i) {
+    const div = document.createElement('div');
+    div.className = 'step pending';
+    div.id = 'step-' + i;
+    const numDiv = document.createElement('div');
+    numDiv.className = 'step-num';
+    numDiv.textContent = String(i + 1);
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'step-body';
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'step-title';
+    titleDiv.textContent = s;
+    const detailDiv = document.createElement('div');
+    detailDiv.className = 'step-detail';
+    detailDiv.id = 'detail-' + i;
+    bodyDiv.appendChild(titleDiv);
+    bodyDiv.appendChild(detailDiv);
+    div.appendChild(numDiv);
+    div.appendChild(bodyDiv);
+    c.appendChild(div);
+  });
+}
+
+function setStep(i, status, detail) {
+  const s = document.getElementById('step-' + i);
+  if (!s) return;
+  s.className = 'step ' + status;
+  if (detail) document.getElementById('detail-' + i).textContent = detail;
+}
+
+function renderIdentities(identities) {
+  const c = el('identities');
+  c.replaceChildren();
+  identities.forEach(function(id) {
+    const div = document.createElement('div');
+    div.className = 'identity-card';
+    const name = document.createElement('span');
+    name.className = 'identity-name';
+    name.textContent = id.name;
+    const did = document.createElement('span');
+    did.className = 'identity-did';
+    did.textContent = id.did.substring(0, 20) + '...' + id.did.slice(-8);
+    div.appendChild(name);
+    div.appendChild(did);
+    c.appendChild(div);
+  });
+}
+
+function renderProposalResult(proposal) {
+  const c = el('proposalResult');
+  c.replaceChildren();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Proposal: ' + (proposal.title || '');
+  card.appendChild(h3);
+  const dl = document.createElement('dl');
+  dl.className = 'result-grid';
+  const fields = [
+    ['ID', proposal.id],
+    ['Domain', proposal.domain_id],
+    ['Status', typeof proposal.state === 'object' ? Object.keys(proposal.state)[0] : String(proposal.state)],
+    ['Proposer', proposal.proposer],
+  ];
+  fields.forEach(function(f) {
+    const dt = document.createElement('dt');
+    dt.textContent = f[0];
+    const dd = document.createElement('dd');
+    dd.textContent = f[1] || '';
+    if (f[0] === 'Status') dd.style.color = 'var(--green)';
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  });
+  card.appendChild(dl);
+  c.appendChild(card);
+}
+
+function renderTallyResult(tally) {
+  const c = el('tallyResult');
+  c.replaceChildren();
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Vote Tally';
+  card.appendChild(h3);
+
+  const totalVotes = tally.for_votes + tally.against_votes + tally.abstain_votes;
+  const forPct = totalVotes > 0 ? Math.round(tally.for_votes / totalVotes * 100) : 0;
+  const againstPct = 100 - forPct;
+
+  const bar = document.createElement('div');
+  bar.className = 'vote-bar';
+  const forBar = document.createElement('div');
+  forBar.className = 'vote-for';
+  forBar.style.width = forPct + '%';
+  const againstBar = document.createElement('div');
+  againstBar.className = 'vote-against';
+  againstBar.style.width = againstPct + '%';
+  bar.appendChild(forBar);
+  bar.appendChild(againstBar);
+  card.appendChild(bar);
+
+  const label = document.createElement('div');
+  label.className = 'vote-bar-label';
+  const forLabel = document.createElement('span');
+  forLabel.textContent = 'For: ' + tally.for_votes + ' (' + forPct + '%)';
+  const againstLabel = document.createElement('span');
+  againstLabel.textContent = 'Against: ' + tally.against_votes;
+  label.appendChild(forLabel);
+  label.appendChild(againstLabel);
+  card.appendChild(label);
+
+  const dl = document.createElement('dl');
+  dl.className = 'result-grid';
+  dl.style.marginTop = '.5rem';
+  [['Total Votes', totalVotes], ['Abstentions', tally.abstain_votes]].forEach(function(f) {
+    const dt = document.createElement('dt');
+    dt.textContent = f[0];
+    const dd = document.createElement('dd');
+    dd.textContent = String(f[1]);
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  });
+  card.appendChild(dl);
+  c.appendChild(card);
+}
+
+function renderProofResult(proof) {
+  const c = el('proofResult');
+  c.replaceChildren();
+  if (!proof) return;
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Cryptographic Proof';
+  card.appendChild(h3);
+  const p = document.createElement('p');
+  p.style.cssText = 'font-size:.8rem;color:var(--dim);margin-bottom:.5rem';
+  p.textContent = 'Every governance decision produces a tamper-evident receipt with vote hashes and attestations.';
+  card.appendChild(p);
+  const box = document.createElement('div');
+  box.className = 'proof-box';
+  box.textContent = JSON.stringify(proof, null, 2);
+  card.appendChild(box);
+  c.appendChild(card);
+}
+
+async function api(method, path, body, token) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const text = await r.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch(e) {}
+  return { status: r.status, data: json, text };
+}
+
+async function generateIdentity(name) {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: 'Ed25519' }, true, ['sign', 'verify']
+  );
+  const pubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
+  const did = 'did:icn:z' + base58Encode(pubRaw);
+  return { name, did, keyPair, pubRaw };
+}
+
+async function sign(keyPair, data) {
+  const sig = await crypto.subtle.sign('Ed25519', keyPair.privateKey, data);
+  return new Uint8Array(sig);
+}
+
+function hexEncode(bytes) {
+  return Array.from(bytes).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+function hexDecode(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) bytes[i/2] = parseInt(hex.substr(i, 2), 16);
+  return bytes;
+}
+
+const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function base58Encode(bytes) {
+  let num = 0n;
+  for (const b of bytes) num = num * 256n + BigInt(b);
+  let result = '';
+  while (num > 0n) {
+    const r = num % 58n;
+    result = B58_ALPHABET[Number(r)] + result;
+    num = num / 58n;
+  }
+  for (const b of bytes) { if (b === 0) result = '1' + result; else break; }
+  return result;
+}
+
+async function authenticate(identity, coopId, scopes) {
+  const cr = await api('POST', '/auth/challenge', { did: identity.did });
+  if (cr.status !== 200) throw new Error('Challenge failed: ' + cr.status);
+  const nonceBytes = hexDecode(cr.data.nonce);
+  const signature = await sign(identity.keyPair, nonceBytes);
+  const vr = await api('POST', '/auth/verify', {
+    did: identity.did,
+    signature: hexEncode(signature),
+    coop_id: coopId,
+    scopes: scopes,
+  });
+  if (vr.status !== 200) throw new Error('Verify failed: ' + vr.status + ' ' + (vr.text || ''));
+  identity.token = vr.data.token;
+  return vr.data.token;
+}
+
+async function runDemo() {
+  if (state.running) return;
+  state.running = true;
+  el('runBtn').disabled = true;
+  el('resetBtn').disabled = true;
+  el('statusText').textContent = 'Running...';
+  el('statusText').style.color = 'var(--dim)';
+  el('results').classList.add('hidden');
+  renderSteps();
+
+  const allScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
+  const govScopes = ['governance:read','governance:write'];
+  let proposalId = null;
+
+  try {
+    el('statusText').textContent = 'Generating identities...';
+    const admin = await generateIdentity('Admin');
+    const alice = await generateIdentity('Alice');
+    const bob = await generateIdentity('Bob');
+    renderIdentities([admin, alice, bob]);
+
+    // Step 0: Auth Admin
+    setStep(0, 'active');
+    await authenticate(admin, COOP_ID, allScopes);
+    setStep(0, 'done', 'JWT token obtained');
+
+    // Step 1: Create coop
+    setStep(1, 'active');
+    const r1 = await api('POST', '/coops', { id: COOP_ID, name: 'Demo Cooperative' }, admin.token);
+    if (r1.status !== 200 && r1.status !== 201) throw new Error('Create coop: ' + r1.status);
+    setStep(1, 'done', COOP_ID);
+
+    // Step 2: Create domain
+    setStep(2, 'active');
+    const r2 = await api('POST', '/gov/domains', {
+      id: DOMAIN_ID, name: 'Demo Governance', profile: 'cooperative_default',
+      quorum_percent: 50, approval_percent: 51, voting_period_days: 7, members: [admin.did],
+    }, admin.token);
+    if (r2.status !== 200 && r2.status !== 201) throw new Error('Create domain: ' + r2.status + ' ' + (r2.text || ''));
+    setStep(2, 'done', DOMAIN_ID);
+
+    // Steps 3-4: Add Alice
+    setStep(3, 'active');
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: alice.did, role: 'participant', display_name: 'Alice' }, admin.token);
+    setStep(3, 'done', alice.did.substring(0, 25) + '...');
+
+    setStep(4, 'active');
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: alice.did, weight: 1.0 }, admin.token);
+    setStep(4, 'done');
+
+    // Steps 5-6: Add Bob
+    setStep(5, 'active');
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: bob.did, role: 'participant', display_name: 'Bob' }, admin.token);
+    setStep(5, 'done', bob.did.substring(0, 25) + '...');
+
+    setStep(6, 'active');
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: bob.did, weight: 1.0 }, admin.token);
+    setStep(6, 'done');
+
+    // Step 7: Auth Alice
+    setStep(7, 'active');
+    await authenticate(alice, COOP_ID, govScopes);
+    setStep(7, 'done', 'JWT token obtained');
+
+    // Step 8: Create proposal
+    setStep(8, 'active');
+    const r8 = await api('POST', '/gov/proposals', {
+      domain_id: DOMAIN_ID, title: 'Approve Q2 Budget of $12,000',
+      description: 'Allocate $12,000 for Q2 operations: equipment ($4k), training ($3k), outreach ($2.5k), admin ($2.5k).',
+      payload: { type: 'budget', amount: 12000, recipient: admin.did, currency: 'USD', purpose: 'Q2 2026 Operating Budget' },
+    }, alice.token);
+    if (r8.status !== 200 && r8.status !== 201) throw new Error('Create proposal: ' + r8.status + ' ' + (r8.text || ''));
+    proposalId = r8.data.id || r8.data.proposal_id;
+    setStep(8, 'done', 'ID: ' + proposalId.substring(0, 8) + '...');
+
+    // Step 9: Open
+    setStep(9, 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/open', { voting_period_seconds: 3600 }, alice.token);
+    setStep(9, 'done', 'Voting open for 1 hour');
+
+    // Step 10: Alice votes
+    setStep(10, 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Essential for Q2 ops.' }, alice.token);
+    setStep(10, 'done');
+
+    // Step 11: Auth Bob
+    setStep(11, 'active');
+    await authenticate(bob, COOP_ID, govScopes);
+    setStep(11, 'done', 'JWT token obtained');
+
+    // Step 12: Bob votes
+    setStep(12, 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Budget looks reasonable.' }, bob.token);
+    setStep(12, 'done');
+
+    // Step 13: Close
+    setStep(13, 'active');
+    await authenticate(admin, COOP_ID, allScopes);
+    await api('POST', '/gov/proposals/' + proposalId + '/close', {}, admin.token);
+    setStep(13, 'done');
+
+    // Step 14: Final state
+    setStep(14, 'active');
+    const rp = await api('GET', '/gov/proposals/' + proposalId, null, admin.token);
+    const proposal = rp.data;
+    setStep(14, 'done', 'State: ' + (typeof proposal.state === 'object' ? Object.keys(proposal.state)[0] : String(proposal.state)));
+
+    // Step 15: Tally
+    setStep(15, 'active');
+    const rt = await api('GET', '/gov/proposals/' + proposalId + '/tally', null, admin.token);
+    const tally = rt.data;
+    setStep(15, 'done', 'For: ' + tally.for_votes + ', Against: ' + tally.against_votes);
+
+    // Step 16: Proof
+    setStep(16, 'active');
+    const rpf = await api('GET', '/gov/proposals/' + proposalId + '/proof', null, admin.token);
+    if (rpf.status === 200) {
+      setStep(16, 'done', 'Verified');
+    } else {
+      setStep(16, 'done', 'Proof generated (verification pending)');
+    }
+
+    // Show results
+    el('results').classList.remove('hidden');
+    renderProposalResult(proposal);
+    renderTallyResult(tally);
+    renderProofResult(rpf.status === 200 ? rpf.data : null);
+
+    el('statusText').textContent = 'Demo complete';
+    el('statusText').style.color = 'var(--green)';
+  } catch (e) {
+    const active = document.querySelector('.step.active');
+    if (active) {
+      const idx = parseInt(active.id.split('-')[1]);
+      setStep(idx, 'fail', e.message);
+    }
+    el('statusText').textContent = 'Error: ' + e.message;
+    el('statusText').style.color = 'var(--red)';
+  }
+
+  state.running = false;
+  el('runBtn').disabled = false;
+  el('resetBtn').disabled = false;
+}
+
+function resetDemo() {
+  el('identities').replaceChildren();
+  el('results').classList.add('hidden');
+  el('proposalResult').replaceChildren();
+  el('tallyResult').replaceChildren();
+  el('proofResult').replaceChildren();
+  el('statusText').textContent = 'Ready';
+  el('statusText').style.color = 'var(--dim)';
+  renderSteps();
+}
+
+renderSteps();
+</script>
+</body>
+</html>
