@@ -100,6 +100,7 @@ pub trait GovernanceOps: Send + Sync {
     async fn cast_vote(
         &self,
         proposal_id: ProposalId,
+        voter: Did,
         choice: VoteChoice,
         comment: Option<String>,
     ) -> Result<()>;

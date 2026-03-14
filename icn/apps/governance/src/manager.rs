@@ -773,7 +773,9 @@ impl GovernanceManager {
         comment: Option<String>,
     ) -> Result<()> {
         if let Some(ref handle) = self.governance_handle {
-            return handle.cast_vote(proposal_id, choice, comment).await;
+            return handle
+                .cast_vote(proposal_id, voter.clone(), choice, comment)
+                .await;
         }
 
         let proposals = self.proposals.read().map_err(|e| {

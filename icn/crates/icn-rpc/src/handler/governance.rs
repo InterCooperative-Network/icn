@@ -655,7 +655,7 @@ pub async fn handle_governance_vote_cast(
     };
 
     match governance_handle
-        .cast_vote(proposal_id, choice, request.comment)
+        .cast_vote(proposal_id, ctx.caller_did.clone(), choice, request.comment)
         .await
     {
         Ok(()) => {

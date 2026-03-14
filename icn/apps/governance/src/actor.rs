@@ -167,6 +167,8 @@ pub enum GovernanceCommand {
     CastVote {
         /// Proposal to vote on
         proposal_id: ProposalId,
+        /// DID of the voter (authenticated caller)
+        voter: Did,
         /// Vote choice
         choice: VoteChoice,
         /// Optional comment explaining the vote
@@ -911,11 +913,13 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn cast_vote(
         &self,
         proposal_id: ProposalId,
+        voter: Did,
         choice: icn_governance::VoteChoice,
         comment: Option<String>,
     ) -> Result<()> {
         self.submit(GovernanceCommand::CastVote {
             proposal_id,
+            voter,
             choice,
             comment,
         })
@@ -1535,12 +1539,13 @@ impl GovernanceActor {
 
             GovernanceCommand::CastVote {
                 proposal_id,
+                voter,
                 choice,
                 comment,
             } => {
-                info!("Casting vote on proposal: {}", proposal_id.0);
+                info!("Casting vote on proposal: {} by {}", proposal_id.0, voter);
 
-                let mut vote = Vote::new(proposal_id.clone(), self.did.clone(), choice);
+                let mut vote = Vote::new(proposal_id.clone(), voter, choice);
                 if let Some(c) = comment {
                     vote = vote.with_comment(c);
                 }
