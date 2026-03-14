@@ -3,480 +3,601 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ICN Governance Demo</title>
+<title>Cooperative Governance Demo — InterCooperative Network</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--dim:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--font:system-ui,-apple-system,sans-serif;--mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace}
-body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.5;padding:1rem;max-width:900px;margin:0 auto}
-h1{color:#fff;font-size:1.5rem;margin-bottom:.5rem}
-h2{color:var(--accent);font-size:1.1rem;margin:1.5rem 0 .5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem}
-.subtitle{color:var(--dim);font-size:.85rem;margin-bottom:1rem}
-.step{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.75rem 1rem;margin:.5rem 0;display:flex;align-items:center;gap:.75rem;transition:border-color .2s}
-.step.done{border-left:3px solid var(--green)}
-.step.fail{border-left:3px solid var(--red)}
-.step.active{border-left:3px solid var(--yellow);animation:pulse 1.5s infinite}
-.step.pending{opacity:.5}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-.step-num{background:var(--border);color:var(--dim);border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;flex-shrink:0}
-.step.done .step-num{background:var(--green);color:#000}
-.step.fail .step-num{background:var(--red);color:#fff}
-.step.active .step-num{background:var(--yellow);color:#000}
-.step-body{flex:1;min-width:0}
-.step-title{font-weight:600;font-size:.9rem}
-.step-detail{font-size:.75rem;color:var(--dim);font-family:var(--mono);word-break:break-all;margin-top:.15rem}
-.btn{background:var(--accent);color:#fff;border:none;padding:.6rem 1.5rem;border-radius:6px;cursor:pointer;font-size:.9rem;font-weight:600;transition:opacity .2s}
-.btn:hover{opacity:.85}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.controls{display:flex;gap:.75rem;align-items:center;margin:1rem 0}
-.status{font-size:.8rem;color:var(--dim)}
-.result-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem;margin:.75rem 0}
-.result-card h3{color:var(--green);font-size:.95rem;margin-bottom:.5rem}
-.result-grid{display:grid;grid-template-columns:auto 1fr;gap:.25rem .75rem;font-size:.85rem}
-.result-grid dt{color:var(--dim)}
-.result-grid dd{color:var(--text);font-family:var(--mono)}
-.proof-box{background:#0d1117;border:1px solid var(--border);border-radius:4px;padding:.5rem;margin-top:.5rem;font-family:var(--mono);font-size:.7rem;color:var(--dim);max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
-.vote-bar{display:flex;height:24px;border-radius:4px;overflow:hidden;margin:.5rem 0}
-.vote-for{background:var(--green)}
-.vote-against{background:var(--red)}
-.vote-bar-label{display:flex;justify-content:space-between;font-size:.75rem;color:var(--dim)}
-.hidden{display:none}
-.identity-card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;margin:.25rem 0;font-size:.8rem;display:flex;justify-content:space-between}
-.identity-name{font-weight:600;color:#fff}
-.identity-did{font-family:var(--mono);color:var(--dim);font-size:.7rem}
+:root{
+  --bg:#0f1419;--surface:#1a1f2e;--card:#222838;--border:#2d3548;
+  --text:#e2e8f0;--dim:#8892a8;--accent:#6c9fff;--accent-dim:#4a7ad4;
+  --green:#4ade80;--green-dim:#22633a;--red:#f87171;--red-dim:#7f1d1d;
+  --yellow:#fbbf24;--purple:#a78bfa;
+  --font:'Segoe UI','Inter',system-ui,-apple-system,sans-serif;
+  --mono:'SF Mono','Fira Code','Cascadia Code',Consolas,monospace;
+  --radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;min-height:100vh}
+.container{max-width:820px;margin:0 auto;padding:1.5rem 1rem 3rem}
+
+/* Header */
+.header{text-align:center;padding:2rem 0 1.5rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.header h1{font-size:1.6rem;font-weight:700;color:#fff;letter-spacing:-.02em}
+.header .subtitle{color:var(--dim);font-size:.95rem;margin-top:.35rem}
+.header .subtitle em{color:var(--accent);font-style:normal}
+
+/* Gateway config */
+.gateway-config{display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:1rem;font-size:.8rem;color:var(--dim)}
+.gateway-config input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.3rem .6rem;border-radius:6px;font-family:var(--mono);font-size:.8rem;width:240px;text-align:center}
+
+/* Phases */
+.phase{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.25rem;overflow:hidden}
+.phase-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.15rem;border-bottom:1px solid var(--border);cursor:default}
+.phase-number{background:var(--accent-dim);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0}
+.phase.done .phase-number{background:var(--green-dim)}
+.phase.error .phase-number{background:var(--red-dim)}
+.phase-title{flex:1;margin-left:.75rem;font-weight:600;font-size:1rem}
+.phase-desc{color:var(--dim);font-size:.8rem;margin-left:.75rem}
+.phase-btn{background:var(--accent);color:#fff;border:none;padding:.45rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .15s;white-space:nowrap}
+.phase-btn:hover{filter:brightness(1.15)}
+.phase-btn:disabled{opacity:.35;cursor:not-allowed;filter:none}
+.phase-btn.running{background:var(--yellow);color:#000}
+.phase.done .phase-btn{background:var(--green-dim);color:var(--green)}
+
+/* Phase body */
+.phase-body{padding:1rem 1.15rem;display:none}
+.phase.open .phase-body{display:block}
+
+/* Steps inside phases */
+.step{display:flex;align-items:flex-start;gap:.65rem;padding:.45rem 0;font-size:.88rem;color:var(--dim)}
+.step-icon{width:20px;text-align:center;flex-shrink:0;font-size:.85rem;line-height:1.4}
+.step.done{color:var(--text)}
+.step.done .step-icon{color:var(--green)}
+.step.fail .step-icon{color:var(--red)}
+.step.active{color:var(--yellow)}
+.step.active .step-icon{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step-detail{color:var(--dim);font-size:.75rem;font-family:var(--mono);margin-top:.1rem}
+
+/* Members panel */
+.members{display:flex;gap:.65rem;flex-wrap:wrap;margin:.75rem 0}
+.member{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;font-size:.82rem;display:flex;align-items:center;gap:.5rem}
+.member-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:#fff}
+.member-avatar.admin{background:#6366f1}
+.member-avatar.alice{background:#ec4899}
+.member-avatar.bob{background:#f59e0b}
+.member-name{font-weight:600;color:#fff}
+.member-role{color:var(--dim);font-size:.72rem}
+
+/* Proposal card */
+.proposal-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin:.75rem 0}
+.proposal-title{font-weight:600;font-size:1rem;color:#fff;margin-bottom:.4rem}
+.proposal-desc{color:var(--dim);font-size:.85rem;line-height:1.5}
+.proposal-meta{display:flex;gap:1.5rem;margin-top:.65rem;font-size:.78rem;color:var(--dim)}
+.proposal-meta span{display:flex;align-items:center;gap:.3rem}
+
+/* Vote display */
+.votes-container{margin:.75rem 0}
+.vote-row{display:flex;align-items:center;gap:.65rem;padding:.35rem 0;font-size:.88rem}
+.vote-badge{padding:.15rem .55rem;border-radius:4px;font-weight:600;font-size:.75rem;text-transform:uppercase}
+.vote-badge.for{background:var(--green-dim);color:var(--green)}
+.vote-badge.against{background:var(--red-dim);color:var(--red)}
+
+/* Tally bar */
+.tally{margin:.75rem 0}
+.tally-bar{height:32px;border-radius:6px;overflow:hidden;display:flex;background:var(--card)}
+.tally-for{background:var(--green);transition:width .6s ease}
+.tally-against{background:var(--red);transition:width .6s ease}
+.tally-labels{display:flex;justify-content:space-between;font-size:.82rem;color:var(--dim);margin-top:.35rem}
+.tally-result{text-align:center;font-size:1.1rem;font-weight:700;margin-top:.5rem;padding:.5rem;border-radius:6px}
+.tally-result.accepted{color:var(--green);background:var(--green-dim)}
+.tally-result.rejected{color:var(--red);background:var(--red-dim)}
+
+/* Receipt card */
+.receipt{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin:.75rem 0}
+.receipt h3{font-size:.9rem;color:var(--purple);margin-bottom:.65rem;display:flex;align-items:center;gap:.4rem}
+.receipt-row{display:flex;justify-content:space-between;padding:.3rem 0;font-size:.82rem;border-bottom:1px solid var(--border)}
+.receipt-row:last-child{border-bottom:none}
+.receipt-label{color:var(--dim)}
+.receipt-value{color:var(--text);font-family:var(--mono);font-size:.78rem;text-align:right;max-width:60%;word-break:break-all}
+
+/* Status bar */
+.status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:.5rem 1rem;display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:.82rem;color:var(--dim);z-index:100}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.status-dot.ok{background:var(--green)}
+.status-dot.error{background:var(--red)}
+.status-dot.running{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Error display */
+.error-box{background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:.75rem 1rem;margin:.5rem 0;font-size:.85rem;color:var(--red)}
+
+/* Responsive */
+@media(max-width:640px){
+  .container{padding:1rem .75rem 4rem}
+  .header h1{font-size:1.3rem}
+  .members{flex-direction:column}
+  .proposal-meta{flex-direction:column;gap:.3rem}
+  .receipt-row{flex-direction:column;gap:.15rem}
+  .receipt-value{max-width:100%;text-align:left}
+}
 </style>
 </head>
 <body>
 
-<h1>ICN Cooperative Governance Demo</h1>
-<p class="subtitle">Decentralized identity, democratic proposals, cryptographic proofs</p>
+<div class="container">
+  <div class="header">
+    <h1>Cooperative Governance Demo</h1>
+    <p class="subtitle">How cooperatives make decisions with <em>InterCooperative Network</em></p>
+    <div class="gateway-config">
+      <label for="gwUrl">Gateway:</label>
+      <input type="text" id="gwUrl" value="http://localhost:8080">
+    </div>
+  </div>
 
-<div class="controls">
-  <button class="btn" id="runBtn" onclick="runDemo()">Run Demo</button>
-  <button class="btn" id="resetBtn" onclick="resetDemo()" style="background:var(--border)" disabled>Reset</button>
-  <span class="status" id="statusText">Ready</span>
+  <!-- Phase 1: Setup -->
+  <div class="phase open" id="phase1">
+    <div class="phase-header">
+      <div class="phase-number">1</div>
+      <div>
+        <div class="phase-title">Set Up the Cooperative</div>
+        <div class="phase-desc">Create a co-op and add three members with digital identities</div>
+      </div>
+      <button class="phase-btn" id="btn1" onclick="runPhase1()">Run Setup</button>
+    </div>
+    <div class="phase-body" id="body1"></div>
+  </div>
+
+  <!-- Phase 2: Govern -->
+  <div class="phase" id="phase2">
+    <div class="phase-header">
+      <div class="phase-number">2</div>
+      <div>
+        <div class="phase-title">Make a Decision Together</div>
+        <div class="phase-desc">Submit a budget proposal and vote on it democratically</div>
+      </div>
+      <button class="phase-btn" id="btn2" onclick="runPhase2()" disabled>Run Vote</button>
+    </div>
+    <div class="phase-body" id="body2"></div>
+  </div>
+
+  <!-- Phase 3: Verify -->
+  <div class="phase" id="phase3">
+    <div class="phase-header">
+      <div class="phase-number">3</div>
+      <div>
+        <div class="phase-title">Verify the Result</div>
+        <div class="phase-desc">Close the vote and get a tamper-proof cryptographic receipt</div>
+      </div>
+      <button class="phase-btn" id="btn3" onclick="runPhase3()" disabled>Run Verify</button>
+    </div>
+    <div class="phase-body" id="body3"></div>
+  </div>
 </div>
 
-<h2>Identities</h2>
-<div id="identities"></div>
-
-<h2>Governance Flow</h2>
-<div id="steps"></div>
-
-<div id="results" class="hidden">
-  <h2>Results</h2>
-  <div id="proposalResult"></div>
-  <div id="tallyResult"></div>
-  <div id="proofResult"></div>
+<div class="status-bar">
+  <div class="status-dot" id="statusDot"></div>
+  <span id="statusText">Ready — click "Run Setup" to begin</span>
 </div>
 
 <script>
-const GATEWAY = location.origin;
-const API = GATEWAY + '/v1';
-const COOP_ID = 'demo-coop';
+// ── Configuration ──────────────────────────────────────────────────────
+function getGateway() { return document.getElementById('gwUrl').value.replace(/\/+$/, ''); }
+function getApi() { return getGateway() + '/v1'; }
+
+const COOP_ID = 'finger-lakes-food';
+const COOP_NAME = 'Finger Lakes Food Co-op';
 const DOMAIN_ID = 'coop:' + COOP_ID;
-const STEPS = [
-  'Authenticate Admin',
-  'Create cooperative',
-  'Create governance domain',
-  'Add Alice to cooperative',
-  'Add Alice to governance domain',
-  'Add Bob to cooperative',
-  'Add Bob to governance domain',
-  'Authenticate Alice',
-  'Alice creates proposal',
-  'Open proposal for voting',
-  'Alice votes FOR',
-  'Authenticate Bob',
-  'Bob votes FOR',
-  'Close proposal',
-  'Retrieve final state',
-  'Retrieve vote tally',
-  'Retrieve cryptographic proof',
-];
 
-let state = { running: false };
+// ── State ──────────────────────────────────────────────────────────────
+let identities = {};
+let proposalId = null;
 
-function el(id) { return document.getElementById(id); }
+// ── Utilities ──────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
 
-// Escape HTML special characters to prevent XSS
-function esc(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.textContent;
+function setStatus(text, state) {
+  $('statusText').textContent = text;
+  const dot = $('statusDot');
+  dot.className = 'status-dot' + (state ? ' ' + state : '');
 }
 
-function renderSteps() {
-  const c = el('steps');
-  c.replaceChildren();
-  STEPS.forEach(function(s, i) {
-    const div = document.createElement('div');
-    div.className = 'step pending';
-    div.id = 'step-' + i;
-    const numDiv = document.createElement('div');
-    numDiv.className = 'step-num';
-    numDiv.textContent = String(i + 1);
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'step-body';
-    const titleDiv = document.createElement('div');
-    titleDiv.className = 'step-title';
-    titleDiv.textContent = s;
-    const detailDiv = document.createElement('div');
-    detailDiv.className = 'step-detail';
-    detailDiv.id = 'detail-' + i;
-    bodyDiv.appendChild(titleDiv);
-    bodyDiv.appendChild(detailDiv);
-    div.appendChild(numDiv);
-    div.appendChild(bodyDiv);
-    c.appendChild(div);
-  });
+function addStep(bodyId, text, status) {
+  const icons = { pending: '\u2022', active: '\u25e6', done: '\u2713', fail: '\u2717' };
+  const body = $(bodyId);
+  const div = document.createElement('div');
+  div.className = 'step ' + status;
+  const icon = document.createElement('div');
+  icon.className = 'step-icon';
+  icon.textContent = icons[status] || '\u2022';
+  const span = document.createElement('span');
+  span.textContent = text;
+  div.appendChild(icon);
+  div.appendChild(span);
+  body.appendChild(div);
+  return div;
 }
 
-function setStep(i, status, detail) {
-  const s = document.getElementById('step-' + i);
-  if (!s) return;
-  s.className = 'step ' + status;
-  if (detail) document.getElementById('detail-' + i).textContent = detail;
-}
-
-function renderIdentities(identities) {
-  const c = el('identities');
-  c.replaceChildren();
-  identities.forEach(function(id) {
-    const div = document.createElement('div');
-    div.className = 'identity-card';
-    const name = document.createElement('span');
-    name.className = 'identity-name';
-    name.textContent = id.name;
-    const did = document.createElement('span');
-    did.className = 'identity-did';
-    did.textContent = id.did.substring(0, 20) + '...' + id.did.slice(-8);
-    div.appendChild(name);
-    div.appendChild(did);
-    c.appendChild(div);
-  });
-}
-
-function renderProposalResult(proposal) {
-  const c = el('proposalResult');
-  c.replaceChildren();
-  const card = document.createElement('div');
-  card.className = 'result-card';
-  const h3 = document.createElement('h3');
-  h3.textContent = 'Proposal: ' + (proposal.title || '');
-  card.appendChild(h3);
-  const dl = document.createElement('dl');
-  dl.className = 'result-grid';
-  const fields = [
-    ['ID', proposal.id],
-    ['Domain', proposal.domain_id],
-    ['Status', typeof proposal.state === 'object' ? Object.keys(proposal.state)[0] : String(proposal.state)],
-    ['Proposer', proposal.proposer],
-  ];
-  fields.forEach(function(f) {
-    const dt = document.createElement('dt');
-    dt.textContent = f[0];
-    const dd = document.createElement('dd');
-    dd.textContent = f[1] || '';
-    if (f[0] === 'Status') dd.style.color = 'var(--green)';
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  });
-  card.appendChild(dl);
-  c.appendChild(card);
-}
-
-function renderTallyResult(tally) {
-  const c = el('tallyResult');
-  c.replaceChildren();
-  const card = document.createElement('div');
-  card.className = 'result-card';
-  const h3 = document.createElement('h3');
-  h3.textContent = 'Vote Tally';
-  card.appendChild(h3);
-
-  const totalVotes = tally.for_votes + tally.against_votes + tally.abstain_votes;
-  const forPct = totalVotes > 0 ? Math.round(tally.for_votes / totalVotes * 100) : 0;
-  const againstPct = 100 - forPct;
-
-  const bar = document.createElement('div');
-  bar.className = 'vote-bar';
-  const forBar = document.createElement('div');
-  forBar.className = 'vote-for';
-  forBar.style.width = forPct + '%';
-  const againstBar = document.createElement('div');
-  againstBar.className = 'vote-against';
-  againstBar.style.width = againstPct + '%';
-  bar.appendChild(forBar);
-  bar.appendChild(againstBar);
-  card.appendChild(bar);
-
-  const label = document.createElement('div');
-  label.className = 'vote-bar-label';
-  const forLabel = document.createElement('span');
-  forLabel.textContent = 'For: ' + tally.for_votes + ' (' + forPct + '%)';
-  const againstLabel = document.createElement('span');
-  againstLabel.textContent = 'Against: ' + tally.against_votes;
-  label.appendChild(forLabel);
-  label.appendChild(againstLabel);
-  card.appendChild(label);
-
-  const dl = document.createElement('dl');
-  dl.className = 'result-grid';
-  dl.style.marginTop = '.5rem';
-  [['Total Votes', totalVotes], ['Abstentions', tally.abstain_votes]].forEach(function(f) {
-    const dt = document.createElement('dt');
-    dt.textContent = f[0];
-    const dd = document.createElement('dd');
-    dd.textContent = String(f[1]);
-    dl.appendChild(dt);
-    dl.appendChild(dd);
-  });
-  card.appendChild(dl);
-  c.appendChild(card);
-}
-
-function renderProofResult(proof) {
-  const c = el('proofResult');
-  c.replaceChildren();
-  if (!proof) return;
-  const card = document.createElement('div');
-  card.className = 'result-card';
-  const h3 = document.createElement('h3');
-  h3.textContent = 'Cryptographic Proof';
-  card.appendChild(h3);
-  const p = document.createElement('p');
-  p.style.cssText = 'font-size:.8rem;color:var(--dim);margin-bottom:.5rem';
-  p.textContent = 'Every governance decision produces a tamper-evident receipt with vote hashes and attestations.';
-  card.appendChild(p);
-  const box = document.createElement('div');
-  box.className = 'proof-box';
-  box.textContent = JSON.stringify(proof, null, 2);
-  card.appendChild(box);
-  c.appendChild(card);
+function updateStep(div, status, detail) {
+  const icons = { pending: '\u2022', active: '\u25e6', done: '\u2713', fail: '\u2717' };
+  div.className = 'step ' + status;
+  div.querySelector('.step-icon').textContent = icons[status] || '\u2022';
+  if (detail) {
+    let d = div.querySelector('.step-detail');
+    if (!d) { d = document.createElement('div'); d.className = 'step-detail'; div.appendChild(d); }
+    d.textContent = detail;
+  }
 }
 
 async function api(method, path, body, token) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(API + path, opts);
+  const r = await fetch(getApi() + path, opts);
   const text = await r.text();
   let json = null;
   try { json = JSON.parse(text); } catch(e) {}
+  if (r.status >= 400) throw new Error((json && json.error) || text || ('HTTP ' + r.status));
   return { status: r.status, data: json, text };
 }
 
-async function generateIdentity(name) {
-  const keyPair = await crypto.subtle.generateKey(
-    { name: 'Ed25519' }, true, ['sign', 'verify']
-  );
-  const pubRaw = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
-  const did = 'did:icn:z' + base58Encode(pubRaw);
-  return { name, did, keyPair, pubRaw };
+// ── Crypto ─────────────────────────────────────────────────────────────
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function b58enc(bytes) {
+  let n = 0n;
+  for (const b of bytes) n = n * 256n + BigInt(b);
+  let r = '';
+  while (n > 0n) { r = B58[Number(n % 58n)] + r; n = n / 58n; }
+  for (const b of bytes) { if (b === 0) r = '1' + r; else break; }
+  return r;
+}
+function hexEnc(bytes) { return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(''); }
+function hexDec(hex) {
+  const b = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) b[i/2] = parseInt(hex.substr(i,2), 16);
+  return b;
 }
 
-async function sign(keyPair, data) {
-  const sig = await crypto.subtle.sign('Ed25519', keyPair.privateKey, data);
-  return new Uint8Array(sig);
+async function makeIdentity(name) {
+  const kp = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign','verify']);
+  const pub = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+  return { name, did: 'did:icn:z' + b58enc(pub), keyPair: kp, token: null };
 }
 
-function hexEncode(bytes) {
-  return Array.from(bytes).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+async function authenticate(id, scopes) {
+  const cr = await api('POST', '/auth/challenge', { did: id.did });
+  const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', id.keyPair.privateKey, hexDec(cr.data.nonce)));
+  const vr = await api('POST', '/auth/verify', { did: id.did, signature: hexEnc(sig), coop_id: COOP_ID, scopes });
+  id.token = vr.data.token;
+  return id.token;
 }
 
-function hexDecode(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) bytes[i/2] = parseInt(hex.substr(i, 2), 16);
-  return bytes;
-}
-
-const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function base58Encode(bytes) {
-  let num = 0n;
-  for (const b of bytes) num = num * 256n + BigInt(b);
-  let result = '';
-  while (num > 0n) {
-    const r = num % 58n;
-    result = B58_ALPHABET[Number(r)] + result;
-    num = num / 58n;
-  }
-  for (const b of bytes) { if (b === 0) result = '1' + result; else break; }
-  return result;
-}
-
-async function authenticate(identity, coopId, scopes) {
-  const cr = await api('POST', '/auth/challenge', { did: identity.did });
-  if (cr.status !== 200) throw new Error('Challenge failed: ' + cr.status);
-  const nonceBytes = hexDecode(cr.data.nonce);
-  const signature = await sign(identity.keyPair, nonceBytes);
-  const vr = await api('POST', '/auth/verify', {
-    did: identity.did,
-    signature: hexEncode(signature),
-    coop_id: coopId,
-    scopes: scopes,
-  });
-  if (vr.status !== 200) throw new Error('Verify failed: ' + vr.status + ' ' + (vr.text || ''));
-  identity.token = vr.data.token;
-  return vr.data.token;
-}
-
-async function runDemo() {
-  if (state.running) return;
-  state.running = true;
-  el('runBtn').disabled = true;
-  el('resetBtn').disabled = true;
-  el('statusText').textContent = 'Running...';
-  el('statusText').style.color = 'var(--dim)';
-  el('results').classList.add('hidden');
-  renderSteps();
+// ── Phase 1: Setup ─────────────────────────────────────────────────────
+async function runPhase1() {
+  const btn = $('btn1');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  btn.className = 'phase-btn running';
+  $('body1').replaceChildren();
+  setStatus('Setting up cooperative...', 'running');
 
   const allScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
-  const govScopes = ['governance:read','governance:write'];
-  let proposalId = null;
 
   try {
-    el('statusText').textContent = 'Generating identities...';
-    const admin = await generateIdentity('Admin');
-    const alice = await generateIdentity('Alice');
-    const bob = await generateIdentity('Bob');
-    renderIdentities([admin, alice, bob]);
+    // Generate identities
+    let s = addStep('body1', 'Generating digital identities for three members...', 'active');
+    identities.admin = await makeIdentity('Admin (Coordinator)');
+    identities.alice = await makeIdentity('Alice');
+    identities.bob = await makeIdentity('Bob');
+    updateStep(s, 'done', 'Three Ed25519 keypairs created');
 
-    // Step 0: Auth Admin
-    setStep(0, 'active');
-    await authenticate(admin, COOP_ID, allScopes);
-    setStep(0, 'done', 'JWT token obtained');
+    // Show members
+    const membersDiv = document.createElement('div');
+    membersDiv.className = 'members';
+    [{n:'Admin',r:'Coordinator',c:'admin',id:identities.admin},
+     {n:'Alice',r:'Member',c:'alice',id:identities.alice},
+     {n:'Bob',r:'Member',c:'bob',id:identities.bob}].forEach(m => {
+      const card = document.createElement('div');
+      card.className = 'member';
+      const av = document.createElement('div');
+      av.className = 'member-avatar ' + m.c;
+      av.textContent = m.n[0];
+      const info = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'member-name';
+      name.textContent = m.n;
+      const role = document.createElement('div');
+      role.className = 'member-role';
+      role.textContent = m.r + ' \u2022 ' + m.id.did.substring(0,24) + '...';
+      info.appendChild(name);
+      info.appendChild(role);
+      card.appendChild(av);
+      card.appendChild(info);
+      membersDiv.appendChild(card);
+    });
+    $('body1').appendChild(membersDiv);
 
-    // Step 1: Create coop
-    setStep(1, 'active');
-    const r1 = await api('POST', '/coops', { id: COOP_ID, name: 'Demo Cooperative' }, admin.token);
-    if (r1.status !== 200 && r1.status !== 201) throw new Error('Create coop: ' + r1.status);
-    setStep(1, 'done', COOP_ID);
+    // Authenticate admin
+    s = addStep('body1', 'Authenticating Admin with challenge-response...', 'active');
+    await authenticate(identities.admin, allScopes);
+    updateStep(s, 'done', 'Signed cryptographic challenge, received JWT');
 
-    // Step 2: Create domain
-    setStep(2, 'active');
-    const r2 = await api('POST', '/gov/domains', {
-      id: DOMAIN_ID, name: 'Demo Governance', profile: 'cooperative_default',
-      quorum_percent: 50, approval_percent: 51, voting_period_days: 7, members: [admin.did],
-    }, admin.token);
-    if (r2.status !== 200 && r2.status !== 201) throw new Error('Create domain: ' + r2.status + ' ' + (r2.text || ''));
-    setStep(2, 'done', DOMAIN_ID);
+    // Create coop
+    s = addStep('body1', 'Creating cooperative: ' + COOP_NAME + '...', 'active');
+    await api('POST', '/coops', { id: COOP_ID, name: COOP_NAME }, identities.admin.token);
+    updateStep(s, 'done');
 
-    // Steps 3-4: Add Alice
-    setStep(3, 'active');
-    await api('POST', '/coops/' + COOP_ID + '/members', { did: alice.did, role: 'participant', display_name: 'Alice' }, admin.token);
-    setStep(3, 'done', alice.did.substring(0, 25) + '...');
+    // Create governance domain
+    s = addStep('body1', 'Creating governance domain with democratic rules...', 'active');
+    await api('POST', '/gov/domains', {
+      id: DOMAIN_ID, name: COOP_NAME + ' Governance', profile: 'cooperative_default',
+      quorum_percent: 50, approval_percent: 51, voting_period_days: 7,
+      members: [identities.admin.did]
+    }, identities.admin.token);
+    updateStep(s, 'done', '50% quorum required, simple majority to pass');
 
-    setStep(4, 'active');
-    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: alice.did, weight: 1.0 }, admin.token);
-    setStep(4, 'done');
+    // Add members
+    s = addStep('body1', 'Adding Alice and Bob as voting members...', 'active');
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: identities.alice.did, role: 'participant', display_name: 'Alice' }, identities.admin.token);
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: identities.alice.did, weight: 1.0 }, identities.admin.token);
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: identities.bob.did, role: 'participant', display_name: 'Bob' }, identities.admin.token);
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: identities.bob.did, weight: 1.0 }, identities.admin.token);
+    updateStep(s, 'done', 'All three members have equal voting weight');
 
-    // Steps 5-6: Add Bob
-    setStep(5, 'active');
-    await api('POST', '/coops/' + COOP_ID + '/members', { did: bob.did, role: 'participant', display_name: 'Bob' }, admin.token);
-    setStep(5, 'done', bob.did.substring(0, 25) + '...');
-
-    setStep(6, 'active');
-    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: bob.did, weight: 1.0 }, admin.token);
-    setStep(6, 'done');
-
-    // Step 7: Auth Alice
-    setStep(7, 'active');
-    await authenticate(alice, COOP_ID, govScopes);
-    setStep(7, 'done', 'JWT token obtained');
-
-    // Step 8: Create proposal
-    setStep(8, 'active');
-    const r8 = await api('POST', '/gov/proposals', {
-      domain_id: DOMAIN_ID, title: 'Approve Q2 Budget of $12,000',
-      description: 'Allocate $12,000 for Q2 operations: equipment ($4k), training ($3k), outreach ($2.5k), admin ($2.5k).',
-      payload: { type: 'budget', amount: 12000, recipient: admin.did, currency: 'USD', purpose: 'Q2 2026 Operating Budget' },
-    }, alice.token);
-    if (r8.status !== 200 && r8.status !== 201) throw new Error('Create proposal: ' + r8.status + ' ' + (r8.text || ''));
-    proposalId = r8.data.id || r8.data.proposal_id;
-    setStep(8, 'done', 'ID: ' + proposalId.substring(0, 8) + '...');
-
-    // Step 9: Open
-    setStep(9, 'active');
-    await api('POST', '/gov/proposals/' + proposalId + '/open', { voting_period_seconds: 3600 }, alice.token);
-    setStep(9, 'done', 'Voting open for 1 hour');
-
-    // Step 10: Alice votes
-    setStep(10, 'active');
-    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Essential for Q2 ops.' }, alice.token);
-    setStep(10, 'done');
-
-    // Step 11: Auth Bob
-    setStep(11, 'active');
-    await authenticate(bob, COOP_ID, govScopes);
-    setStep(11, 'done', 'JWT token obtained');
-
-    // Step 12: Bob votes
-    setStep(12, 'active');
-    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Budget looks reasonable.' }, bob.token);
-    setStep(12, 'done');
-
-    // Step 13: Close
-    setStep(13, 'active');
-    await authenticate(admin, COOP_ID, allScopes);
-    await api('POST', '/gov/proposals/' + proposalId + '/close', {}, admin.token);
-    setStep(13, 'done');
-
-    // Step 14: Final state
-    setStep(14, 'active');
-    const rp = await api('GET', '/gov/proposals/' + proposalId, null, admin.token);
-    const proposal = rp.data;
-    setStep(14, 'done', 'State: ' + (typeof proposal.state === 'object' ? Object.keys(proposal.state)[0] : String(proposal.state)));
-
-    // Step 15: Tally
-    setStep(15, 'active');
-    const rt = await api('GET', '/gov/proposals/' + proposalId + '/tally', null, admin.token);
-    const tally = rt.data;
-    setStep(15, 'done', 'For: ' + tally.for_votes + ', Against: ' + tally.against_votes);
-
-    // Step 16: Proof
-    setStep(16, 'active');
-    const rpf = await api('GET', '/gov/proposals/' + proposalId + '/proof', null, admin.token);
-    if (rpf.status === 200) {
-      setStep(16, 'done', 'Verified');
-    } else {
-      setStep(16, 'done', 'Proof generated (verification pending)');
-    }
-
-    // Show results
-    el('results').classList.remove('hidden');
-    renderProposalResult(proposal);
-    renderTallyResult(tally);
-    renderProofResult(rpf.status === 200 ? rpf.data : null);
-
-    el('statusText').textContent = 'Demo complete';
-    el('statusText').style.color = 'var(--green)';
-  } catch (e) {
-    const active = document.querySelector('.step.active');
-    if (active) {
-      const idx = parseInt(active.id.split('-')[1]);
-      setStep(idx, 'fail', e.message);
-    }
-    el('statusText').textContent = 'Error: ' + e.message;
-    el('statusText').style.color = 'var(--red)';
+    // Done
+    const p1 = $('phase1');
+    p1.className = 'phase done open';
+    btn.textContent = '\u2713 Setup Complete';
+    btn.className = 'phase-btn';
+    $('phase2').className = 'phase open';
+    $('btn2').disabled = false;
+    setStatus('Cooperative created with 3 members — ready to vote', 'ok');
+  } catch(e) {
+    btn.textContent = 'Retry Setup';
+    btn.className = 'phase-btn';
+    btn.disabled = false;
+    const err = document.createElement('div');
+    err.className = 'error-box';
+    err.textContent = 'Setup failed: ' + e.message;
+    $('body1').appendChild(err);
+    setStatus('Error: ' + e.message, 'error');
   }
-
-  state.running = false;
-  el('runBtn').disabled = false;
-  el('resetBtn').disabled = false;
 }
 
-function resetDemo() {
-  el('identities').replaceChildren();
-  el('results').classList.add('hidden');
-  el('proposalResult').replaceChildren();
-  el('tallyResult').replaceChildren();
-  el('proofResult').replaceChildren();
-  el('statusText').textContent = 'Ready';
-  el('statusText').style.color = 'var(--dim)';
-  renderSteps();
+// ── Phase 2: Govern ────────────────────────────────────────────────────
+async function runPhase2() {
+  const btn = $('btn2');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  btn.className = 'phase-btn running';
+  $('body2').replaceChildren();
+  setStatus('Running governance vote...', 'running');
+
+  const govScopes = ['governance:read','governance:write'];
+
+  try {
+    // Authenticate Alice
+    let s = addStep('body2', 'Alice authenticates to submit a proposal...', 'active');
+    await authenticate(identities.alice, govScopes);
+    updateStep(s, 'done');
+
+    // Create proposal
+    s = addStep('body2', 'Alice submits a budget proposal...', 'active');
+    const pr = await api('POST', '/gov/proposals', {
+      domain_id: DOMAIN_ID,
+      title: 'Approve $12,000 for community kitchen equipment',
+      description: 'Purchase commercial-grade equipment for the shared community kitchen: convection oven ($4,000), industrial mixer ($3,000), prep tables and storage ($2,500), safety equipment and small tools ($2,500). This serves all 47 member households.',
+      payload: { type: 'budget', amount: 12000, recipient: identities.admin.did, currency: 'USD', purpose: 'Community Kitchen Equipment' }
+    }, identities.alice.token);
+    proposalId = pr.data.id || pr.data.proposal_id;
+    updateStep(s, 'done');
+
+    // Show proposal card
+    const card = document.createElement('div');
+    card.className = 'proposal-card';
+    const title = document.createElement('div');
+    title.className = 'proposal-title';
+    title.textContent = 'Approve $12,000 for community kitchen equipment';
+    const desc = document.createElement('div');
+    desc.className = 'proposal-desc';
+    desc.textContent = 'Purchase commercial-grade equipment for the shared community kitchen: convection oven ($4,000), industrial mixer ($3,000), prep tables and storage ($2,500), safety equipment and small tools ($2,500).';
+    const meta = document.createElement('div');
+    meta.className = 'proposal-meta';
+    const m1 = document.createElement('span');
+    m1.textContent = '\ud83d\udcb0 $12,000 USD';
+    const m2 = document.createElement('span');
+    m2.textContent = '\ud83d\udc64 Proposed by Alice';
+    const m3 = document.createElement('span');
+    m3.textContent = '\ud83c\udfdb\ufe0f ' + COOP_NAME;
+    meta.appendChild(m1);
+    meta.appendChild(m2);
+    meta.appendChild(m3);
+    card.appendChild(title);
+    card.appendChild(desc);
+    card.appendChild(meta);
+    $('body2').appendChild(card);
+
+    // Open for voting
+    s = addStep('body2', 'Opening proposal for voting...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/open', { voting_period_seconds: 3600 }, identities.alice.token);
+    updateStep(s, 'done', 'Voting period: 1 hour');
+
+    // Alice votes
+    s = addStep('body2', 'Alice casts her vote: FOR', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Essential equipment for our community kitchen. Fully support.' }, identities.alice.token);
+    updateStep(s, 'done');
+
+    // Authenticate and vote as Bob
+    s = addStep('body2', 'Bob authenticates and casts his vote: FOR', 'active');
+    await authenticate(identities.bob, govScopes);
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Great investment. The kitchen serves all our members.' }, identities.bob.token);
+    updateStep(s, 'done');
+
+    // Show votes
+    const votesDiv = document.createElement('div');
+    votesDiv.className = 'votes-container';
+    [{who:'Alice',vote:'for'},{who:'Bob',vote:'for'}].forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'vote-row';
+      const badge = document.createElement('span');
+      badge.className = 'vote-badge ' + v.vote;
+      badge.textContent = v.vote;
+      const name = document.createElement('span');
+      name.textContent = v.who + ' voted';
+      row.appendChild(badge);
+      row.appendChild(name);
+      votesDiv.appendChild(row);
+    });
+    $('body2').appendChild(votesDiv);
+
+    // Done
+    const p2 = $('phase2');
+    p2.className = 'phase done open';
+    btn.textContent = '\u2713 Votes Cast';
+    btn.className = 'phase-btn';
+    $('phase3').className = 'phase open';
+    $('btn3').disabled = false;
+    setStatus('2 votes cast — ready to close and verify', 'ok');
+  } catch(e) {
+    btn.textContent = 'Retry Vote';
+    btn.className = 'phase-btn';
+    btn.disabled = false;
+    const err = document.createElement('div');
+    err.className = 'error-box';
+    err.textContent = 'Vote failed: ' + e.message;
+    $('body2').appendChild(err);
+    setStatus('Error: ' + e.message, 'error');
+  }
 }
 
-renderSteps();
+// ── Phase 3: Verify ────────────────────────────────────────────────────
+async function runPhase3() {
+  const btn = $('btn3');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  btn.className = 'phase-btn running';
+  $('body3').replaceChildren();
+  setStatus('Closing vote and generating proof...', 'running');
+
+  const allScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
+
+  try {
+    // Re-auth admin to close
+    let s = addStep('body3', 'Admin closes the voting period...', 'active');
+    await authenticate(identities.admin, allScopes);
+    await api('POST', '/gov/proposals/' + proposalId + '/close', {}, identities.admin.token);
+    updateStep(s, 'done');
+
+    // Get final state
+    s = addStep('body3', 'Retrieving final proposal state...', 'active');
+    const pr = await api('GET', '/gov/proposals/' + proposalId, null, identities.admin.token);
+    const stateKey = typeof pr.data.state === 'object' ? Object.keys(pr.data.state)[0] : String(pr.data.state);
+    updateStep(s, 'done', 'Outcome: ' + stateKey);
+
+    // Get tally
+    s = addStep('body3', 'Computing vote tally...', 'active');
+    const tr = await api('GET', '/gov/proposals/' + proposalId + '/tally', null, identities.admin.token);
+    const tally = tr.data;
+    updateStep(s, 'done', tally.for_votes + ' for, ' + tally.against_votes + ' against, ' + tally.abstain_votes + ' abstain');
+
+    // Show tally bar
+    const tallyDiv = document.createElement('div');
+    tallyDiv.className = 'tally';
+    const total = tally.for_votes + tally.against_votes + tally.abstain_votes;
+    const forPct = total > 0 ? Math.round(tally.for_votes / total * 100) : 0;
+    const againstPct = total > 0 ? Math.round(tally.against_votes / total * 100) : 0;
+
+    const bar = document.createElement('div');
+    bar.className = 'tally-bar';
+    const forBar = document.createElement('div');
+    forBar.className = 'tally-for';
+    forBar.style.width = forPct + '%';
+    const againstBar = document.createElement('div');
+    againstBar.className = 'tally-against';
+    againstBar.style.width = againstPct + '%';
+    bar.appendChild(forBar);
+    bar.appendChild(againstBar);
+
+    const labels = document.createElement('div');
+    labels.className = 'tally-labels';
+    const fl = document.createElement('span');
+    fl.textContent = '\u2705 For: ' + tally.for_votes + ' (' + forPct + '%)';
+    const al = document.createElement('span');
+    al.textContent = '\u274c Against: ' + tally.against_votes + ' (' + againstPct + '%)';
+    labels.appendChild(fl);
+    labels.appendChild(al);
+
+    const result = document.createElement('div');
+    result.className = 'tally-result ' + (stateKey === 'Accepted' ? 'accepted' : 'rejected');
+    result.textContent = stateKey === 'Accepted' ? '\u2705 PROPOSAL ACCEPTED' : '\u274c PROPOSAL ' + stateKey.toUpperCase();
+
+    tallyDiv.appendChild(bar);
+    tallyDiv.appendChild(labels);
+    tallyDiv.appendChild(result);
+    $('body3').appendChild(tallyDiv);
+
+    // Get proof
+    s = addStep('body3', 'Generating cryptographic receipt...', 'active');
+    const pfr = await api('GET', '/gov/proposals/' + proposalId + '/proof', null, identities.admin.token);
+    updateStep(s, 'done', 'Tamper-proof receipt generated');
+
+    // Show receipt card
+    if (pfr.data) {
+      const receipt = document.createElement('div');
+      receipt.className = 'receipt';
+      const h3 = document.createElement('h3');
+      h3.textContent = '\ud83d\udd10 Governance Receipt';
+      receipt.appendChild(h3);
+
+      const receiptData = pfr.data.receipt || pfr.data;
+      const voteHash = receiptData.vote_hash ? (Array.isArray(receiptData.vote_hash) ? hexEnc(new Uint8Array(receiptData.vote_hash)) : receiptData.vote_hash) : 'N/A';
+      const decisionHash = receiptData.decision_hash ? (Array.isArray(receiptData.decision_hash) ? hexEnc(new Uint8Array(receiptData.decision_hash)) : receiptData.decision_hash) : 'N/A';
+
+      const rows = [
+        ['Proposal', proposalId],
+        ['Domain', DOMAIN_ID],
+        ['Outcome', receiptData.outcome || stateKey],
+        ['For / Against / Abstain', tally.for_votes + ' / ' + tally.against_votes + ' / ' + tally.abstain_votes],
+        ['Vote Hash', voteHash.substring(0, 16) + '...' + voteHash.slice(-16)],
+        ['Decision Hash', decisionHash.substring(0, 16) + '...' + decisionHash.slice(-16)],
+      ];
+
+      rows.forEach(function(r) {
+        const row = document.createElement('div');
+        row.className = 'receipt-row';
+        const label = document.createElement('span');
+        label.className = 'receipt-label';
+        label.textContent = r[0];
+        const value = document.createElement('span');
+        value.className = 'receipt-value';
+        value.textContent = r[1];
+        row.appendChild(label);
+        row.appendChild(value);
+        receipt.appendChild(row);
+      });
+
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:.65rem;font-size:.78rem;color:var(--dim);line-height:1.5';
+      note.textContent = 'This receipt is cryptographically signed. Any modification to the votes, outcome, or proposal details would change the hash, making tampering immediately detectable.';
+      receipt.appendChild(note);
+
+      $('body3').appendChild(receipt);
+    }
+
+    // Done
+    $('phase3').className = 'phase done open';
+    btn.textContent = '\u2713 Verified';
+    btn.className = 'phase-btn';
+    setStatus('Demo complete \u2014 decision recorded with cryptographic proof', 'ok');
+  } catch(e) {
+    btn.textContent = 'Retry Verify';
+    btn.className = 'phase-btn';
+    btn.disabled = false;
+    const err = document.createElement('div');
+    err.className = 'error-box';
+    err.textContent = 'Verification failed: ' + e.message;
+    $('body3').appendChild(err);
+    setStatus('Error: ' + e.message, 'error');
+  }
+}
 </script>
 </body>
 </html>
