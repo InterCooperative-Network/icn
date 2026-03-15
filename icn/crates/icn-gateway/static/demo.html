@@ -135,7 +135,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
     <p class="tagline">Cryptographic audit trail. Self-hosted. Works on your own infrastructure.</p>
     <div class="gateway-config">
       <label for="gwUrl">Gateway:</label>
-      <input type="text" id="gwUrl" value="http://localhost:8080">
+      <input type="text" id="gwUrl" value="">
     </div>
   </div>
 
@@ -199,6 +199,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
+document.getElementById('gwUrl').value = window.location.origin;
 function getGateway() { return document.getElementById('gwUrl').value.replace(/\/+$/, ''); }
 function getApi() { return getGateway() + '/v1'; }
 
