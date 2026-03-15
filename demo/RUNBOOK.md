@@ -37,10 +37,11 @@ This will:
 5. Leave the gateway running for the browser demo
 6. Clean up on Ctrl+C
 
-The demo is split into three phases:
-- **Phase 1: Setup** — Create cooperative, generate identities, add members
-- **Phase 2: Govern** — Submit proposal, cast votes
-- **Phase 3: Verify** — Close vote, show tally, display cryptographic receipt
+The demo is split into four phases:
+- **Phase 1: Founding Assembly** — Alice, Bob, Carol form the cooperative as equal members. Alice is elected temporary coordinator (not a permanent admin role).
+- **Phase 2: Charter Ratification** — The first democratic act: all three members vote to ratify their own cooperative charter.
+- **Phase 3: Democratic Decision** — Bob (not the coordinator) proposes $12,000 for kitchen equipment. All three vote.
+- **Phase 4: Verification** — Carol (not the coordinator, not the proposer) closes the vote. Tally and cryptographic proof generated.
 
 Press Enter between phases to control pacing.
 
@@ -52,7 +53,9 @@ After starting the gateway (via either script), open:
 http://localhost:8080/static/demo.html
 ```
 
-The browser demo has three "Run" buttons matching the three phases. Click each one in sequence. No terminal needed.
+The browser demo has four "Run Phase N" buttons matching the four phases. Click each one in sequence. No terminal needed.
+
+The browser UI highlights the cooperative-first design at each phase — coordinator role is labeled "Temporary", each member's equal voting weight is shown, and the receipt card explicitly names Carol as the closing member.
 
 To present over Zoom: share the browser tab. The UI is dark-themed and readable at 1080p.
 

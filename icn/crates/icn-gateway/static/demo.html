@@ -10,7 +10,7 @@
   --bg:#0f1419;--surface:#1a1f2e;--card:#222838;--border:#2d3548;
   --text:#e2e8f0;--dim:#8892a8;--accent:#6c9fff;--accent-dim:#4a7ad4;
   --green:#4ade80;--green-dim:#22633a;--red:#f87171;--red-dim:#7f1d1d;
-  --yellow:#fbbf24;--purple:#a78bfa;
+  --yellow:#fbbf24;--purple:#a78bfa;--teal:#2dd4bf;
   --font:'Segoe UI','Inter',system-ui,-apple-system,sans-serif;
   --mono:'SF Mono','Fira Code','Cascadia Code',Consolas,monospace;
   --radius:10px;
@@ -23,8 +23,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .header h1{font-size:1.6rem;font-weight:700;color:#fff;letter-spacing:-.02em}
 .header .subtitle{color:var(--dim);font-size:.95rem;margin-top:.35rem}
 .header .subtitle em{color:var(--accent);font-style:normal}
-
-/* Gateway config */
+.header .tagline{color:var(--teal);font-size:.8rem;margin-top:.5rem;font-style:italic}
 .gateway-config{display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:1rem;font-size:.8rem;color:var(--dim)}
 .gateway-config input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.3rem .6rem;border-radius:6px;font-family:var(--mono);font-size:.8rem;width:240px;text-align:center}
 
@@ -34,8 +33,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .phase-number{background:var(--accent-dim);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0}
 .phase.done .phase-number{background:var(--green-dim)}
 .phase.error .phase-number{background:var(--red-dim)}
-.phase-title{flex:1;margin-left:.75rem;font-weight:600;font-size:1rem}
-.phase-desc{color:var(--dim);font-size:.8rem;margin-left:.75rem}
+.phase-titles{flex:1;margin-left:.75rem}
+.phase-title{font-weight:600;font-size:1rem}
+.phase-desc{color:var(--dim);font-size:.8rem}
 .phase-btn{background:var(--accent);color:#fff;border:none;padding:.45rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .15s;white-space:nowrap}
 .phase-btn:hover{filter:brightness(1.15)}
 .phase-btn:disabled{opacity:.35;cursor:not-allowed;filter:none}
@@ -46,7 +46,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .phase-body{padding:1rem 1.15rem;display:none}
 .phase.open .phase-body{display:block}
 
-/* Steps inside phases */
+/* Steps */
 .step{display:flex;align-items:flex-start;gap:.65rem;padding:.45rem 0;font-size:.88rem;color:var(--dim)}
 .step-icon{width:20px;text-align:center;flex-shrink:0;font-size:.85rem;line-height:1.4}
 .step.done{color:var(--text)}
@@ -61,23 +61,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .members{display:flex;gap:.65rem;flex-wrap:wrap;margin:.75rem 0}
 .member{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.5rem .8rem;font-size:.82rem;display:flex;align-items:center;gap:.5rem}
 .member-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:#fff}
-.member-avatar.admin{background:#6366f1}
 .member-avatar.alice{background:#ec4899}
 .member-avatar.bob{background:#f59e0b}
+.member-avatar.carol{background:#8b5cf6}
 .member-name{font-weight:600;color:#fff}
 .member-role{color:var(--dim);font-size:.72rem}
+.member-role.coordinator{color:var(--teal)}
 
 /* Proposal card */
 .proposal-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin:.75rem 0}
-.proposal-title{font-weight:600;font-size:1rem;color:#fff;margin-bottom:.4rem}
-.proposal-desc{color:var(--dim);font-size:.85rem;line-height:1.5}
-.proposal-meta{display:flex;gap:1.5rem;margin-top:.65rem;font-size:.78rem;color:var(--dim)}
+.proposal-title{font-weight:600;font-size:.95rem;color:#fff;margin-bottom:.4rem}
+.proposal-desc{color:var(--dim);font-size:.82rem;line-height:1.5}
+.proposal-meta{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.65rem;font-size:.78rem;color:var(--dim)}
 .proposal-meta span{display:flex;align-items:center;gap:.3rem}
 
 /* Vote display */
 .votes-container{margin:.75rem 0}
-.vote-row{display:flex;align-items:center;gap:.65rem;padding:.35rem 0;font-size:.88rem}
-.vote-badge{padding:.15rem .55rem;border-radius:4px;font-weight:600;font-size:.75rem;text-transform:uppercase}
+.vote-row{display:flex;align-items:center;gap:.65rem;padding:.3rem 0;font-size:.88rem}
+.vote-badge{padding:.12rem .5rem;border-radius:4px;font-weight:600;font-size:.75rem;text-transform:uppercase}
 .vote-badge.for{background:var(--green-dim);color:var(--green)}
 .vote-badge.against{background:var(--red-dim);color:var(--red)}
 
@@ -98,6 +99,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
 .receipt-row:last-child{border-bottom:none}
 .receipt-label{color:var(--dim)}
 .receipt-value{color:var(--text);font-family:var(--mono);font-size:.78rem;text-align:right;max-width:60%;word-break:break-all}
+
+/* Principle box */
+.principle-box{background:var(--card);border-left:3px solid var(--teal);border-radius:0 6px 6px 0;padding:.75rem 1rem;margin:.75rem 0;font-size:.82rem;color:var(--dim);line-height:1.6}
+.principle-box strong{color:var(--teal)}
 
 /* Status bar */
 .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:.5rem 1rem;display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:.82rem;color:var(--dim);z-index:100}
@@ -127,59 +132,73 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
   <div class="header">
     <h1>Cooperative Governance Demo</h1>
     <p class="subtitle">How cooperatives make decisions with <em>InterCooperative Network</em></p>
+    <p class="tagline">No admin. No central server. Three equal founding members.</p>
     <div class="gateway-config">
       <label for="gwUrl">Gateway:</label>
       <input type="text" id="gwUrl" value="http://localhost:8080">
     </div>
   </div>
 
-  <!-- Phase 1: Setup -->
+  <!-- Phase 1: Founding Assembly -->
   <div class="phase open" id="phase1">
     <div class="phase-header">
       <div class="phase-number">1</div>
-      <div>
-        <div class="phase-title">Set Up the Cooperative</div>
-        <div class="phase-desc">Create a co-op and add three members with digital identities</div>
+      <div class="phase-titles">
+        <div class="phase-title">Founding Assembly</div>
+        <div class="phase-desc">Three equal founding members form the cooperative</div>
       </div>
-      <button class="phase-btn" id="btn1" onclick="runPhase1()">Run Setup</button>
+      <button class="phase-btn" id="btn1" onclick="runPhase1()">Run Phase 1</button>
     </div>
     <div class="phase-body" id="body1"></div>
   </div>
 
-  <!-- Phase 2: Govern -->
+  <!-- Phase 2: Charter Ratification -->
   <div class="phase" id="phase2">
     <div class="phase-header">
       <div class="phase-number">2</div>
-      <div>
-        <div class="phase-title">Make a Decision Together</div>
-        <div class="phase-desc">Submit a budget proposal and vote on it democratically</div>
+      <div class="phase-titles">
+        <div class="phase-title">Charter Ratification</div>
+        <div class="phase-desc">First democratic act: members vote to ratify their own rules</div>
       </div>
-      <button class="phase-btn" id="btn2" onclick="runPhase2()" disabled>Run Vote</button>
+      <button class="phase-btn" id="btn2" onclick="runPhase2()" disabled>Run Phase 2</button>
     </div>
     <div class="phase-body" id="body2"></div>
   </div>
 
-  <!-- Phase 3: Verify -->
+  <!-- Phase 3: Democratic Decision -->
   <div class="phase" id="phase3">
     <div class="phase-header">
       <div class="phase-number">3</div>
-      <div>
-        <div class="phase-title">Verify the Result</div>
-        <div class="phase-desc">Close the vote and get a tamper-proof cryptographic receipt</div>
+      <div class="phase-titles">
+        <div class="phase-title">Democratic Decision</div>
+        <div class="phase-desc">Bob proposes — any member can bring a proposal forward</div>
       </div>
-      <button class="phase-btn" id="btn3" onclick="runPhase3()" disabled>Run Verify</button>
+      <button class="phase-btn" id="btn3" onclick="runPhase3()" disabled>Run Phase 3</button>
     </div>
     <div class="phase-body" id="body3"></div>
+  </div>
+
+  <!-- Phase 4: Verification -->
+  <div class="phase" id="phase4">
+    <div class="phase-header">
+      <div class="phase-number">4</div>
+      <div class="phase-titles">
+        <div class="phase-title">Verification</div>
+        <div class="phase-desc">Carol closes the vote — authority rotates across the membership</div>
+      </div>
+      <button class="phase-btn" id="btn4" onclick="runPhase4()" disabled>Run Phase 4</button>
+    </div>
+    <div class="phase-body" id="body4"></div>
   </div>
 </div>
 
 <div class="status-bar">
   <div class="status-dot" id="statusDot"></div>
-  <span id="statusText">Ready — click "Run Setup" to begin</span>
+  <span id="statusText">Ready — click "Run Phase 1" to begin</span>
 </div>
 
 <script>
-// ── Configuration ──────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 function getGateway() { return document.getElementById('gwUrl').value.replace(/\/+$/, ''); }
 function getApi() { return getGateway() + '/v1'; }
 
@@ -187,11 +206,12 @@ const COOP_ID = 'finger-lakes-food';
 const COOP_NAME = 'Finger Lakes Food Co-op';
 const DOMAIN_ID = 'coop:' + COOP_ID;
 
-// ── State ──────────────────────────────────────────────────────────────
-let identities = {};
+// ── State ─────────────────────────────────────────────────────────────────────
+let ids = {}; // alice, bob, carol
+let charterId = null;
 let proposalId = null;
 
-// ── Utilities ──────────────────────────────────────────────────────────
+// ── Utilities ─────────────────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
 
 function setStatus(text, state) {
@@ -201,28 +221,30 @@ function setStatus(text, state) {
 }
 
 function addStep(bodyId, text, status) {
-  const icons = { pending: '\u2022', active: '\u25e6', done: '\u2713', fail: '\u2717' };
+  const icons = { pending: '•', active: '◦', done: '✓', fail: '✗' };
   const body = $(bodyId);
   const div = document.createElement('div');
   div.className = 'step ' + status;
   const icon = document.createElement('div');
   icon.className = 'step-icon';
-  icon.textContent = icons[status] || '\u2022';
-  const span = document.createElement('span');
-  span.textContent = text;
+  icon.textContent = icons[status] || '•';
+  const content = document.createElement('div');
+  const label = document.createElement('span');
+  label.textContent = text;
+  content.appendChild(label);
   div.appendChild(icon);
-  div.appendChild(span);
+  div.appendChild(content);
   body.appendChild(div);
-  return div;
+  return { div, content };
 }
 
-function updateStep(div, status, detail) {
-  const icons = { pending: '\u2022', active: '\u25e6', done: '\u2713', fail: '\u2717' };
-  div.className = 'step ' + status;
-  div.querySelector('.step-icon').textContent = icons[status] || '\u2022';
+function updateStep(s, status, detail) {
+  const icons = { pending: '•', active: '◦', done: '✓', fail: '✗' };
+  s.div.className = 'step ' + status;
+  s.div.querySelector('.step-icon').textContent = icons[status] || '•';
   if (detail) {
-    let d = div.querySelector('.step-detail');
-    if (!d) { d = document.createElement('div'); d.className = 'step-detail'; div.appendChild(d); }
+    let d = s.div.querySelector('.step-detail');
+    if (!d) { d = document.createElement('div'); d.className = 'step-detail'; s.content.appendChild(d); }
     d.textContent = detail;
   }
 }
@@ -236,10 +258,10 @@ async function api(method, path, body, token) {
   let json = null;
   try { json = JSON.parse(text); } catch(e) {}
   if (r.status >= 400) throw new Error((json && json.error) || text || ('HTTP ' + r.status));
-  return { status: r.status, data: json, text };
+  return { status: r.status, data: json };
 }
 
-// ── Crypto ─────────────────────────────────────────────────────────────
+// ── Crypto ────────────────────────────────────────────────────────────────────
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function b58enc(bytes) {
   let n = 0n;
@@ -267,130 +289,225 @@ async function authenticate(id, scopes) {
   const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', id.keyPair.privateKey, hexDec(cr.data.nonce)));
   const vr = await api('POST', '/auth/verify', { did: id.did, signature: hexEnc(sig), coop_id: COOP_ID, scopes });
   id.token = vr.data.token;
-  return id.token;
 }
 
-// ── Phase 1: Setup ─────────────────────────────────────────────────────
+function memberCard(name, role, did, cssClass) {
+  const card = document.createElement('div');
+  card.className = 'member';
+  const av = document.createElement('div');
+  av.className = 'member-avatar ' + cssClass;
+  av.textContent = name[0];
+  const info = document.createElement('div');
+  const nameEl = document.createElement('div');
+  nameEl.className = 'member-name';
+  nameEl.textContent = name;
+  const roleEl = document.createElement('div');
+  roleEl.className = 'member-role' + (role.includes('Coordinator') ? ' coordinator' : '');
+  roleEl.textContent = role + ' • ' + did.substring(0, 22) + '...';
+  info.appendChild(nameEl);
+  info.appendChild(roleEl);
+  card.appendChild(av);
+  card.appendChild(info);
+  return card;
+}
+
+function principleBox(text) {
+  const box = document.createElement('div');
+  box.className = 'principle-box';
+  box.innerHTML = text;
+  return box;
+}
+
+// ── Phase 1: Founding Assembly ────────────────────────────────────────────────
 async function runPhase1() {
   const btn = $('btn1');
   btn.disabled = true;
   btn.textContent = 'Running...';
   btn.className = 'phase-btn running';
   $('body1').replaceChildren();
-  setStatus('Setting up cooperative...', 'running');
+  setStatus('Founding assembly...', 'running');
 
-  const allScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
+  const coordScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
 
   try {
-    // Generate identities
-    let s = addStep('body1', 'Generating digital identities for three members...', 'active');
-    identities.admin = await makeIdentity('Admin (Coordinator)');
-    identities.alice = await makeIdentity('Alice');
-    identities.bob = await makeIdentity('Bob');
-    updateStep(s, 'done', 'Three Ed25519 keypairs created');
+    let s = addStep('body1', 'Generating equal founding member identities...', 'active');
+    ids.alice = await makeIdentity('Alice');
+    ids.bob   = await makeIdentity('Bob');
+    ids.carol = await makeIdentity('Carol');
+    updateStep(s, 'done', 'Three Ed25519 keypairs — self-sovereign digital identities');
 
-    // Show members
     const membersDiv = document.createElement('div');
     membersDiv.className = 'members';
-    [{n:'Admin',r:'Coordinator',c:'admin',id:identities.admin},
-     {n:'Alice',r:'Member',c:'alice',id:identities.alice},
-     {n:'Bob',r:'Member',c:'bob',id:identities.bob}].forEach(m => {
-      const card = document.createElement('div');
-      card.className = 'member';
-      const av = document.createElement('div');
-      av.className = 'member-avatar ' + m.c;
-      av.textContent = m.n[0];
-      const info = document.createElement('div');
-      const name = document.createElement('div');
-      name.className = 'member-name';
-      name.textContent = m.n;
-      const role = document.createElement('div');
-      role.className = 'member-role';
-      role.textContent = m.r + ' \u2022 ' + m.id.did.substring(0,24) + '...';
-      info.appendChild(name);
-      info.appendChild(role);
-      card.appendChild(av);
-      card.appendChild(info);
-      membersDiv.appendChild(card);
-    });
+    membersDiv.appendChild(memberCard('Alice', 'Temporary Coordinator', ids.alice.did, 'alice'));
+    membersDiv.appendChild(memberCard('Bob', 'Equal Member', ids.bob.did, 'bob'));
+    membersDiv.appendChild(memberCard('Carol', 'Equal Member', ids.carol.did, 'carol'));
     $('body1').appendChild(membersDiv);
 
-    // Authenticate admin
-    s = addStep('body1', 'Authenticating Admin with challenge-response...', 'active');
-    await authenticate(identities.admin, allScopes);
-    updateStep(s, 'done', 'Signed cryptographic challenge, received JWT');
+    $('body1').appendChild(principleBox('<strong>Cooperative principle:</strong> Alice is elected coordinator for the founding. This is a temporary role — not a permanent admin position. Every member has equal voting weight.'));
 
-    // Create coop
+    s = addStep('body1', 'Alice authenticates as temporary coordinator...', 'active');
+    await authenticate(ids.alice, coordScopes);
+    updateStep(s, 'done', 'DID challenge-response complete, JWT issued');
+
     s = addStep('body1', 'Creating cooperative: ' + COOP_NAME + '...', 'active');
-    await api('POST', '/coops', { id: COOP_ID, name: COOP_NAME }, identities.admin.token);
+    await api('POST', '/coops', { id: COOP_ID, name: COOP_NAME }, ids.alice.token);
     updateStep(s, 'done');
 
-    // Create governance domain
-    s = addStep('body1', 'Creating governance domain with democratic rules...', 'active');
+    s = addStep('body1', 'Creating governance domain...', 'active');
     await api('POST', '/gov/domains', {
       id: DOMAIN_ID, name: COOP_NAME + ' Governance', profile: 'cooperative_default',
       quorum_percent: 50, approval_percent: 51, voting_period_days: 7,
-      members: [identities.admin.did]
-    }, identities.admin.token);
-    updateStep(s, 'done', '50% quorum required, simple majority to pass');
+      members: [ids.alice.did]
+    }, ids.alice.token);
+    updateStep(s, 'done', '50% quorum, simple majority, 7-day default period');
 
-    // Add members
-    s = addStep('body1', 'Adding Alice and Bob as voting members...', 'active');
-    await api('POST', '/coops/' + COOP_ID + '/members', { did: identities.alice.did, role: 'participant', display_name: 'Alice' }, identities.admin.token);
-    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: identities.alice.did, weight: 1.0 }, identities.admin.token);
-    await api('POST', '/coops/' + COOP_ID + '/members', { did: identities.bob.did, role: 'participant', display_name: 'Bob' }, identities.admin.token);
-    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: identities.bob.did, weight: 1.0 }, identities.admin.token);
-    updateStep(s, 'done', 'All three members have equal voting weight');
+    s = addStep('body1', 'Adding Bob as equal founding member...', 'active');
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: ids.bob.did, role: 'participant', display_name: 'Bob' }, ids.alice.token);
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: ids.bob.did, weight: 1.0 }, ids.alice.token);
+    updateStep(s, 'done', 'Equal voting weight: 1.0');
 
-    // Done
-    const p1 = $('phase1');
-    p1.className = 'phase done open';
-    btn.textContent = '\u2713 Setup Complete';
+    s = addStep('body1', 'Adding Carol as equal founding member...', 'active');
+    await api('POST', '/coops/' + COOP_ID + '/members', { did: ids.carol.did, role: 'participant', display_name: 'Carol' }, ids.alice.token);
+    await api('POST', '/gov/domains/' + DOMAIN_ID + '/members', { did: ids.carol.did, weight: 1.0 }, ids.alice.token);
+    updateStep(s, 'done', 'Equal voting weight: 1.0');
+
+    $('phase1').className = 'phase done open';
+    btn.textContent = '✓ Founding Assembly';
     btn.className = 'phase-btn';
     $('phase2').className = 'phase open';
     $('btn2').disabled = false;
-    setStatus('Cooperative created with 3 members — ready to vote', 'ok');
+    setStatus('Cooperative founded with 3 equal members — ready to ratify charter', 'ok');
   } catch(e) {
-    btn.textContent = 'Retry Setup';
+    btn.textContent = 'Retry';
     btn.className = 'phase-btn';
     btn.disabled = false;
     const err = document.createElement('div');
     err.className = 'error-box';
-    err.textContent = 'Setup failed: ' + e.message;
+    err.textContent = 'Phase 1 failed: ' + e.message;
     $('body1').appendChild(err);
     setStatus('Error: ' + e.message, 'error');
   }
 }
 
-// ── Phase 2: Govern ────────────────────────────────────────────────────
+// ── Phase 2: Charter Ratification ────────────────────────────────────────────
 async function runPhase2() {
   const btn = $('btn2');
   btn.disabled = true;
   btn.textContent = 'Running...';
   btn.className = 'phase-btn running';
   $('body2').replaceChildren();
-  setStatus('Running governance vote...', 'running');
+  setStatus('Charter ratification vote...', 'running');
 
   const govScopes = ['governance:read','governance:write'];
 
   try {
-    // Authenticate Alice
-    let s = addStep('body2', 'Alice authenticates to submit a proposal...', 'active');
-    await authenticate(identities.alice, govScopes);
+    $('body2').appendChild(principleBox('<strong>Cooperative principle:</strong> The first democratic act is ratifying the cooperative\'s own rules. No one person\'s authority creates the charter — the members do, together.'));
+
+    let s = addStep('body2', 'Alice submits founding charter for ratification...', 'active');
+    const cr = await api('POST', '/gov/proposals', {
+      domain_id: DOMAIN_ID,
+      title: 'Ratify the Finger Lakes Food Co-op Founding Charter',
+      description: 'Adopt the cooperative\'s founding charter, establishing member rights, governance structure, and operating principles.',
+      payload: {
+        type: 'text',
+        body: 'COOPERATIVE CHARTER — Finger Lakes Food Co-op\n\n1. MEMBERSHIP: Any person who supports our mission may join. All members have equal voting rights.\n2. GOVERNANCE: Decisions are made democratically. No member has more authority than any other.\n3. PURPOSE: To provide affordable, healthy food to our community and build economic resilience through cooperation.\n4. COORDINATION: Coordinators are elected for specific purposes and terms. All coordination roles rotate.\n5. AMENDMENT: This charter may be amended by a two-thirds vote of members.'
+      }
+    }, ids.alice.token);
+    charterId = cr.data.id || cr.data.proposal_id;
+    updateStep(s, 'done', 'Charter proposal: ' + charterId);
+
+    const charterCard = document.createElement('div');
+    charterCard.className = 'proposal-card';
+    const ct = document.createElement('div');
+    ct.className = 'proposal-title';
+    ct.textContent = 'Ratify the Finger Lakes Food Co-op Founding Charter';
+    const cd = document.createElement('div');
+    cd.className = 'proposal-desc';
+    cd.textContent = 'Establishes member rights, governance structure, and operating principles. No member has more authority than any other. All coordination roles rotate.';
+    charterCard.appendChild(ct);
+    charterCard.appendChild(cd);
+    $('body2').appendChild(charterCard);
+
+    s = addStep('body2', 'Opening charter for ratification vote...', 'active');
+    await api('POST', '/gov/proposals/' + charterId + '/open', { voting_period_seconds: 3600 }, ids.alice.token);
     updateStep(s, 'done');
 
-    // Create proposal
-    s = addStep('body2', 'Alice submits a budget proposal...', 'active');
+    s = addStep('body2', 'Alice votes to ratify...', 'active');
+    await api('POST', '/gov/proposals/' + charterId + '/vote', { choice: 'for', comment: 'This charter reflects our values. I vote to ratify.' }, ids.alice.token);
+    updateStep(s, 'done');
+
+    s = addStep('body2', 'Bob authenticates and votes to ratify...', 'active');
+    await authenticate(ids.bob, govScopes);
+    await api('POST', '/gov/proposals/' + charterId + '/vote', { choice: 'for', comment: 'Agreed. These rules give every member a voice.' }, ids.bob.token);
+    updateStep(s, 'done');
+
+    s = addStep('body2', 'Carol authenticates and votes to ratify...', 'active');
+    await authenticate(ids.carol, govScopes);
+    await api('POST', '/gov/proposals/' + charterId + '/vote', { choice: 'for', comment: 'Unanimously supported. Let\'s build something together.' }, ids.carol.token);
+    updateStep(s, 'done');
+
+    const votesDiv = document.createElement('div');
+    votesDiv.className = 'votes-container';
+    [{who:'Alice',vote:'for'},{who:'Bob',vote:'for'},{who:'Carol',vote:'for'}].forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'vote-row';
+      const badge = document.createElement('span');
+      badge.className = 'vote-badge for';
+      badge.textContent = 'for';
+      const name = document.createElement('span');
+      name.textContent = v.who + ' ratified the charter';
+      row.appendChild(badge);
+      row.appendChild(name);
+      votesDiv.appendChild(row);
+    });
+    $('body2').appendChild(votesDiv);
+
+    s = addStep('body2', 'Alice closes the ratification...', 'active');
+    await api('POST', '/gov/proposals/' + charterId + '/close', {}, ids.alice.token);
+    updateStep(s, 'done', 'Charter ratified 3/3 — cooperative is constituted');
+
+    $('phase2').className = 'phase done open';
+    btn.textContent = '✓ Charter Ratified';
+    btn.className = 'phase-btn';
+    $('phase3').className = 'phase open';
+    $('btn3').disabled = false;
+    setStatus('Charter ratified 3-0 — ready for first proposal', 'ok');
+  } catch(e) {
+    btn.textContent = 'Retry';
+    btn.className = 'phase-btn';
+    btn.disabled = false;
+    const err = document.createElement('div');
+    err.className = 'error-box';
+    err.textContent = 'Phase 2 failed: ' + e.message;
+    $('body2').appendChild(err);
+    setStatus('Error: ' + e.message, 'error');
+  }
+}
+
+// ── Phase 3: Democratic Decision ──────────────────────────────────────────────
+async function runPhase3() {
+  const btn = $('btn3');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  btn.className = 'phase-btn running';
+  $('body3').replaceChildren();
+  setStatus('Running democratic vote...', 'running');
+
+  const govScopes = ['governance:read','governance:write'];
+
+  try {
+    $('body3').appendChild(principleBox('<strong>Cooperative principle:</strong> Bob proposes — not the coordinator. Any member may initiate a proposal. Authority is distributed by design.'));
+
+    let s = addStep('body3', 'Bob submits a budget proposal...', 'active');
     const pr = await api('POST', '/gov/proposals', {
       domain_id: DOMAIN_ID,
       title: 'Approve $12,000 for community kitchen equipment',
       description: 'Purchase commercial-grade equipment for the shared community kitchen: convection oven ($4,000), industrial mixer ($3,000), prep tables and storage ($2,500), safety equipment and small tools ($2,500). This serves all 47 member households.',
-      payload: { type: 'budget', amount: 12000, recipient: identities.admin.did, currency: 'USD', purpose: 'Community Kitchen Equipment' }
-    }, identities.alice.token);
+      payload: { type: 'budget', amount: 12000, recipient: ids.alice.did, currency: 'USD', purpose: 'Community Kitchen Equipment' }
+    }, ids.bob.token);
     proposalId = pr.data.id || pr.data.proposal_id;
-    updateStep(s, 'done');
+    updateStep(s, 'done', 'Proposal: ' + proposalId);
 
-    // Show proposal card
     const card = document.createElement('div');
     card.className = 'proposal-card';
     const title = document.createElement('div');
@@ -398,113 +515,97 @@ async function runPhase2() {
     title.textContent = 'Approve $12,000 for community kitchen equipment';
     const desc = document.createElement('div');
     desc.className = 'proposal-desc';
-    desc.textContent = 'Purchase commercial-grade equipment for the shared community kitchen: convection oven ($4,000), industrial mixer ($3,000), prep tables and storage ($2,500), safety equipment and small tools ($2,500).';
+    desc.textContent = 'Convection oven ($4,000) · Industrial mixer ($3,000) · Prep tables and storage ($2,500) · Safety and small tools ($2,500) · Serves all 47 member households.';
     const meta = document.createElement('div');
     meta.className = 'proposal-meta';
-    const m1 = document.createElement('span');
-    m1.textContent = '\ud83d\udcb0 $12,000 USD';
-    const m2 = document.createElement('span');
-    m2.textContent = '\ud83d\udc64 Proposed by Alice';
-    const m3 = document.createElement('span');
-    m3.textContent = '\ud83c\udfdb\ufe0f ' + COOP_NAME;
-    meta.appendChild(m1);
-    meta.appendChild(m2);
-    meta.appendChild(m3);
-    card.appendChild(title);
-    card.appendChild(desc);
-    card.appendChild(meta);
-    $('body2').appendChild(card);
+    const m1 = document.createElement('span'); m1.textContent = '💰 $12,000 USD';
+    const m2 = document.createElement('span'); m2.textContent = '👤 Proposed by Bob';
+    const m3 = document.createElement('span'); m3.textContent = '🏛️ ' + COOP_NAME;
+    meta.appendChild(m1); meta.appendChild(m2); meta.appendChild(m3);
+    card.appendChild(title); card.appendChild(desc); card.appendChild(meta);
+    $('body3').appendChild(card);
 
-    // Open for voting
-    s = addStep('body2', 'Opening proposal for voting...', 'active');
-    await api('POST', '/gov/proposals/' + proposalId + '/open', { voting_period_seconds: 3600 }, identities.alice.token);
+    s = addStep('body3', 'Bob opens the proposal for voting...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/open', { voting_period_seconds: 3600 }, ids.bob.token);
     updateStep(s, 'done', 'Voting period: 1 hour');
 
-    // Alice votes
-    s = addStep('body2', 'Alice casts her vote: FOR', 'active');
-    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Essential equipment for our community kitchen. Fully support.' }, identities.alice.token);
+    s = addStep('body3', 'Alice votes FOR...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'This serves every member household. Fully support.' }, ids.alice.token);
     updateStep(s, 'done');
 
-    // Authenticate and vote as Bob
-    s = addStep('body2', 'Bob authenticates and casts his vote: FOR', 'active');
-    await authenticate(identities.bob, govScopes);
-    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'Great investment. The kitchen serves all our members.' }, identities.bob.token);
+    s = addStep('body3', 'Bob votes FOR his own proposal...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'I believe in this investment.' }, ids.bob.token);
     updateStep(s, 'done');
 
-    // Show votes
+    s = addStep('body3', 'Carol votes FOR...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/vote', { choice: 'for', comment: 'The kitchen benefits everyone.' }, ids.carol.token);
+    updateStep(s, 'done');
+
     const votesDiv = document.createElement('div');
     votesDiv.className = 'votes-container';
-    [{who:'Alice',vote:'for'},{who:'Bob',vote:'for'}].forEach(v => {
+    [{who:'Alice',label:'Alice voted'},{who:'Bob',label:'Bob voted (proposer)'},{who:'Carol',label:'Carol voted'}].forEach(v => {
       const row = document.createElement('div');
       row.className = 'vote-row';
       const badge = document.createElement('span');
-      badge.className = 'vote-badge ' + v.vote;
-      badge.textContent = v.vote;
+      badge.className = 'vote-badge for';
+      badge.textContent = 'for';
       const name = document.createElement('span');
-      name.textContent = v.who + ' voted';
+      name.textContent = v.label;
       row.appendChild(badge);
       row.appendChild(name);
       votesDiv.appendChild(row);
     });
-    $('body2').appendChild(votesDiv);
+    $('body3').appendChild(votesDiv);
 
-    // Done
-    const p2 = $('phase2');
-    p2.className = 'phase done open';
-    btn.textContent = '\u2713 Votes Cast';
+    $('phase3').className = 'phase done open';
+    btn.textContent = '✓ Votes Cast';
     btn.className = 'phase-btn';
-    $('phase3').className = 'phase open';
-    $('btn3').disabled = false;
-    setStatus('2 votes cast — ready to close and verify', 'ok');
+    $('phase4').className = 'phase open';
+    $('btn4').disabled = false;
+    setStatus('3 votes cast — Carol will close and verify', 'ok');
   } catch(e) {
-    btn.textContent = 'Retry Vote';
+    btn.textContent = 'Retry';
     btn.className = 'phase-btn';
     btn.disabled = false;
     const err = document.createElement('div');
     err.className = 'error-box';
-    err.textContent = 'Vote failed: ' + e.message;
-    $('body2').appendChild(err);
+    err.textContent = 'Phase 3 failed: ' + e.message;
+    $('body3').appendChild(err);
     setStatus('Error: ' + e.message, 'error');
   }
 }
 
-// ── Phase 3: Verify ────────────────────────────────────────────────────
-async function runPhase3() {
-  const btn = $('btn3');
+// ── Phase 4: Verification ─────────────────────────────────────────────────────
+async function runPhase4() {
+  const btn = $('btn4');
   btn.disabled = true;
   btn.textContent = 'Running...';
   btn.className = 'phase-btn running';
-  $('body3').replaceChildren();
-  setStatus('Closing vote and generating proof...', 'running');
-
-  const allScopes = ['coop:read','coop:write','coop:admin','governance:read','governance:write','treasury:read','treasury:write'];
+  $('body4').replaceChildren();
+  setStatus('Carol closing vote and generating proof...', 'running');
 
   try {
-    // Re-auth admin to close
-    let s = addStep('body3', 'Admin closes the voting period...', 'active');
-    await authenticate(identities.admin, allScopes);
-    await api('POST', '/gov/proposals/' + proposalId + '/close', {}, identities.admin.token);
-    updateStep(s, 'done');
+    $('body4').appendChild(principleBox('<strong>Cooperative principle:</strong> Carol closes the vote — not the coordinator, not the proposer. Any member may close a vote. This is rotating authority in practice.'));
 
-    // Get final state
-    s = addStep('body3', 'Retrieving final proposal state...', 'active');
-    const pr = await api('GET', '/gov/proposals/' + proposalId, null, identities.admin.token);
+    let s = addStep('body4', 'Carol closes the vote...', 'active');
+    await api('POST', '/gov/proposals/' + proposalId + '/close', {}, ids.carol.token);
+    updateStep(s, 'done', 'Closed by Carol — rotating authority demonstrated');
+
+    s = addStep('body4', 'Retrieving proposal outcome...', 'active');
+    const pr = await api('GET', '/gov/proposals/' + proposalId, null, ids.carol.token);
     const stateKey = typeof pr.data.state === 'object' ? Object.keys(pr.data.state)[0] : String(pr.data.state);
     updateStep(s, 'done', 'Outcome: ' + stateKey);
 
-    // Get tally
-    s = addStep('body3', 'Computing vote tally...', 'active');
-    const tr = await api('GET', '/gov/proposals/' + proposalId + '/tally', null, identities.admin.token);
+    s = addStep('body4', 'Computing vote tally...', 'active');
+    const tr = await api('GET', '/gov/proposals/' + proposalId + '/tally', null, ids.carol.token);
     const tally = tr.data;
-    updateStep(s, 'done', tally.for_votes + ' for, ' + tally.against_votes + ' against, ' + tally.abstain_votes + ' abstain');
+    updateStep(s, 'done', tally.for_votes + ' for · ' + tally.against_votes + ' against · ' + tally.abstain_votes + ' abstain');
 
-    // Show tally bar
     const tallyDiv = document.createElement('div');
     tallyDiv.className = 'tally';
     const total = tally.for_votes + tally.against_votes + tally.abstain_votes;
     const forPct = total > 0 ? Math.round(tally.for_votes / total * 100) : 0;
     const againstPct = total > 0 ? Math.round(tally.against_votes / total * 100) : 0;
-
     const bar = document.createElement('div');
     bar.className = 'tally-bar';
     const forBar = document.createElement('div');
@@ -515,52 +616,47 @@ async function runPhase3() {
     againstBar.style.width = againstPct + '%';
     bar.appendChild(forBar);
     bar.appendChild(againstBar);
-
     const labels = document.createElement('div');
     labels.className = 'tally-labels';
     const fl = document.createElement('span');
-    fl.textContent = '\u2705 For: ' + tally.for_votes + ' (' + forPct + '%)';
+    fl.textContent = '✅ For: ' + tally.for_votes + ' (' + forPct + '%)';
     const al = document.createElement('span');
-    al.textContent = '\u274c Against: ' + tally.against_votes + ' (' + againstPct + '%)';
+    al.textContent = '❌ Against: ' + tally.against_votes;
     labels.appendChild(fl);
     labels.appendChild(al);
-
     const result = document.createElement('div');
     result.className = 'tally-result ' + (stateKey === 'Accepted' ? 'accepted' : 'rejected');
-    result.textContent = stateKey === 'Accepted' ? '\u2705 PROPOSAL ACCEPTED' : '\u274c PROPOSAL ' + stateKey.toUpperCase();
-
+    result.textContent = stateKey === 'Accepted' ? '✅ PROPOSAL ACCEPTED' : '❌ PROPOSAL ' + stateKey.toUpperCase();
     tallyDiv.appendChild(bar);
     tallyDiv.appendChild(labels);
     tallyDiv.appendChild(result);
-    $('body3').appendChild(tallyDiv);
+    $('body4').appendChild(tallyDiv);
 
-    // Get proof
-    s = addStep('body3', 'Generating cryptographic receipt...', 'active');
-    const pfr = await api('GET', '/gov/proposals/' + proposalId + '/proof', null, identities.admin.token);
+    s = addStep('body4', 'Generating cryptographic proof...', 'active');
+    const pfr = await api('GET', '/gov/proposals/' + proposalId + '/proof', null, ids.carol.token);
     updateStep(s, 'done', 'Tamper-proof receipt generated');
 
-    // Show receipt card
     if (pfr.data) {
       const receipt = document.createElement('div');
       receipt.className = 'receipt';
       const h3 = document.createElement('h3');
-      h3.textContent = '\ud83d\udd10 Governance Receipt';
+      h3.textContent = '🔐 Governance Receipt';
       receipt.appendChild(h3);
 
       const receiptData = pfr.data.receipt || pfr.data;
-      const voteHash = receiptData.vote_hash ? (Array.isArray(receiptData.vote_hash) ? hexEnc(new Uint8Array(receiptData.vote_hash)) : receiptData.vote_hash) : 'N/A';
-      const decisionHash = receiptData.decision_hash ? (Array.isArray(receiptData.decision_hash) ? hexEnc(new Uint8Array(receiptData.decision_hash)) : receiptData.decision_hash) : 'N/A';
+      const toHex = v => v ? (Array.isArray(v) ? hexEnc(new Uint8Array(v)) : String(v)) : 'N/A';
+      const voteHash = toHex(receiptData.vote_hash);
+      const decisionHash = toHex(receiptData.decision_hash);
 
-      const rows = [
+      [
         ['Proposal', proposalId],
         ['Domain', DOMAIN_ID],
         ['Outcome', receiptData.outcome || stateKey],
-        ['For / Against / Abstain', tally.for_votes + ' / ' + tally.against_votes + ' / ' + tally.abstain_votes],
-        ['Vote Hash', voteHash.substring(0, 16) + '...' + voteHash.slice(-16)],
-        ['Decision Hash', decisionHash.substring(0, 16) + '...' + decisionHash.slice(-16)],
-      ];
-
-      rows.forEach(function(r) {
+        ['Tally', tally.for_votes + ' for / ' + tally.against_votes + ' against / ' + tally.abstain_votes + ' abstain'],
+        ['Closed by', 'Carol (rotating authority)'],
+        ['Vote Hash', voteHash.substring(0,16) + '...' + voteHash.slice(-16)],
+        ['Decision Hash', decisionHash.substring(0,16) + '...' + decisionHash.slice(-16)],
+      ].forEach(function(r) {
         const row = document.createElement('div');
         row.className = 'receipt-row';
         const label = document.createElement('span');
@@ -576,25 +672,23 @@ async function runPhase3() {
 
       const note = document.createElement('div');
       note.style.cssText = 'margin-top:.65rem;font-size:.78rem;color:var(--dim);line-height:1.5';
-      note.textContent = 'This receipt is cryptographically signed. Any modification to the votes, outcome, or proposal details would change the hash, making tampering immediately detectable.';
+      note.textContent = 'Any modification to the votes, outcome, or proposal details changes the hash — tampering is immediately detectable. No admin issued this receipt. The members did.';
       receipt.appendChild(note);
-
-      $('body3').appendChild(receipt);
+      $('body4').appendChild(receipt);
     }
 
-    // Done
-    $('phase3').className = 'phase done open';
-    btn.textContent = '\u2713 Verified';
+    $('phase4').className = 'phase done open';
+    btn.textContent = '✓ Verified';
     btn.className = 'phase-btn';
-    setStatus('Demo complete \u2014 decision recorded with cryptographic proof', 'ok');
+    setStatus('Demo complete — decision recorded with cryptographic proof', 'ok');
   } catch(e) {
-    btn.textContent = 'Retry Verify';
+    btn.textContent = 'Retry';
     btn.className = 'phase-btn';
     btn.disabled = false;
     const err = document.createElement('div');
     err.className = 'error-box';
-    err.textContent = 'Verification failed: ' + e.message;
-    $('body3').appendChild(err);
+    err.textContent = 'Phase 4 failed: ' + e.message;
+    $('body4').appendChild(err);
     setStatus('Error: ' + e.message, 'error');
   }
 }
