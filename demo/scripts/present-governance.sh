@@ -96,6 +96,7 @@ ICN_KEYSTORE_PASSPHRASE=demo "$ICND" --data-dir "$DATA_DIR" --init >/dev/null 2>
 echo "  [4/4] Starting gateway on port ${PORT}..."
 ICN_KEYSTORE_PASSPHRASE=demo \
 ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
+ICN_DEV_MODE=1 \
 "$ICND" \
   --gateway-enable \
   --gateway-bind "$BIND" \
