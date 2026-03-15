@@ -216,9 +216,7 @@ def main():
         print(f"  {C.BOLD}{C.WHITE}║   InterCooperative Network (ICN)                     ║{C.RESET}")
         print(f"  {C.BOLD}{C.WHITE}╚══════════════════════════════════════════════════════╝{C.RESET}")
         print()
-        print(f"  {C.DIM}No admin. No central server. Three equal founding members.{C.RESET}")
-        print(f"  {C.DIM}Every vote is signed. Every decision is verifiable.{C.RESET}")
-        print(f"  {C.DIM}The first democratic act ratifies the rules themselves.{C.RESET}")
+        print(f"  {C.DIM}Every vote is cryptographically signed. Every decision is verifiable.{C.RESET}")
         print()
         print(f"  {C.DIM}Gateway: {GATEWAY}{C.RESET}")
     else:
@@ -236,11 +234,11 @@ def main():
     # =========================================================================
     # PHASE 1: FOUNDING ASSEMBLY
     # =========================================================================
-    phase_header(1, "Founding Assembly",
-                 "Three equal founding members form the cooperative")
+    phase_header(1, "Member Setup",
+                 "Register the cooperative, provision identities, configure governance")
 
-    step(1, "Generate founding member identities")
-    narrator("Each founder gets a cryptographic keypair — a self-sovereign digital identity.")
+    step(1, "Generate member identities")
+    narrator("Each member gets a unique Ed25519 keypair. Their DID is derived from the public key.")
     alice = Identity("Alice")
     bob   = Identity("Bob")
     carol = Identity("Carol")
@@ -248,8 +246,7 @@ def main():
     ok(f"Bob:   {bob.did}")
     ok(f"Carol: {carol.did}")
 
-    step(2, "Alice authenticates (elected temporary coordinator)")
-    narrator("Alice is elected coordinator for the founding — a temporary, not permanent, role.")
+    step(2, "Alice authenticates as coordinator")
     coordinator_scopes = [
         "coop:read", "coop:write", "coop:admin",
         "governance:read", "governance:write",
@@ -258,7 +255,6 @@ def main():
     authenticate(alice, coordinator_scopes)
 
     step(3, "Create the cooperative")
-    narrator("The cooperative is registered on the network — owned by its members, not a company.")
     status, resp = api("POST", "/coops", {
         "id": COOP_ID,
         "name": COOP_NAME,
@@ -285,7 +281,6 @@ def main():
         fail("Failed to create governance domain", status, resp)
 
     step(5, "Add Bob to cooperative and governance domain")
-    narrator("Bob joins as an equal member with full voting rights.")
     status, resp = api("POST", f"/coops/{COOP_ID}/members", {
         "did": bob.did,
         "role": "participant",
@@ -298,12 +293,11 @@ def main():
         "weight": 1.0,
     }, alice.token)
     if status in (200, 201):
-        ok("Bob joined — equal voting weight")
+        ok("Bob added — voting weight 1.0")
     else:
         fail("Failed to add Bob to governance domain", status, resp)
 
     step(6, "Add Carol to cooperative and governance domain")
-    narrator("Carol joins — the cooperative now has three equal founding members.")
     status, resp = api("POST", f"/coops/{COOP_ID}/members", {
         "did": carol.did,
         "role": "participant",
@@ -316,22 +310,20 @@ def main():
         "weight": 1.0,
     }, alice.token)
     if status in (200, 201):
-        ok("Carol joined — equal voting weight")
+        ok("Carol added — voting weight 1.0")
     else:
         fail("Failed to add Carol to governance domain", status, resp)
 
-    phase_complete(f"{COOP_NAME} founded — Alice, Bob, and Carol, equal members.")
+    phase_complete(f"{COOP_NAME} — 3 members, governance domain active.")
     phase_pause("Charter Ratification")
 
     # =========================================================================
     # PHASE 2: CHARTER RATIFICATION
     # =========================================================================
     phase_header(2, "Charter Ratification",
-                 "The first democratic act: members ratify their own rules")
+                 "Members vote to adopt the cooperative's founding charter")
 
     step(7, "Alice submits the founding charter for ratification")
-    narrator("In a cooperative, even the rules are decided democratically.")
-    narrator("Alice proposes the charter — but it only takes effect when the members vote for it.")
     status, resp = api("POST", "/gov/proposals", {
         "domain_id": DOMAIN_ID,
         "title": "Ratify the Finger Lakes Food Co-op Founding Charter",
@@ -371,10 +363,8 @@ def main():
         fail("Failed to open charter", status, resp)
 
     step(9, "Alice votes to ratify the charter")
-    narrator("Alice votes first — the coordinator has no more weight than any other member.")
     status, resp = api("POST", f"/gov/proposals/{charter_id}/vote", {
         "choice": "for",
-        "comment": "This charter reflects our values. I vote to ratify.",
     }, alice.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Alice: FOR{C.RESET}")
@@ -385,7 +375,6 @@ def main():
     authenticate(bob, ["governance:read", "governance:write"])
     status, resp = api("POST", f"/gov/proposals/{charter_id}/vote", {
         "choice": "for",
-        "comment": "Agreed. These rules give every member a voice.",
     }, bob.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Bob: FOR{C.RESET}")
@@ -396,7 +385,6 @@ def main():
     authenticate(carol, ["governance:read", "governance:write"])
     status, resp = api("POST", f"/gov/proposals/{charter_id}/vote", {
         "choice": "for",
-        "comment": "Unanimously supported. Let's build something together.",
     }, carol.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Carol: FOR{C.RESET}")
@@ -404,25 +392,22 @@ def main():
         fail("Carol's charter vote failed", status, resp)
 
     step(12, "Alice closes the charter ratification")
-    narrator("3 votes cast, 3 in favor. The charter is ratified — by the members, for the members.")
     status, resp = api("POST", f"/gov/proposals/{charter_id}/close", {}, alice.token)
     if status in (200, 201):
         ok(f"{C.BOLD}{C.GREEN}Charter ratified — 3/3 unanimous{C.RESET}")
     else:
         fail("Failed to close charter", status, resp)
 
-    phase_complete("Charter ratified 3-0. The cooperative is constituted.")
+    phase_complete("Charter ratified 3/3.")
     phase_pause("Democratic Decision")
 
     # =========================================================================
     # PHASE 3: DEMOCRATIC DECISION
     # =========================================================================
-    phase_header(3, "Democratic Decision",
-                 "Bob proposes — any member can bring a proposal forward")
+    phase_header(3, "Budget Proposal",
+                 "Submit a spending proposal and record member votes")
 
     step(13, "Bob proposes community kitchen equipment")
-    narrator("Bob brings a budget proposal. The coordinator didn't propose this — Bob did.")
-    narrator("Any member can initiate a proposal. Authority is distributed.")
     status, resp = api("POST", "/gov/proposals", {
         "domain_id": DOMAIN_ID,
         "title": "Approve $12,000 for community kitchen equipment",
@@ -457,51 +442,42 @@ def main():
         fail("Failed to open proposal", status, resp)
 
     step(15, "Alice votes FOR the kitchen equipment")
-    narrator("Alice reviews Bob's proposal and votes.")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/vote", {
         "choice": "for",
-        "comment": "This serves every member household. Fully support.",
     }, alice.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Alice: FOR{C.RESET}")
     else:
         fail("Alice's vote failed", status, resp)
 
-    step(16, "Bob votes FOR his own proposal")
-    narrator("Bob votes on his own proposal — members may always vote on proposals they submit.")
+    step(16, "Bob votes FOR")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/vote", {
         "choice": "for",
-        "comment": "I believe in this investment. Voting in favor.",
     }, bob.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Bob: FOR{C.RESET}")
     else:
         fail("Bob's vote failed", status, resp)
 
-    step(17, "Carol votes FOR the proposal")
-    narrator("Carol casts the final vote.")
+    step(17, "Carol votes FOR")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/vote", {
         "choice": "for",
-        "comment": "The kitchen equipment benefits everyone. Yes.",
     }, carol.token)
     if status in (200, 201):
         ok(f"{C.GREEN}Carol: FOR{C.RESET}")
     else:
         fail("Carol's vote failed", status, resp)
 
-    phase_complete("All three members voted. 3 votes FOR, 0 against.")
+    phase_complete("3 votes FOR, 0 against.")
     phase_pause("Verification")
 
     # =========================================================================
     # PHASE 4: VERIFICATION
     # =========================================================================
     phase_header(4, "Verification",
-                 "Carol closes the vote — authority rotates across the membership")
+                 "Close the vote and generate a cryptographic audit receipt")
 
     step(18, "Carol closes and tallies the vote")
-    narrator("Carol closes the vote. Not the coordinator. Not the proposer.")
-    narrator("Any member can close a vote once the voting period ends.")
-    narrator("This is what rotating authority looks like.")
     status, resp = api("POST", f"/gov/proposals/{proposal_id}/close", {}, carol.token)
     if status in (200, 201):
         ok("Vote closed by Carol")
@@ -542,8 +518,7 @@ def main():
         print(f"  ⚠ Tally not available (HTTP {status})")
 
     step(19, "Generate cryptographic proof")
-    narrator("A tamper-proof receipt is generated — cryptographic evidence of this decision.")
-    narrator("Anyone can verify this decision happened. No one can alter it after the fact.")
+    narrator("Receipt binds the tally, outcome, and all ballot hashes into a single verifiable record.")
     status, resp = api("GET", f"/gov/proposals/{proposal_id}/proof", token=carol.token)
     proof_hash = None
     if status == 200:
@@ -576,21 +551,17 @@ def main():
         print(f"  {C.BOLD}{C.WHITE}╚══════════════════════════════════════════════════════╝{C.RESET}")
         print()
         print(f"  {C.CYAN}🏪 Cooperative:{C.RESET}  {COOP_NAME}")
-        print(f"  {C.CYAN}👥 Members:{C.RESET}      Alice (coordinator), Bob, Carol")
-        print(f"  {C.CYAN}📜 Charter:{C.RESET}      Ratified 3/3 — members adopted their own rules")
+        print(f"  {C.CYAN}🏛️  Domain:{C.RESET}       {DOMAIN_ID}")
+        print(f"  {C.CYAN}👥 Members:{C.RESET}      Alice, Bob, Carol")
+        print(f"  {C.CYAN}📜 Charter:{C.RESET}      Ratified 3/3")
         print(f"  {C.CYAN}📋 Proposal:{C.RESET}     \"Approve $12,000 for community kitchen equipment\"")
-        print(f"  {C.CYAN}🗳  Votes:{C.RESET}        "
-              f"{C.GREEN}{tally.get('for_votes', 3)} for{C.RESET}, "
-              f"{tally.get('against_votes', 0)} against, "
-              f"{tally.get('abstain_votes', 0)} abstain")
-        print(f"  {C.CYAN}✅ Result:{C.RESET}       {C.GREEN}{C.BOLD}ACCEPTED{C.RESET}")
+        print(f"  {C.CYAN}🗳  Tally:{C.RESET}         "
+              f"{C.GREEN}{tally.get('for_votes', 3)} for{C.RESET}  "
+              f"{tally.get('against_votes', 0)} against  "
+              f"{C.DIM}{tally.get('abstain_votes', 0)} abstain{C.RESET}")
+        print(f"  {C.CYAN}✅ Outcome:{C.RESET}      {C.GREEN}{C.BOLD}ACCEPTED{C.RESET}")
         if proof_hash:
-            print(f"  {C.CYAN}🔐 Proof:{C.RESET}        {C.DIM}{proof_hash[:40]}...{C.RESET}")
-        print()
-        print(f"  {C.DIM}What this demonstrates:{C.RESET}")
-        print(f"  {C.DIM}  No admin. Coordinator is elected and temporary.{C.RESET}")
-        print(f"  {C.DIM}  Any member can propose. Any member can close a vote.{C.RESET}")
-        print(f"  {C.DIM}  The first democratic act ratifies the rules themselves.{C.RESET}")
+            print(f"  {C.CYAN}🔐 Receipt:{C.RESET}      {C.DIM}{proof_hash[:48]}...{C.RESET}")
         print()
     else:
         print("=" * 60)
@@ -598,18 +569,13 @@ def main():
         print("=" * 60)
         print(f"""
   Cooperative:  {COOP_NAME}
-  Members:      Alice (coordinator), Bob, Carol
+  Domain:       {DOMAIN_ID}
+  Members:      Alice, Bob, Carol
   Charter:      Ratified 3/3
   Proposal:     "Approve $12,000 for community kitchen equipment"
-  Votes:        {tally.get('for_votes', 3)} FOR, {tally.get('against_votes', 0)} against
-  Status:       ACCEPTED — cryptographic audit trail generated
-
-  What this demonstrates:
-  • No admin. Coordinator is elected and temporary.
-  • Any member can propose. Any member can close a vote.
-  • The first democratic act ratifies the rules themselves.
-  • Every vote is cryptographically signed and non-repudiable.
-  • Every decision has a tamper-proof proof receipt.
+  Tally:        {tally.get('for_votes', 3)} for / {tally.get('against_votes', 0)} against
+  Outcome:      ACCEPTED
+  Receipt:      {proof_hash[:48] + '...' if proof_hash else 'N/A'}
 """)
 
 

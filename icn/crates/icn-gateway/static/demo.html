@@ -132,7 +132,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
   <div class="header">
     <h1>Cooperative Governance Demo</h1>
     <p class="subtitle">How cooperatives make decisions with <em>InterCooperative Network</em></p>
-    <p class="tagline">No admin. No central server. Three equal founding members.</p>
+    <p class="tagline">Cryptographic audit trail. Self-hosted. Works on your own infrastructure.</p>
     <div class="gateway-config">
       <label for="gwUrl">Gateway:</label>
       <input type="text" id="gwUrl" value="http://localhost:8080">
@@ -144,8 +144,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
     <div class="phase-header">
       <div class="phase-number">1</div>
       <div class="phase-titles">
-        <div class="phase-title">Founding Assembly</div>
-        <div class="phase-desc">Three equal founding members form the cooperative</div>
+        <div class="phase-title">Member Setup</div>
+        <div class="phase-desc">Register the cooperative, provision identities, configure governance</div>
       </div>
       <button class="phase-btn" id="btn1" onclick="runPhase1()">Run Phase 1</button>
     </div>
@@ -170,8 +170,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
     <div class="phase-header">
       <div class="phase-number">3</div>
       <div class="phase-titles">
-        <div class="phase-title">Democratic Decision</div>
-        <div class="phase-desc">Bob proposes — any member can bring a proposal forward</div>
+        <div class="phase-title">Budget Proposal</div>
+        <div class="phase-desc">Submit a spending proposal and record member votes</div>
       </div>
       <button class="phase-btn" id="btn3" onclick="runPhase3()" disabled>Run Phase 3</button>
     </div>
@@ -184,7 +184,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:
       <div class="phase-number">4</div>
       <div class="phase-titles">
         <div class="phase-title">Verification</div>
-        <div class="phase-desc">Carol closes the vote — authority rotates across the membership</div>
+        <div class="phase-desc">Close the vote and generate a cryptographic audit receipt</div>
       </div>
       <button class="phase-btn" id="btn4" onclick="runPhase4()" disabled>Run Phase 4</button>
     </div>
@@ -338,14 +338,12 @@ async function runPhase1() {
 
     const membersDiv = document.createElement('div');
     membersDiv.className = 'members';
-    membersDiv.appendChild(memberCard('Alice', 'Temporary Coordinator', ids.alice.did, 'alice'));
-    membersDiv.appendChild(memberCard('Bob', 'Equal Member', ids.bob.did, 'bob'));
-    membersDiv.appendChild(memberCard('Carol', 'Equal Member', ids.carol.did, 'carol'));
+    membersDiv.appendChild(memberCard('Alice', 'Coordinator', ids.alice.did, 'alice'));
+    membersDiv.appendChild(memberCard('Bob', 'Member', ids.bob.did, 'bob'));
+    membersDiv.appendChild(memberCard('Carol', 'Member', ids.carol.did, 'carol'));
     $('body1').appendChild(membersDiv);
 
-    $('body1').appendChild(principleBox('<strong>Cooperative principle:</strong> Alice is elected coordinator for the founding. This is a temporary role — not a permanent admin position. Every member has equal voting weight.'));
-
-    s = addStep('body1', 'Alice authenticates as temporary coordinator...', 'active');
+    s = addStep('body1', 'Alice authenticates as coordinator...', 'active');
     await authenticate(ids.alice, coordScopes);
     updateStep(s, 'done', 'DID challenge-response complete, JWT issued');
 
@@ -401,8 +399,6 @@ async function runPhase2() {
   const govScopes = ['governance:read','governance:write'];
 
   try {
-    $('body2').appendChild(principleBox('<strong>Cooperative principle:</strong> The first democratic act is ratifying the cooperative\'s own rules. No one person\'s authority creates the charter — the members do, together.'));
-
     let s = addStep('body2', 'Alice submits founding charter for ratification...', 'active');
     const cr = await api('POST', '/gov/proposals', {
       domain_id: DOMAIN_ID,
@@ -496,8 +492,6 @@ async function runPhase3() {
   const govScopes = ['governance:read','governance:write'];
 
   try {
-    $('body3').appendChild(principleBox('<strong>Cooperative principle:</strong> Bob proposes — not the coordinator. Any member may initiate a proposal. Authority is distributed by design.'));
-
     let s = addStep('body3', 'Bob submits a budget proposal...', 'active');
     const pr = await api('POST', '/gov/proposals', {
       domain_id: DOMAIN_ID,
@@ -585,8 +579,6 @@ async function runPhase4() {
   setStatus('Carol closing vote and generating proof...', 'running');
 
   try {
-    $('body4').appendChild(principleBox('<strong>Cooperative principle:</strong> Carol closes the vote — not the coordinator, not the proposer. Any member may close a vote. This is rotating authority in practice.'));
-
     let s = addStep('body4', 'Carol closes the vote...', 'active');
     await api('POST', '/gov/proposals/' + proposalId + '/close', {}, ids.carol.token);
     updateStep(s, 'done', 'Closed by Carol — rotating authority demonstrated');
@@ -653,7 +645,7 @@ async function runPhase4() {
         ['Domain', DOMAIN_ID],
         ['Outcome', receiptData.outcome || stateKey],
         ['Tally', tally.for_votes + ' for / ' + tally.against_votes + ' against / ' + tally.abstain_votes + ' abstain'],
-        ['Closed by', 'Carol (rotating authority)'],
+        ['Closed by', 'Carol'],
         ['Vote Hash', voteHash.substring(0,16) + '...' + voteHash.slice(-16)],
         ['Decision Hash', decisionHash.substring(0,16) + '...' + decisionHash.slice(-16)],
       ].forEach(function(r) {
@@ -672,7 +664,7 @@ async function runPhase4() {
 
       const note = document.createElement('div');
       note.style.cssText = 'margin-top:.65rem;font-size:.78rem;color:var(--dim);line-height:1.5';
-      note.textContent = 'Any modification to the votes, outcome, or proposal details changes the hash — tampering is immediately detectable. No admin issued this receipt. The members did.';
+      note.textContent = 'Any modification to the votes, outcome, or proposal details changes the hash and breaks verification. This receipt can be checked independently against the raw ballot records.';
       receipt.appendChild(note);
       $('body4').appendChild(receipt);
     }
