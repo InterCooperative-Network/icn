@@ -1,5 +1,4 @@
----
-// Layout.astro — Main site shell with nav + footer
+﻿---
 import '../styles/global.css';
 import ThemeToggle from '../components/ThemeToggle.astro';
 
@@ -9,7 +8,7 @@ export interface Props {
   activeNav?: string;
 }
 
-const { title, description = 'A substrate daemon for the cooperative internet. DIDs, trust graphs, mutual credit, CCL contracts, and democratic governance — all in one P2P coordination layer.', activeNav = '' } = Astro.props;
+const { title, description = 'Democratic infrastructure for cooperatives, communities, and federations. Build your co-op on infrastructure no one owns but everyone runs.', activeNav = '' } = Astro.props;
 const currentPath = Astro.url.pathname;
 
 const jsonLd = {
@@ -21,19 +20,15 @@ const jsonLd = {
       "name": "InterCooperative Network",
       "url": "https://intercooperative.network",
       "logo": "https://intercooperative.network/favicon.svg",
-      "sameAs": [
-        "https://github.com/InterCooperative-Network"
-      ]
+      "sameAs": ["https://github.com/InterCooperative-Network"]
     },
     {
       "@type": "WebSite",
       "@id": "https://intercooperative.network/#website",
       "url": "https://intercooperative.network",
       "name": "InterCooperative Network",
-      "description": "A substrate daemon for the cooperative internet.",
-      "publisher": {
-        "@id": "https://intercooperative.network/#organization"
-      }
+      "description": "Democratic infrastructure for cooperatives, communities, and federations.",
+      "publisher": { "@id": "https://intercooperative.network/#organization" }
     }
   ]
 };
@@ -47,46 +42,36 @@ const jsonLd = {
   <meta name="description" content={description} />
   <meta name="theme-color" content="#06090f" />
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
-
   <title>{title} | InterCooperative Network</title>
-  
   <script is:inline>
-    // Prevent theme flash
     const theme = (() => {
-      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
-        return localStorage.getItem('theme');
-      }
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
     })();
-    if (theme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-    }
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
   </script>
 </head>
 <body>
-  <!-- Navigation -->
   <nav class="nav" id="main-nav">
     <div class="nav-inner">
       <a href="/" class="nav-logo">
         <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none">
           <rect width="128" height="128" rx="28" fill="url(#nav-bg)"/>
-          <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-          <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-          <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-          <circle cx="64" cy="30" r="11" fill="url(#nav-teal)"/>
-          <circle cx="34" cy="82" r="11" fill="url(#nav-teal)"/>
-          <circle cx="94" cy="82" r="11" fill="url(#nav-teal)"/>
-          <circle cx="64" cy="64" r="4" fill="url(#nav-teal)" opacity="0.8"/>
+          <line x1="64" y1="30" x2="34" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+          <line x1="64" y1="30" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+          <line x1="34" y1="82" x2="94" y2="82" stroke="url(#nav-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+          <circle cx="64" cy="30" r="11" fill="url(#nav-warm)"/>
+          <circle cx="34" cy="82" r="11" fill="url(#nav-warm)"/>
+          <circle cx="94" cy="82" r="11" fill="url(#nav-warm)"/>
+          <circle cx="64" cy="64" r="4" fill="url(#nav-warm)" opacity="0.8"/>
           <defs>
             <linearGradient id="nav-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"/><stop offset="1" stop-color="#0a1628"/></linearGradient>
-            <linearGradient id="nav-teal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+            <linearGradient id="nav-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#fb923c"/></linearGradient>
           </defs>
         </svg>
         <span>ICN</span>
@@ -115,12 +100,10 @@ const jsonLd = {
     </div>
   </nav>
 
-  <!-- Main Content -->
   <main>
     <slot />
   </main>
 
-  <!-- Footer -->
   <footer class="footer">
     <div class="container">
       <div class="footer-inner">
@@ -128,21 +111,21 @@ const jsonLd = {
           <a href="/" class="nav-logo">
             <svg class="nav-logo-svg" width="28" height="28" viewBox="0 0 128 128" fill="none">
               <rect width="128" height="128" rx="28" fill="url(#ft-bg)"/>
-              <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-              <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-              <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-teal)" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
-              <circle cx="64" cy="30" r="11" fill="url(#ft-teal)"/>
-              <circle cx="34" cy="82" r="11" fill="url(#ft-teal)"/>
-              <circle cx="94" cy="82" r="11" fill="url(#ft-teal)"/>
-              <circle cx="64" cy="64" r="4" fill="url(#ft-teal)" opacity="0.8"/>
+              <line x1="64" y1="30" x2="34" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+              <line x1="64" y1="30" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+              <line x1="34" y1="82" x2="94" y2="82" stroke="url(#ft-warm)" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+              <circle cx="64" cy="30" r="11" fill="url(#ft-warm)"/>
+              <circle cx="34" cy="82" r="11" fill="url(#ft-warm)"/>
+              <circle cx="94" cy="82" r="11" fill="url(#ft-warm)"/>
+              <circle cx="64" cy="64" r="4" fill="url(#ft-warm)" opacity="0.8"/>
               <defs>
                 <linearGradient id="ft-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f2027"/><stop offset="1" stop-color="#0a1628"/></linearGradient>
-                <linearGradient id="ft-teal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+                <linearGradient id="ft-warm" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#fb923c"/></linearGradient>
               </defs>
             </svg>
             <span>InterCooperative Network</span>
           </a>
-          <p>A substrate daemon for the cooperative internet. Infrastructure for cooperatives, communities, and federations.</p>
+          <p>Democratic infrastructure for cooperatives, communities, and federations. Infrastructure no one owns, but everyone runs.</p>
         </div>
 
         <div class="footer-col">
@@ -171,24 +154,23 @@ const jsonLd = {
             <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank">GitHub</a></li>
             <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank">Issues</a></li>
             <li><a href="/community">Community</a></li>
+            <li><a href="/blog">Blog</a></li>
           </ul>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <span>AGPL-3.0 License · InterCooperative Network</span>
+        <span>AGPL-3.0 · InterCooperative Network · cooperative infrastructure, not extractive tech</span>
         <span>Built with cooperation, not extraction</span>
       </div>
     </div>
   </footer>
 
   <script is:inline>
-    // Mobile nav toggle
     document.getElementById('nav-toggle')?.addEventListener('click', () => {
       document.getElementById('nav-links')?.classList.toggle('open');
     });
 
-    // Scroll-reveal animations
     const revealObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -198,7 +180,7 @@ const jsonLd = {
       });
     }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
-    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive').forEach(el => {
+    document.querySelectorAll('.card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step').forEach(el => {
       el.classList.add('reveal');
       revealObserver.observe(el);
     });

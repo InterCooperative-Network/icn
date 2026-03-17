@@ -1,11 +1,9 @@
----
-// src/pages/about.astro — About ICN
+﻿---
 import Layout from '../layouts/Layout.astro';
 import fs from 'node:fs';
 import { renderMarkdown } from '../lib/markdown';
 import { resolveRepoDoc } from '../lib/paths';
 
-// VISION.md from repo root docs/
 const visionPath = resolveRepoDoc('VISION.md');
 let visionHtml = '';
 if (fs.existsSync(visionPath)) {
@@ -17,13 +15,17 @@ if (fs.existsSync(visionPath)) {
   <section class="section" style="padding-top: calc(64px + var(--space-3xl));">
     <div class="container">
       <div class="about-hero">
-        <span class="badge badge-purple">About the Project</span>
+        <span class="badge badge-amber">About the Project</span>
         <h1>InterCooperative Network</h1>
         <p class="about-lead">
-          ICN treats systemic transformation as an infrastructure challenge. We're building the 
-          substrate that lets cooperatives, communities, and federations govern themselves 
-          democratically and coordinate economically — without extractive platforms or central authorities.
+          Cooperatives built on extractive platforms are still extractive at the infrastructure layer.
+          ICN is the substrate that fixes that — democratic governance, cooperative economics, and
+          self-sovereign identity running on P2P infrastructure that no one owns but everyone runs.
         </p>
+        <div class="about-ctas">
+          <a href="/docs/GETTING_STARTED" class="btn btn-primary">Try it now →</a>
+          <a href="/roadmap" class="btn btn-ghost">See the roadmap</a>
+        </div>
       </div>
     </div>
   </section>
@@ -34,37 +36,36 @@ if (fs.existsSync(visionPath)) {
         <div>
           <h2>What is ICN?</h2>
           <p style="margin-top: var(--space-md);">
-            ICN is a P2P coordination daemon — a background service that runs on your machine (or server) 
-            and connects with other ICN nodes to form cooperative networks. It provides four 
-            foundational "institution primitives":
+            ICN is a P2P coordination daemon — a background service that connects with other ICN nodes
+            to form cooperative networks. It provides four foundational institution primitives:
           </p>
           <div class="primitive-list">
             <div class="primitive">
-              <div class="primitive-icon">🔐</div>
+              <div class="primitive-icon">🔑</div>
               <div>
                 <strong>Identity & Membership</strong>
-                <p>Self-sovereign DIDs, capability-based access, web-of-participation trust</p>
+                <p>Self-sovereign DIDs with Ed25519 cryptography. Web-of-participation trust. Your members own their identity.</p>
               </div>
             </div>
             <div class="primitive">
               <div class="primitive-icon">📜</div>
               <div>
                 <strong>Rules & Governance</strong>
-                <p>CCL contracts encode bylaws as executable code — democratic decisions at any scale</p>
+                <p>CCL contracts encode bylaws as executable code. Proposals, votes, receipts, delegation — democratic decisions that scale.</p>
               </div>
             </div>
             <div class="primitive">
               <div class="primitive-icon">💰</div>
               <div>
                 <strong>Economics</strong>
-                <p>Mutual credit ledger, mana-based resource allocation, cooperative treasury</p>
+                <p>Mutual credit ledger with Merkle-DAG integrity. Dynamic credit limits. Cooperative treasury without extractive finance.</p>
               </div>
             </div>
             <div class="primitive">
               <div class="primitive-icon">🌐</div>
               <div>
                 <strong>Interoperation</strong>
-                <p>Federation agreements, cross-group trust, clearing, and resource sharing</p>
+                <p>Federation agreements, cross-group trust, clearing, and shared resource allocation across cooperative networks.</p>
               </div>
             </div>
           </div>
@@ -86,7 +87,7 @@ if (fs.existsSync(visionPath)) {
             <div class="comp-row">
               <span>Economics</span>
               <span class="comp-old">Extractive finance</span>
-              <span class="comp-new">Mutual credit + mana</span>
+              <span class="comp-new">Mutual credit + cooperative treasury</span>
             </div>
             <div class="comp-row">
               <span>Identity</span>
@@ -100,8 +101,8 @@ if (fs.existsSync(visionPath)) {
             </div>
             <div class="comp-row">
               <span>Infrastructure</span>
-              <span class="comp-old">Central servers / Blockchain</span>
-              <span class="comp-new">P2P daemon, no mining</span>
+              <span class="comp-old">Central servers / blockchain</span>
+              <span class="comp-new">P2P daemon — no mining, no landlord</span>
             </div>
           </div>
         </div>
@@ -109,99 +110,37 @@ if (fs.existsSync(visionPath)) {
     </div>
   </section>
 
-  <!-- Vision from repo -->
-  <section class="section">
-    <div class="container-narrow">
-      <span class="badge badge-teal mb-lg">From VISION.md</span>
-      <article class="prose" set:html={visionHtml} />
-    </div>
-  </section>
+  {visionHtml && (
+    <section class="section">
+      <div class="container-narrow">
+        <span class="badge badge-teal mb-lg">From VISION.md</span>
+        <article class="prose" set:html={visionHtml} />
+      </div>
+    </section>
+  )}
 </Layout>
 
 <style>
-  .about-hero {
-    max-width: 720px;
-  }
-
-  .about-hero h1 {
-    margin: var(--space-md) 0;
-  }
-
-  .about-lead {
-    font-size: 1.25rem;
-    line-height: 1.8;
-  }
-
-  .primitive-list {
-    margin-top: var(--space-xl);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-
-  .primitive {
-    display: flex;
-    gap: var(--space-md);
-    padding: var(--space-md);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-subtle);
-  }
-
-  .primitive-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-
-  .primitive strong {
-    color: var(--text-heading);
-    display: block;
-    margin-bottom: var(--space-xs);
-  }
-
-  .primitive p {
-    font-size: 0.875rem;
-    margin: 0;
-  }
+  .about-hero { max-width: 720px; }
+  .about-hero h1 { margin: var(--space-md) 0; }
+  .about-lead { font-size: 1.25rem; line-height: 1.8; margin-bottom: var(--space-lg); }
+  .about-ctas { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 
   .comparison-table {
     margin-top: var(--space-xl);
     border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+    border-radius: var(--radius-lg); overflow: hidden;
   }
-
   .comp-row {
-    display: grid;
-    grid-template-columns: 100px 1fr 1fr;
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.8125rem;
+    display: grid; grid-template-columns: 100px 1fr 1fr;
+    border-bottom: 1px solid var(--border-subtle); font-size: .8125rem;
   }
-
   .comp-row:last-child { border-bottom: none; }
-
-  .comp-row span {
-    padding: var(--space-sm) var(--space-md);
-    color: var(--text-secondary);
-  }
-
+  .comp-row span { padding: var(--space-sm) var(--space-md); color: var(--text-secondary); }
   .comp-header span {
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: 0.6875rem;
-    letter-spacing: 0.1em;
-    background: var(--bg-card);
+    font-weight: 600; color: var(--text-muted); text-transform: uppercase;
+    font-size: .6875rem; letter-spacing: .1em; background: var(--bg-card);
   }
-
-  .comp-old {
-    color: var(--text-muted) !important;
-    text-decoration: line-through;
-    opacity: 0.7;
-  }
-
-  .comp-new {
-    color: var(--accent-teal) !important;
-  }
+  .comp-old { color: var(--text-muted) !important; text-decoration: line-through; opacity: .7; }
+  .comp-new { color: var(--accent-teal) !important; }
 </style>

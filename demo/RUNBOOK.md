@@ -21,7 +21,7 @@ python3 demo/scripts/demo-governance.py http://localhost:8080
 pkill -f icnd
 ```
 
-All 18 steps run without pausing. Exit code 0 = success, 1 = failure.
+All 19 steps run without pausing. Exit code 0 = success, 1 = failure.
 
 ## Presenter Mode (interactive, for live demos)
 
@@ -156,7 +156,7 @@ rm -rf /tmp/icn-demo /tmp/icn-demo-*
 | File | Purpose |
 |------|---------|
 | `demo/scripts/start-demo.sh` | Cold-start: build, init, start, health check |
-| `demo/scripts/demo-governance.py` | 18-step governance flow (automated or `--presenter`) |
+| `demo/scripts/demo-governance.py` | 19-step governance flow (automated or `--presenter`) |
 | `demo/scripts/present-governance.sh` | All-in-one presenter launcher |
 | `demo/scripts/record-demo.sh` | Record terminal demo with asciinema |
 | `icn/crates/icn-gateway/static/demo.html` | Browser-based demo UI |

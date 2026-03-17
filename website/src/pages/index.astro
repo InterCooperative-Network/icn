@@ -1,39 +1,35 @@
----
-// src/pages/index.astro — ICN Homepage
+﻿---
 import Layout from '../layouts/Layout.astro';
 import NetworkGraph from '../components/NetworkGraph.astro';
-import stats from '../data/stats.json';
 
-// Format large numbers nicely
-function fmt(n: number): string {
-  if (n >= 1000) return Math.floor(n / 1000) + 'K+';
-  return n.toString();
-}
+
+const commitUrl = 'https://github.com/InterCooperative-Network/icn/commits/main';
 ---
 
-<Layout title="A Substrate Daemon for the Cooperative Internet" activeNav="home">
-  <!-- Hero Section -->
+<Layout title="Democratic Infrastructure for Cooperatives" activeNav="home">
+
+  <!-- ═══ HERO ═══════════════════════════════════════════════════ -->
   <section class="hero relative overflow-hidden">
-    <div class="absolute inset-0 z-0 opacity-60 pointer-events-auto">
-      <NetworkGraph client:idle />
+    <div class="absolute inset-0 z-0 opacity-40 pointer-events-auto">
+      <NetworkGraph />
     </div>
-    
-    <div class="container relative z-10 pointer-events-none">
-      <div class="hero-content animate-in pointer-events-auto">
+
+    <div class="container relative z-10">
+      <div class="hero-content animate-in">
         <div class="badge badge-teal mb-lg">
           <span class="badge-dot"></span>
-          Active Development · {stats.crates} crates · {fmt(stats.testCount)} tests passing
+          Active Development · Stage A: Institution-in-a-Box
         </div>
 
         <h1>
-          A Substrate Daemon<br/>
-          <span class="gradient-text">For The Cooperative Internet</span>
+          Build cooperatives<br/>
+          <span class="gradient-text">that govern themselves.</span>
         </h1>
 
         <p>
-          P2P coordination infrastructure for cooperatives, communities, and federations. 
-          Decentralized identity, trust graphs, mutual credit, smart contracts, 
-          and democratic governance — without blockchain or central servers.
+          ICN is democratic infrastructure for cooperatives, communities, and federations.
+          Charter your org, run democratic votes, manage your treasury, and federate with peers —
+          on infrastructure no one owns but everyone runs.
         </p>
 
         <div class="hero-actions">
@@ -43,218 +39,156 @@ function fmt(n: number): string {
           </a>
           <a href="https://github.com/InterCooperative-Network/icn" target="_blank" class="btn btn-secondary">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-            View Source
+            View on GitHub
           </a>
-          <a href="/docs" class="btn btn-ghost">
-            Read the Docs
-          </a>
-        </div>
-
-        <div class="hero-stats">
-          <div class="stat">
-            <div class="stat-value">{fmt(stats.rustLinesOfCode)}</div>
-            <div class="stat-label">Lines of Rust</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value blue">{stats.crates}</div>
-            <div class="stat-label">Crates</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value purple">{fmt(stats.testCount)}</div>
-            <div class="stat-label">Tests</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value amber">{stats.mergedPRs}</div>
-            <div class="stat-label">Merged PRs</div>
-          </div>
+          <a href="/about" class="btn btn-ghost">Learn More</a>
         </div>
       </div>
     </div>
-    <!-- Background visual -->
+      </div>
+    </div>
     <div class="hero-bg-grid" aria-hidden="true"></div>
   </section>
 
-  <!-- What ICN Is Section -->
-  <section class="section-alt">
-    <div class="container">
-      <div class="section-header">
-        <span class="badge badge-teal">The Constraint Engine</span>
-        <h2>Not a blockchain. Not a server.<br/>A <span class="shimmer-text">coordination substrate</span>.</h2>
-        <p>
-          ICN is a P2P daemon where cooperative apps translate governance into generic constraints, 
-          and the kernel enforces them without understanding their meaning. 
-          This is the <strong style="color: var(--text-heading)">Meaning Firewall</strong>.
-        </p>
-      </div>
-
-      <div class="arch-diagram">
-        <div class="arch-layer arch-top">
-          <div class="arch-box accent-purple">
-            <span class="arch-label">CCL Document</span>
-            <span class="arch-desc">constitution · bylaws · treaty</span>
-          </div>
-        </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-layer arch-middle">
-          <div class="arch-box accent-blue">
-            <span class="arch-label">Policy Oracles</span>
-            <span class="arch-desc">governance · trust · ledger</span>
-          </div>
-        </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-layer arch-middle">
-          <div class="arch-box accent-teal">
-            <span class="arch-label">ConstraintSet</span>
-            <span class="arch-desc">rate limits · credit ceilings · capability grants</span>
-          </div>
-        </div>
-        <div class="arch-arrow">↓</div>
-        <div class="arch-layer arch-bottom">
-          <div class="arch-box accent-amber">
-            <span class="arch-label">Kernel</span>
-            <span class="arch-desc">enforces constraints mechanically — no domain semantics</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Core Capabilities -->
+  <!-- ═══ USE CASES ══════════════════════════════════════════════ -->
   <section class="section">
     <div class="container">
       <div class="section-header">
-        <span class="badge badge-blue">What ICN Provides</span>
-        <h2>Institution primitives, built for cooperation</h2>
+        <span class="badge badge-amber">What You Can Build</span>
+        <h2>From charter to treasury,<br/><span class="shimmer-text">in one afternoon.</span></h2>
         <p>
-          Everything a cooperative, community, or federation needs to govern itself democratically, 
-          coordinate economically, and interoperate with peers.
+          ICN gives cooperatives the full stack: identity, governance, economics, and federation.
+          No platform fees. No central admin. No extractive middleman.
         </p>
       </div>
 
       <div class="grid grid-3">
-        <div class="card card-accent-teal animate-in">
-          <div class="card-icon">🔐</div>
-          <h3>Decentralized Identity</h3>
-          <p>DIDs with Ed25519 cryptography, Age-encrypted keystores, and post-quantum hybrid signatures. Self-sovereign identity without infrastructure dependencies.</p>
+        <div class="use-case-card card card-accent-teal animate-in">
+          <div class="card-icon">🏛️</div>
+          <h3>Form a Cooperative</h3>
+          <p>Three members, one vote, five minutes. Generate self-sovereign DIDs, submit a founding charter, and open a treasury. Your governance data lives on infrastructure you run.</p>
+          <div class="card-footer">
+            <span class="tech-pill">DID · Ed25519</span>
+            <span class="tech-pill">Charter · CCL</span>
+          </div>
         </div>
 
-        <div class="card card-accent-teal animate-in animate-delay-1">
-          <div class="card-icon">🕸️</div>
-          <h3>Trust Graph</h3>
-          <p>Web-of-participation trust computation with signed attestations, transitive propagation, and scope-bounded scoring. Trust derives from relationships, not proof-of-work.</p>
-        </div>
-
-        <div class="card card-accent-blue animate-in animate-delay-2">
-          <div class="card-icon">💰</div>
-          <h3>Mutual Credit Ledger</h3>
-          <p>Double-entry accounting with Merkle-DAG integrity, dynamic credit limits, fork resolution, and witness signatures. Cooperative economics without extractive finance.</p>
-        </div>
-
-        <div class="card card-accent-blue animate-in animate-delay-3">
-          <div class="card-icon">📜</div>
-          <h3>CCL Contracts</h3>
-          <p>Program bylaws, governance rules, and federation agreements as executable code. Deterministic WASM execution with fuel metering and capability-based security.</p>
-        </div>
-
-        <div class="card card-accent-purple animate-in animate-delay-4">
+        <div class="use-case-card card card-accent-amber animate-in animate-delay-1">
           <div class="card-icon">🗳️</div>
-          <h3>Democratic Governance</h3>
-          <p>Proposals, voting, delegation, and policy execution with liquid democracy support. Democratic decision-making that scales from local coops to global federations.</p>
+          <h3>Run Democratic Votes</h3>
+          <p>Any member can propose. Any member can close. Every decision produces a cryptographic receipt with a vote hash you can verify forever — not a spreadsheet in someone's inbox.</p>
+          <div class="card-footer">
+            <span class="tech-pill">Proposals · Tally</span>
+            <span class="tech-pill">Receipts · Proofs</span>
+          </div>
         </div>
 
-        <div class="card card-accent-purple animate-in">
+        <div class="use-case-card card card-accent-green animate-in animate-delay-2">
           <div class="card-icon">🌐</div>
-          <h3>P2P Networking</h3>
-          <p>QUIC/TLS sessions with mDNS discovery, gossip replication with causal ordering, and trust-gated topic subscription. No central servers required.</p>
+          <h3>Federate With Others</h3>
+          <p>Connect your co-op to a network through trust agreements and mutual credit. Inter-cooperative clearing without a bank. Shared resources without a landlord.</p>
+          <div class="card-footer">
+            <span class="tech-pill">Trust Graph</span>
+            <span class="tech-pill">Mutual Credit</span>
+          </div>
         </div>
       </div>
     </div>
-  </section>
-
-  <!-- Vision Section -->
+  </section>﻿
+  <!-- ═══ DEMO CALLOUT ══════════════════════════════════════════ -->
   <section class="section-alt">
     <div class="container">
-      <div class="vision-grid">
-        <div class="vision-content">
-          <span class="badge badge-purple">Vision: Institution-in-a-Box</span>
-          <h2>Spin up a community. Give it rules. Give it money flows. Make it interoperable.</h2>
+      <div class="demo-callout">
+        <div class="demo-text">
+          <span class="badge badge-green">Live Demo</span>
+          <h2>See it working.<br/>Right now.</h2>
           <p>
-            ICN exposes four "institution primitives" cleanly: <strong style="color: var(--text-heading)">Identity & Membership</strong>, 
-            <strong style="color: var(--text-heading)">Rules & Governance</strong>, 
-            <strong style="color: var(--text-heading)">Economics</strong>, and 
-            <strong style="color: var(--text-heading)">Interoperation</strong>.
+            Alice, Bob, and Carol formed a cooperative, unanimously ratified their charter,
+            and approved a $12,000 equipment proposal — each receiving a cryptographic
+            receipt they can verify independently. No central server. No admin account. No platform lock-in.
           </p>
-          <p>
-            The first product is a municipal operating system starter kit — one-click "New Coop", 
-            default charter templates, membership onboarding, treasury ledger, and a proposal-to-vote loop.
+          <div class="demo-actions">
+            <a href="http://localhost:8080/static/demo.html" target="_blank" class="btn btn-primary">
+              Launch Demo
+              <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+            <a href="/docs/GETTING_STARTED" class="btn btn-ghost">Run it locally →</a>
+          </div>
+          <p class="demo-note">
+            The demo runs the full governance stack locally — no network, no cloud, no accounts.
+            Start it with <code>bash demo/scripts/start-demo.sh</code>.
           </p>
-          <a href="/about" class="btn btn-secondary mt-lg">Learn More →</a>
         </div>
-        <div class="vision-stages">
-          <div class="stage-item">
-            <div class="stage-num stage-a">A</div>
-            <div>
-              <h4>Institutions</h4>
-              <p>Institution-in-a-Box, Charters, Treasury</p>
-            </div>
+        <div class="demo-terminal">
+          <div class="terminal-header">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">demo-governance.py</span>
           </div>
-          <div class="stage-item">
-            <div class="stage-num stage-b">B</div>
-            <div>
-              <h4>Federation</h4>
-              <p>Agreements, Cross-group Trust, Clearing</p>
-            </div>
-          </div>
-          <div class="stage-item">
-            <div class="stage-num stage-c">C</div>
-            <div>
-              <h4>Commons</h4>
-              <p>Resource Contribution, Shared Services</p>
-            </div>
-          </div>
-          <div class="stage-item">
-            <div class="stage-num stage-d">D</div>
-            <div>
-              <h4>Civilization Tools</h4>
-              <p>Municipal Governance, Public Infrastructure</p>
-            </div>
-          </div>
+          <pre class="terminal-body"><code><span class="t-dim">✓</span> Alice: <span class="t-teal">did:icn:zG3PibF2D8jyyQ17wsFKJZ...</span>
+<span class="t-dim">✓</span> Bob:   <span class="t-teal">did:icn:z7iesUTnpyfhw1wPishDw...</span>
+<span class="t-dim">✓</span> Carol: <span class="t-teal">did:icn:zCUpdSZcQxr217wmLacYMZ...</span>
+
+<span class="t-dim">✓</span> Cooperative created: <span class="t-heading">Finger Lakes Food Co-op</span>
+<span class="t-dim">✓</span> Governance domain:   <span class="t-amber">coop:finger-lakes-food</span>
+<span class="t-dim">✓</span> Bob added  — voting weight <span class="t-green">1.0</span>
+<span class="t-dim">✓</span> Carol added — voting weight <span class="t-green">1.0</span>
+
+<span class="t-dim">✓</span> Charter proposal submitted
+<span class="t-dim">✓</span> Alice: <span class="t-green">FOR</span>  · Bob: <span class="t-green">FOR</span>  · Carol: <span class="t-green">FOR</span>
+<span class="t-dim">✓</span> Charter ratified — <span class="t-amber">3/3 unanimous</span>
+
+<span class="t-dim">✓</span> Bob proposes: <span class="t-heading">Approve $12,000 for kitchen equipment</span>
+<span class="t-dim">✓</span> Alice: <span class="t-green">FOR</span>  · Bob: <span class="t-green">FOR</span>  · Carol: <span class="t-green">FOR</span>
+<span class="t-dim">✓</span> Vote closed by Carol · Outcome: <span class="t-green">ACCEPTED</span>
+
+<span class="t-dim">✓</span> Receipt: <span class="t-purple">9a717129bb8c70a0dd2eec47...</span></code></pre>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Technical Details -->
+  <!-- ═══ THE MEANING FIREWALL ═══════════════════════════════════ -->
   <section class="section">
     <div class="container">
       <div class="section-header">
-        <span class="badge badge-teal">Architecture</span>
-        <h2>28 crates. 3 binaries. Zero central servers.</h2>
-        <p>Core subsystems organized around the Meaning Firewall — kernel enforces mechanisms, apps define meaning.</p>
+        <span class="badge badge-teal">The Architecture</span>
+        <h2>Not a blockchain. Not a server.<br/>A <span class="shimmer-text">coordination substrate.</span></h2>
+        <p>
+          ICN is a P2P daemon. Cooperative apps translate governance into generic constraints.
+          The kernel enforces them without understanding their meaning.
+          This is the <strong style="color: var(--text-heading)">Meaning Firewall</strong>.
+        </p>
       </div>
 
-      <div class="grid grid-2">
-        <div class="card">
-          <h3 style="color: var(--accent-teal)">Kernel (Domain-Agnostic)</h3>
-          <div class="crate-list">
-            <div class="crate-row"><code>icn-core</code> <span>Tokio runtime, supervisor, actor lifecycle</span></div>
-            <div class="crate-row"><code>icn-net</code> <span>QUIC/TLS sessions, mDNS discovery</span></div>
-            <div class="crate-row"><code>icn-gossip</code> <span>Topic-based replication, causal ordering</span></div>
-            <div class="crate-row"><code>icn-gateway</code> <span>REST + WebSocket API</span></div>
-            <div class="crate-row"><code>icn-identity</code> <span>DIDs, Ed25519 keypairs, keystore</span></div>
-            <div class="crate-row"><code>icn-store</code> <span>Persistent KV storage (sled)</span></div>
+      <div class="firewall-diagram">
+        <div class="fw-layer">
+          <div class="fw-box fw-app">
+            <span class="fw-label">CCL Document</span>
+            <span class="fw-desc">constitution · bylaws · treaty · budget</span>
           </div>
         </div>
-
-        <div class="card">
-          <h3 style="color: var(--accent-purple)">Apps (Policy Oracles)</h3>
-          <div class="crate-list">
-            <div class="crate-row"><code>apps/trust</code> <span>Trust graph → rate limits, credit multipliers</span></div>
-            <div class="crate-row"><code>apps/governance</code> <span>GovernanceActor, proposal execution</span></div>
-            <div class="crate-row"><code>apps/ledger</code> <span>Ledger reduction and settlement</span></div>
-            <div class="crate-row"><code>icn-ccl</code> <span>Contract language, interpreter, fuel metering</span></div>
-            <div class="crate-row"><code>icn-compute</code> <span>Trust-gated distributed execution</span></div>
-            <div class="crate-row"><code>icn-federation</code> <span>Inter-cooperative coordination</span></div>
+        <div class="fw-arrow">↓</div>
+        <div class="fw-layer fw-row">
+          <div class="fw-box fw-oracle">
+            <span class="fw-label">Governance</span>
+            <span class="fw-desc">proposals · votes · delegation</span>
+          </div>
+          <div class="fw-box fw-oracle">
+            <span class="fw-label">Trust Graph</span>
+            <span class="fw-desc">attestations · scores · propagation</span>
+          </div>
+          <div class="fw-box fw-oracle">
+            <span class="fw-label">Ledger</span>
+            <span class="fw-desc">mutual credit · treasury · clearing</span>
+          </div>
+        </div>
+        <div class="fw-arrow">↓ <span class="fw-firewall-label">MEANING FIREWALL</span></div>
+        <div class="fw-layer">
+          <div class="fw-box fw-kernel">
+            <span class="fw-label">Kernel</span>
+            <span class="fw-desc">enforces constraints mechanically — no domain semantics</span>
           </div>
         </div>
       </div>
@@ -263,228 +197,256 @@ function fmt(n: number): string {
         <a href="/architecture" class="btn btn-secondary">Full Architecture →</a>
       </div>
     </div>
+  </section>﻿
+  <!-- ═══ FOR DEVELOPERS ════════════════════════════════════════ -->
+  <section class="section-alt">
+    <div class="container">
+      <div class="dev-grid">
+        <div class="dev-text">
+          <span class="badge badge-teal">For Developers</span>
+          <h2>34 crates.<br/>Zero central servers.</h2>
+          <p>
+            ICN is built in Rust — 34 crates, zero central servers.
+            Three binaries: <code>icnd</code> (daemon), <code>icn-cli</code> (tooling), and a gateway.
+            Core subsystems organized around the Meaning Firewall.
+          </p>
+          <div class="crate-table">
+            <div class="crate-section">
+              <div class="crate-section-label teal">Kernel (Domain-Agnostic)</div>
+              <div class="crate-row"><code>icn-core</code><span>Tokio runtime, supervisor, actor lifecycle</span></div>
+              <div class="crate-row"><code>icn-net</code><span>QUIC/TLS sessions, mDNS discovery</span></div>
+              <div class="crate-row"><code>icn-gossip</code><span>Topic-based replication, causal ordering</span></div>
+              <div class="crate-row"><code>icn-identity</code><span>DIDs, Ed25519 keypairs, Age keystore</span></div>
+              <div class="crate-row"><code>icn-gateway</code><span>REST + WebSocket API, static demo UI</span></div>
+            </div>
+            <div class="crate-section">
+              <div class="crate-section-label amber">Apps (Policy Oracles)</div>
+              <div class="crate-row"><code>apps/governance</code><span>Proposals, voting, delegation, receipts</span></div>
+              <div class="crate-row"><code>apps/trust</code><span>Trust graph → rate limits, credit multipliers</span></div>
+              <div class="crate-row"><code>apps/ledger</code><span>Mutual credit, settlement, fork resolution</span></div>
+              <div class="crate-row"><code>icn-ccl</code><span>Contract language, WASM interpreter, fuel</span></div>
+            </div>
+          </div>
+          <div class="dev-ctas">
+            <a href="/docs/GETTING_STARTED" class="btn btn-teal">Quick Start →</a>
+            <a href="/docs/CONTRIBUTING" class="btn btn-ghost">Contributing →</a>
+            <a href="https://github.com/InterCooperative-Network/icn" target="_blank" class="btn btn-ghost">
+              ★ Star on GitHub
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <!-- CTA Section -->
+  <!-- ═══ STAGES (FOR FUNDERS + CO-OPS) ════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <span class="badge badge-purple">Digital Public Infrastructure</span>
+        <h2>Not a startup. Not a protocol.<br/><span class="gradient-text-warm">A cooperative operating system.</span></h2>
+        <p>
+          ICN is designed to replace extractive platforms with cooperative ownership at every layer —
+          from the individual co-op to municipal governance. Four stages, built in sequence.
+        </p>
+      </div>
+
+      <div class="stages-grid">
+        <div class="stage-card stage-active card animate-in">
+          <div class="stage-num stage-a">A</div>
+          <div class="stage-body">
+            <div class="stage-status">
+              <span class="badge badge-green">Active Now</span>
+            </div>
+            <h3>Institution-in-a-Box</h3>
+            <p>One-click cooperative creation. Default charter templates. Membership onboarding. Treasury ledger. Proposal-to-vote loop. The minimum viable institution.</p>
+          </div>
+        </div>
+
+        <div class="stage-card card animate-in animate-delay-1">
+          <div class="stage-num stage-b">B</div>
+          <div class="stage-body">
+            <h3>Federation Layer</h3>
+            <p>Inter-cooperative agreements with treaty-based governance, cross-group trust propagation, and federation clearing for mutual credit networks.</p>
+          </div>
+        </div>
+
+        <div class="stage-card card animate-in animate-delay-2">
+          <div class="stage-num stage-c">C</div>
+          <div class="stage-body">
+            <h3>Compute Commons</h3>
+            <p>Shared compute resources contributed to a commons and allocated via mana. Members contribute hardware; the network rewards them with cooperative capacity.</p>
+          </div>
+        </div>
+
+        <div class="stage-card card animate-in animate-delay-3">
+          <div class="stage-num stage-d">D</div>
+          <div class="stage-body">
+            <h3>Civilization Tools</h3>
+            <p>Municipal governance platforms, participatory budgeting at city scale, public infrastructure coordination, and democratic technology governance.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mt-xl">
+        <a href="/roadmap" class="btn btn-secondary">Full Roadmap →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CTA ═══════════════════════════════════════════════════ -->
   <section class="section-alt">
     <div class="container">
       <div class="cta-box">
-        <h2>Build the cooperative future</h2>
+        <h2>Build the cooperative internet.</h2>
         <p>
-          Contribute to infrastructure that replaces extractive systems with cooperative ownership. 
-          Program your governance, democratize your economics, and own the systems that shape your world.
+          Contribute to infrastructure that replaces extractive systems with cooperative ownership.
+          Program your governance. Democratize your economics. Own the systems that shape your world.
         </p>
         <div class="hero-actions" style="justify-content: center;">
           <a href="/docs/GETTING_STARTED" class="btn btn-primary">Get Started →</a>
           <a href="/docs/CONTRIBUTING" class="btn btn-secondary">Contribute →</a>
-          <a href="https://github.com/InterCooperative-Network/icn" target="_blank" class="btn btn-ghost">Star on GitHub ★</a>
+          <a href="https://github.com/InterCooperative-Network/icn" target="_blank" class="btn btn-ghost">Star on GitHub ☆</a>
         </div>
-        <p class="sync-note">
-          Stats synced from repository on {new Date(stats.syncedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · 
-          Latest commit: <a href={`https://github.com/InterCooperative-Network/icn/commit/${stats.latestCommitFull}`} target="_blank"><code>{stats.latestCommit}</code></a>
-        </p>
       </div>
     </div>
   </section>
-</Layout>
-
+</Layout>﻿
 <style>
-  /* Architecture diagram */
-  .arch-diagram {
-    max-width: 600px;
-    margin: 0 auto;
-  }
+/* Hero */
+.relative { position: relative; }
+.overflow-hidden { overflow: hidden; }
+.absolute { position: absolute; }
+.inset-0 { inset: 0; }
+.z-0 { z-index: 0; }
+.z-10 { z-index: 10; }
+.pointer-events-auto { pointer-events: auto; }
+.pointer-events-none { pointer-events: none; }
+.badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-teal); display: inline-block;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
 
-  .arch-layer {
-    display: flex;
-    justify-content: center;
-  }
+.hero-bg-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(45,212,191,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45,212,191,.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
+  pointer-events: none;
+}
 
-  .arch-box {
-    background: var(--bg-card);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    padding: var(--space-lg) var(--space-xl);
-    text-align: center;
-    width: 100%;
-    transition: all var(--duration-normal) var(--ease-out);
-  }
+/* Use cases */
+.card-icon { font-size: 2rem; margin-bottom: var(--space-md); }
+.card-footer { margin-top: var(--space-md); display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+.tech-pill {
+  font-size: .6875rem; font-family: var(--font-mono);
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 999px; padding: .2em .6em; color: var(--text-muted);
+}
 
-  .arch-box:hover {
-    transform: translateY(-2px);
-  }
+/* Demo callout */
+.demo-callout {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: var(--space-3xl); align-items: center;
+}
+.demo-text { display: flex; flex-direction: column; gap: var(--space-lg); }
+.demo-text h2 { margin: 0; }
+.demo-text > p { margin: 0; }
+.demo-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+.demo-note { font-size: .875rem; color: var(--text-muted); margin: 0; }
 
-  .arch-box.accent-purple { border-left: 3px solid var(--accent-purple); }
-  .arch-box.accent-blue { border-left: 3px solid var(--accent-blue); }
-  .arch-box.accent-teal { border-left: 3px solid var(--accent-teal); }
-  .arch-box.accent-amber { border-left: 3px solid var(--accent-amber); }
+.demo-terminal {
+  background: var(--bg-code); border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl); overflow: hidden;
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(45,212,191,.06);
+}
+.terminal-header {
+  display: flex; align-items: center; gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255,255,255,.04); border-bottom: 1px solid var(--border-subtle);
+}
+.terminal-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+}
+.terminal-dot.red { background: #ff5f57; }
+.terminal-dot.yellow { background: #ffbd2e; }
+.terminal-dot.green { background: #28ca41; }
+.terminal-title { font-size: .75rem; color: var(--text-muted); margin-left: auto; font-family: var(--font-mono); }
+.terminal-body {
+  margin: 0; padding: var(--space-lg); border: none; border-radius: 0;
+  font-size: .8rem; line-height: 1.9; overflow-x: auto;
+}
+.t-dim { color: var(--text-muted); }
+.t-teal { color: var(--accent-teal); }
+.t-amber { color: var(--accent-amber); }
+.t-green { color: var(--accent-green); }
+.t-purple { color: var(--accent-purple); }
+.t-heading { color: var(--text-heading); }
 
-  .arch-label {
-    display: block;
-    font-family: var(--font-heading);
-    font-weight: 700;
-    font-size: 1.125rem;
-    color: var(--text-heading);
-  }
+/* Meaning Firewall */
+.firewall-diagram { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 0; }
+.fw-layer { display: flex; justify-content: center; }
+.fw-row { gap: var(--space-md); }
+.fw-box {
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); padding: var(--space-lg) var(--space-xl);
+  text-align: center; flex: 1;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+.fw-box:hover { transform: translateY(-2px); }
+.fw-app { border-left: 3px solid var(--accent-purple); }
+.fw-oracle { border-left: 3px solid var(--accent-amber); }
+.fw-kernel { border-left: 3px solid var(--accent-teal); }
+.fw-label { display: block; font-family: var(--font-heading); font-weight: 700; font-size: 1.0625rem; color: var(--text-heading); }
+.fw-desc { display: block; font-size: .75rem; color: var(--text-muted); margin-top: var(--space-xs); }
+.fw-arrow { text-align: center; font-size: 1.5rem; color: var(--text-muted); padding: var(--space-sm) 0; display: flex; align-items: center; justify-content: center; gap: var(--space-md); }
+.fw-firewall-label { font-size: .6875rem; font-family: var(--font-mono); letter-spacing: .15em; color: var(--accent-amber); text-transform: uppercase; }
 
-  .arch-desc {
-    display: block;
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    margin-top: var(--space-xs);
-  }
+/* Developer section */
+.dev-grid { max-width: 800px; }
+.crate-table { margin-top: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-xl); }
+.crate-section { display: flex; flex-direction: column; gap: var(--space-sm); }
+.crate-section-label { font-size: .6875rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; margin-bottom: var(--space-xs); }
+.crate-section-label.teal { color: var(--accent-teal); }
+.crate-section-label.amber { color: var(--accent-amber); }
+.crate-row { display: flex; gap: var(--space-md); align-items: baseline; font-size: .875rem; }
+.crate-row code { font-size: .8125rem; white-space: nowrap; flex-shrink: 0; }
+.crate-row span { color: var(--text-muted); }
+.dev-ctas { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-xl); }
 
-  .arch-arrow {
-    text-align: center;
-    font-size: 1.5rem;
-    color: var(--text-muted);
-    padding: var(--space-sm) 0;
-  }
+/* Stages */
+.stages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-lg); }
+.stage-card { display: flex; gap: var(--space-md); align-items: flex-start; }
+.stage-active { border-color: rgba(74,222,128,0.3); background: linear-gradient(135deg, var(--bg-card), rgba(74,222,128,0.04)); }
+.stage-num {
+  width: 44px; height: 44px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; flex-shrink: 0;
+}
+.stage-a { background: var(--accent-green-glow); color: var(--accent-green); }
+.stage-b { background: rgba(56,189,248,.12); color: var(--accent-blue); }
+.stage-c { background: rgba(167,139,250,.12); color: var(--accent-purple); }
+.stage-d { background: var(--accent-amber-glow); color: var(--accent-amber); }
+.stage-body { display: flex; flex-direction: column; gap: var(--space-xs); }
+.stage-status { margin-bottom: var(--space-xs); }
+.stage-body h3 { font-size: 1.0625rem; margin: 0; }
+.stage-body p { font-size: .875rem; margin: 0; }
 
-  /* Card icon */
-  .card-icon {
-    font-size: 2rem;
-    margin-bottom: var(--space-md);
-  }
+/* CTA */
+.cta-box { text-align: center; max-width: 700px; margin: 0 auto; }
+.cta-box h2 { margin-bottom: var(--space-md); }
+.cta-box > p { margin: 0 auto var(--space-xl); font-size: 1.125rem; }
 
-  /* Vision grid */
-  .vision-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3xl);
-    align-items: center;
-  }
-
-  .vision-content p {
-    margin-top: var(--space-md);
-    font-size: 1.0625rem;
-  }
-
-  .vision-stages {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
-  }
-
-  .stage-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-lg);
-    padding: var(--space-lg);
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-subtle);
-    transition: all var(--duration-normal) var(--ease-out);
-  }
-
-  .stage-item:hover {
-    border-color: var(--border-accent);
-    transform: translateX(4px);
-  }
-
-  .stage-num {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-heading);
-    font-weight: 800;
-    font-size: 1.125rem;
-    flex-shrink: 0;
-  }
-
-  .stage-a { background: var(--accent-teal-glow); color: var(--accent-teal); }
-  .stage-b { background: rgba(56, 189, 248, 0.12); color: var(--accent-blue); }
-  .stage-c { background: rgba(167, 139, 250, 0.12); color: var(--accent-purple); }
-  .stage-d { background: rgba(251, 191, 36, 0.12); color: var(--accent-amber); }
-
-  .stage-item h4 {
-    font-size: 1rem;
-    margin-bottom: 2px;
-  }
-
-  .stage-item p {
-    font-size: 0.8125rem;
-    margin: 0;
-  }
-
-  /* Crate list */
-  .crate-list {
-    margin-top: var(--space-md);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .crate-row {
-    display: flex;
-    gap: var(--space-md);
-    align-items: baseline;
-    font-size: 0.875rem;
-  }
-
-  .crate-row code {
-    font-size: 0.8125rem;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .crate-row span {
-    color: var(--text-muted);
-  }
-
-  /* CTA */
-  .cta-box {
-    text-align: center;
-    max-width: 700px;
-    margin: 0 auto;
-  }
-
-  .cta-box h2 {
-    margin-bottom: var(--space-md);
-  }
-
-  .cta-box > p {
-    margin: 0 auto var(--space-xl);
-    font-size: 1.125rem;
-  }
-
-  .sync-note {
-    margin-top: var(--space-xl);
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-
-  .badge-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent-teal);
-    display: inline-block;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  /* Hero background grid */
-  .hero-bg-grid {
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(45, 212, 191, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(45, 212, 191, 0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
-    mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
-    -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, black 20%, transparent 70%);
-    pointer-events: none;
-  }
-
-  @media (max-width: 768px) {
-    .vision-grid { grid-template-columns: 1fr; }
-  }
+@media (max-width: 1000px) {
+  .stages-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .demo-callout { grid-template-columns: 1fr; }
+  .stages-grid { grid-template-columns: 1fr; }
+}
 </style>
