@@ -367,7 +367,7 @@ When the active scope changes, the charter determines what the member sees and c
 ### What the charter controls (from `icn-governance` crate)
 
 ```toml
-# Example: charters/worker-coop.toml
+# Example: contracts/templates/worker-coop.yaml
 [membership]
 admission = "application_plus_vote"
 quorum = "two_thirds"
@@ -408,7 +408,7 @@ The mobile app does NOT hardcode governance semantics. It reads charter configur
 
 ### Charter fallback
 
-If charter templates are not yet deployed (Phase 2 Track A incomplete), the app falls back to a default governance profile:
+**Charter templates are deployed as of Phase 1 complete (2026-03-18).** Five templates exist at `contracts/templates/` (worker-coop, consumer-coop, housing-coop, community-org, federation). The ratification flow (`ProposalPayload::Charter`, PRs #1336+#1337) is merged. If a cooperative has not yet ratified a charter, the app falls back to a default governance profile:
 - Simple majority voting
 - Standard proposal types (text, budget, membership, config_change)
 - No patronage tracking
@@ -708,4 +708,4 @@ If state changes before sync (e.g., proposal amended while offline vote is pendi
 
 ---
 
-*Spec generated 2026-03-18. Update when charter templates ship (Phase 2 Track A), when gateway scopes are expanded (treasury:read/write), or when mobile implementation reveals missing assumptions.*
+*Spec generated 2026-03-18. Updated 2026-03-18: charter templates shipped (Phase 1 complete, PRs #1336+#1337). Next update triggers: gateway scope expansion (treasury:read/write), mobile implementation reveals missing assumptions.*
