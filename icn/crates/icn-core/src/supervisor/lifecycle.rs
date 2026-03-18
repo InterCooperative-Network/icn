@@ -274,6 +274,16 @@ async fn spawn_actors_with_identity(
         );
     }
 
+    // Register charter oracle with OracleRegistry if available (Phase 1 charter engine).
+    if let Some(charter_oracle) = service_registry.and_then(|r| r.charter_oracle().cloned()) {
+        let charter_domain = charter_oracle.domain();
+        oracle_registry.register(charter_domain.clone(), charter_oracle);
+        info!(
+            "Registered CharterPolicyOracle with OracleRegistry for domain '{}'",
+            charter_domain
+        );
+    }
+
     // Transition to CoreApps phase: first-party oracles are registered.
     oracle_registry.set_phase(icn_kernel_api::bootstrap::BootstrapPhase::CoreApps);
     info!("OracleRegistry phase: CoreApps");
