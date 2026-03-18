@@ -693,6 +693,21 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             let new_config = serde_json::json!({ key: value }).to_string();
             ProposalPayload::ConfigChange { new_config }
         }
+        ProposalPayloadRequest::Charter {
+            charter_id,
+            charter_yaml,
+        } => {
+            if charter_id.is_empty() || charter_id.trim().is_empty() {
+                return Err(err_bad("Charter ID cannot be empty"));
+            }
+            if charter_yaml.is_empty() || charter_yaml.trim().is_empty() {
+                return Err(err_bad("Charter YAML cannot be empty"));
+            }
+            ProposalPayload::Charter {
+                charter_id: charter_id.clone(),
+                charter_yaml: charter_yaml.clone(),
+            }
+        }
     };
 
     let scope = match req.scope {
@@ -724,6 +739,7 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         ProposalPayloadRequest::Budget { .. } => "budget",
         ProposalPayloadRequest::Membership { .. } => "membership",
         ProposalPayloadRequest::ConfigChange { .. } => "config_change",
+        ProposalPayloadRequest::Charter { .. } => "charter",
     };
 
     ctx.emitter.emit_proposal_created(
@@ -997,6 +1013,19 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         icn_governance::ProposalState::NoQuorum { .. } => "no_quorum",
         _ => "unknown",
     };
+
+    // On charter acceptance: deploy the document to the charter policy oracle.
+    if outcome == "accepted" {
+        if let icn_governance::ProposalPayload::Charter {
+            ref charter_id,
+            ref charter_yaml,
+        } = proposal.payload
+        {
+            if let Some(hook) = &ctx.on_charter_accepted {
+                hook(charter_id.clone(), charter_yaml.clone());
+            }
+        }
+    }
 
     ctx.emitter
         .emit_proposal_closed(&proposal_id.0, &proposal.domain_id.0, outcome);

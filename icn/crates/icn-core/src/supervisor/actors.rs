@@ -27,6 +27,9 @@ pub struct GatewayActorHandles {
     pub service_discovery_manager:
         Option<Arc<icn_gateway::service_discovery_mgr::ServiceDiscoveryManager>>,
     pub naming_service: Option<Arc<dyn icn_kernel_api::naming::NamingService>>,
+    /// Hook invoked when a Charter proposal is accepted.
+    /// Type-erased so `icn-core` stays domain-agnostic.
+    pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
 }
 
 /// Core actor handles returned from initialization
@@ -104,4 +107,8 @@ pub struct BootstrapHandles {
     /// Factory for creating the governance effect subscription.
     /// When provided, the supervisor uses this instead of calling `icn_governance_actor` directly.
     pub effect_subscription_factory: Option<EffectSubscriptionFactory>,
+    /// Hook invoked when a Charter proposal is accepted.
+    /// Type-erased so `icn-core` stays domain-agnostic (no `icn-charter-app` import).
+    /// The daemon builds this closure from `Arc<CharterPolicyOracle>`.
+    pub charter_accepted_hook: Option<Arc<dyn Fn(String, String) + Send + Sync>>,
 }

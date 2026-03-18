@@ -242,10 +242,36 @@ async fn build_services(
     tracing::info!("Ledger service initialized from apps/ledger");
 
     // Create CharterPolicyOracle from apps/charter (Phase 1 charter engine).
-    // Starts empty; charters are deployed at runtime via the charter API.
-    let charter_oracle = icn_charter_app::create_oracle();
-    registry = registry.with_charter_oracle(charter_oracle);
+    // Starts empty; charters are deployed at runtime via governance ratification.
+    // We hold the concrete Arc<CharterPolicyOracle> so the gateway can wire its
+    // on_charter_accepted hook to it; the kernel sees only the dyn PolicyOracle view.
+    let charter_oracle = Arc::new(icn_charter_app::CharterPolicyOracle::new());
+    registry =
+        registry.with_charter_oracle(
+            charter_oracle.clone() as Arc<dyn icn_kernel_api::authz::PolicyOracle>
+        );
     tracing::info!("Charter oracle initialized from apps/charter");
+
+    // Build charter ratification hook: when a Charter proposal is accepted the governance
+    // handler calls this closure with (charter_id, charter_yaml).  We parse the YAML here
+    // and deploy into the oracle so subsequent CCL evaluations use the new charter.
+    let oracle_for_hook = charter_oracle.clone();
+    let charter_accepted_hook: Arc<dyn Fn(String, String) + Send + Sync> = Arc::new(
+        move |charter_id, yaml| match icn_ccl::schema::CclDocument::from_yaml(&yaml) {
+            Ok(doc) => {
+                let ctx = icn_ccl::schema::bridge::CharterContext::new().with_members(100);
+                oracle_for_hook.deploy_charter(charter_id.clone(), doc, ctx);
+                tracing::info!("Charter '{}' deployed via ratification", charter_id);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Charter ratification: failed to parse YAML for '{}': {}",
+                    charter_id,
+                    e
+                );
+            }
+        },
+    );
 
     let bootstrap_handles = icn_core::supervisor::BootstrapHandles {
         ledger: ledger_handle,
@@ -261,6 +287,7 @@ async fn build_services(
                 effect_callback(effects, receipt_id);
             })
         })),
+        charter_accepted_hook: Some(charter_accepted_hook),
     };
 
     Ok((registry, Some(bootstrap_handles)))

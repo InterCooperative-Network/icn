@@ -122,6 +122,7 @@ pub async fn run_supervisor(
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
             naming_service: gateway_handles.naming_service,
+            charter_accepted_hook: gateway_handles.charter_accepted_hook,
         },
     );
 
@@ -331,6 +332,7 @@ async fn spawn_actors_with_identity(
     let contract_actor_handle = handles.contract_actor;
     let protocol_parameter_store_from_daemon = handles.protocol_parameter_store;
     let effect_subscription_factory = handles.effect_subscription_factory;
+    gateway_handles.charter_accepted_hook = handles.charter_accepted_hook;
 
     // Wire runtime handles into the pre-initialized Ledger.
     // These depend on gossip/trust which are only available after gossip init.
