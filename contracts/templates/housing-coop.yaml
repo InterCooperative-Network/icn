@@ -1,0 +1,87 @@
+schema_version: v0
+
+# Harbor Homes Housing Cooperative
+# Template for limited-equity housing cooperatives with multi-stakeholder
+# membership. Capital expenditures require supermajority to protect tenants.
+
+entity:
+  name: "Harbor Homes Housing Cooperative"
+  type: cooperative
+  subtype: multi_stakeholder
+  membership:
+    open_to: [individual]
+    classes:
+      - name: resident_owner
+        default: true
+        criteria:
+          all:
+            - field: equity_paid
+              op: ">="
+              value: 500
+            - field: occupancy_agreement_signed
+              op: "=="
+              value: true
+    rights_by_class:
+      resident_owner: [vote, run_for_board, propose, access_resources]
+
+governance:
+  bodies:
+    - name: tenant_assembly
+      composition: all_members
+      convenes:
+        regular: quarterly
+        special:
+          trigger: emergency
+
+    - name: board
+      seats: 5
+      elected_by: tenant_assembly
+      term:
+        years: 2
+        staggered: false
+      recall:
+        petition: "0.25 * members"
+        vote: simple_majority
+
+  decisions:
+    - name: ordinary
+      authority: tenant_assembly
+      threshold: simple_majority
+      quorum: "0.25 * members"
+
+    - name: capital_expenditure
+      authority: tenant_assembly
+      threshold: supermajority
+      quorum: "0.33 * members"
+
+  delegation:
+    allowed: true
+    transitive: false
+    revocable: instant
+    scope: [vote]
+
+economics:
+  capital:
+    member_equity:
+      minimum: 500
+      interest_rate: 0.0
+      refund_on_exit:
+        full: true
+        within:
+          days: 180
+
+  credit:
+    eligibility:
+      field: membership_months
+      op: ">="
+      value: 6
+    limit: "min(2000, patronage * 0.4)"
+    terms: net60
+
+  surplus:
+    allocation:
+      - target: reserves
+        fraction: "0.40"
+        until: "reserves >= 12 * monthly_operating"
+      - target: community_fund
+        fraction: "0.60"

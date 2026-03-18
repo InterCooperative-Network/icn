@@ -1332,6 +1332,9 @@ pub struct ServiceRegistry {
     proposal_executor: Option<Arc<dyn ProposalExecutor>>,
     ledger: Option<Arc<dyn LedgerService>>,
     cell: Option<Arc<dyn CellService>>,
+    /// Charter oracle — Phase 1 charter engine.
+    /// Holds an `Arc<dyn PolicyOracle>` directly (no full service trait yet).
+    charter_oracle: Option<Arc<dyn PolicyOracle>>,
 }
 
 impl Default for ServiceRegistry {
@@ -1350,6 +1353,7 @@ impl ServiceRegistry {
             proposal_executor: None,
             ledger: None,
             cell: None,
+            charter_oracle: None,
         }
     }
 
@@ -1389,6 +1393,12 @@ impl ServiceRegistry {
         self
     }
 
+    /// Register the charter oracle (Phase 1 charter engine).
+    pub fn with_charter_oracle(mut self, oracle: Arc<dyn PolicyOracle>) -> Self {
+        self.charter_oracle = Some(oracle);
+        self
+    }
+
     /// Get the trust service (if registered)
     pub fn trust(&self) -> Option<&Arc<dyn TrustService>> {
         self.trust.as_ref()
@@ -1417,6 +1427,11 @@ impl ServiceRegistry {
     /// Get the cell service (if registered)
     pub fn cell(&self) -> Option<&Arc<dyn CellService>> {
         self.cell.as_ref()
+    }
+
+    /// Get the charter oracle (if registered)
+    pub fn charter_oracle(&self) -> Option<&Arc<dyn PolicyOracle>> {
+        self.charter_oracle.as_ref()
     }
 }
 

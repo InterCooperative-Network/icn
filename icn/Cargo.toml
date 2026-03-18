@@ -35,6 +35,7 @@ members = [
     "crates/icn-api",
     "crates/icn-naming",
     "crates/icn-authz",
+    "apps/charter",
     "apps/governance",
     "apps/membership",
     "apps/ledger",

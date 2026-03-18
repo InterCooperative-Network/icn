@@ -1,0 +1,26 @@
+[package]
+name = "icn-charter-app"
+version = "0.1.0"
+edition = "2021"
+description = "Charter app — YAML charter documents produce kernel-enforced constraints"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Kernel API for PolicyOracle trait and types
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
+
+# CCL schema + bridge (charter_to_constraints, CharterContext, CclDocument)
+icn-ccl = { path = "../../crates/icn-ccl" }
+
+# Sync primitives (PolicyOracle::evaluate() is synchronous)
+parking_lot = "0.12"
+
+# Error handling
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+[lints]
+workspace = true

@@ -1,0 +1,110 @@
+schema_version: v0
+
+# Finger Lakes Cooperative Development Network
+# Template for federations of cooperatives with delegate governance,
+# treaty-level decisions, and inter-cooperative settlement.
+
+entity:
+  name: "Finger Lakes Cooperative Development Network"
+  type: federation
+  subtype: geographic
+  jurisdiction:
+    type: geographic
+    bounds: "Finger Lakes Region, NY"
+  membership:
+    open_to: [cooperative, community]
+    classes:
+      - name: member_cooperative
+        default: true
+        criteria:
+          all:
+            - field: signed_membership_agreement
+              op: "=="
+              value: true
+            - field: equity_paid
+              op: ">="
+              value: 1000
+
+    rights_by_class:
+      member_cooperative: [vote, propose, access_resources, patronage_refund]
+
+governance:
+  bodies:
+    - name: general_assembly
+      composition: all_members
+      convenes:
+        regular: annually
+        special:
+          trigger: petition
+          threshold: "0.25 * members"
+
+    - name: delegate_council
+      elected_by: general_assembly
+      term:
+        years: 2
+        staggered: true
+      recall:
+        petition: "0.33 * members"
+        vote: simple_majority
+
+  decisions:
+    - name: ordinary
+      authority: delegate_council
+      threshold: simple_majority
+      quorum: "0.50 * members"
+
+    - name: treaty
+      authority: general_assembly
+      threshold: supermajority
+      quorum: "0.67 * members"
+      ratification_period:
+        days: 90
+
+  delegation:
+    allowed: true
+    transitive: false
+    revocable: instant
+    scope: [vote, propose]
+
+economics:
+  credit:
+    eligibility:
+      field: membership_months
+      op: ">="
+      value: 12
+    limit: "min(5000, patronage * 0.5)"
+    terms: net60
+
+  surplus:
+    allocation:
+      - target: reserves
+        fraction: "0.25"
+        until: "reserves >= 6 * monthly_operating"
+      - target: community_fund
+        fraction: "0.50"
+      - target: patronage_refund
+        fraction: "0.25"
+        proportional_to: purchases
+
+agreement:
+  name: "Finger Lakes CDN Membership Agreement"
+  parties:
+    - type: cooperative
+      id: "did:icn:member-coop"
+    - type: community
+      id: "did:icn:member-community"
+  boundary:
+    transfers:
+      allowed: true
+      settlement:
+        cycle: monthly
+        method: net_settlement
+  disputes:
+    ladder:
+      - stage: mediation
+        binding: false
+      - stage: arbitration
+        binding: true
+  exit:
+    notice_period:
+      days: 90

@@ -241,6 +241,12 @@ async fn build_services(
     .context("Failed to initialize ledger services")?;
     tracing::info!("Ledger service initialized from apps/ledger");
 
+    // Create CharterPolicyOracle from apps/charter (Phase 1 charter engine).
+    // Starts empty; charters are deployed at runtime via the charter API.
+    let charter_oracle = icn_charter_app::create_oracle();
+    registry = registry.with_charter_oracle(charter_oracle);
+    tracing::info!("Charter oracle initialized from apps/charter");
+
     let bootstrap_handles = icn_core::supervisor::BootstrapHandles {
         ledger: ledger_handle,
         ledger_store,
